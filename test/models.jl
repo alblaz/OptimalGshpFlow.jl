@@ -77,6 +77,11 @@ evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
 x, Tc, Th = temperatureprofiles(evaporator_solution; n = 11)
 
+W  = compressor_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+
+
+
 # using WGLMakie
 # fig = Figure(; size = (600, 400))
 # ax = Axis(fig[1, 1], xlabel = "x")
@@ -91,6 +96,7 @@ borehole = SingleUPipeBorehole(H = 100., D = 4., λg = 3., pipe_position = ((0.0
 Tin, Tb  = 273.15, 278.15
 Vs = evaporator.Vs
 param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
+
 
 u0 = [275.]
 prob = NonlinearProblem(borehole_model!,u0,param_borehole_prototype,abstol = 1e-9)  
