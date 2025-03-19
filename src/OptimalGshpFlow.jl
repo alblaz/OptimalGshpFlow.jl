@@ -4,7 +4,7 @@ using CoolProp, Interpolations
 # Write your package code here.
 using StaticArrays, Parameters, ExponentialUtilities
 using RequiredInterfaces
-
+using LambertW
 
 include("utilities.jl")
 export linearmap_01_to_ab, linearmap_ab_to_01
@@ -26,6 +26,7 @@ include("heatexchanger.jl")
 include("pipeflow.jl")
 include("models.jl")
 include("compressor.jl")
+include("pressuredrop.jl")
 
 # from "solutiontypes.jl"
 export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBoreholeSolution
@@ -51,5 +52,6 @@ export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporato
 export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
 
 export compressor_power, condenser_power
+export pressure_drop, pumping_power
 
 end
