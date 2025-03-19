@@ -26,13 +26,14 @@ struct EvaporatorDesign{T <: Number}
     A::T
     U::T
     hei::T
+    ΔT_sup::T
 end
 
-function EvaporatorDesign(Q2nom,Te,Tc, refrigerant,secondaryfluid; U =2000., ΔTs = 3., ΔT_l = 1.5)
-    A,Vref,Vsf,hei = evaporator_design(Q2nom,Te,Tc, refrigerant,secondaryfluid; U =U, ΔTsf = ΔTs, ΔT_l = ΔT_l)
+function EvaporatorDesign(Q2nom,Te,Tc, refrigerant,secondaryfluid; U =2000., ΔTs = 3., ΔT_l = 1.5, ΔT_sub=5., ΔT_sup=5., ηᵥ=0.95)
+    A,Vref,Vsf,hei = evaporator_design(Q2nom,Te,Tc, refrigerant,secondaryfluid; U =U, ΔTsf = ΔTs, ΔT_l = ΔT_l, ΔT_sub=ΔT_sub, ΔT_sup=ΔT_sup, ηᵥ=ηᵥ)
     Thl = Te + ΔT_l
     Thh = Thl + ΔTs
-    return EvaporatorDesign(Q2nom, refrigerant, Vref, Te, secondaryfluid, Vsf, Thh, Thl, A, U, hei)
+    return EvaporatorDesign(Q2nom, refrigerant, Vref, Te, secondaryfluid, Vsf, Thh, Thl, A, U, hei, ΔT_sup)
 end
 
 
