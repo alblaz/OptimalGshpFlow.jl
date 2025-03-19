@@ -25,6 +25,7 @@ include("solutiontypes.jl")
 include("heatexchanger.jl")
 include("pipeflow.jl")
 include("models.jl")
+include("compressor.jl")
 
 # from "solutiontypes.jl"
 export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBoreholeSolution
@@ -48,5 +49,7 @@ export EvaporatorDesign
 # include("models.jl")
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!
 export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
+
+export compressor_power, condenser_power
 
 end
