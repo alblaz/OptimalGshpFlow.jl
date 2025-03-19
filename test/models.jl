@@ -87,11 +87,12 @@ Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
 # ax = Axis(fig[1, 1], xlabel = "x")
 # lines!(ax, x, Tc)
 # lines!(ax, x, Th)
+# fig
 
 ##################
 # borehole model #
 ##################
-borehole = SingleUPipeBorehole(H = 100., D = 4., λg = 3., pipe_position = ((0.04, 0.0), (-0.04, 0.0)))
+borehole = SingleUPipeBorehole(H = 200., D = 4., λg = 3., pipe_position = ((0.04, 0.0), (-0.04, 0.0)))
 λground = 3.5
 Tin, Tb  = 273.15, 278.15
 Vs = evaporator.Vs
@@ -119,8 +120,11 @@ sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
 
 
-
-
+# compute pumping power in the broehole
+@unpack rpi, H = evaporatorborehole_solution.borehole.borehole
+@unpack Tin, Tout = evaporatorborehole_solution.borehole
+@unpack Vc = evaporatorborehole_solution.evaporator.superheat_region
+Ppump = pumping_power(0.4, H, Vc ,2rpi, secondaryfluid, (Tin + Tout)/2 )
 
 
 
