@@ -25,16 +25,18 @@ include("plateheatexchanger.jl")
 export PlateHeatExchanger, h_platehex_wanniarachchi
 
 include("evaporatordesign.jl")
-export EvaporatorDesign, evaporator_design
+export EvaporatorDesign 
+#export evaporator_design
 
 include("borehole.jl")
-export Borehole, SingleUPipeBorehole, uniform_Tb_coeffs
+export Borehole, SingleUPipeBorehole
+#export uniform_Tb_coeffs
 
 include("solutiontypes.jl")
 export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBoreholeSolution
 
 include("models.jl")
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!
-
+export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
 
 end

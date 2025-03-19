@@ -29,7 +29,7 @@ evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
 # preparation phase #
 #####################
 
-using OptimalGshpFlow, CoolProp, NonlinearSolve
+using OptimalGshpFlow, CoolProp, NonlinearSolve, Parameters
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
 evaporator = EvaporatorDesign(2000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
@@ -43,28 +43,36 @@ refrigerant = Refrigerant(refrigerant_name)
 plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
 
 
-
 ####################
 # evaporator model #
 ####################
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Tsf_h = 278.;
+Ts_h = 278.;
 
-p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
+# p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
+
+param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid, plateheatexchanger=plateheatexchanger, 
+                                        hei = evaporator.hei, Vs = evaporator.Vs, Vref = evaporator.Vref, 
+                                        ΔTsup =  ΔTsup, Ts_h = Ts_h)
+
+# you can use the template and just change one or two parameters instead of redifining everything all the time
+# p2_ev = EvaporatorParameters(param_evaporator_prototype, Vs = 2*evaporator.Vs)
+                                        
+# @unpack plateheatexchanger = param_evaporator_prototype                           
 
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
 ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
 xms = tanhmap_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
-Tsf_l, Tsf_m = Tsf_h - 4, Tsf_h - 2
+Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 
-u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m]
 
-prob = NonlinearProblem(evaporator_model!,u0,p,abstol = 1e-7)  
+prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol = 1e-7)  
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
-evaporator_solution = evaporator_model(sol.u,p)
+evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
 
 ##################
@@ -74,9 +82,10 @@ borehole = SingleUPipeBorehole(H = 100., D = 4., λg = 3., pipe_position = ((0.0
 λground = 3.5
 Tin, Tb  = 273.15, 278.15
 Vs = evaporator.Vs
-p = secondaryfluid, Vs, Tin, borehole, λground, Tb 
+param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
+
 u0 = [275.]
-prob = NonlinearProblem(borehole_model!,u0,p,abstol = 1e-9)  
+prob = NonlinearProblem(borehole_model!,u0,param_borehole_prototype,abstol = 1e-9)  
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 
 
@@ -85,11 +94,20 @@ sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 #############################
 # The model evaporatorborehole_model! combine the models above by imposing Tin = Ts_l and Tout = Ts_h
 
-p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, bh, λground , Tb
-u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h]
-prob = NonlinearProblem(evaporatorborehole_model!,u0,p,abstol = 1e-7) 
+param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid, plateheatexchanger=plateheatexchanger, 
+                                        hei = evaporator.hei, Vs = evaporator.Vs, Vref = evaporator.Vref, 
+                                        ΔTsup =  ΔTsup, 
+                                        borehole=borehole, λground=λground, Tb=Tb)
+
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h]
+prob = NonlinearProblem(evaporatorborehole_model!,u0,param_evaporatorborehole_prototype,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
-evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
+evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
+
+
+
+
+
 
 
 

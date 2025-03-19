@@ -85,11 +85,12 @@ Constructor
 - `Qb`: Heat exchnaged in the borehole
 - `Rbstar`: Effective borehole resistance
 """
-function BoreholeSolution(borehole, λground,Tin,Tout,Tb,Vs,properties)
+function BoreholeSolution(borehole,λground,Tin,Tout,Tb,Vs,properties)
     ρ = properties.ρ((Tin+Tout)/2)
-    c = properties.cp((Tin+Tout)/2)
-    Qb = ρ*cp*Vs(Tout - Tin)
-    Rbstar = ((Tin+Tout)/2 - Tb)/(Qb*borehole.H)
+    cp = properties.cp((Tin+Tout)/2)
+    Cs = ρ*cp*Vs
+    Qb = Cs*(Tout - Tin)
+    Rbstar = (Tb - (Tin+Tout)/2 )/(Qb/borehole.H)
     return BoreholeSolution(borehole, λground, Tin, Tout, Tb, Vs, Cs, Qb, Rbstar)
 end
 
