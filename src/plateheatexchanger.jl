@@ -29,7 +29,7 @@ PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 """
 function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
     np =  round(Int, A/(L*W)/ϕ) + 2        # number of plates
-    H = (np-1)/2 * b                  # total height of the secondary fluid channels 
+    H = (np-1)/2 * b                       # total height of the secondary fluid channels 
     return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β)
 end
 

@@ -4,21 +4,21 @@ Sort of a unified interface/procedure to compute the solution for these three sy
 
 EVAPORATOR MODEL
 p = refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h
-u0 = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
 prob = NonlinearProblem(evaporator_model!,u0,p,abstol = 1e-7)  #with evaporator_model!(du,u,p) 
 @time sol = solve(prob, TrustRegion(); abstol = 1e-9) 
 evaporator_solution = evaporator_model(sol.u,p)
 
 BOREHOLE MODEL
 p = secondaryfluid, Vs, Tin, borehole, λg, Tb
-u0 = Tout
+u0 = [Tout]
 prob = NonlinearProblem(borehole_model!,u0,p,abstol = 1e-7)  
 sol = solve(prob, TrustRegion(); abstol = 1e-9) 
 borehole_solution = borehole_model(u,p)
 
 EVAPORATORBOREHOLE MODEL
 p = refrigerant, secondaryfluid, plateheatexchanger, borehole, hei, Vs, Vref, ΔTsup, borehole, λg, Tb
-u0 = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h]
 prob = NonlinearProblem(evaporatorborehole_model,u0,p,abstol = 1e-7)  #with evaporatorborehole_model(du,u,p) 
 @time sol = solve(prob)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
@@ -29,7 +29,8 @@ evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
 # preparation phase #
 #####################
 
-using OptimalGshpFlow, CoolProp, NonlinearSolve, Parameters
+using OptimalGshpFlow, CoolProp, Parameters
+# using NonlinearSolve, WGLMakie # This two packages are not dependencies so I load them from a separate environment.
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
 evaporator = EvaporatorDesign(2000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
@@ -74,6 +75,13 @@ prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
+x, Tc, Th = temperatureprofiles(evaporator_solution; n = 11)
+
+# using WGLMakie
+# fig = Figure(; size = (600, 400))
+# ax = Axis(fig[1, 1], xlabel = "x")
+# lines!(ax, x, Tc)
+# lines!(ax, x, Th)
 
 ##################
 # borehole model #

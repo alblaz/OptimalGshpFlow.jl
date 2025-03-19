@@ -18,24 +18,34 @@ export SecondaryFluid
 export Refrigerant
 #export  RefrigerantSaturatedVapor, RefrigerantSuperHeatedVapor, refrigerant_twophaseregion, refrigerant_superheated
 
-include("pipeflow.jl")
-export nusselt_circularpipe, h_circularpipe 
-
-include("plateheatexchanger.jl")
-export PlateHeatExchanger, h_platehex_wanniarachchi
-
 include("evaporatordesign.jl")
-export EvaporatorDesign 
-#export evaporator_design
-
 include("borehole.jl")
-export Borehole, SingleUPipeBorehole
-#export uniform_Tb_coeffs
-
+include("plateheatexchanger.jl")
 include("solutiontypes.jl")
+include("heatexchanger.jl")
+include("pipeflow.jl")
+include("models.jl")
+
+# from "solutiontypes.jl"
 export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBoreholeSolution
 
-include("models.jl")
+# from "borehole.jl"
+export Borehole, SingleUPipeBorehole
+
+# from "pipeflow.jl"
+export nusselt_circularpipe, h_circularpipe 
+
+# from "plateheatexchanger.jl"
+export PlateHeatExchanger, h_platehex_wanniarachchi
+export counterflow_heatexchanger
+
+#from "heatexchanger.jl"
+export temperatureprofiles
+
+# from "evaporatordesign.jl"
+export EvaporatorDesign 
+
+# include("models.jl")
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!
 export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
 
