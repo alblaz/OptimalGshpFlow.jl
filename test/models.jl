@@ -74,6 +74,13 @@ prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
+x, Tc, Th = temperatureprofiles(evaporator_solution::EvaporatorSolution; n = 11)
+
+# using WGLMakie
+# fig = Figure(; size = (600, 400))
+# ax = Axis(fig[1, 1], xlabel = "x")
+# lines!(ax, x, Tc)
+# lines!(ax, x, Th)
 
 ##################
 # borehole model #

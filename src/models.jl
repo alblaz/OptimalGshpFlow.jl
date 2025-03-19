@@ -247,7 +247,7 @@ function evaporator_model(u,p::EvaporatorParameters)
     
     Ue, hs_e, href_e  =  evaporator_uvalue_twophase(Tsm_e, Vs, Qe, pe, xs, secondaryfluid, refrigerant, plateheatexchanger)
     NTU_e = Ue*A*xs/Cmin_e
-    twophase_heatexchanger = HeatExchangerSolution(Qe, Ts_m, Ts_l, Te, Te, Cs_e, Cref_e, Vs, Vref, hs_e, href_e, Ue, A*xs, ϵe, NTU_e)
+    twophase_heatexchanger = HeatExchangerSolution(Qe, Ts_m, Ts_l, Te, Te, Cs_e, Cref_e, Vs, Vref, hs_e, href_e, Ue*A*xs, ϵe, NTU_e)
 
     # superheating region
     
@@ -266,7 +266,7 @@ function evaporator_model(u,p::EvaporatorParameters)
     NTU_sup = Usup*A*(1-xs)/Cmin_sup
     
     Tch_sup = Te + ΔTsup
-    superheat_heatexchanger = HeatExchangerSolution(Qsup, Ts_h, Ts_m, Tch_sup, Te, Cs_sup, Cref_sup, Vs, Vref, hs_sup, href_sup, Usup, A*(1-xs), ϵsup, NTU_sup)
+    superheat_heatexchanger = HeatExchangerSolution(Qsup, Ts_h, Ts_m, Tch_sup, Te, Cs_sup, Cref_sup, Vs, Vref, hs_sup, href_sup, Usup*A*(1-xs), ϵsup, NTU_sup)
 
     return EvaporatorSolution(plateheatexchanger,xs, twophase_heatexchanger, superheat_heatexchanger)
 end

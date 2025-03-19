@@ -23,6 +23,7 @@ export nusselt_circularpipe, h_circularpipe
 
 include("plateheatexchanger.jl")
 export PlateHeatExchanger, h_platehex_wanniarachchi
+export counterflow_heatexchanger, temperatureprofiles
 
 include("evaporatordesign.jl")
 export EvaporatorDesign 
