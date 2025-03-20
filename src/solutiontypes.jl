@@ -36,8 +36,7 @@ struct HeatExchangerSolution
     Vc
     hh
     hc
-    U
-    A
+    UA
     ϵ
     NTU
 end
@@ -85,12 +84,12 @@ Constructor
 - `Qb`: Heat exchnaged in the borehole
 - `Rbstar`: Effective borehole resistance
 """
-function BoreholeSolution(borehole, λground,Tin,Tout,Tb,Vs,properties)
+function BoreholeSolution(borehole,λground,Tin,Tout,Tb,Vs,properties)
     ρ = properties.ρ((Tin+Tout)/2)
-    c = properties.cp((Tin+Tout)/2)
-    Cs=ρ*c*Vs
+    cp = properties.cp((Tin+Tout)/2)
+    Cs = ρ*cp*Vs
     Qb = Cs*(Tout - Tin)
-    Rbstar = ((Tin+Tout)/2 - Tb)/(Qb*borehole.H)
+    Rbstar = (Tb - (Tin+Tout)/2 )/(Qb/borehole.H)
     return BoreholeSolution(borehole, λground, Tin, Tout, Tb, Vs, Cs, Qb, Rbstar)
 end
 
@@ -113,10 +112,47 @@ struct EvaporatorSolution
     xs::Real
     twophase_region::HeatExchangerSolution
     superheat_region::HeatExchangerSolution
+    ΔT_l  
+    ΔT_m
+    ΔT_h
 end
 
+function EvaporatorSolution(plateheatexchanger::PlateHeatExchanger, xs, twophase_region::HeatExchangerSolution, superheat_region::HeatExchangerSolution)
+    ΔT_l = twophase_region.Thl - twophase_region.Tcl
+    ΔT_m = twophase_region.Thh - twophase_region.Tch   
+    ΔT_h = superheat_region.Thh - superheat_region.Tch  
+    return EvaporatorSolution(plateheatexchanger,xs, twophase_region,superheat_region, ΔT_l, ΔT_m, ΔT_h)
+end
+
+
+function temperatureprofiles(evaporator_solution::EvaporatorSolution; n = 11)
+    @unpack xs, ΔT_m, ΔT_l, ΔT_h =  evaporator_solution
+    x_twophase,Tc_twophase,Th_twophase  =  counterflow_heatexchanger(evaporator_solution.twophase_region; n=n, defaultdirection = ΔT_l > ΔT_m )
+    x_superheat,Tc_superheat,Th_superheat = counterflow_heatexchanger(evaporator_solution.superheat_region; n=n,  defaultdirection = ΔT_m > ΔT_h )
+    x_twophase  = collect(x_twophase * xs)
+    x_superheat = @. x_superheat * (1-xs) + xs
+    x  = vcat(x_twophase, x_superheat)
+    Tc = vcat(Tc_twophase, Tc_superheat)
+    Th = vcat(Th_twophase, Th_superheat) 
+    return x, Tc, Th
+end
 
 struct EvaporatorBoreholeSolution
     evaporator::EvaporatorSolution
     borehole::BoreholeSolution
 end
+
+
+
+
+# ΔT1,ΔT2 = Thle - Tcle, Thhe - Tche
+# default_direction_e = ΔT1>ΔT2 ? true : false 
+# @show default_direction_e
+# chx(Che,Thi,Tho,Cce,Tci,Tco,UAe; x = xe , defaultdirection = default_direction_e) 
+
+# ΔT1,ΔT2 = Thlsup - Tclsup, Thhsup - Tchsup
+# default_direction_sup = ΔT1>ΔT2 ? true : false 
+
+# @show default_direction_sup
+# Thi,Tho,Tci,Tco = Thhsup,Thlsup,Tclsup,Tclsup
+# xsuper, Thsup,Tcsup  = chx(Chsup,Thi,Tho,Ccsup,Tci,Tco,UAsup; x = xsup , defaultdirection = default_direction_sup) 

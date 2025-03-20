@@ -1,11 +1,83 @@
 """
-    `evaporator_model!(du, u, p)`
+EvaporatorParameters
+
+`refrigerant::Refrigerant`                 refrigerant properties,
+`secondaryfluid::SecondaryFluid`           secondary fluid properties,
+`plateheatexchanger::PlateHeatExchanger`   plate heat exchanger geometry,
+`hei`                                      refrigerant enthalpy at the inlet of the evaporator,
+`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
+`Vref`                                     volume flow rate of the refrigerant (m^3/s), 
+`ΔTsup`                                    refrigerant super heating degree, 
+`Ts_h`                                     secondary fluid temperature (in Kelvin) at the inlet of the evaporator
+"""
+@with_kw struct EvaporatorParameters
+    refrigerant::Refrigerant
+    secondaryfluid::SecondaryFluid
+    plateheatexchanger::PlateHeatExchanger
+    hei
+    Vs
+    Vref
+    ΔTsup 
+    Ts_h
+end
+
+
+"""
+BoreholeParameters
+
+`secondaryfluid::SecondaryFluid`           secondary fluid properties,
+`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
+`Tin`                                      borehole inlet temperature
+`borehole::Borehole`                       borehole heat exchanger configuration,
+`λground`                                  ground conductivity,
+`Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
+"""
+@with_kw struct BoreholeParameters 
+    secondaryfluid::SecondaryFluid
+    Vs
+    Tin 
+    borehole::Borehole
+    λground
+    Tb
+end
+
+
+"""
+EvaporatorBoreholeParameters    
+
+`refrigerant::Refrigerant`                 refrigerant properties,
+`secondaryfluid::SecondaryFluid`           secondary fluid properties,
+`plateheatexchanger::PlateHeatExchanger`   plate heat exchanger geometry,
+`hei`                                      refrigerant enthalpy at the inlet of the evaporator,
+`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
+`Vref`                                     volume flow rate of the refrigerant (m^3/s), 
+`ΔTsup`                                    refrigerant super heating degree, 
+`borehole::Borehole`                       borehole heat exchanger configuration,
+`λground`                                  ground conductivity,
+`Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
+"""
+@with_kw struct EvaporatorBoreholeParameters 
+    refrigerant::Refrigerant
+    secondaryfluid::SecondaryFluid
+    plateheatexchanger::PlateHeatExchanger
+    hei
+    Vs
+    Vref
+    ΔTsup 
+    borehole::Borehole
+    λground
+    Tb
+end
+
+
+"""
+    `evaporator_model!(du, u, p::EvaporatorParameters)`
 
 Heat balances and equalities defining the evaporator's physical behavior considering a two region steady state model for the heat exchanger with moving boundary bewteen the two-phase region and the superheated region.
 
 `du`   vector that contains the result of equalities resulting from heat balances and equations, 
 `u`    vector of variables, 
-`p`    vector of parameters. 
+`p::EvaporatorParameters`  parameters    
 
 variables:
     `u0 = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m`
@@ -18,22 +90,10 @@ variables:
 `xms`     coordinate of the moving boundary mapped using tanh transformation, 
 `Tsf_l`   secondary fluid temperature (in Kelvin) at the evaporator outlet, 
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
-
-parameters:
-    p = refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h
-
-`refrigerant::Refrigerant`                 refrigerant properties,
-`secondaryfluid::SecondaryFluid`           secondary fluid properties,
-`plateheatexchanger::PlateHeatExchanger`   plate heat exchanger geometry,
-`hei`                                      refrigerant enthalpy at the inlet of the evaporator,
-`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
-`Vref`                                     volume flow rate of the refrigerant (m^3/s), 
-`ΔTsup`                                    refrigerant super heating degree, 
-`Ts_h`                                     secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-function evaporator_model!(du, u, p)
+function evaporator_model!(du, u, p::EvaporatorParameters)
 
-    refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h = p
+    @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h = p
     A = plateheatexchanger.A
     ## u is a vector that contains the unknonws of the problem    
     ## u = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
@@ -167,9 +227,9 @@ unpack, remap and complete the solution obtained by solving evaporator_model!(du
 The return value is of type EvaporatorSolution 
 
 """
-function evaporator_model(u,p)
+function evaporator_model(u,p::EvaporatorParameters)
     pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m = u
-    refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h = p
+    @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h = p
     A = plateheatexchanger.A 
 
     # transform mapped variables
@@ -187,7 +247,7 @@ function evaporator_model(u,p)
     
     Ue, hs_e, href_e  =  evaporator_uvalue_twophase(Tsm_e, Vs, Qe, pe, xs, secondaryfluid, refrigerant, plateheatexchanger)
     NTU_e = Ue*A*xs/Cmin_e
-    twophase_heatexchanger = HeatExchangerSolution(Qe, Ts_m, Ts_l, Te, Te, Cs_e, Cref_e, Vs, Vref, hs_e, href_e, Ue, A*xs, ϵe, NTU_e)
+    twophase_heatexchanger = HeatExchangerSolution(Qe, Ts_m, Ts_l, Te, Te, Cs_e, Cref_e, Vs, Vref, hs_e, href_e, Ue*A*xs, ϵe, NTU_e)
 
     # superheating region
     
@@ -206,7 +266,7 @@ function evaporator_model(u,p)
     NTU_sup = Usup*A*(1-xs)/Cmin_sup
     
     Tch_sup = Te + ΔTsup
-    superheat_heatexchanger = HeatExchangerSolution(Qsup, Ts_h, Ts_m, Tch_sup, Te, Cs_sup, Cref_sup, Vs, Vref, hs_sup, href_sup, Usup, A*(1-xs), ϵsup, NTU_sup)
+    superheat_heatexchanger = HeatExchangerSolution(Qsup, Ts_h, Ts_m, Tch_sup, Te, Cs_sup, Cref_sup, Vs, Vref, hs_sup, href_sup, Usup*A*(1-xs), ϵsup, NTU_sup)
 
     return EvaporatorSolution(plateheatexchanger,xs, twophase_heatexchanger, superheat_heatexchanger)
 end
@@ -234,24 +294,10 @@ variables:
 `Tsf_l`   secondary fluid temperature (in Kelvin) at the evaporator outlet, 
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
 `Ts_h`    secondary fluid temperature (in Kelvin) at the inlet of the evaporator
-
-parameters:
-    p = refrigerant, secondaryfluid, plateheatexchanger,borehole, hei, Vs, Vref, ΔTsup, Tb
-
-`refrigerant::Refrigerant`                 refrigerant properties,
-`secondaryfluid::SecondaryFluid`           secondary fluid properties,
-`plateheatexchanger::PlateHeatExchanger`   plate heat exchanger geometry,
-`hei`                                      refrigerant enthalpy at the inlet of the evaporator,
-`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
-`Vref`                                     volume flow rate of the refrigerant (m^3/s), 
-`ΔTsup`                                    refrigerant super heating degree, 
-`borehole::Borehole`                       borehole heat exchanger configuration,
-`λground`                                  ground conductivity,
-`Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-function evaporatorborehole_model!(du, u, p)
+function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters)
 
-    refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, borehole, λground, Tb = p
+    @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, borehole, λground, Tb = p
     A = plateheatexchanger.A
     ## u is a vector that contains the unknonws of the problem    
     ## u = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h]
@@ -311,16 +357,19 @@ unpack, remap and complete the solution obtained by solving evaporatorborehole_m
 The return value is of type EvaporatorBoreholeSolution 
 
 """
-function evaporatorborehole_model(u,p)
+function evaporatorborehole_model(u,p::EvaporatorBoreholeParameters)
     pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h = u
-    refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, borehole, λground, Tb = p
+    @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, borehole, λground, Tb = p
 
     _u = u[1:8]
-    _p = p[1:7]..., u[9]
+    _p = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid, plateheatexchanger=plateheatexchanger, 
+                              hei=hei, Vs=Vs, Vref=Vref, ΔTsup=ΔTsup, Ts_h=u[9])
+    
 
     evaporator_solution = evaporator_model(_u, _p)
 
     # BoreholeSolution(borehole, λground,Tin,Tout,Tb,Vs,properties)
+    
     borehole_solution = BoreholeSolution(borehole, λground,Ts_l, Ts_h, Tb, Vs, secondaryfluid)
     return EvaporatorBoreholeSolution(evaporator_solution, borehole_solution)
 end
@@ -340,33 +389,23 @@ variables:
     `u0 = [Tout]`
 
 `Tout`    borehole outlet temperature 
-
-parameters:
-    p = secondaryfluid, Vs, Tin, borehole, λground, Tb
-
-`secondaryfluid::SecondaryFluid`           secondary fluid properties,
-`Vs`                                       volume flow rate of secondary fluid (m^3/s), 
-`Tin`                                      borehole inlet temperature
-`borehole::Borehole`                       borehole heat exchanger configuration,
-`λground`                                  ground conductivity,
-`Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-function borehole_model!(du,u,p)
-    secondaryfluid, Vs, Tin, borehole, λground, Tb = p
+function borehole_model!(du,u,p::BoreholeParameters)
+    @unpack secondaryfluid, Vs, Tin, borehole, λground, Tb = p
     kin = uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ((u[1] + Tin)/2)*Vs, (u[1] + Tin)/2, secondaryfluid)
     du[1] = kin*Tin - 1*u[1] + (1-kin)* Tb
 end
 
 
 """
-     `borehole_model(u,p)`
+     `borehole_model(u,p::BoreholeParameters)`
 
 unpack, remap and complete the solution obtained by solving borehole_model!(du,u,p) such that all the parameters of the borehole are available.
 The return value is of type BoreholeSolution 
 
 """
-function borehole_model(u,p)
-    secondaryfluid, Vs, Tin, borehole, λground, Tb = p
+function borehole_model(u,p::BoreholeParameters)
+    @unpack secondaryfluid, Vs, Tin, borehole, λground, Tb = p
     Tout = u[1]
     return BoreholeSolution(borehole, λground, Tin, Tout, Tb, Vs, secondaryfluid)
 end
