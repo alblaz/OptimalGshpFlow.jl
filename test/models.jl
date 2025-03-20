@@ -120,7 +120,7 @@ sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
 
 
-# compute pumping power in the broehole
+# compute pumping power in the borehole
 @unpack rpi, H = evaporatorborehole_solution.borehole.borehole
 @unpack Tin, Tout = evaporatorborehole_solution.borehole
 @unpack Vc = evaporatorborehole_solution.evaporator.superheat_region

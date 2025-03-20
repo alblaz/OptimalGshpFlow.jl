@@ -4,6 +4,7 @@ authors = ["Alberto Lazzarotto <alberto.lazzarotto84@gmail.com> and contributors
 version = "1.0.0-DEV"
 
 [deps]
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
 CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 ExponentialUtilities = "d4d017d3-3776-5f7e-afef-a10c40355c18"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
@@ -13,6 +14,7 @@ RequiredInterfaces = "97f35ef4-7bc5-4ec1-a41a-dcc69c7308c6"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+Clapeyron = "0.6.10"
 CoolProp = "0.2.0"
 ExponentialUtilities = "1.27.0"
 Interpolations = "0.15.1"
