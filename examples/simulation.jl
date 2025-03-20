@@ -104,8 +104,27 @@ prob = NonlinearProblem(evaporatorborehole_model!,u0,p,abstol = 1e-7)
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
 
+evap_xs=evaporatorborehole_solution.evaporator.xs
+evap_2phase=evaporatorborehole_solution.evaporator.twophase_region
+evap_superheat=evaporatorborehole_solution.evaporator.superheat_region
+evap_T=evap_2phase.Tcl - K
 
+#############################
+# Plotting #
+#############################
+x_2phase = range(0., evap_xs, length = 40)
 
+UA=evap_2phase.A*evap_2phase.U
+C_sf=evap_2phase.Ch
+
+T_sf_out_2phase=evap_2phase.Thl
+
+T_profile_2phase = evap_T .+ (T_sf_out_2phase-evap_T)*exp.(UA ./ (x_2phase*C_sf))
+using Plots
+plotly()
+plot(x_2phase,T_profile_2phase)
+
+#########################
 Q2,Te,Tc = 8000., K - 5, 40 + K
 # refrigerant = "R134a"
 refrigerant = "R290"
