@@ -1,5 +1,6 @@
 using OptimalGshpFlow
-using CoolProp
+using CoolProp, NonlinearSolve, Revise
+
 ### TO-DO
 # assume a condensing pressure and get the compressor power after optimizing for the evap-borehole model
 # circ. pump model based on pressure drop and flow rate
@@ -13,7 +14,99 @@ using CoolProp
 # DESIGN NOMINAL CONDITIONS 
 # Tc = 40°; Te = -5°C; hei =hco; Q2 = 5000 W; defaults ΔTs = 3.; U = 2000 W/m^2;  we discard superheating in the design
 
-Q2,Te,Tc = 8000., 273.15 - 5, 40 + 273.15
+K=273.15 #K to °C
+########################################
+# input parameters for the simulation #
+########################################
+        ################################
+        # evaporator model #
+        ################################
+
+        ΔTsup = 5.;
+        ΔTsub = 5.;
+        ηᵥ=0.95;
+        # Tsf_h = 278.;
+        ################################
+        # borehole model #
+        ################################
+
+        H = 100.
+        D = 4.
+        λg = 3.
+        pipe_position = ((0.04, 0.0), (-0.04, 0.0))
+        λground = 3.5
+        Tin, Tb  = 0. + K , 5. + K
+
+
+########################################
+# simulation #
+########################################
+
+################################
+## preparation phase ##
+################################
+
+refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
+evaporator = EvaporatorDesign(2000., 0. +K, 40. +K, refrigerant_name,secondaryfluid_name;
+        U =2000., ΔTs = 3., ΔT_l = 1.5, ΔT_sub=ΔTsub, ΔT_sup=ΔTsup, ηᵥ=ηᵥ)
+
+Trange = range(-15. + K, 30 + K, length = 40) #temperature range used to build secondary fluid interpolants
+secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
+refrigerant = Refrigerant(refrigerant_name)
+
+# we have the sizing parameter for a generic evaporator (A,Vs,Vref), and we now need to choose the size L and W of the plate heat exchanger
+# PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.) --> hence giving th enumber of plates as output
+plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
+
+
+####################
+# evaporator model #
+####################
+
+
+p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei,
+        evaporator.Vs, evaporator.Vref, evaporator.ΔT_sup, evaporator.Thh
+
+# initial guesses for the u vector
+pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
+xms = tanhmap_01_to_R(0.5)
+Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
+Tsf_l, Tsf_m = evaporator.Thh - 4, evaporator.Thh - 2
+
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
+
+prob = NonlinearProblem(evaporator_model!,u0,p,abstol = 1e-7)  
+sol  = solve(prob, TrustRegion(); abstol = 1e-9)
+evaporator_solution = evaporator_model(sol.u,p)
+
+
+##################
+# borehole model #
+##################
+borehole = SingleUPipeBorehole(H=H, D=D, λg=λg, pipe_position = pipe_position)
+Vs = evaporator.Vs
+p = secondaryfluid, Vs, Tin, borehole, λground, Tb 
+u0 = [2. + K]
+prob = NonlinearProblem(borehole_model!,u0,p,abstol = 1e-9)  
+sol  = solve(prob, TrustRegion(); abstol = 1e-9)
+
+
+#############################
+# evaporator-borehole model #
+#############################
+# The model evaporatorborehole_model! combine the models above by imposing Tin = Ts_l and Tout = Ts_h
+
+p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei,
+        evaporator.Vs, evaporator.Vref, evaporator.ΔT_sup, borehole, λground , Tb
+u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, evaporator.Thh]
+prob = NonlinearProblem(evaporatorborehole_model!,u0,p,abstol = 1e-7) 
+sol  = solve(prob, TrustRegion(); abstol = 1e-9)
+evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
+
+
+
+Q2,Te,Tc = 8000., K - 5, 40 + K
 # refrigerant = "R134a"
 refrigerant = "R290"
 # refrigerant = "R134a"
@@ -28,7 +121,7 @@ M = PropsSI.("M",  refrigerant) #molar mass
 pr_min = 1e-4  #400. / PropsSI.("Pcrit",  refrigerant)
 
 # build spline relevant splines for secondary fluid properties
-Trange = range(-15. +  273.15, 30 + 273.15, length = 40)
+Trange = range(-15. +  K, 30 + K, length = 40)
 secondary_fluid =  "INCOMP::MEA-28%"
 spl_sf = interpolate_sf_properties(Trange, secondary_fluid)
 
