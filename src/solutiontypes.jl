@@ -87,8 +87,9 @@ Constructor
 """
 function BoreholeSolution(borehole, λground,Tin,Tout,Tb,Vs,properties)
     ρ = properties.ρ((Tin+Tout)/2)
-    Cs = properties.cp((Tin+Tout)/2)
-    Qb = ρ*Cs*Vs*(Tout - Tin)
+    c = properties.cp((Tin+Tout)/2)
+    Cs=ρ*c*Vs
+    Qb = Cs*(Tout - Tin)
     Rbstar = ((Tin+Tout)/2 - Tb)/(Qb*borehole.H)
     return BoreholeSolution(borehole, λground, Tin, Tout, Tb, Vs, Cs, Qb, Rbstar)
 end
