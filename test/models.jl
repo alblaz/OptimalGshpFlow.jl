@@ -121,6 +121,8 @@ evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorbor
 
 
 # compute pumping power in the broehole
+# The @unpack macro is used to extract multiple fields from a composite type (struct) and assign them to local variables.
+# Here, it extracts the fields `rpi` and `H` from the `borehole` field of `evaporatorborehole_solution.borehole` and assigns them to local variables `rpi` and `H`.
 @unpack rpi, H = evaporatorborehole_solution.borehole.borehole
 @unpack Tin, Tout = evaporatorborehole_solution.borehole
 @unpack Vc = evaporatorborehole_solution.evaporator.superheat_region
