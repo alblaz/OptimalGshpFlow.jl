@@ -73,7 +73,7 @@ Type of collector: $(@bind collector Select(["U pipe" => "U pipe","Double U pipe
 
 # ╔═╡ 9e09fbba-ecdf-4615-8baf-f25a7cafb195
 md"""
-Pipe diameter: $(@bind Dp_ Scrubbable(5:0.5:30.0, default = 11.5)) cm"""
+Pipe diameter: $(@bind Dp_ Scrubbable(2:0.2:6, default = 4.0)) cm"""
 
 # ╔═╡ b754c0a6-4579-40f2-b03c-31142ef5bb2f
 md"""
@@ -3496,10 +3496,10 @@ version = "3.6.0+0"
 # ╟─8b583195-b96d-4cd6-8bb5-f09512c38ea6
 # ╟─a27c5fc7-dad2-44f3-ab65-5736fefc874d
 # ╟─4b6d717a-edb6-4292-bcb7-5dc44e560637
-# ╟─7e0fdfd5-dc29-4cb1-9ee5-82442ec8933c
+# ╠═7e0fdfd5-dc29-4cb1-9ee5-82442ec8933c
 # ╟─81a7c7ba-9cba-4b50-98c8-e14f5edf64d3
 # ╟─ac5f77da-a6b7-4be1-8fb6-523c10f2a147
-# ╟─9e09fbba-ecdf-4615-8baf-f25a7cafb195
+# ╠═9e09fbba-ecdf-4615-8baf-f25a7cafb195
 # ╟─b754c0a6-4579-40f2-b03c-31142ef5bb2f
 # ╟─2dffa4af-cb4e-42f0-be0e-417734d119d4
 # ╟─6a121d29-491f-4b7b-8295-367e6683add8
