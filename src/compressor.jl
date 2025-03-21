@@ -7,8 +7,11 @@ Returns the power delivered by the compressor in W.
 `ηis` is the isotropic efficiency of the compressor, 
 `evaporator_solution::EvaporatorSolution` contains the results from the evaporator simulation
 `refrigerant::Refrigerant` 
+
+Parameters
+`ξ` percentage heat loss from the compressor enveloppe, default to 7% (lower for large hermetic compressor), larger for non-hermetic compressors
 """
-function compressor_power(Tc, ηis, evaporator_solution::EvaporatorSolution, refrigerant::Refrigerant)
+function compressor_power(Tc, ηis, evaporator_solution::EvaporatorSolution, refrigerant::Refrigerant;ξ=0.07)
     
     Vref = evaporator_solution.twophase_region.Vc
     T_compressor_inlet = evaporator_solution.superheat_region.Tch
@@ -23,7 +26,7 @@ function compressor_power(Tc, ηis, evaporator_solution::EvaporatorSolution, ref
 
     ρ =  PropsSI("D", "T",  T_compressor_inlet, "P", pe, refrigerant.name) 
     
-    W = ρ * Vref * Δh_compressor
+    W = ρ * Vref * Δh_compressor / (1-ξ)
     return W
 end
 
