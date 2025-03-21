@@ -75,7 +75,7 @@ function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D
     # v_port = V/(π*D_port^2/4)
     # Δp_port=+ 1.5*ρ*v_port^2/2*N_pass
     # NB! port pressure drop accounted for in Martin
-    
+    # @show fD
     Δp = fD * L/Dₕ * v^2 * ρ/2 
     return Δp
 end
