@@ -1,5 +1,5 @@
 using OptimalGshpFlow
-using CoolProp, NonlinearSolve, Revise
+using CoolProp, NonlinearSolve, Parameters
 
 ### TO-DO
 # assume a condensing pressure and get the compressor power after optimizing for the evap-borehole model
@@ -56,7 +56,8 @@ refrigerant = Refrigerant(refrigerant_name)
 
 # we have the sizing parameter for a generic evaporator (A,Vs,Vref), and we now need to choose the size L and W of the plate heat exchanger
 # PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.) --> hence giving th enumber of plates as output
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
+@unpack Vref,Vs,hei,ΔT_sup,Thh,A=evaporator
+plateheatexchanger = PlateHeatExchanger(A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
 
 
 ####################
@@ -64,8 +65,12 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.1
 ####################
 
 
-p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei,
-        evaporator.Vs, evaporator.Vref, evaporator.ΔT_sup, evaporator.Thh
+p  = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid,
+                                        plateheatexchanger=plateheatexchanger, 
+                                        hei = hei, Vs = Vs, Vref = Vref, 
+                                        ΔTsup= ΔT_sup, Ts_h=Thh)
+## could we just pass an evaporator type here?
+                                
 
 # initial guesses for the u vector
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
@@ -104,22 +109,29 @@ prob = NonlinearProblem(evaporatorborehole_model!,u0,p,abstol = 1e-7)
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,p)
 
-evap_xs=evaporatorborehole_solution.evaporator.xs
-evap_2phase=evaporatorborehole_solution.evaporator.twophase_region
-evap_superheat=evaporatorborehole_solution.evaporator.superheat_region
-evap_T=evap_2phase.Tcl - K
+# evap_xs=evaporatorborehole_solution.evaporator.xs
+# evap_2phase=evaporatorborehole_solution.evaporator.twophase_region
+# evap_superheat=evaporatorborehole_solution.evaporator.superheat_region
+# evap_T=evap_2phase.Tcl - K
 
 #############################
 # Plotting #
 #############################
-x_2phase = range(0., evap_xs, length = 40)
+# x_2phase = range(0., evap_xs, length = 40)
 
-UA=evap_2phase.A*evap_2phase.U
-C_sf=evap_2phase.Ch
+# UA=evap_2phase.A*evap_2phase.U
+# C_sf=evap_2phase.Ch
 
-T_sf_out_2phase=evap_2phase.Thl
+# T_sf_out_2phase=evap_2phase.Thl
 
-T_profile_2phase = evap_T .+ (T_sf_out_2phase-evap_T)*exp.(UA ./ (x_2phase*C_sf))
+# T_profile_2phase = evap_T .+ (T_sf_out_2phase-evap_T)*exp.(UA ./ (x_2phase*C_sf))
+
+
+x, Tc, Th = temperatureprofiles(evaporator_solution; n = 15)
+
+W  = compressor_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+
 using Plots
 plotly()
 plot(x_2phase,T_profile_2phase)

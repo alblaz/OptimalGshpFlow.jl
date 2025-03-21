@@ -39,6 +39,7 @@ end
 compute the Darcy friction factor fD given the Reynolds number and cheveron angle `β` based on Martin (1996)
 """
 function f_Martin(Re,β)
+    β=β*pi/180
     if Re < 2000
         f₀=64/Re
         f₁=597/Re+3.85
@@ -60,7 +61,7 @@ Compute the pressure drop for a plate heat exchanger.
 `platehex::PlateHeatExchanger` is the plate heat exchanger object containing parameters such as number of plates, plate width, chevron angle, and plate length,
 `fluidproperties` is an object of type `SecondaryFluid` that provides fluid properties like density and viscosity.
 """
-function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.04,N_pass=1)    
+function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.05,N_pass=1)    
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
     @unpack np,b,ϕ,β,L = platehex
