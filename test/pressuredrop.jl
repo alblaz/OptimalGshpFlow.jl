@@ -9,8 +9,9 @@ Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used 
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
 refrigerant = Refrigerant(refrigerant_name)
 
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.4, 0.1; b=0.002, ϕ=1.189, β = 30.)
+plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.189, β = 30.)  # NB! chevron angle vs. reverse chev. ang. !
 # include("..\\pressuredrop.jl")
-T_mean=(evaporator.Thh+evaporator.Thl)/2
-@show pressure_drop_evap(evaporator.Vs, plateheatexchanger, secondaryfluid,T_mean)
-@show pressure_drop(200*2,evaporator.Vs,0.04*(1-1/17),secondaryfluid,T_mean) # SDR 17
+@unpack Vs,Thh,Thl = evaporator
+T_mean=(Thh+Thl)/2
+@show pressure_drop_evap(Vs, plateheatexchanger, secondaryfluid,T_mean)
+@show pressure_drop(200*2,Vs,0.04*(1-1/17),secondaryfluid,T_mean) # SDR 17
