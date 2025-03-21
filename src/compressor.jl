@@ -51,10 +51,10 @@ function condenser_power(Tc, ηis, evaporator_solution::EvaporatorSolution, refr
     Δh_compressor = (his_compressor_outlet - h_compressor_inlet)/ηis
 
     h_compressor_outlet =  h_compressor_inlet + Δh_compressor
-    h_condenser_outlet =  PropsSI("H", "T",  Tc, "Q", 0, refrigerant.name)
+    h_condenser_outlet =  PropsSI("H", "T",  Tc, "Q", 0, refrigerant.name) # add subcooling
     
     ρ =  PropsSI("D", "T",  T_compressor_inlet, "P", pe, refrigerant.name) 
-    Q1 = ρ * Vref * (h_compressor_outlet - h_condenser_outlet)
+    Q1 = ρ * Vref * (h_compressor_outlet - h_condenser_outlet) # add volumetric efficiency
 
     return Q1
 end
