@@ -45,9 +45,10 @@ Model a borehole with a single U-pipe with burial depth `D` and length `H`.
     Cg = 2000. * 1550.                  # grout capacity
     αg = λg/Cg	                        # grout thermal diffusivity
 
-    rpi = 0.02                          # inner pipe radius
+    rpo = 0.02                          # inner pipe radius
     λp = 0.42                           # pipe material conductivity
-    rpo = 0.0223                        # outer pipe radius
+    SDR = 17
+    rpi = rpo/(1-2/SDR)                        # outer pipe radius
     dpw = rpo-rpi                       # pipe thickness
     hp = 725.                           # heat transfer coefficient fluid to pipe ?
     pipe_position::NTuple{2, Tuple{T, T}} = ((0.03, 0.0), (-0.03, 0.0))
