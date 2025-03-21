@@ -70,7 +70,7 @@ p  = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid
                                         hei = hei, Vs = Vs, Vref = Vref, 
                                         ΔTsup= ΔT_sup, Ts_h=Thh)
 ## could we just pass an evaporator type here?
-                                
+
 
 # initial guesses for the u vector
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
@@ -90,9 +90,8 @@ evaporator_solution = evaporator_model(sol.u,p)
 # borehole model #
 ##################
 borehole = SingleUPipeBorehole(H=H, D=D, λg=λg, pipe_position = pipe_position)
-Vs = evaporator.Vs
-p = secondaryfluid, Vs, Tin, borehole, λground, Tb 
 u0 = [2. + K]
+p = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
 prob = NonlinearProblem(borehole_model!,u0,p,abstol = 1e-9)  
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 
@@ -102,8 +101,10 @@ sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 #############################
 # The model evaporatorborehole_model! combine the models above by imposing Tin = Ts_l and Tout = Ts_h
 
-p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei,
-        evaporator.Vs, evaporator.Vref, evaporator.ΔT_sup, borehole, λground , Tb
+p = EvaporatorBoreholeParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid, plateheatexchanger=plateheatexchanger, 
+                                        hei = hei, Vs = Vs, Vref = Vref, 
+                                        ΔTsup =  ΔT_sup, 
+                                        borehole=borehole, λground=λground, Tb=Tb)
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, evaporator.Thh]
 prob = NonlinearProblem(evaporatorborehole_model!,u0,p,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
@@ -134,7 +135,19 @@ Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
 
 using Plots
 plotly()
-plot(x_2phase,T_profile_2phase)
+plot(x, Th .- K, label="secondary fluid")
+plot!(x, Tc .- K, label="refrigerant")
+
+# compute pumping power in the broehole
+@unpack rpi, H = evaporatorborehole_solution.borehole.borehole
+@unpack Tin, Tout = evaporatorborehole_solution.borehole
+@unpack Vc = evaporatorborehole_solution.evaporator.superheat_region
+Ppump = pumping_power(0.4, H, Vc ,2rpi, secondaryfluid, (Tin + Tout)/2,evaporatorborehole_solution.evaporator.plateheatexchanger)
+
+W  = compressor_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
+
+
 
 #########################
 Q2,Te,Tc = 8000., K - 5, 40 + K
