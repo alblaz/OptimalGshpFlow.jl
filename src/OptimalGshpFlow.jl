@@ -45,7 +45,10 @@ export counterflow_heatexchanger
 export temperatureprofiles
 
 # from "evaporatordesign.jl"
-export EvaporatorDesign 
+export EvaporatorDesign
+
+# from "pressuredrop.jl"
+export  pressure_drop_evap,  pressure_drop, pumping_power
 
 # include("models.jl")
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!

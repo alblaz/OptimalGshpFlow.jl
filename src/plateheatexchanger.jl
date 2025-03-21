@@ -6,7 +6,7 @@
 `W` plate width\\
 `H` heat exchanger height\\
 `np` number of plates\\
-`ϕ` constant ... \\
+`ϕ` surface enlargement factor \\
 `b` pressing depth\\
 `β` chevron angle\\
 """
@@ -28,8 +28,8 @@ Constructor
 PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 """
 function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
-    np =  round(Int, A/(L*W)/ϕ) + 2        # number of plates
-    H = (np-1)/2 * b                       # total height of the secondary fluid channels 
+    np =  round(Int, A/(L*W)/ϕ) + 2        # number of total plates, i.e. including the two "blind" plates on the side
+    H = (np-1)/2 * b                     # total height of the secondary fluid channels 
     return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β)
 end
 
