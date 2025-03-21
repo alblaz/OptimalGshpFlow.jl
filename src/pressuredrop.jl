@@ -39,6 +39,7 @@ end
 compute the Darcy friction factor fD given the Reynolds number and cheveron angle `β` based on Martin (1996)
 """
 function f_Martin(Re,β)
+    β=β*pi/180
     if Re < 2000
         f₀=64/Re
         f₁=597/Re+3.85
