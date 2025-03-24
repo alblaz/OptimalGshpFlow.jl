@@ -34,6 +34,55 @@ function pressure_drop(H,V,D,fluidproperties,T)
 end
 
 """
+    `f_Martin(Re)`
+
+compute the Darcy friction factor fD given the Reynolds number and cheveron angle `β` based on Martin (1996)
+"""
+function f_Martin(Re,β)
+    β=β*pi/180
+    if Re < 2000
+        f₀=64/Re
+        f₁=597/Re+3.85
+    else
+        f₀=(1.8*log10(Re)-1.5)^(-2) # check log or log10
+        f₁=39/Re^0.289
+    end
+    A=1/cos(β)*(0.18*sin(β)*(1+2*cos(β))+f₀)
+    fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
+    return fD
+end
+
+"""
+    `pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties)`
+
+Compute the pressure drop for a plate heat exchanger.
+
+`V` is the volume flow rate (m^3/s),
+`platehex::PlateHeatExchanger` is the plate heat exchanger object containing parameters such as number of plates, plate width, chevron angle, and plate length,
+`fluidproperties` is an object of type `SecondaryFluid` that provides fluid properties like density and viscosity.
+"""
+function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.04,N_pass=1)    
+    ρ = fluidproperties.ρ(T)
+    μ = fluidproperties.μ(T)
+    @unpack np,b,ϕ,β,L = platehex
+    Nc=(np-1)/2 #number of channels
+    Dₕ=2*b/ϕ # hydraulic diameter 4*A/P
+
+    v = V/(L*b*Nc) # velocity per channel
+    Re = ρ*v*Dₕ/μ #Reynolds number per channel
+    fD = f_Martin(Re,β)
+
+    # v_port = V/(π*D_port^2/4)
+    # Δp_port=+ 1.5*ρ*v_port^2/2*N_pass
+    # NB! port pressure drop accounted for in Martin
+    
+    Δp = fD * L/Dₕ * v^2 * ρ/2 
+    return Δp
+end
+
+
+
+"""
     `pumping_power(Δp, V, η)`
 
 Compute the pumping power given the pressure loss `Δp`, 
