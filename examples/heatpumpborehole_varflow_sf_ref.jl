@@ -43,7 +43,7 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
                                         borehole=borehole, λground=λground, Tb=Tb)
 
                                         
-pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
 ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
 xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
@@ -54,6 +54,7 @@ param = EvaporatorBoreholeParameters(param_evaporatorborehole_prototype,Vs = 1.5
 prob = NonlinearProblem(evaporatorborehole_model!,u0,param,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 # sol  = solve(prob, GaussNewton(); abstol = 1e-9)
+
 
 
 
