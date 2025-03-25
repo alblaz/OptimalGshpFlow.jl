@@ -32,7 +32,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15 + 5 ;
+Ts_h = 273.15  + 5 ;
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
 
@@ -46,8 +46,8 @@ param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, seco
 # @unpack plateheatexchanger = param_evaporator_prototype                           
 
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.7) 
-xms = tanhmap_01_to_R(0.7)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
+xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 
@@ -154,5 +154,5 @@ Legend(gb[0,1], elements, labels, title,
 
 ##.
 fig
-mypath = joinpath(@__DIR__,"figures")
-save(joinpath(mypath,"heatpump_singleVs.png"), fig)
+# mypath = joinpath(@__DIR__,"figures")
+# save(joinpath(mypath,"heatpump_singleVs.png"), fig)

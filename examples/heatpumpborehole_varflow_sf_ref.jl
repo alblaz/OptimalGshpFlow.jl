@@ -1,6 +1,7 @@
 ####################
 # evaporator model #
 ####################
+using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
 evaporator = EvaporatorDesign(6000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
@@ -22,8 +23,8 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 
 λground = 3.
 
-Tb = 273.15  + 10
-ΔTsup = 5
+Tb = 273.15  + 0
+ΔTsup = 2.
 ηpump = 0.2
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
@@ -43,15 +44,19 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
 
                                         
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.4) 
-xms = tanhmap_01_to_R(0.4)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
+xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
-Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
+Ts_l, Ts_m, Ts_h = Tb - 6, Tb - 4, Tb - 2
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h]
 
 param = EvaporatorBoreholeParameters(param_evaporatorborehole_prototype,Vs = 1.5evaporator.Vs)
 prob = NonlinearProblem(evaporatorborehole_model!,u0,param,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
+# sol  = solve(prob, GaussNewton(); abstol = 1e-9)
+
+
+
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
 
 x, Tc, Th = temperatureprofiles(evaporatorborehole_solution.evaporator; n = 11)
@@ -80,7 +85,7 @@ sol2  = solve(prob2, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution2 = evaporatorborehole_model(sol2.u,param2)
 
 
-x2, Tc2, Th2 = temperatureprofiles(evaporatorborehole_solution2.evaporator; n = 11)
+x2, Tc2, Th2 = temperatureprofiles(evaporatorborehole_solution2.evaporator; n = 31)
 
 W_2  = compressor_power(273.15 + 40, 0.7, evaporatorborehole_solution2.evaporator, refrigerant)
 Q1_2 = condenser_power(273.15 + 40, 0.7, evaporatorborehole_solution2.evaporator, refrigerant)
@@ -94,7 +99,7 @@ Ppump_borehole_2 = pumping_power(ηpump, 2H, Vh ,2rpi, secondaryfluid, (Tin + To
 #compute pumping power in the evaporator
 Tmean_2 = (evaporatorborehole_solution2.evaporator.superheat_region.Thh  + evaporatorborehole_solution2.evaporator.twophase_region.Thl) / 2
 Δp_evap_2 = pressure_drop_evap(evaporatorborehole_solution2.evaporator.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_2)
-Ppump_evap_2 = pumping_power(Δp_evap_2, evaporatorborehole_solution2.evaporator.superheat_region.Vh, 0.4)
+Ppump_evap_2 = pumping_power(Δp_evap_2, evaporatorborehole_solution2.evaporator.superheat_region.Vh, ηpump)
 #compute total pumping Power
 Ppump_2 = Ppump_borehole_2 + Ppump_evap_2
 
@@ -106,7 +111,7 @@ sol3  = solve(prob3, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution3 = evaporatorborehole_model(sol3.u,param3)
 
 
-x3, Tc3, Th3 = temperatureprofiles(evaporatorborehole_solution3.evaporator; n = 11)
+x3, Tc3, Th3 = temperatureprofiles(evaporatorborehole_solution3.evaporator; n = 31)
 
 W_3  = compressor_power(273.15 + 40, 0.7, evaporatorborehole_solution3.evaporator, refrigerant)
 Q1_3 = condenser_power(273.15 + 40, 0.7, evaporatorborehole_solution3.evaporator, refrigerant)
@@ -120,7 +125,7 @@ Ppump_borehole_3 = pumping_power(ηpump, 2H, Vh ,2rpi, secondaryfluid, (Tin + To
 #compute pumping power in the evaporator
 Tmean_3 = (evaporatorborehole_solution3.evaporator.superheat_region.Thh  + evaporatorborehole_solution3.evaporator.twophase_region.Thl) / 2
 Δp_evap_3 = pressure_drop_evap(evaporatorborehole_solution3.evaporator.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_3)
-Ppump_evap_3 = pumping_power(Δp_evap_3, evaporatorborehole_solution3.evaporator.superheat_region.Vh, 0.4)
+Ppump_evap_3 = pumping_power(Δp_evap_3, evaporatorborehole_solution3.evaporator.superheat_region.Vh, ηpump)
 #compute total pumping Power
 Ppump_3 = Ppump_borehole_3 + Ppump_evap_3
 
@@ -225,5 +230,5 @@ fig
 ##.
 
 mypath = joinpath(@__DIR__,"figures")
-save(joinpath(mypath,"boreholeheatpump_variableVsVref_T$(round(Int,Tb)).png"), fig)
+# save(joinpath(mypath,"boreholeheatpump_variableVsVref_T$(round(Int,Tb)).png"), fig)
 # fig
