@@ -46,11 +46,12 @@ compute the convective heat transfer coefficient for a liquid flowing in a plate
 """
 function h_platehex_wanniarachchi(V, platehex::PlateHeatExchanger, fluidproperties)    
     
-    A, L, W, H, np, ϕ, b, β = getfield.(Ref(platehex), fieldnames(PlateHeatExchanger))    
+    @unpack A, L, W, H, np, ϕ, b, β =platehex
+    # A, L, W, H, np, ϕ, b, β = getfield.(Ref(platehex), fieldnames(PlateHeatExchanger))    
     ρ, μ, λ, cp = fluidproperties
 
     us = V/(H*W)                  # speed of the secondary fluid 
-    dh = 2*b                       # hydraulic diameter 
+    dh = 2*b/ϕ                       # hydraulic diameter, NB! check the definition, this is not the "real" hydraulic diameter
 
     Redh = ρ * us * dh / μ           # Reynolds
 
