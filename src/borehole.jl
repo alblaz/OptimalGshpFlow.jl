@@ -47,7 +47,7 @@ Model a borehole with a single U-pipe with burial depth `D` and length `H`.
 
     rpo = 0.02                          # inner pipe radius
     λp = 0.42                           # pipe material conductivity
-    SDR = 17
+    SDR = 17.
     rpi = rpo/(1-2/SDR)                        # outer pipe radius
     dpw = rpo-rpi                       # pipe thickness
     hp = 725.                           # heat transfer coefficient fluid to pipe ?
