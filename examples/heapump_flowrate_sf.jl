@@ -6,7 +6,6 @@ effect of change of the secondary fluid flow rate
 #####################
 # preparation phase #
 #####################
-
 using OptimalGshpFlow, NonlinearSolve, CoolProp, Parameters
 # using NonlinearSolve, WGLMakie # This two packages are not dependencies so I load them from a separate environment.
 
@@ -31,7 +30,8 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15  ;
+Ts_h = 273.15 + 10;
+ηpump = 0.3
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
 
@@ -65,7 +65,7 @@ Q2 = evaporator_solution.twophase_region.Q + evaporator_solution.superheat_regio
 
 Tmean = (evaporator_solution.superheat_region.Thh  + evaporator_solution.twophase_region.Thl) / 2
 Δp_evap = pressure_drop_evap(evaporator_solution.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean)
-Ppump = pumping_power(Δp_evap, evaporator_solution.superheat_region.Vh, 0.4)
+Ppump = pumping_power(Δp_evap, evaporator_solution.superheat_region.Vh, ηpump)
 
 
 p_ev2 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.5*evaporator.Vs)
@@ -80,7 +80,7 @@ Q2_2 = evaporator_solution2.twophase_region.Q + evaporator_solution2.superheat_r
 
 Tmean_2 = (evaporator_solution2.superheat_region.Thh  + evaporator_solution2.twophase_region.Thl) / 2
 Δp_evap_2 = pressure_drop_evap(evaporator_solution2.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_2)
-Ppump_2 = pumping_power(Δp_evap_2, evaporator_solution2.superheat_region.Vh, 0.4)
+Ppump_2 = pumping_power(Δp_evap_2, evaporator_solution2.superheat_region.Vh, ηpump)
 # CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2] ]
 
 p_ev3 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.3*evaporator.Vs)
@@ -95,7 +95,7 @@ Q2_3 = evaporator_solution3.twophase_region.Q + evaporator_solution3.superheat_r
 
 Tmean_3 = (evaporator_solution3.superheat_region.Thh  + evaporator_solution3.twophase_region.Thl) / 2
 Δp_evap_3 = pressure_drop_evap(evaporator_solution3.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_3)
-Ppump_3 = pumping_power(Δp_evap_3, evaporator_solution3.superheat_region.Vh, 0.4)
+Ppump_3 = pumping_power(Δp_evap_3, evaporator_solution3.superheat_region.Vh, ηpump)
 
 ##.
 
@@ -108,18 +108,24 @@ CopS = [round(x, digits=2) for x in [Q1/(W + Ppump), Q1_2/(W_2 + Ppump_2), Q1_3/
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
-lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
-lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
-vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
-lines!(ax, x2, Tc2, color = :chocolate1, linewidth =1)
-lines!(ax, x2, Th2, color = :chocolate1, linestyle = :dash, linewidth = 2)
-vlines!(ax, [evaporator_solution2.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
-lines!(ax, x3, Tc3, color = :green, linewidth = 2)
-lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2 )
-vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
-ylims!(ax,250,290.)
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (°C)")
 
+lref1 = lines!(ax, x, Tc .- 273.15, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
+ls1   = lines!(ax, x, Th .- 273.15, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
+
+lines!(ax, x, Tc .- 273.15, color = :dodgerblue, linewidth = 2)
+lines!(ax, x, Th .- 273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
+vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
+lines!(ax, x2, Tc2 .- 273.15, color = :chocolate1, linewidth =1)
+lines!(ax, x2, Th2 .- 273.15, color = :chocolate1, linestyle = :dash, linewidth = 2)
+vlines!(ax, [evaporator_solution2.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
+lines!(ax, x3, Tc3 .- 273.15, color = :green, linewidth = 2)
+lines!(ax, x3, Th3 .- 273.15, color = :green, linestyle = :dash, linewidth =2 )
+vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
+ylims!(ax,250 -273.15,290. -273.15)
+
+axislegend(ax, [lref1, ls1], ["Tsf", "Tref"], color = [:black, :black],  position = :rb,
+orientation = :horizontal)
 
 fig
 

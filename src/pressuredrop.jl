@@ -5,7 +5,7 @@
 compute the Darcy friction factor fD given the Reynolds number
 """
 function fDarcy(Re)
-    fD = Re<2300. ? 64/Re : (1/(lambertw(0.629*Re)))^2
+    fD = Re<2300. ? 64/Re : (1/(0.838*lambertw(0.629*Re)))^2
     return fD
 end
 
@@ -47,8 +47,10 @@ function f_Martin(Re,β)
         f₀=(1.8*log10(Re)-1.5)^(-2) # check log or log10
         f₁=39/Re^0.289
     end
-    A=1/cos(β)*(0.18*sin(β)*(1+2*cos(β))+f₀)
-    fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
+    # A=1/cos(β)*(0.18*sin(β)*(1+2*cos(β))+f₀)
+    # fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
+    # fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
+    fD= (cos(β)/(0.18*tan(β) + 0.36 *sin(β) + f₀/cos(β))  + (1-cos(β))/√(3.8*f₁))^-2
     return fD
 end
 
@@ -79,7 +81,6 @@ function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D
     Δp = fD * L/Dₕ * v^2 * ρ/2 
     return Δp
 end
-
 
 
 """
