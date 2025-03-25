@@ -22,9 +22,9 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 
 λground = 3.
 
-Tb = 273.15 + 10
+Tb = 273.15  + 10
 ΔTsup = 5
-ηpump = 0.4
+ηpump = 0.2
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
 # u0 = [275.]
@@ -43,13 +43,14 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
 
                                         
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
-xms = tanhmap_01_to_R(0.5)
+ϵme = ϵmsup =  tanhmap_01_to_R(0.4) 
+xms = tanhmap_01_to_R(0.4)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h]
 
-prob = NonlinearProblem(evaporatorborehole_model!,u0,param_evaporatorborehole_prototype,abstol = 1e-7) 
+param = EvaporatorBoreholeParameters(param_evaporatorborehole_prototype,Vs = 1.5evaporator.Vs)
+prob = NonlinearProblem(evaporatorborehole_model!,u0,param,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
 
@@ -67,14 +68,14 @@ Ppump_borehole = pumping_power(ηpump, 2H, Vh ,2rpi, secondaryfluid, (Tin + Tout
 #compute pumping power in the evaporator
 Tmean = (evaporatorborehole_solution.evaporator.superheat_region.Thh  + evaporatorborehole_solution.evaporator.twophase_region.Thl) / 2
 Δp_evap = pressure_drop_evap(evaporatorborehole_solution.evaporator.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean)
-Ppump_evap = pumping_power(Δp_evap, evaporatorborehole_solution.evaporator.superheat_region.Vh, 0.4)
+Ppump_evap = pumping_power(Δp_evap, evaporatorborehole_solution.evaporator.superheat_region.Vh, ηpump)
 #compute total pumping Power
 Ppump = Ppump_borehole + Ppump_evap
 
 ## example 2
 
 param2 = EvaporatorBoreholeParameters(param_evaporatorborehole_prototype, Vs = 0.5evaporator.Vs, Vref = 0.5evaporator.Vref)
-prob2 = NonlinearProblem(evaporatorborehole_model!,u0,param2,abstol = 1e-7) 
+prob2 = NonlinearProblem(evaporatorborehole_model!,sol.u,param2,abstol = 1e-7) 
 sol2  = solve(prob2, TrustRegion(); abstol = 1e-9)
 evaporatorborehole_solution2 = evaporatorborehole_model(sol2.u,param2)
 
@@ -136,26 +137,26 @@ CopS = [round(x, digits=2) for x in [Q1/(W + Ppump), Q1_2/(W_2 + Ppump_2), Q1_3/
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
-lines!(ax, [0.,1.], evaporatorborehole_solution.borehole.Tb .* [1,1], color = :brown, linewidth = 2)
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (°C)")
+lines!(ax, [0.,1.], (evaporatorborehole_solution.borehole.Tb - 273.15).* [1,1], color = :brown, linewidth = 2)
 
-lref1 = lines!(ax, x, Tc, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
-ls1   = lines!(ax, x, Th, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
+lref1 = lines!(ax, x, Tc .- 273.15, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
+ls1   = lines!(ax, x, Th .- 273.15, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
 
-lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
-lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
+lines!(ax, x, Tc .- 273.15, color = :dodgerblue, linewidth = 2)
+lines!(ax, x, Th .- 273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporatorborehole_solution.evaporator.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
 
-lines!(ax, x2, Tc2, color = :chocolate1, linewidth =2)
-lines!(ax, x2, Th2, color = :chocolate1, linestyle = :dash, linewidth = 2)
+lines!(ax, x2, Tc2 .- 273.15, color = :chocolate1, linewidth =2)
+lines!(ax, x2, Th2 .- 273.15, color = :chocolate1, linestyle = :dash, linewidth = 2)
 vlines!(ax, [evaporatorborehole_solution2.evaporator.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
 
-lines!(ax, x3, Tc3, color = :green, linewidth = 2)
-lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2)
+lines!(ax, x3, Tc3 .- 273.15, color = :green, linewidth = 2)
+lines!(ax, x3, Th3 .- 273.15, color = :green, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporatorborehole_solution3.evaporator.xs], color = :green, linestyle = :dot, linewidth = 1)
-ylims!(ax,250,290.)
+ylims!(ax,250-273.15,290. - 273.15)
 
-text!(ax, [0.1], [evaporatorborehole_solution.borehole.Tb + 0.2],
+text!(ax, [0.1], [evaporatorborehole_solution.borehole.Tb - 273.15 + 0.2],
     # text= rich(rich("Tb", font="Bold"), " Tb", font =:regular),
     text= rich("borehole temperature", font =:regular),
     align = (:left, :bottom), color = :brown)

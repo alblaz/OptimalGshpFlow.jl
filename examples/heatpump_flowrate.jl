@@ -31,7 +31,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15  ;
+Ts_h = 273.15  + 10;
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
 
@@ -107,18 +107,24 @@ CopS = [round(x, digits=2) for x in [Q1/(W + Ppump), Q1_2/(W_2 + Ppump_2), Q1_3/
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
-lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
-lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
-vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
-lines!(ax, x2, Tc2, color = :chocolate1, linewidth =1)
-lines!(ax, x2, Th2, color = :chocolate1, linestyle = :dash, linewidth = 2)
-vlines!(ax, [evaporator_solution2.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
-lines!(ax, x3, Tc3, color = :green, linewidth = 2)
-lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2 )
-vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
-ylims!(ax,250,290.)
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (°C)")
 
+lref1 = lines!(ax, x, Tc .- 273.15, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
+ls1   = lines!(ax, x, Th .- 273.15, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
+
+lines!(ax, x, Tc .-273.15, color = :dodgerblue, linewidth = 2)
+lines!(ax, x, Th .-273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
+vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
+lines!(ax, x2, Tc2 .-273.15, color = :chocolate1, linewidth =1)
+lines!(ax, x2, Th2 .-273.15, color = :chocolate1, linestyle = :dash, linewidth = 2)
+vlines!(ax, [evaporator_solution2.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
+lines!(ax, x3, Tc3 .-273.15, color = :green, linewidth = 2)
+lines!(ax, x3, Th3 .-273.15, color = :green, linestyle = :dash, linewidth =2 )
+vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
+ylims!(ax,250 .-273.15,290. .-273.15)
+
+axislegend(ax, [lref1, ls1], ["Tsf", "Tref"], color = [:black, :black],  position = :rb,
+orientation = :horizontal)
 
 fig
 

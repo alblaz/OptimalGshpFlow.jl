@@ -22,8 +22,8 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 
 λground = 3.
 
-Tb = 273.15 - 3.
-ΔTsup = 7.5
+Tb = 273.15 + 10
+ΔTsup = 5.
 ηpump = 0.4
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
@@ -137,26 +137,26 @@ CopS = [round(x, digits=2) for x in [Q1/(W + Ppump), Q1_2/(W_2 + Ppump_2), Q1_3/
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
-lines!(ax, [0.,1.], evaporatorborehole_solution.borehole.Tb .* [1,1], color = :brown, linewidth = 2)
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (°C)")
+lines!(ax, [0.,1.], (evaporatorborehole_solution.borehole.Tb -273.15) .* [1,1], color = :brown, linewidth = 2)
 
-lref1 = lines!(ax, x, Tc, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
-ls1   = lines!(ax, x, Th, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
+lref1 = lines!(ax, x, Tc .- 273.15, color = :grey, linewidth = 2, label = "refrigerant", visible = false)
+ls1   = lines!(ax, x, Th .- 273.15, color = :grey, linestyle = :dash, linewidth =2, label = "secondary fluid", visible = false)
 
-lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
-lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
+lines!(ax, x, Tc .- 273.15, color = :dodgerblue, linewidth = 2)
+lines!(ax, x, Th .- 273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporatorborehole_solution.evaporator.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
 
-lines!(ax, x2, Tc2, color = :chocolate1, linewidth =2)
-lines!(ax, x2, Th2, color = :chocolate1, linestyle = :dash, linewidth = 2)
+lines!(ax, x2, Tc2 .- 273.15, color = :chocolate1, linewidth =2)
+lines!(ax, x2, Th2 .- 273.15, color = :chocolate1, linestyle = :dash, linewidth = 2)
 vlines!(ax, [evaporatorborehole_solution2.evaporator.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
 
-lines!(ax, x3, Tc3, color = :green, linewidth = 2)
-lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2)
+lines!(ax, x3, Tc3 .- 273.15, color = :green, linewidth = 2)
+lines!(ax, x3, Th3 .- 273.15, color = :green, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporatorborehole_solution3.evaporator.xs], color = :green, linestyle = :dot, linewidth = 1)
-ylims!(ax,250,290.)
+ylims!(ax,250 .- 273.15, 290 .- 273.15)
 
-text!(ax, [0.1], [evaporatorborehole_solution.borehole.Tb + 0.2 ],
+text!(ax, [0.1], [evaporatorborehole_solution.borehole.Tb .- 273.15 + 0.2 ],
     # text= rich(rich("Tb", font="Bold"), " Tb", font =:regular),
     text= rich("borehole temperature", font =:regular),
     align = (:left, :bottom), color = :brown)

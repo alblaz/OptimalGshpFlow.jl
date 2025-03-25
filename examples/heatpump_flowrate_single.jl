@@ -80,9 +80,9 @@ CopS = [round(x, digits=2) for x in [Q1/(W + Ppump)] ]
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
-lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
-lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (°C)")
+lref1 = lines!(ax, x, Tc .- 273.15, color = :dodgerblue, linewidth = 2)
+ls1 = lines!(ax, x, Th .- 273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
 # lines!(ax, x2, Tc2, color = :chocolate1, linewidth =1)
 # lines!(ax, x2, Th2, color = :chocolate1, linestyle = :dash, linewidth = 2)
@@ -90,9 +90,11 @@ vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, lin
 # lines!(ax, x3, Tc3, color = :green, linewidth = 2)
 # lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2 )
 # vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
-# ylims!(ax,272,280.)
-ylims!(ax,250,290.)
 
+ylims!(ax,- 10.,10.)
+
+axislegend(ax, [lref1, ls1], ["Tsf", "Tref"],  position = :rb,
+orientation = :horizontal)
 
 fig
 
@@ -151,6 +153,6 @@ Legend(gb[0,1], elements, labels, title,
         )
 
 ##.
-
+fig
 mypath = joinpath(@__DIR__,"figures")
 save(joinpath(mypath,"heatpump_singleVs.png"), fig)
