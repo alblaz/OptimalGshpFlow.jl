@@ -5,7 +5,7 @@
 compute the Darcy friction factor fD given the Reynolds number
 """
 function fDarcy(Re)
-    fD = Re<2300. ? 64/Re : (1/(lambertw(0.629*Re)))^2
+    fD = Re<2300. ? 64/Re : (1/(0.838*lambertw(0.629*Re)))^2
     return fD
 end
 
