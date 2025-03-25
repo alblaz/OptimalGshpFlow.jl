@@ -24,7 +24,7 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 λground = 3.
 
 Tb = 273.15 - 5
-ΔTsup = 0.5
+ΔTsup = 3.5
 ηpump = 0.3
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
@@ -109,7 +109,12 @@ Vs   = [p.Vs for p in params]
 fig = Figure(; size = (600, 400))
 ga = fig[1, 1] = GridLayout()
 ax = Axis(fig[1, 1], xlabel = "Vs (l/s)", ylabel = "COP")
-lines!(ax, Vs * 1000, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
-lines!(ax, Vs * 1000, COP2, color = :indianred, linewidth = 2, label = "COP2")
+lcop1 = lines!(ax, Vs * 1000, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
+lcop2 = lines!(ax, Vs * 1000, COP2, color = :indianred, linewidth = 2, label = "COP2")
 
+axislegend(ax, [lcop1,lcop2],["COPh","COPc"], position = :rt)#, orientation = :horizontal)
+
+mypath = joinpath(@__DIR__,"figures")
+save(joinpath(mypath,"optimalCOP_Tb_$(round(Int,Tb))_deltaTsup$(round(Int,div(ΔTsup,1)))_$(round(Int,mod(ΔTsup,1)*10)).png"), fig)
+# fig
 fig

@@ -24,7 +24,7 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 λground = 3.
 
 Tb = 273.15  + 0
-ΔTsup = 2.
+ΔTsup = 5.
 ηpump = 0.2
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
@@ -54,8 +54,6 @@ param = EvaporatorBoreholeParameters(param_evaporatorborehole_prototype,Vs = 1.5
 prob = NonlinearProblem(evaporatorborehole_model!,u0,param,abstol = 1e-7) 
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 # sol  = solve(prob, GaussNewton(); abstol = 1e-9)
-
-
 
 
 evaporatorborehole_solution = evaporatorborehole_model(sol.u,param_evaporatorborehole_prototype)
