@@ -70,6 +70,7 @@ struct RefrigerantSaturatedVapor
     cp
     μ
     λ
+    s
  end
 
  struct RefrigerantSuperHeatedVapor
@@ -78,6 +79,8 @@ struct RefrigerantSaturatedVapor
     cp
     μ
     λ
+    s
+    # his
  end
 
 """
@@ -124,8 +127,8 @@ function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, 
     pcrit = PropsSI.("Pcrit",  refrigerant_name) # critical pressure 
     M = PropsSI.("M",  refrigerant_name)
 
-    return Refrigerant(refrigerant_name, RefrigerantSaturatedVapor(saturated.h, saturated.T, saturated.ρ, saturated.cp, saturated.μ,  saturated.λ),
-    RefrigerantSuperHeatedVapor(superheated.h, superheated.ρ, superheated.cp, superheated.μ,  superheated.λ),
+    return Refrigerant(refrigerant_name, RefrigerantSaturatedVapor(saturated.h, saturated.T, saturated.ρ, saturated.cp, saturated.μ,  saturated.λ, saturated.s),
+    RefrigerantSuperHeatedVapor(superheated.h, superheated.ρ, superheated.cp, superheated.μ, superheated.λ, superheated.s),
     pcrit,
     pr_min,
     M)
@@ -162,14 +165,16 @@ function refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-4)
     cp1 = map(p-> PropsSI.("C", "P",  p, "Q", x, refrigerant), ps)
     μ1 = map(p-> PropsSI.("V", "P",  p, "Q", x, refrigerant), ps)
     λ1 = map(p-> PropsSI.("CONDUCTIVITY", "P",  p, "Q", x, refrigerant), ps)
+    s1 = map(p-> PropsSI.("S", "P",  p, "Q", x, refrigerant), ps)
     spl_hsat = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), h1, extrapolation_bc = Flat())
     spl_Tref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), T1, extrapolation_bc = Flat())
     spl_ρref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), ρ1, extrapolation_bc = Flat())
     spl_cpref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), cp1, extrapolation_bc = Flat())
     spl_μref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), μ1, extrapolation_bc = Flat())
     spl_λref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), λ1, extrapolation_bc = Flat())
+    spl_sref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), s1, extrapolation_bc = Flat())
 
-    spl_sat = (h = spl_hsat, T = spl_Tref, ρ = spl_ρref, cp = spl_cpref, μ = spl_μref, λ=spl_λref)
+    spl_sat = (h = spl_hsat, T = spl_Tref, ρ = spl_ρref, cp = spl_cpref, μ = spl_μref, λ=spl_λref, s = spl_sref)
     return spl_sat
 end
 
@@ -206,6 +211,7 @@ function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns 
     μ1 = map(p-> PropsSI.("V", "P",  p, "Q", 1., refrigerant), ps)
     λ1 = map(p-> PropsSI.("CONDUCTIVITY", "P",  p, "Q", 1., refrigerant), ps)
     cp1 = map(p-> PropsSI.("C", "P",  p, "Q", 1., refrigerant), ps)
+    s1 = map(p-> PropsSI.("S", "P",  p, "Q", 1., refrigerant), ps)
 
     C = [(p...,s) for p in zip(ps,T1), s in superheating_range]
 
@@ -229,14 +235,18 @@ function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns 
     B_λ[:,1] .= λ1
     B_λ[:, 2:end] .= map(x-> PropsSI.("CONDUCTIVITY", "P",  x[1], "T", x[2] + x[3], refrigerant), C[:,2:end] )
 
+    B_s = similar(B_H)
+    B_s[:,1] .= s1
+    B_s[:, 2:end] .= map(x-> PropsSI.("S", "P",  x[1], "T", x[2] + x[3], refrigerant), C[:,2:end] )
 
     splpsΔT_H = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_H, extrapolation_bc = Flat())
     splpsΔT_ρ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_ρ, extrapolation_bc = Flat())
     splpsΔT_μ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_μ, extrapolation_bc = Flat())
     splpsΔT_cp = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_cp, extrapolation_bc = Flat())
     splpsΔT_λ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_λ, extrapolation_bc = Flat())
+    splpsΔT_s = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_s, extrapolation_bc = Flat())
 
 
-    spl = ( h =splpsΔT_H, ρ = splpsΔT_ρ, μ=splpsΔT_μ, cp = splpsΔT_cp, λ =  splpsΔT_λ  )
+    spl = ( h =splpsΔT_H, ρ = splpsΔT_ρ,  cp = splpsΔT_cp,  μ=splpsΔT_μ, λ =  splpsΔT_λ, s =  splpsΔT_s  )
     return spl
 end
