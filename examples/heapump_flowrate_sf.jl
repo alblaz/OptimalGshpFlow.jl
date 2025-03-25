@@ -7,11 +7,13 @@ effect of change of the secondary fluid flow rate
 # preparation phase #
 #####################
 
-using OptimalGshpFlow, CoolProp, Parameters
+using OptimalGshpFlow, NonlinearSolve, CoolProp, Parameters
 # using NonlinearSolve, WGLMakie # This two packages are not dependencies so I load them from a separate environment.
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
-evaporator = EvaporatorDesign(5000., 273. -5 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+# evaporator = EvaporatorDesign(5000., 273. -5 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+evaporator = EvaporatorDesign(6000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+
 
 Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
@@ -20,7 +22,8 @@ refrigerant = Refrigerant(refrigerant_name)
 # we have the sizing parameter for a generic evaporator (A,Vs,Vref), and we now need to choose the size L and W of the plate heat exchanger
 # PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 # plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.189, β = 30.)
+# plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.189, β = 30.)
+plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.189, β = 30.)  # NB! chevron angle vs. reverse chev. ang. !
 
 ####################
 # evaporator model #
@@ -28,7 +31,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15 + -3.;
+Ts_h = 273.15  ;
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
 
@@ -42,15 +45,15 @@ param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, seco
 # @unpack plateheatexchanger = param_evaporator_prototype                           
 
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
-xms = tanhmap_01_to_R(0.5)
+ϵme = ϵmsup =  tanhmap_01_to_R(0.95) 
+xms = tanhmap_01_to_R(0.95)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m]
 
 # prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol = 1e-7)  
-prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol = 1e-7)  
+prob = NonlinearProblem(evaporator_model!, sol.u, param_evaporator_prototype, abstol = 1e-7)  
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
@@ -59,6 +62,11 @@ x, Tc, Th = temperatureprofiles(evaporator_solution; n = 11)
 W  = compressor_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
 Q1 = condenser_power(273.15 + 40, 0.7, evaporator_solution, refrigerant)
 Q2 = evaporator_solution.twophase_region.Q + evaporator_solution.superheat_region.Q
+
+Tmean = (evaporator_solution.superheat_region.Thh  + evaporator_solution.twophase_region.Thl) / 2
+Δp_evap = pressure_drop_evap(evaporator_solution.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean)
+Ppump = pumping_power(Δp_evap, evaporator_solution.superheat_region.Vh, 0.4)
+
 
 p_ev2 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.5*evaporator.Vs)
 prob2 = NonlinearProblem(evaporator_model!,sol.u, p_ev2, abstol = 1e-7)  
@@ -70,10 +78,13 @@ W_2  = compressor_power(273.15 + 40, 0.7, evaporator_solution2, refrigerant)
 Q1_2 = condenser_power(273.15 + 40, 0.7, evaporator_solution2, refrigerant)
 Q2_2 = evaporator_solution2.twophase_region.Q + evaporator_solution2.superheat_region.Q
 
+Tmean_2 = (evaporator_solution2.superheat_region.Thh  + evaporator_solution2.twophase_region.Thl) / 2
+Δp_evap_2 = pressure_drop_evap(evaporator_solution2.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_2)
+Ppump_2 = pumping_power(Δp_evap_2, evaporator_solution2.superheat_region.Vh, 0.4)
 # CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2] ]
 
 p_ev3 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.3*evaporator.Vs)
-prob3 = NonlinearProblem(evaporator_model!,sol.u, p_ev3, abstol = 1e-7)  
+prob3 = NonlinearProblem(evaporator_model!,sol2.u, p_ev3, abstol = 1e-7)  
 sol3  = solve(prob3, TrustRegion(); abstol = 1e-9)
 evaporator_solution3 = evaporator_model(sol3.u, p_ev3)
 x3, Tc3, Th3 = temperatureprofiles(evaporator_solution3; n = 51)
@@ -82,9 +93,13 @@ W_3  = compressor_power(273.15 + 40, 0.7, evaporator_solution3, refrigerant)
 Q1_3 = condenser_power(273.15 + 40, 0.7, evaporator_solution3, refrigerant)
 Q2_3 = evaporator_solution3.twophase_region.Q + evaporator_solution3.superheat_region.Q
 
+Tmean_3 = (evaporator_solution3.superheat_region.Thh  + evaporator_solution3.twophase_region.Thl) / 2
+Δp_evap_3 = pressure_drop_evap(evaporator_solution3.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_3)
+Ppump_3 = pumping_power(Δp_evap_3, evaporator_solution3.superheat_region.Vh, 0.4)
+
 ##.
 
-CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2, Q1_3/W_3] ]
+CopS = [round(x, digits=2) for x in [Q1/(W + Ppump), Q1_2/(W_2 + Ppump_2), Q1_3/(W_3 + Ppump_3)] ]
 
 
 
@@ -93,7 +108,7 @@ CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2, Q1_3/W_3] ]
 fig = Figure(; size = (600, 400))
 
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "x")
+ax = Axis(fig[1, 1], xlabel = "x (%)", ylabel = "Temperature (K)")
 lines!(ax, x, Tc, color = :dodgerblue, linewidth = 2)
 lines!(ax, x, Th, color = :dodgerblue, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
@@ -116,7 +131,7 @@ gb = fig[1, 2] = GridLayout()
 
 nconf = 3
 
-tbl = (power = [Q1, Q2, W, Q1_2, Q2_2, W_2, Q1_3, Q2_3, W_3]./1000,
+tbl = (power = [Q1, Q2, W + Ppump, Q1_2, Q2_2, W_2 + Ppump_2, Q1_3, Q2_3, W_3 + Ppump_3]./1000,
        grp_type          = repeat([1,2,3],nconf), #[1,2,3,1,2,3],
        grp_configuration = vcat([fill(i,3) for i=1:nconf]...), #[1,1,1,2,2,2],
        grp_test = repeat([1,2,2],nconf) #,       [1,2,2,1,2,2]
