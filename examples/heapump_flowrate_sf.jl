@@ -6,7 +6,6 @@ effect of change of the secondary fluid flow rate
 #####################
 # preparation phase #
 #####################
-
 using OptimalGshpFlow, NonlinearSolve, CoolProp, Parameters
 # using NonlinearSolve, WGLMakie # This two packages are not dependencies so I load them from a separate environment.
 

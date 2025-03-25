@@ -11,7 +11,8 @@ using OptimalGshpFlow, NonlinearSolve, CoolProp, Parameters
 # using NonlinearSolve, WGLMakie # This two packages are not dependencies so I load them from a separate environment.
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
-evaporator = EvaporatorDesign(5000., 273. -5 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+# evaporator = EvaporatorDesign(5000., 273. -5 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+evaporator = EvaporatorDesign(6000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
 Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
@@ -20,7 +21,9 @@ refrigerant = Refrigerant(refrigerant_name)
 # we have the sizing parameter for a generic evaporator (A,Vs,Vref), and we now need to choose the size L and W of the plate heat exchanger
 # PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 # plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.2, 0.06; b=0.002, ϕ=1.189, β = 30.)
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.189, β = 30.)
+# plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.189, β = 30.)
+plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.189, β = 30.)  # NB! chevron angle vs. reverse chev. ang. !
+
 
 ####################
 # evaporator model #
@@ -28,7 +31,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.25, 0.12; b=0.002, ϕ=1.
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15 - 3.;
+Ts_h = 273.15  ;
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
 
@@ -42,8 +45,8 @@ param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, seco
 # @unpack plateheatexchanger = param_evaporator_prototype                           
 
 pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.95) 
-xms = tanhmap_01_to_R(0.95)
+ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
+xms = tanhmap_01_to_R(0.3)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 
@@ -66,7 +69,7 @@ Ppump = pumping_power(Δp_evap, evaporator_solution.superheat_region.Vh, 0.4)
 
 # p_ev2 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.5*evaporator.Vs, Vref = 0.5*evaporator.Vref)
 p_ev2 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.5*evaporator.Vs, Vref = 0.5*evaporator.Vref)
-prob2 = NonlinearProblem(evaporator_model!,sol.u, p_ev2, abstol = 1e-7)  
+prob2 = NonlinearProblem(evaporator_model!,u0, p_ev2, abstol = 1e-7)  
 sol2  = solve(prob2, TrustRegion(); abstol = 1e-9)
 evaporator_solution2 = evaporator_model(sol2.u, p_ev2)
 x2, Tc2, Th2 = temperatureprofiles(evaporator_solution2; n = 51)
@@ -75,10 +78,9 @@ W_2  = compressor_power(273.15 + 40, 0.7, evaporator_solution2, refrigerant)
 Q1_2 = condenser_power(273.15 + 40, 0.7, evaporator_solution2, refrigerant)
 Q2_2 = evaporator_solution2.twophase_region.Q + evaporator_solution2.superheat_region.Q
 
-W_3  = compressor_power(273.15 + 40, 0.7, evaporator_solution3, refrigerant)
-Q1_3 = condenser_power(273.15 + 40, 0.7, evaporator_solution3, refrigerant)
-Q2_3 = evaporator_solution3.twophase_region.Q + evaporator_solution3.superheat_region.Q
-
+Tmean_2 = (evaporator_solution2.superheat_region.Thh  + evaporator_solution2.twophase_region.Thl) / 2
+Δp_evap_2 = pressure_drop_evap(evaporator_solution2.superheat_region.Vh, plateheatexchanger, secondaryfluid,Tmean_2)
+Ppump_2 = pumping_power(Δp_evap_2, evaporator_solution2.superheat_region.Vh, 0.4)
 # CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2] ]
 
 p_ev3 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.3*evaporator.Vs,Vref = 0.3*evaporator.Vref)

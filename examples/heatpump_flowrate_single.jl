@@ -29,6 +29,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 # evaporator model #
 ####################
 
+
 # input parameters for the simulation
 ΔTsup = 5.;  
 Ts_h = 273.15 + 5 ;
@@ -89,7 +90,8 @@ vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, lin
 # lines!(ax, x3, Tc3, color = :green, linewidth = 2)
 # lines!(ax, x3, Th3, color = :green, linestyle = :dash, linewidth =2 )
 # vlines!(ax, [evaporator_solution3.xs], color = :green, linestyle = :dot, linewidth = 1)
-ylims!(ax,272,280.)
+# ylims!(ax,272,280.)
+ylims!(ax,250,290.)
 
 
 fig
