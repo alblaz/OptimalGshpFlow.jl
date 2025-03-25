@@ -109,8 +109,8 @@ function pumping_power(η, H, V, D, fluidproperties, T)
 end
 
 
-function pumping_power(η, H, V, D, fluidproperties, T,platehex)
+function pumping_power(η, H, V, D, fluidproperties, T, platehex,minor_losses=0.15)
     Δp = pressure_drop(H,V,D,fluidproperties,T)+pressure_drop_evap(V, platehex, fluidproperties,T)
-    P = Δp * V / η
+    P = Δp *(1+minor_losses)* V / η
     return P
 end
