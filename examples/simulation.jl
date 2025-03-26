@@ -94,7 +94,7 @@ p  = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid
 
 
 # initial guesses for the u vector
-pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)
 ϵme = ϵmsup =  sigmoid_01_to_R(0.7) 
 xms = sigmoid_01_to_R(0.8)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
@@ -223,7 +223,7 @@ function simulation(evaporator_solutions, borehole_solutions, evapbh_solutions, 
                 end
                 u0[4] = sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
                 u0[5] = sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
-                u0[7]=sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
+                u0[6] = sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
                 if i == max_iter
                         @show sol_evapbh.retcode
                         println("/!\\ not converged")
@@ -268,7 +268,7 @@ plot!(ΔT_range, COP₂, label="COP₂")
 #     ## could we just pass an evaporator type here?
 
 #     # initial guesses for the u vector
-#     pme = sigmoid_ab_to_R(PropsSI("P", "T", evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+#     pme = sigmoid_ab_to_R(PropsSI("P", "T", evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)
 #     ϵme = ϵmsup = sigmoid_01_to_R(0.5)
 #     xms = sigmoid_01_to_R(0.5)
 #     Qe, Qsup = evaporator.Qnom * 0.9, evaporator.Qnom * 0.1
