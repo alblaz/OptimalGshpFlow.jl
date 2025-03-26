@@ -57,7 +57,7 @@ K=273.15 #K to °C
         ################################
         # simulation parameters #
         ################################
-        reltol=1e-3
+        reltol=1e-2
 
 ########################################
 # simulation #
@@ -94,11 +94,11 @@ p  = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid
 
 
 # initial guesses for the u vector
-pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
-xms = tanhmap_01_to_R(0.5)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.7) 
+xms = sigmoid_01_to_R(0.8)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
-Tsf_l, Tsf_m = evaporator.Thl,  evaporator.Thl+(evaporator.Thh -  evaporator.Thl)*3/4
+Tsf_l, Tsf_m = evaporator.Thl,  evaporator.Thl+(evaporator.Thh -  evaporator.Thl)*2/3
 
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
 
@@ -128,35 +128,7 @@ p = EvaporatorBoreholeParameters(refrigerant=refrigerant, secondaryfluid=seconda
                                         borehole=borehole, λground=λground, Tb=Tb)
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, evaporator.Thh]
 prob = NonlinearProblem(evaporatorborehole_model!,u0,p,reltol = reltol)
-try 
-        sol_evapbh  = solve(prob, TrustRegion(); reltol = reltol)
-catch e
-end
-
-a=true
-i=0
-max_iter=20
-call_i(;i=i,max_iter=max_iter)=i,max_iter
-while a || (sol_evapbh.retcode!=ReturnCode.Success && i<=max_iter)
-        i,max_iter=call_i()
-        @show i
-        i += 1
-        a=false
-        try
-            prob = NonlinearProblem(evaporatorborehole_model!, u0, p, reltol=reltol)
-            sol_evapbh = solve(prob, TrustRegion(); reltol=reltol)
-        catch e
-            # @show tanhmap_R_to_01(u0[4]),tanhmap_R_to_01(u0[7])
-        end
-        u0[4] = u0[5] = tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
-        u0[7]=tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
-        if i == max_iter
-            @show sol_evapbh.retcode
-            println("/!\\ not converged")
-        elseif sol_evapbh.retcode == ReturnCode.Success
-            println(":) converged") 
-        end
-end
+sol_evapbh  = solve(prob, TrustRegion(); reltol = reltol)
 evaporatorborehole_solution = evaporatorborehole_model(sol_evapbh.u,p)
 
 #############################
@@ -206,7 +178,7 @@ function pass_u0(Vs,Q_evap,ρ_cₚ,to_pass="sol_evapbh";sol_evap=sol_evap, sol_b
 end
 
 T_mean=(Thl+Thh)/2
-ΔT_range=range(0.5, 7, length=61)
+ΔT_range=range(0.5, 7, length=121)
 V_range=Q_evap./(ΔT_range * secondaryfluid.ρ(T_mean) * secondaryfluid.cp(T_mean))
 
 
@@ -235,10 +207,11 @@ function simulation(evaporator_solutions, borehole_solutions, evapbh_solutions, 
                                          ΔTsup=ΔT_sup,
                                          borehole=borehole, λground=λground, Tb=Tb)
 
-        u0 = pass_u0(Vs,Q_evap,p.secondaryfluid.ρ(Tin)*p.secondaryfluid.cp(Tin); sol_evapbh=sol_evapbh)
+        # u0 = sol_evapbh.u
+        u0=pass_u0(Vs,Q_evap,p.secondaryfluid.ρ(Tin)*p.secondaryfluid.cp(Tin); sol_evapbh=sol_evapbh)
         a=true
         i=0
-        max_iter=20
+        max_iter=100
         while a || (sol_evapbh.retcode!=ReturnCode.Success && i<=max_iter)
                 i += 1
                 a=false
@@ -246,10 +219,11 @@ function simulation(evaporator_solutions, borehole_solutions, evapbh_solutions, 
                         prob = NonlinearProblem(evaporatorborehole_model!, u0, p, reltol=reltol)
                         sol_evapbh = solve(prob, TrustRegion(); reltol=reltol)
                 catch e
-                        # @show tanhmap_R_to_01(u0[4]),tanhmap_R_to_01(u0[7])
+                        # @show sigmoid_R_to_01(u0[4]),sigmoid_R_to_01(u0[7])
                 end
-                u0[4] = u0[5] = tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
-                u0[7]=tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
+                u0[4] = sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
+                u0[5] = sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
+                u0[7]=sigmoid_01_to_R(min(max(0.5+randn(1)[1],0.03),0.97))
                 if i == max_iter
                         @show sol_evapbh.retcode
                         println("/!\\ not converged")
@@ -294,9 +268,9 @@ plot!(ΔT_range, COP₂, label="COP₂")
 #     ## could we just pass an evaporator type here?
 
 #     # initial guesses for the u vector
-#     pme = tanhmap_ab_to_R(PropsSI("P", "T", evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-#     ϵme = ϵmsup = tanhmap_01_to_R(0.5)
-#     xms = tanhmap_01_to_R(0.5)
+#     pme = sigmoid_ab_to_R(PropsSI("P", "T", evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+#     ϵme = ϵmsup = sigmoid_01_to_R(0.5)
+#     xms = sigmoid_01_to_R(0.5)
 #     Qe, Qsup = evaporator.Qnom * 0.9, evaporator.Qnom * 0.1
 #     Tsf_l, Tsf_m = evaporator.Thh - 4, evaporator.Thh - 2
 
