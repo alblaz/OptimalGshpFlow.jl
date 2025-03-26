@@ -12,21 +12,23 @@ secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
 refrigerant = Refrigerant(refrigerant_name)
 
 # we have the sizing parameter for a generic evaporator (A,Vs,Vref), and we now need to choose the size L and W of the plate heat exchanger
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.189, β = 30.)  # NB! chevron angle vs. reverse chev. ang. !
+plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.189, β = 30., Dport=0.05,N_pass=1)  # NB! chevron angle vs. reverse chev. ang. !
 
 ##################
 # borehole model #
 ##################
-di = 0.04*(1-1/17) #internal pipe diameter
-borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 2., pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
+dout = 0.04 #internal pipe diameter
+borehole = SingleUPipeBorehole(H = 200., D = 4., rpo = dout/2, SDR=17., rb = 0.115, λg = 2., pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
 @assert norm([borehole.pipe_position[1]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 @assert norm([borehole.pipe_position[2]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 
 λground = 3.
 
-Tb = 273.15 - 5
+Tb = 273.15+10.
 ΔTsup = 3.5
-ηpump = 0.3
+ηpump = 0.4
+
+
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
 # u0 = [275.]
@@ -57,6 +59,7 @@ function solve_configuration(u0,p)
     sol  = solve(prob, TrustRegion(); abstol = 1e-9)
     return sol
 end
+
 
 params = [EvaporatorBoreholeParameters(param_evaporatorborehole_prototype,Vs = V) for V in  evaporator.Vs .* (2:-0.05:0.1)]
 # sols = [solve_configuration(u0,p) for p in params]
@@ -99,34 +102,66 @@ function evaluate_solution(sol,p; Tcond = 273.15 + 40, ηis = 0.7)
     # COP2 = Q2/(W  + Ppump)
     COP1 = Q1/W
     COP2 = Q1/(W  + Ppump)
-    return COP1, COP2, evaporatorborehole_solution
+    return COP1, COP2, Q1, evaporatorborehole_solution
 end
 
 
 COP1 = [evaluate_solution(sol,p)[1] for (sol,p) in zip(sols,params)]
 COP2 = [evaluate_solution(sol,p)[2] for (sol,p) in zip(sols,params)]
-ΔTs = [evaluate_solution(sol,p)[3].evaporator.ΔT_h for (sol,p) in zip(sols,params)]
+Q1 = [evaluate_solution(sol,p)[3] for (sol,p) in zip(sols,params)]
+ΔTs = [evaluate_solution(sol,p)[4].evaporator.superheat_region.Thh .- evaluate_solution(sol,p)[4].evaporator.twophase_region.Thl for (sol,p) in zip(sols,params)]
+Tin_bh = [evaluate_solution(sol,p)[4].evaporator.twophase_region.Thl for (sol,p) in zip(sols,params)]
+Tout_bh = [evaluate_solution(sol,p)[4].evaporator.superheat_region.Thh for (sol,p) in zip(sols,params)]
 Vs   = [p.Vs for p in params]
+T_mean=(Tin_bh+Tout_bh)/2
 
 
-
-fig = Figure(; size = (600, 400))
+fig = Figure(; size = (600, 600))
 ga = fig[1, 1] = GridLayout()
-# ax = Axis(fig[1, 1], xlabel = "Vs (l/s)", ylabel = "COP")
-ax = Axis(fig[1, 1], xlabel = "Temperature difference (K)", ylabel = "COP")
-lcop1 = lines!(ax, ΔTs, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
-lcop2 = lines!(ax, ΔTs, COP2, color = :indianred, linewidth = 2, label = "COP2")
+ax = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "COP")
+lcop1 = lines!(ax, Vs*1000, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
+lcop2 = lines!(ax, Vs*1000, COP2, color = :indianred, linewidth = 2, label = "COP2")
+
+# Add a secondary axis for Q1
+ax2 = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "Q1", yaxisposition = :right)
+lq1 = lines!(ax2, Vs*1000, Q1, color = :green, linewidth = 2, label = "Q1")
 
 # Add dashed vertical line for the maximum of COP2
 max_COP2_index = argmax(COP2)
-lmax=lines!(ax,ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
+lmax = lines!(ax, ones(2).*Vs[max_COP2_index]*1000, [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
 
-axislegend(ax, [lcop1,lcop2,lmax],["COPh","COPc","max"], position = :rt)#, orientation = :horizontal)
+axislegend(ax, [lcop1, lcop2, lmax], ["COP1", "COP2", "max"], position = :rt)
+axislegend(ax2, [lq1], ["Q1"], position = :rb)
 
-mypath = joinpath(@__DIR__,"figures")
-save(joinpath(mypath,"optimalCOP_Tb_$(round(Int,Tb))_deltaTsup$(round(Int,div(ΔTsup,1)))_$(round(Int,mod(ΔTsup,1)*10)).png"), fig)
-# fig
+# Save the first plot
+mypath = joinpath(@__DIR__, "figures")
+save(joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
+
+# Add a subplot for T_mean vs flow rate under the existing plot
+ax3 = Axis(fig[2, 1], xlabel = "Flow rate [l/s]", ylabel = "Temperature [°C]")
+ltin= lines!(ax3, Vs*1000, Tin_bh .- 273.15, color = :blue, linewidth = 2, label = "T_in_bh")
+ltout = lines!(ax3, Vs*1000, Tout_bh .- 273.15, color = :red, linewidth = 2, label = "T_out_bh")
+ltb = lines!(ax3, Vs*1000, Tb*ones(length(Vs)) .- 273.15, color = :green, linewidth = 2, label = "T_out_bh")
+Re = @. evaporator.Vs .* (2:-0.05:0.1) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
+
+# Add a subplot for Reynolds number vs flow rate under the existing plots
+ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
+lre = lines!(ax4, Vs * 1000, Re, color = :purple, linewidth = 2, label = "Re")
+
+axislegend(ax4, [lre], ["Re"], position = :rb)
+
+
+# Add dashed vertical line for the maximum of T_mean
+# max_T_mean_index = argmax(T_mean)
+# lmax_tmean = lines!(ax3, ones(2).*Vs[max_T_mean_index]*1000, [minimum(T_mean), maximum(T_mean)], linestyle = :dash, color = :black)
+
+axislegend(ax3, [ltin, ltout,ltb], ["T_in_bh", "T_out_bh", "T_borehole"], position = :rb)
+
+# Save the combined plot
+save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
+linkxaxes!(ax,ax2,ax3,ax4)
 fig
+
 
 ### Same plot in interactive form with Plotly
 plotly()
