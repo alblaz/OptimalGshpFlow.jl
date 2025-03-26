@@ -63,10 +63,10 @@ Compute the pressure drop for a plate heat exchanger.
 `platehex::PlateHeatExchanger` is the plate heat exchanger object containing parameters such as number of plates, plate width, chevron angle, and plate length,
 `fluidproperties` is an object of type `SecondaryFluid` that provides fluid properties like density and viscosity.
 """
-function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.05,N_pass=1)    
+function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T)    
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
-    @unpack np,b,ϕ,β,L,W = platehex
+    @unpack np,b,ϕ,β,L,W,D_port,N_pass = platehex
     Nc=(np-1)/2/N_pass #number of parallel channels
     Dₕ=2*b/ϕ # hydraulic diameter 4*A/P
 

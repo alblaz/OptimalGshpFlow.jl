@@ -19,6 +19,8 @@ struct PlateHeatExchanger{T <: Number}
    ϕ::T
    b::T
    β::T
+   D_port::T
+   N_pass::T
 end
 
 """
@@ -27,11 +29,11 @@ Constructor
 
 PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 """
-function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.,Dport=0.05)
+function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30., Dport=0.05,N_pass=1)
     L_eff=L-Dport # effective heat transfer area (no heat transfer over the length having the ports)
     np =  round(Int, A/(L*W*ϕ)/2)+1 + 2  # number of total plates, i.e. including the two "blind" plates on the side, number of plates should always be odd
     H = (np-1)/2 * b                     # total height of the secondary fluid channels 
-    return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β)
+    return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β,Dport,N_pass)
 end
 
 """
