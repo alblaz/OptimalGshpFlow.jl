@@ -9,8 +9,6 @@ Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used 
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
 refrigerant = Refrigerant(refrigerant_name)
 
-evaporator.A
-
 plateheatexchanger = PlateHeatExchanger(3.33, 0.52, 0.19; b=0.00206, ϕ=1.189, β = 30., Dport=0.06,N_pass=1)  # NB! chevron angle vs. reverse chev. ang. !
 
 @unpack Vs,Thh,Thl = evaporator
