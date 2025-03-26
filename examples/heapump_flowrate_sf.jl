@@ -30,7 +30,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 
 # input parameters for the simulation
 ΔTsup = 5.;  
-Ts_h = 273.15 + 10;
+Ts_h = 273.15  -3;
 ηpump = 0.3
 
 # p  = refrigerant, secondaryfluid, plateheatexchanger, evaporator.hei, evaporator.Vs, evaporator.Vref, ΔTsup, Tsf_h
@@ -44,16 +44,16 @@ param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, seco
                                         
 # @unpack plateheatexchanger = param_evaporator_prototype                           
 
-pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.95) 
-xms = tanhmap_01_to_R(0.95)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
+xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m]
 
 # prob = NonlinearProblem(evaporator_model!,u0, param_evaporator_prototype, abstol = 1e-7)  
-prob = NonlinearProblem(evaporator_model!, sol.u, param_evaporator_prototype, abstol = 1e-7)  
+prob = NonlinearProblem(evaporator_model!, u0, param_evaporator_prototype, abstol = 1e-7)  
 sol  = solve(prob, TrustRegion(); abstol = 1e-9)
 evaporator_solution = evaporator_model(sol.u, param_evaporator_prototype)
 
@@ -69,7 +69,7 @@ Ppump = pumping_power(Δp_evap, evaporator_solution.superheat_region.Vh, ηpump)
 
 
 p_ev2 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.5*evaporator.Vs)
-prob2 = NonlinearProblem(evaporator_model!,sol.u, p_ev2, abstol = 1e-7)  
+prob2 = NonlinearProblem(evaporator_model!,u0, p_ev2, abstol = 1e-7)  
 sol2  = solve(prob2, TrustRegion(); abstol = 1e-9)
 evaporator_solution2 = evaporator_model(sol2.u, p_ev2)
 x2, Tc2, Th2 = temperatureprofiles(evaporator_solution2; n = 51)
@@ -84,7 +84,7 @@ Ppump_2 = pumping_power(Δp_evap_2, evaporator_solution2.superheat_region.Vh, η
 # CopS = [round(x, digits=2) for x in [Q1/W, Q1_2/W_2] ]
 
 p_ev3 = EvaporatorParameters(param_evaporator_prototype, Vs = 0.3*evaporator.Vs)
-prob3 = NonlinearProblem(evaporator_model!,sol2.u, p_ev3, abstol = 1e-7)  
+prob3 = NonlinearProblem(evaporator_model!,u0, p_ev3, abstol = 1e-7)  
 sol3  = solve(prob3, TrustRegion(); abstol = 1e-9)
 evaporator_solution3 = evaporator_model(sol3.u, p_ev3)
 x3, Tc3, Th3 = temperatureprofiles(evaporator_solution3; n = 51)
@@ -116,7 +116,7 @@ ls1   = lines!(ax, x, Th .- 273.15, color = :grey, linestyle = :dash, linewidth 
 lines!(ax, x, Tc .- 273.15, color = :dodgerblue, linewidth = 2)
 lines!(ax, x, Th .- 273.15, color = :dodgerblue, linestyle = :dash, linewidth =2)
 vlines!(ax, [evaporator_solution.xs], color = :dodgerblue, linestyle = :dot, linewidth =1)
-lines!(ax, x2, Tc2 .- 273.15, color = :chocolate1, linewidth =1)
+lines!(ax, x2, Tc2 .- 273.15, color = :chocolate1, linewidth =2)
 lines!(ax, x2, Th2 .- 273.15, color = :chocolate1, linestyle = :dash, linewidth = 2)
 vlines!(ax, [evaporator_solution2.xs], color = :chocolate1, linestyle = :dot, linewidth =1)
 lines!(ax, x3, Tc3 .- 273.15, color = :green, linewidth = 2)
@@ -187,4 +187,4 @@ fig
 ##.
 
 mypath = joinpath(@__DIR__,"figures")
-save(joinpath(mypath,"variableVs_T$(round(Int,Ts_h)).png"), fig)
+# save(joinpath(mypath,"variableVs_T$(round(Int,Ts_h)).png"), fig)

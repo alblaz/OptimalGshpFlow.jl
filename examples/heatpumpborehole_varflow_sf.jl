@@ -24,7 +24,7 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpi = di/2,  rb = 0.115, λg = 
 
 Tb = 273.15 + 10
 ΔTsup = 5.
-ηpump = 0.4
+ηpump = 0.2
 
 # param_borehole_prototype = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
 # u0 = [275.]
@@ -42,9 +42,9 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
                                         borehole=borehole, λground=λground, Tb=Tb)
 
         
-pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
-xms = tanhmap_01_to_R(0.5)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
+xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m = Ts_h - 4, Ts_h - 2
 

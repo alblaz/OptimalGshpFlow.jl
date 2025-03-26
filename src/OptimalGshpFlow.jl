@@ -9,7 +9,7 @@ using LambertW
 include("utilities.jl")
 export linearmap_01_to_ab, linearmap_ab_to_01
 export tanhmap_01_to_R, tanhmap_R_to_01, tanhmap_ab_to_R, tanhmap_R_to_ab
-export sigmoid_01_to_R, sigmoid_R_to_01
+export sigmoid_01_to_R, sigmoid_R_to_01, sigmoid_ab_to_R, sigmoid_R_to_ab
 
 include("fluidproperties.jl")
 # export interpolate_sf_properties, interpolate_ref_properties_twophaseregion, interpolate_ref_properties_superheatedregion
