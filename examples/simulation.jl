@@ -25,7 +25,7 @@ K=273.15 #K to °C
         ΔTsup = 5.;
         ΔTsub = 5.;
         ηᵥ=0.95;
-        Q_evap=5000.;
+        Q_evap=6000.;
         L=0.5;
         W=0.15;
         T_evap_design= 0. + K
@@ -42,7 +42,7 @@ K=273.15 #K to °C
         λg = 3. #grout
         pipe_position = ((0.04, 0.0), (-0.04, 0.0))
         λground = 3.5 #ground
-        Tin, Tb  = -3. + K , 2. + K
+        Tin, Tb  = 1. + K , 5. + K
 
         ################################
         # compressor #
@@ -53,6 +53,11 @@ K=273.15 #K to °C
         # condenser #
         ################################
         T_cond=40. + K
+
+        ################################
+        # simulation parameters #
+        ################################
+        reltol=1e-3
 
 ########################################
 # simulation #
@@ -93,12 +98,12 @@ pme = tanhmap_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.nam
 ϵme = ϵmsup =  tanhmap_01_to_R(0.5) 
 xms = tanhmap_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
-Tsf_l, Tsf_m = evaporator.Thh - 4, evaporator.Thh - 2
+Tsf_l, Tsf_m = evaporator.Thl,  evaporator.Thl+(evaporator.Thh -  evaporator.Thl)*3/4
 
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
 
-prob = NonlinearProblem(evaporator_model!,u0,p,reltol = 1e-5)  
-sol_evap  = solve(prob, TrustRegion(); reltol = 1e-5)
+prob = NonlinearProblem(evaporator_model!,u0,p,reltol = reltol)  
+sol_evap  = solve(prob, TrustRegion(); reltol = reltol)
 evaporator_solution = evaporator_model(sol_evap.u,p)
 
 
@@ -108,8 +113,8 @@ evaporator_solution = evaporator_model(sol_evap.u,p)
 borehole = SingleUPipeBorehole(H=H, D=D, λg=λg, pipe_position = pipe_position, rpo=Dpo/2, SDR=SDR)
 u0 = [1. + K]
 p = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
-prob = NonlinearProblem(borehole_model!,u0,p,reltol = 1e-5)  
-sol_bh  = solve(prob, TrustRegion(); reltol = 1e-5)
+prob = NonlinearProblem(borehole_model!,u0,p,reltol = reltol)  
+sol_bh  = solve(prob, TrustRegion(); reltol = reltol)
 
 
 #############################
@@ -122,8 +127,36 @@ p = EvaporatorBoreholeParameters(refrigerant=refrigerant, secondaryfluid=seconda
                                         ΔTsup =  ΔT_sup, 
                                         borehole=borehole, λground=λground, Tb=Tb)
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, evaporator.Thh]
-prob = NonlinearProblem(evaporatorborehole_model!,u0,p,reltol = 1e-5) 
-sol_evapbh  = solve(prob, TrustRegion(); reltol = 1e-5)
+prob = NonlinearProblem(evaporatorborehole_model!,u0,p,reltol = reltol)
+try 
+        sol_evapbh  = solve(prob, TrustRegion(); reltol = reltol)
+catch e
+end
+
+a=true
+i=0
+max_iter=20
+call_i(;i=i,max_iter=max_iter)=i,max_iter
+while a || (sol_evapbh.retcode!=ReturnCode.Success && i<=max_iter)
+        i,max_iter=call_i()
+        @show i
+        i += 1
+        a=false
+        try
+            prob = NonlinearProblem(evaporatorborehole_model!, u0, p, reltol=reltol)
+            sol_evapbh = solve(prob, TrustRegion(); reltol=reltol)
+        catch e
+            # @show tanhmap_R_to_01(u0[4]),tanhmap_R_to_01(u0[7])
+        end
+        u0[4] = u0[5] = tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
+        u0[7]=tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
+        if i == max_iter
+            @show sol_evapbh.retcode
+            println("/!\\ not converged")
+        elseif sol_evapbh.retcode == ReturnCode.Success
+            println(":) converged") 
+        end
+end
 evaporatorborehole_solution = evaporatorborehole_model(sol_evapbh.u,p)
 
 #############################
@@ -173,7 +206,7 @@ function pass_u0(Vs,Q_evap,ρ_cₚ,to_pass="sol_evapbh";sol_evap=sol_evap, sol_b
 end
 
 T_mean=(Thl+Thh)/2
-ΔT_range=range(2.9, 7, length=61)
+ΔT_range=range(0.5, 7, length=61)
 V_range=Q_evap./(ΔT_range * secondaryfluid.ρ(T_mean) * secondaryfluid.cp(T_mean))
 
 
@@ -190,45 +223,41 @@ x,Tc,Th,W,Q₁,COP₁,Ppump,COP₂=[],[],[],[],[],[],[],[]
 function simulation(evaporator_solutions, borehole_solutions, evapbh_solutions, x,Tc,Th,W,Q₁,COP₁,Ppump,COP₂,Q_evap
         ;sol_evap=sol_evap,sol_bh=sol_bh,sol_evapbh=sol_evapbh,borehole = borehole, Tin=Tin, λground=λground, Tb=Tb
         )
+
     for Vs in V_range
         # p = EvaporatorParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid,
-        #                           plateheatexchanger=plateheatexchanger, 
-        #                           hei=hei, Vs=Vs, Vref=Vref, 
-        #                           ΔTsup=ΔT_sup, Ts_h=Thh)
-        ## could we just pass an evaporator type here?
+        
         @show Vs
-        # initial guesses for the u vector
-        # u0 =  sol_evap
-        # # [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m]
-
-        # prob = NonlinearProblem(evaporator_model!, u0, p, reltol=1e-5)
-        # sol_evap = solve(prob, TrustRegion(); reltol=1e-5)
-        # push!(evaporator_solutions, evaporator_model(sol_evap.u, p))
-
-        ##################
-        # borehole model #
-        ##################
-    #     borehole = SingleUPipeBorehole(H=H, D=D, λg=λg, pipe_position=pipe_position, rpo=Dpo/2, SDR=SDR)
-        # u0 = [1. + K]
-        # p = BoreholeParameters(secondaryfluid=secondaryfluid, Vs=Vs, Tin=Tin, borehole=borehole, λground=λground, Tb=Tb)
-        # prob = NonlinearProblem(borehole_model!, u0, p, reltol=1e-5)
-        # sol_bh=solve(prob, TrustRegion(); reltol=1e-5)
-        # push!(borehole_solutions,sol_bh)
-
-        #############################
-        # evaporator-borehole model #
-        #############################
-        # The model evaporatorborehole_model! combine the models above by imposing Tin = Ts_l and Tout = Ts_h
+        
 
         p = EvaporatorBoreholeParameters(refrigerant=refrigerant, secondaryfluid=secondaryfluid, plateheatexchanger=plateheatexchanger,
                                          hei=hei, Vs=Vs, Vref=Vref,
                                          ΔTsup=ΔT_sup,
                                          borehole=borehole, λground=λground, Tb=Tb)
-        u0 = pass_u0(Vs,Q_evap,p.secondaryfluid.ρ(Tin)*p.secondaryfluid.cp(Tin),"")
-        prob = NonlinearProblem(evaporatorborehole_model!, u0, p, reltol=1e-5)
-        sol_evapbh = solve(prob, TrustRegion(); reltol=1e-5)
-        push!(evapbh_solutions,evaporatorborehole_model(sol_evapbh.u, p))
 
+        u0 = pass_u0(Vs,Q_evap,p.secondaryfluid.ρ(Tin)*p.secondaryfluid.cp(Tin); sol_evapbh=sol_evapbh)
+        a=true
+        i=0
+        max_iter=20
+        while a || (sol_evapbh.retcode!=ReturnCode.Success && i<=max_iter)
+                i += 1
+                a=false
+                try
+                        prob = NonlinearProblem(evaporatorborehole_model!, u0, p, reltol=reltol)
+                        sol_evapbh = solve(prob, TrustRegion(); reltol=reltol)
+                catch e
+                        # @show tanhmap_R_to_01(u0[4]),tanhmap_R_to_01(u0[7])
+                end
+                u0[4] = u0[5] = tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
+                u0[7]=tanhmap_01_to_R(min(max(rand(1)[1],0.03),0.97))
+                if i == max_iter
+                        @show sol_evapbh.retcode
+                        println("/!\\ not converged")
+                elseif sol_evapbh.retcode==ReturnCode.Success
+                        println(":) converged") 
+                end
+        end
+        push!(evapbh_solutions,evaporatorborehole_model(sol_evapbh.u, p))
         # this could be done outside the for loop
         push!(x, temperatureprofiles(evapbh_solutions[end].evaporator; n = 15)[1])
         push!(Tc, temperatureprofiles(evapbh_solutions[end].evaporator; n = 15)[2])
