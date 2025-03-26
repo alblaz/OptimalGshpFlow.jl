@@ -20,7 +20,7 @@ struct PlateHeatExchanger{T <: Number}
    b::T
    β::T
    D_port::T
-   N_pass::T
+   N_pass::Int
 end
 
 """
