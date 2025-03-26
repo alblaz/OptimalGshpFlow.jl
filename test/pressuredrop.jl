@@ -11,11 +11,11 @@ refrigerant = Refrigerant(refrigerant_name)
 
 evaporator.A
 
-plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.52, 0.19; b=0.002, ϕ=1.189, β = 30., Dport=0.06)  # NB! chevron angle vs. reverse chev. ang. !
+plateheatexchanger = PlateHeatExchanger(3.33, 0.52, 0.19; b=0.002, ϕ=1.189, β = 30., Dport=0.06)  # NB! chevron angle vs. reverse chev. ang. !
 
 @unpack Vs,Thh,Thl = evaporator
 T_mean=(Thh+Thl)/2
-@show pressure_drop_evap(Vs, plateheatexchanger, secondaryfluid,T_mean)
+@show pressure_drop_evap(Vs, plateheatexchanger, secondaryfluid,T_mean;N_pass=2)
 @show pressure_drop(200*2,Vs,0.04*(1-2/17),secondaryfluid,T_mean) # SDR 17
 @show pumping_power(0.5, 2*200, Vs, 0.04*(1-2/17), secondaryfluid, T_mean, plateheatexchanger)
 

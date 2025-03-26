@@ -67,7 +67,7 @@ function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
     @unpack np,b,ϕ,β,L,W = platehex
-    Nc=(np-1)/2 #number of channels
+    Nc=(np-1)/2/N_pass #number of parallel channels
     Dₕ=2*b/ϕ # hydraulic diameter 4*A/P
 
     v = V/(W*b*Nc) # velocity per channel, check if to be corrected for corrugation factor (see eq.92 in Jocke's thesis)
@@ -78,7 +78,7 @@ function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D
     # Δp_port=+ 1.5*ρ*v_port^2/2*N_pass
     # NB! port pressure drop accounted for in Martin
     # @show fD
-    Δp = fD * L/Dₕ * v^2 * ρ/2 
+    Δp = fD * L/Dₕ * v^2 * ρ/2 * N_pass
     return Δp
 end
 
