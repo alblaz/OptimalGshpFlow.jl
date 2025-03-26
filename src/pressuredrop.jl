@@ -83,7 +83,6 @@ function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D
 end
 
 
-
 """
     `pumping_power(Δp, V, η)`
 

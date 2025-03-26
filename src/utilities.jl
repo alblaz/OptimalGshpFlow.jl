@@ -45,6 +45,21 @@ mapping x ∈ (0,1) => y ∈ (-∞,+∞)
 """
 sigmoid_01_to_R(x) = -log((1 + x)/x)
 
+"""
+x = sigmoid_R_to_ab(y,a,b)
+
+mapping y ∈ (-∞,+∞) => to x ∈ (a,b)
+"""
+# map_Rtoab(y,a,b) = (tanh(y) + 1)/2 * (b-a) + a 
+sigmoid_R_to_ab(y,a,b) = linearmap_01_to_ab(sigmoid_R_to_01(y),a,b)
+
+"""
+y= sigmoid_ab_to_R(x,a,b)
+
+mapping from x ∈ (a,b) to y ∈ (-∞,+∞) 
+"""
+# tanhmap_Rtoab(x,a,b) = atanh(2*(x-a)/(b-a) - 1) 
+sigmoid_ab_to_R(x,a,b) = sigmoid_01_to_R(linearmap_ab_to_01(x,a,b))
 
 """
 x = tanhmap_R_to_ab(y,a,b)
