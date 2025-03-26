@@ -344,7 +344,7 @@ function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters)
     # kin = uniform_Tb_coeffs(bh, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[2] + u[9])/2, secondaryflui)
     # du[9] = kin*u[2] - 1*u[9] + (1-kin)* Tb
 
-    du[9] = uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9]/2), secondaryfluid)*u[7] - u[9] + (1-uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9]/2), secondaryfluid))*Tb
+    du[9] = uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9])/2, secondaryfluid)*u[7] - u[9] + (1-uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9])/2, secondaryfluid))*Tb
 
     return nothing
 end
