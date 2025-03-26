@@ -4,7 +4,8 @@
 using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
-evaporator = EvaporatorDesign(6000., 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+Q_evap=6000.
+evaporator = EvaporatorDesign(Q_evap, 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
 Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
@@ -96,25 +97,51 @@ function evaluate_solution(sol,p; Tcond = 273.15 + 40, ηis = 0.7)
     
     # COP1 = Q1/(W + Ppump)
     # COP2 = Q2/(W  + Ppump)
-    COP1 = Q1/(W + Ppump)
-    COP2 = Q2/(W  + Ppump)
-    return COP1, COP2
+    COP1 = Q1/W
+    COP2 = Q1/(W  + Ppump)
+    return COP1, COP2, evaporatorborehole_solution
 end
 
 
 COP1 = [evaluate_solution(sol,p)[1] for (sol,p) in zip(sols,params)]
 COP2 = [evaluate_solution(sol,p)[2] for (sol,p) in zip(sols,params)]
+ΔTs = [evaluate_solution(sol,p)[3].evaporator.ΔT_h for (sol,p) in zip(sols,params)]
 Vs   = [p.Vs for p in params]
+
+
 
 fig = Figure(; size = (600, 400))
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "Vs (l/s)", ylabel = "COP")
-lcop1 = lines!(ax, Vs * 1000, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
-lcop2 = lines!(ax, Vs * 1000, COP2, color = :indianred, linewidth = 2, label = "COP2")
+# ax = Axis(fig[1, 1], xlabel = "Vs (l/s)", ylabel = "COP")
+ax = Axis(fig[1, 1], xlabel = "Temperature difference (K)", ylabel = "COP")
+lcop1 = lines!(ax, ΔTs, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
+lcop2 = lines!(ax, ΔTs, COP2, color = :indianred, linewidth = 2, label = "COP2")
 
-axislegend(ax, [lcop1,lcop2],["COPh","COPc"], position = :rt)#, orientation = :horizontal)
+# Add dashed vertical line for the maximum of COP2
+max_COP2_index = argmax(COP2)
+lmax=lines!(ax,ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
+
+axislegend(ax, [lcop1,lcop2,lmax],["COPh","COPc","max"], position = :rt)#, orientation = :horizontal)
 
 mypath = joinpath(@__DIR__,"figures")
 save(joinpath(mypath,"optimalCOP_Tb_$(round(Int,Tb))_deltaTsup$(round(Int,div(ΔTsup,1)))_$(round(Int,mod(ΔTsup,1)*10)).png"), fig)
 # fig
 fig
+
+### Same plot in interactive form with Plotly
+plotly()
+
+# Create the plot
+p = plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "COP", legend = :topright)
+plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
+
+# Add dashed vertical line for the maximum of COP2
+max_COP2_index = argmax(COP2)
+plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
+
+# Save the plot
+mypath = joinpath(@__DIR__, "figures")
+savefig(p, joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).html"))
+
+# Display the plot
+p
