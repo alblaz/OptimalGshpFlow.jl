@@ -50,7 +50,7 @@ end
 - `ΔT_l`                pinch point on the low temperature side of the evaporator,
 - `ΔT_sub`              subcooling,
 - `ΔT_sup`              superheating,
-- `ηᵥ=0.95              volumetric efficiency.
+- `ηᵥ`                  volumetric efficiency.
 
 Evaluate the design parameters for the evaporator. The design parameter estimated are:
 - `A`       the Area of the heat exchanger, 
@@ -65,7 +65,7 @@ julia> using CoolProp
 julia> A,Vref,Vsf,hei = evaporator_design(5000, 273.15-5, 273.15+40, "R134a", "INCOMP::MEA-28%")
 ```
 """
-function evaporator_design(Q2,Te,Tc, refrigerant,secondary_fluid; U =2000., ΔTsf = 3., ΔT_l = 1.5, ΔT_sub=5., ΔT_sup=5., ηᵥ=0.95)
+function evaporator_design(Q2,Te,Tc, refrigerant,secondary_fluid; U =2000., ΔTsf = 3., ΔT_l = 1, ΔT_sub=5., ΔT_sup=5., ηᵥ=0.95)
     
     hco = PropsSI("H", "T",  Tc-ΔT_sub, "Q", 0, refrigerant) #enthalpy at the outlet of the condenser - nominal conditions
     hei = hco                                        # enthalpy at the inlet of the evaporator - nominal conditions
@@ -88,7 +88,7 @@ function evaporator_design(Q2,Te,Tc, refrigerant,secondary_fluid; U =2000., ΔTs
     Tsf_h = Tsf_l + ΔTsf
     ΔT_h = Tsf_h - Te
     # LMTD = (ΔT1 - ΔT2)/log(ΔT1/ΔT2)
-    A = Q2/U * log(ΔT_h/ΔT_l)/ (ΔT_h - ΔT_l)
+    A = Q2/U * log(ΔT_h/ΔT_l)/ (ΔT_h - ΔT_l)*1.2 # correction for superheating area
 
     return A,Vref,Vsf,hei
 end
