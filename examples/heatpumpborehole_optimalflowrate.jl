@@ -18,7 +18,7 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 # borehole model #
 ##################
 dout = 0.04 #internal pipe diameter
-borehole = SingleUPipeBorehole(H = 200., D = 4., rpo = dout/2, SDR=17., rb = 0.115, λg = 2., pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
+borehole = SingleUPipeBorehole(H = 300., D = 4., rpo = dout/2, SDR=17., rb = 0.115, λg = 2., pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
 @assert norm([borehole.pipe_position[1]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 @assert norm([borehole.pipe_position[2]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 
