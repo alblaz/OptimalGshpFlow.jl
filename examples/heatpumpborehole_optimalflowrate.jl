@@ -5,7 +5,7 @@ using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
 Q_evap=6000.
-evaporator = EvaporatorDesign(Q_evap, 273.,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+evaporator = EvaporatorDesign(Q_evap, 273. - 8 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
 Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
@@ -24,8 +24,8 @@ borehole = SingleUPipeBorehole(H = 200., D = 4., rpo = dout/2, SDR=17., rb = 0.1
 
 λground = 3.
 
-Tb = 273.15+10.
-ΔTsup = 3.5
+Tb = 273.15 + 0
+ΔTsup = 7.5
 ηpump = 0.4
 
 
@@ -47,8 +47,8 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
 
                                         
 pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  sigmoid_01_to_R(0.3) 
-xms = sigmoid_01_to_R(0.3)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.2) 
+xms = sigmoid_01_to_R(0.2)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m, Ts_h = Tb - 6, Tb - 4, Tb - 2
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h]
@@ -116,67 +116,115 @@ Vs   = [p.Vs for p in params]
 T_mean=(Tin_bh+Tout_bh)/2
 
 
+Re = @. evaporator.Vs .* (2:-0.05:0.1) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
+transflow_idx = findfirst(x->x<2300,Re)
+
+ΔTsf = Tout_bh .- Tin_bh
+ΔTsf_idx = findfirst(x-> x>3, ΔTsf)
+
+##.
 fig = Figure(; size = (600, 600))
 ga = fig[1, 1] = GridLayout()
-ax = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "COP")
+ax = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "COP", rightspinevisible = false)
 lcop1 = lines!(ax, Vs*1000, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
 lcop2 = lines!(ax, Vs*1000, COP2, color = :indianred, linewidth = 2, label = "COP2")
 
 # Add a secondary axis for Q1
-ax2 = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "Q1", yaxisposition = :right)
-lq1 = lines!(ax2, Vs*1000, Q1, color = :green, linewidth = 2, label = "Q1")
+ax2 = Axis(fig[1, 1], xlabel = "Flow rate [l/s]", ylabel = "Q1 (kW)", ylabelcolor = :green,
+            yaxisposition = :right, yticklabelcolor = :green, rightspinecolor = :green, ytickcolor = :green)
+lq1 = lines!(ax2, Vs*1000, Q1/1000, color = :green, linewidth = 2,  label = "Q1")
 
 # Add dashed vertical line for the maximum of COP2
 max_COP2_index = argmax(COP2)
-lmax = lines!(ax, ones(2).*Vs[max_COP2_index]*1000, [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
+# lmax = lines!(ax, ones(2).*Vs[max_COP2_index]*1000, [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
+# lmax = lines!(ax, ones(2).*Vs[max_COP2_index]*1000, [0., maximum(COP2)], linestyle = :dash, color = :black)
+lmax = vlines!(ax2,Vs[max_COP2_index]*1000, linestyle = :dash, color = :black)
 
-axislegend(ax, [lcop1, lcop2, lmax], ["COP1", "COP2", "max"], position = :rt)
-axislegend(ax2, [lq1], ["Q1"], position = :rb)
+ltransflow = vlines!(ax,Vs[transflow_idx-1:transflow_idx] * 1000, linestyle = :dot, color = :gray)
+lΔT3flow   = vlines!(ax,Vs[ΔTsf_idx] * 1000, linestyle = :dash, color = :red)
+
+# axislegend(ax, [lcop1, lcop2, lmax,ltransflow,lΔT3flow ], ["COP1", "COP2", "max(COP2)", "lam/turb", "ΔT=3°C control"], position = :rt)
+axislegend(ax, [lcop1, lcop2], ["COP1", "COP2"], position = :rt)
+
+# axislegend(ax, [sc1, sc2], ["One", "Two"], "Selected Dots", position = :rb,
+#     orientation = :horizontal)
+# axislegend(ax, [lmax,ltransflow,lΔT3flow ], ["max(COP2)", "lam/turb", "ΔT=3°C control"], position = :rt)
+# axislegend(ax2, [lq1], ["Q1"], position = :rb,)
+hidespines!(ax2, :l, :b, :t)
+hidexdecorations!(ax2,grid = true);
+hideydecorations!(ax2,grid = true, label = false, ticklabels = false, ticks = false,);
+
+ylims!(ax,2,5.5)
+ylims!(ax2,4,10)
 
 # Save the first plot
-mypath = joinpath(@__DIR__, "figures")
-save(joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
+# mypath = joinpath(@__DIR__, "figures")
+# save(joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
 
 # Add a subplot for T_mean vs flow rate under the existing plot
 ax3 = Axis(fig[2, 1], xlabel = "Flow rate [l/s]", ylabel = "Temperature [°C]")
-ltin= lines!(ax3, Vs*1000, Tin_bh .- 273.15, color = :blue, linewidth = 2, label = "T_in_bh")
-ltout = lines!(ax3, Vs*1000, Tout_bh .- 273.15, color = :red, linewidth = 2, label = "T_out_bh")
-ltb = lines!(ax3, Vs*1000, Tb*ones(length(Vs)) .- 273.15, color = :green, linewidth = 2, label = "T_out_bh")
-Re = @. evaporator.Vs .* (2:-0.05:0.1) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
+ltin= lines!(ax3, Vs*1000, Tin_bh .- 273.15, color = :navy, linewidth = 2, label = "T_in_bh")
+ltout = lines!(ax3, Vs*1000, Tout_bh .- 273.15, color = :firebrick, linewidth = 2, label = "T_out_bh")
+ltb = lines!(ax3, Vs*1000, Tb*ones(length(Vs)) .- 273.15, color = :cyan4, linewidth = 2, label = "T_out_bh")
 
-# Add a subplot for Reynolds number vs flow rate under the existing plots
-ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
-lre = lines!(ax4, Vs * 1000, Re, color = :purple, linewidth = 2, label = "Re")
+vlines!(ax3,Vs[max_COP2_index]*1000, linestyle = :dash, color = :black)
+vlines!(ax3,Vs[transflow_idx-1:transflow_idx] * 1000, linestyle = :dot, color = :gray)
+vlines!(ax3,Vs[ΔTsf_idx] * 1000, linestyle = :dash, color = :red)
 
-axislegend(ax4, [lre], ["Re"], position = :rb)
+axislegend(ax3, [ltin, ltout,ltb], ["T_in_bh", "T_out_bh", "T_borehole"], position = :rb)
+
+ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "ΔT [°C]")
+lines!(ax4, Vs*1000, Tout_bh .- Tin_bh, color = :dodgerblue, linewidth = 2)
+
+# ΔTsf[ΔTsf_idx]
+# findfirst(x-> x<3, ΔTsf[18:end])
+axislegend(ax4, [lmax,ltransflow,lΔT3flow ], ["max(COP2)", "lam/turb", "ΔT=3°C flow"], position = :rt)
+
+vlines!(ax4,Vs[max_COP2_index]*1000, linestyle = :dash, color = :black)
+vlines!(ax4,Vs[transflow_idx-1:transflow_idx] * 1000, linestyle = :dot, color = :gray)
+
+vlines!(ax4,Vs[ΔTsf_idx] * 1000, linestyle = :dash, color = :red)
+
+hlines!(ax4, [3.], color = :black, linewidth = 1, linestyle = :dash)
+ylims!(ax4, 0.,9)
 
 
+# # Add a subplot for Reynolds number vs flow rate under the existing plots
+# ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
+# lre = lines!(ax4, Vs * 1000, Re, color = :purple, linewidth = 2, label = "Re")
+
+# # add dotted lined to highlight laminar turbulent transition
+# vlines!(ax4,Vs[transflow_idx-1:transflow_idx] * 1000, linestyle = :dot, color = :gray)
+# hlines!(ax4,[2300.], linestyle = :dot, color = :gray)
+
+
+##.
+fig
 # Add dashed vertical line for the maximum of T_mean
 # max_T_mean_index = argmax(T_mean)
 # lmax_tmean = lines!(ax3, ones(2).*Vs[max_T_mean_index]*1000, [minimum(T_mean), maximum(T_mean)], linestyle = :dash, color = :black)
 
-axislegend(ax3, [ltin, ltout,ltb], ["T_in_bh", "T_out_bh", "T_borehole"], position = :rb)
 
 # Save the combined plot
-save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
-linkxaxes!(ax,ax2,ax3,ax4)
-fig
+save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_H($(round(Int,borehole.H)).png"), fig)
+# linkxaxes!(ax,ax2,ax3,ax4)
+# fig
 
 
-### Same plot in interactive form with Plotly
-plotly()
+# ### Same plot in interactive form with Plotly
+# plotly()
 
-# Create the plot
-p = plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "COP", legend = :topright)
-plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
+# # Create the plot
+# p = plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "COP", legend = :topright)
+# plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
 
-# Add dashed vertical line for the maximum of COP2
-max_COP2_index = argmax(COP2)
-plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
+# # Add dashed vertical line for the maximum of COP2
+# max_COP2_index = argmax(COP2)
+# plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
 
-# Save the plot
-mypath = joinpath(@__DIR__, "figures")
-savefig(p, joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).html"))
+# # Save the plot
+# mypath = joinpath(@__DIR__, "figures")
+# savefig(p, joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).html"))
 
-# Display the plot
-p
+# # Display the plot
+# p 
