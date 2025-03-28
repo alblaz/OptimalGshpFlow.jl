@@ -85,23 +85,40 @@ using PlutoExtras
 # ╔═╡ ed723b83-28ad-4938-97e8-891b40acc0db
 md" # Optimal Flow in GSHP - UI demonstration"
 
+# ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
+md" ## Sub model: Evaporator"
+
+# ╔═╡ 7d67878c-7647-4ecc-a259-7b61861c1f8e
+md"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
 # ╔═╡ 5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 md" # Outputs"
-
-# ╔═╡ 0a284427-2f1e-4d6f-b3d9-32b0b54c4564
-md" ## Secondary fluid"
-
-# ╔═╡ 30d089ba-e823-408c-9073-50b3f37a1c4c
-md"## Operation"
-
-# ╔═╡ 25b4a88c-5c58-4d67-8d0f-ecbad5f5afae
-md"## Refrigerant"
-
-# ╔═╡ 3703ecf4-8a7d-44f7-a59a-f429ad768205
-md" ### Evaporator"
-
-# ╔═╡ 4bf19bc9-29f9-493f-830c-a6beb30fc8d6
-md" ### Condensor"
 
 # ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
 md""" # Solving the system"""
@@ -677,7 +694,6 @@ md"## Bonds"
 
 # ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
 begin
-	
 	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
 	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
 	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
@@ -687,20 +703,18 @@ begin
 
 	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
 		md"Refrigerant" = @bind refrigerant Select(["R290" => "R290 (propane)", "R134A" => "R134A"])
-		md"Evaporator length"  = @bind L_ Scrubbable(.05:0.05:1.0, default = 0.3, suffix = " m")
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .10, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .10, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 10.0)
-		md"""HTC gas""" = @bind htc_g_ Scrubbable(200:1:1500.0, default = 800.0, format=".0s", suffix = " W/m/K")
-		md"""HTC two-phase""" = @bind htc_tp_ Scrubbable(200:1:500.0, default = 200.0, format=".0s", suffix = " W/m/K")
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
+		md"""HTC gas""" = @bind htc_g_ Scrubbable(200:1:500.0, default = 200.0, format=".0s", suffix = " W/m²/K")
+		md"""HTC two-phase""" = @bind htc_tp_ Scrubbable(200:1:1500.0, default = 1200.0, format=".0s", suffix = " W/m²/K")
 	end
 	
 	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:5.0, default = .25, suffix = " kg/s")
-		md"Evaporation temperature" = @bind Tevap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
+		md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
+		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
 		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-		md"Condensation temperature" = @bind Tcond_ Scrubbable(T_range_cond; default=40.0, suffix = " °C")
-		md"Subcooling degree" = @bind ΔT_SC_ Scrubbable(1.0:0.1:10.0; default=5.0, suffix = " K")
 	end
 
 	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
@@ -708,7 +722,7 @@ end
 
 # ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
 begin
-	eq_superheating = T_r_out ~ 273.15-5
+	eq_superheating = T_r_out ~ T_evap+ΔT_SH_
 	#eq_prop_r = 280.0 ~ T_p_r
 	#eq_prop_b = 280.0 ~ T_p_b
 	
@@ -761,7 +775,7 @@ begin
 
 		# IV:
 		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_,
+		ṁ_b => ṁ_b_,
 		αL => pi/4,
 
 		h_b => htc_tp_,
@@ -769,10 +783,10 @@ begin
 	
 		# Parameters
 		L_PHX => L_PHX_,
-		T_evap => 273.15-10.0,
-		T_p_r => 273.0,
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
 		T_p_b => T_evap  + 5.0,
-		T_b_in => 273.15 + 5.0,
+		T_b_in => T_evap+ΔT_SH_+ΔT_brine_,
 	]
 	prob_ = NonlinearProblem(sys_, [], p_, symbolic_u0 = true);
 	sol_ = NonlinearSolve.solve(prob_)
@@ -913,18 +927,8 @@ end
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
 Pevap_ = PropsSI("P", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
 
-# ╔═╡ 984f3e2a-c965-45fb-a492-c64de4d3e3d3
-md"""
-Evaporation pressure: **$(round(Pevap_/1e5, digits = 2))** bar
-"""
-
 # ╔═╡ 7ab03084-d007-4657-a5cd-74b13c671011
 Pcond_ = PropsSI("P", "T", 273.15+Tcond_, "Q", 1.0, refrigerant)
-
-# ╔═╡ 08db51d7-89ee-4a27-a83f-627b5fbd108a
-md"""
-Condensation pressure: **$(round(Pcond_/1e5, digits = 2))** bar
-"""
 
 # ╔═╡ c6e7431b-7265-40e3-b3b0-d5f06222ef5d
 T_bub_cond = PropsSI("T", "P", Pcond_, "Q", 0.0, refrigerant)
@@ -938,34 +942,14 @@ h_evap_in = h_exit_cond
 # ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
 h_dew_val = PropsSI("HMASS", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
 
-# ╔═╡ 4e2df2e4-da65-483b-be8f-479e60048f30
-md"""
-Dew enthalpy evaporator: **$(round(h_dew_val/1e3))** kJ/kg
-"""
-
 # ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
 h_comp_val = PropsSI("HMASS", "T", 273.15+Tevap_+ΔT_SH_, "P", Pevap_, refrigerant)
-
-# ╔═╡ 9f562f5f-6fb9-4e45-a019-1c85f9910189
-md"""
-Enthalpy suction compressor: **$(round(h_comp_val/1e3))** kJ/kg
-"""
 
 # ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
 cp_dew_val = PropsSI("C", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
 
-# ╔═╡ eadefc6c-7ba5-464d-99bc-d9055134a721
-md"""
-Dew thermal capacity evaporator: **$(round(cp_dew_val))** J/kg/K
-"""
-
 # ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
 Tbrine_ = Tevap_+ΔT_SH_+ΔT_brine_
-
-# ╔═╡ c9635ea5-8aa6-447e-9590-f6a90e053e6f
-md"""
-Inlet brine temperature: **$(Tbrine_) °C**
-"""
 
 # ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
 html"""
@@ -4049,31 +4033,22 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╟─ed723b83-28ad-4938-97e8-891b40acc0db
+# ╟─c89c0195-7f93-4a49-993a-7efa861db428
 # ╟─38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╟─7d67878c-7647-4ecc-a259-7b61861c1f8e
 # ╟─5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
-# ╟─0a284427-2f1e-4d6f-b3d9-32b0b54c4564
-# ╠═c9635ea5-8aa6-447e-9590-f6a90e053e6f
-# ╟─30d089ba-e823-408c-9073-50b3f37a1c4c
-# ╟─25b4a88c-5c58-4d67-8d0f-ecbad5f5afae
-# ╟─3703ecf4-8a7d-44f7-a59a-f429ad768205
-# ╟─984f3e2a-c965-45fb-a492-c64de4d3e3d3
-# ╟─4e2df2e4-da65-483b-be8f-479e60048f30
-# ╟─eadefc6c-7ba5-464d-99bc-d9055134a721
-# ╟─9f562f5f-6fb9-4e45-a019-1c85f9910189
-# ╟─4bf19bc9-29f9-493f-830c-a6beb30fc8d6
-# ╟─08db51d7-89ee-4a27-a83f-627b5fbd108a
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╟─d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═58fa2bc3-d201-4778-bdc4-9483e3374ee8
-# ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
+# ╟─25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
-# ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
+# ╟─08c9f46e-e683-4429-a5d6-56682232c1e7
 # ╠═c4102eaf-773a-4069-8e3d-45d7a7ac9e69
 # ╠═88d844a6-eb94-408f-9bdd-572e6f8ddf4f
-# ╠═8903d352-a21d-43bd-9030-e316af7de22d
+# ╟─8903d352-a21d-43bd-9030-e316af7de22d
 # ╠═ad4c38f4-b78d-42c9-b868-102b1a17386d
 # ╠═352f52d6-70ec-47d7-8b46-892f6f1f6184
-# ╠═f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
+# ╟─f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 # ╟─ce0d26ff-768f-49b8-a0ef-462f2fc8f067
 # ╟─1cd63e6f-37b2-49ba-8887-2220d1df7c6f
 # ╟─6435d235-34f8-4f43-a945-7cdd62e5dce7
