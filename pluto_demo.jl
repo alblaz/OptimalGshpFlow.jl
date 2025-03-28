@@ -67,7 +67,7 @@ using Logging
 # ╔═╡ f6b9843f-bb5e-4275-bea2-05e9d594207f
 begin
     using WGLMakie
-    set_theme!(theme_dark())
+#    set_theme!(theme_dark())
 end
 
 # ╔═╡ 1c61fab6-f56b-460b-870f-8e3a83337312
@@ -85,9 +85,6 @@ using PlutoExtras
 # ╔═╡ ed723b83-28ad-4938-97e8-891b40acc0db
 md" # Optimal Flow in GSHP - UI demonstration"
 
-# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
-md"## Bonds"
-
 # ╔═╡ 5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 md" # Outputs"
 
@@ -97,12 +94,6 @@ md" ## Secondary fluid"
 # ╔═╡ 30d089ba-e823-408c-9073-50b3f37a1c4c
 md"## Operation"
 
-# ╔═╡ 768b2630-1f60-4c72-8245-bb5cab7eae0e
-
-md"""
-Mass flow in the BHE: **$(sol[ṁ2]) kg/s**
-"""
-
 # ╔═╡ 25b4a88c-5c58-4d67-8d0f-ecbad5f5afae
 md"## Refrigerant"
 
@@ -111,21 +102,6 @@ md" ### Evaporator"
 
 # ╔═╡ 4bf19bc9-29f9-493f-830c-a6beb30fc8d6
 md" ### Condensor"
-
-# ╔═╡ c2ecbbe2-eae5-40cb-b726-25aa7a8af316
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-# Plot using WGLMakie
-fig = Figure()
-ax = Axis(fig[1, 1], xlabel="x (m)", ylabel="T_b_SH (°C)", title="Superheater Brine Temperature Profile")
-lines!(L_PHX_val* sin(αL_val)^2..L_PHX_val, x->T_b_SH_func((x-L_PHX_val* sin(αL_val)^2), T_evap_val, T_b_in_val, αL_val, L_PHX_val, Per_PHX_val, U_SH_val, cp_b_val, ṁ_b_val))
-lines!(L_PHX_val* sin(αL_val)^2..L_PHX_val, x->T_r_SH_func((x-L_PHX_val* sin(αL_val)^2), T_evap_val, T_b_in_val, αL_val, L_PHX_val, Per_PHX_val, U_SH_val, cp_b_val, cp_r_val, ṁ_b_val, ṁ_r_val))
-lines!(0..L_PHX_val* sin(αL_val)^2, x->T_b_EV_func(x, T_evap_val, T_b_in_val, αL_val, L_PHX_val, Per_PHX_val, U_EV_val, U_SH_val, cp_b_val, ṁ_b_val))
-lines!(0..L_PHX_val* sin(αL_val)^2, x->T_evap_val)
-fig  # Display the figure
-end
-  ╠═╡ =#
 
 # ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
 md""" # Solving the system"""
@@ -642,6 +618,94 @@ end
 # ╔═╡ 58fa2bc3-d201-4778-bdc4-9483e3374ee8
 T_r_out
 
+# ╔═╡ 98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
+begin
+	TT = 273.15-15
+	pp = 2e4
+	bb(T, p) = 1/Clapeyron.volume(modelref, p, T, phase=:unknown)
+	xx = substitute(h_r_gas, [cp_r_gas => cp_r(TT, pp), μ_r_gas => μ_g(TT, pp), λ_r_gas => λ_g(TT, pp), ρ_r_gas => bb(TT, pp),  cp_r_gas => cp_r(TT, pp), b => 1e-3,W => 10e-2,H => 20e-2,np => 10.0,ϕ => 1.189, β => 30.0])
+	
+	xx_func = build_function(xx, ṁ_r, expression=Val{false});
+end;
+
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
+md"---"
+
+# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
+md"## Utilities"
+
+# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
+
+	candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
+
+# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
+T_range_cond = 25:0.1:65.0
+
+# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
+begin
+	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
+	@register_symbolic μ_brine(T, fluid)
+end
+
+# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
+md"## Bonds"
+
+# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
+begin
+	
+	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
+	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
+	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
+	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
+	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
+	end
+
+	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant" = @bind refrigerant Select(["R290" => "R290 (propane)", "R134A" => "R134A"])
+		md"Evaporator length"  = @bind L_ Scrubbable(.05:0.05:1.0, default = 0.3, suffix = " m")
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .10, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .10, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 10.0)
+		md"""HTC gas""" = @bind htc_g_ Scrubbable(200:1:1500.0, default = 800.0, format=".0s", suffix = " W/m/K")
+		md"""HTC two-phase""" = @bind htc_tp_ Scrubbable(200:1:500.0, default = 200.0, format=".0s", suffix = " W/m/K")
+	end
+	
+	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:5.0, default = .25, suffix = " kg/s")
+		md"Evaporation temperature" = @bind Tevap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
+		md"Condensation temperature" = @bind Tcond_ Scrubbable(T_range_cond; default=40.0, suffix = " °C")
+		md"Subcooling degree" = @bind ΔT_SC_ Scrubbable(1.0:0.1:10.0; default=5.0, suffix = " K")
+	end
+
+	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+end
+
 # ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
 begin
 	eq_superheating = T_r_out ~ 273.15-5
@@ -689,22 +753,22 @@ begin
 
 		#PHX
 		b => 1e-3,
-		W => 15e-2,
-		H => 30e-2,
-		np => 100.0,
+		W => W_,
+		np => np_,
+		H => np*b*2, ### meh
 		ϕ => 1.189,
 		β => 30.0,
 
 		# IV:
-		ṁ_r => .2,
-		ṁ_b => .8,
+		ṁ_r => ṁ_r_,
+		ṁ_b => ṁ_r_,
 		αL => pi/4,
 
-		h_b => 300.0,
-		h_r_gas => 100.0,
+		h_b => htc_tp_,
+		h_r_gas => htc_g_,
 	
 		# Parameters
-		L_PHX => 0.7,
+		L_PHX => L_PHX_,
 		T_evap => 273.15-10.0,
 		T_p_r => 273.0,
 		T_p_b => T_evap  + 5.0,
@@ -788,15 +852,15 @@ begin
     
     # Add a vertical dashed line at x = L_EV_func()
     vline = L_EV_func()
-    vlines!(ax, [vline], color=:white, linestyle=:dash)
+    vlines!(ax, [vline], color=:black, linestyle=:dash)
     
     # Choose a y-position for the text (adjust as needed)
     # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
     y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
     
     # Add text labels to the left and right of the vertical line
-    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:white, rotation = pi/2)
-    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:white, rotation = pi/2)
+    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
+    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
     
     axislegend(ax, position = :lt)  # Add legend to the axis
 
@@ -810,51 +874,6 @@ sol_.ps[T_b_in]
 
 # ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
 sol_[αL]
-
-# ╔═╡ 98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
-begin
-	TT = 273.15-15
-	pp = 2e4
-	bb(T, p) = 1/Clapeyron.volume(modelref, p, T, phase=:unknown)
-	xx = substitute(h_r_gas, [cp_r_gas => cp_r(TT, pp), μ_r_gas => μ_g(TT, pp), λ_r_gas => λ_g(TT, pp), ρ_r_gas => bb(TT, pp),  cp_r_gas => cp_r(TT, pp), b => 1e-3,W => 10e-2,H => 20e-2,np => 10.0,ϕ => 1.189, β => 30.0])
-	
-	xx_func = build_function(xx, ṁ_r, expression=Val{false});
-end;
-
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
-# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
-md"## Utilities"
-
-# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
-
-	candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
 
 # ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 begin
@@ -886,42 +905,10 @@ begin
         catch e
         end
     end
-    results_df
+    results_df;
 	
 end
 
-
-# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
-T_range_cond = 25:0.1:65.0
-
-# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
-begin
-	
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind concentration tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R290" => "R290 (propane)", "R134A" => "R134A"])
-		md"Evaporator length"  = @bind L_ Scrubbable(.05:0.05:1.0, default = 0.5, suffix = " m")
-		md"Evaporator perimeter"  = @bind P_ Scrubbable(0.0:0.05:10.0, default = 10.0, format=".0s", suffix = " m")
-		md"""HTC gas""" = @bind U_A_ Scrubbable(200:1:1500.0, default = 800.0, format=".0s", suffix = " W/m/K")
-		md"""HTC two-phase""" = @bind U_B_ Scrubbable(200:1:500.0, default = 200.0, format=".0s", suffix = " W/m/K")
-	end
-	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:10.0, default = 1.0, suffix = " kg/s")
-		md"Evaporation temperature" = @bind Tevap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-		md"Condensation temperature" = @bind Tcond_ Scrubbable(T_range_cond; default=40.0, suffix = " °C")
-		md"Subcooling degree" = @bind ΔT_SC_ Scrubbable(1.0:0.1:10.0; default=5.0, suffix = " K")
-	end
-
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
-end
 
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
 Pevap_ = PropsSI("P", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
@@ -980,64 +967,13 @@ md"""
 Inlet brine temperature: **$(Tbrine_) °C**
 """
 
-# ╔═╡ ff754da1-688e-40d7-99d1-a91b6a8b4ba2
-if fluid != "Water"
-	fluid_call = "INCOMP::"*fluid*"[$(concentration)]"
-else
-	fluid_call = fluid
-end
-
-# ╔═╡ 0f7c8016-d127-4842-ac74-273f3a5ccc79
-cp_brine_ = Unitful.ustrip(PropsSI("C", "T", Tbrine_+273.15, "Q", 0.0, fluid_call))
-
-# ╔═╡ a7eb03ee-b55f-41fc-82b3-7f81a7ec9db0
-md"""
-Fluid thermal capacity: cp = **$(round(cp_brine_)) J/kg/K**
-"""
-
-# ╔═╡ 276bcba0-9a4d-442f-9d78-acb64bb284d9
-λ_brine_ = Unitful.ustrip(PropsSI("L", "T", Tbrine_+273.15, "Q", 0.0, fluid_call))
-
-# ╔═╡ f4ca4219-2e3a-412a-9c06-98b72cb63ae0
-md"""
-Fluid thermal conductivity: λ = **$(round(λ_brine_, digits=2)) W/m/K**
-"""
-
-# ╔═╡ 7ed12177-a1e4-45c7-aa0e-bd28fa633479
-ρ_brine_ = Unitful.ustrip(PropsSI("D", "T", Tbrine_+273.15, "Q", 0.0, fluid_call))
-
-# ╔═╡ bea8fea1-7248-4fcc-892c-6f8f3c6e46cb
-md"""
-Fluid density: **ρ = $(round(ρ_brine_, digits=1)) kg/m³**
-"""
-
-# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
-begin
-	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
-	@register_symbolic μ_brine(T, fluid)
-end
-
-# ╔═╡ 6ab6f510-b30c-49c3-851f-e65ddb3c5757
-μ_brine_ = μ_brine(Tbrine_, fluid_call)
-
-# ╔═╡ 5184eed4-0e01-4d05-aefb-84b6b7811ddb
-md"""
-Fluid dynamic viscosity: μ = **$(round(μ_brine_, digits=3)) Pa⋅s**
-"""
-
-# ╔═╡ 49ed09fe-a492-4210-af09-0aee5b479d09
-μ_brine(Tbrine_, "INCOMP::MEA[0.2]")
-
-# ╔═╡ 2459c7a6-ddad-44c6-acf7-35c2cc0cc366
-fluid_call
-
 # ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
 html"""
 <style>
 	main {
 		margin: 0 auto;
 		max-width: 2000px;
-    	padding-left: max(450px, 5%);
+    	padding-left: max(550px, 5%);
     	padding-right: max(500px, 5%);
 	}
 </style>
@@ -4114,17 +4050,10 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╟─ed723b83-28ad-4938-97e8-891b40acc0db
 # ╟─38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╟─4b6d717a-edb6-4292-bcb7-5dc44e560637
-# ╠═607cd32d-c035-4f36-ad7d-b45cf59d2347
 # ╟─5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 # ╟─0a284427-2f1e-4d6f-b3d9-32b0b54c4564
-# ╠═a7eb03ee-b55f-41fc-82b3-7f81a7ec9db0
-# ╠═f4ca4219-2e3a-412a-9c06-98b72cb63ae0
-# ╠═5184eed4-0e01-4d05-aefb-84b6b7811ddb
-# ╠═bea8fea1-7248-4fcc-892c-6f8f3c6e46cb
 # ╠═c9635ea5-8aa6-447e-9590-f6a90e053e6f
 # ╟─30d089ba-e823-408c-9073-50b3f37a1c4c
-# ╠═768b2630-1f60-4c72-8245-bb5cab7eae0e
 # ╟─25b4a88c-5c58-4d67-8d0f-ecbad5f5afae
 # ╟─3703ecf4-8a7d-44f7-a59a-f429ad768205
 # ╟─984f3e2a-c965-45fb-a492-c64de4d3e3d3
@@ -4133,9 +4062,8 @@ version = "3.6.0+0"
 # ╟─9f562f5f-6fb9-4e45-a019-1c85f9910189
 # ╟─4bf19bc9-29f9-493f-830c-a6beb30fc8d6
 # ╟─08db51d7-89ee-4a27-a83f-627b5fbd108a
-# ╠═c2ecbbe2-eae5-40cb-b726-25aa7a8af316
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
-# ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
+# ╟─d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═58fa2bc3-d201-4778-bdc4-9483e3374ee8
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
@@ -4164,14 +4092,9 @@ version = "3.6.0+0"
 # ╠═3ec0a698-d433-4022-a42e-30158f951f5a
 # ╠═a0bf0d50-1125-4c34-b60e-4505e9edee95
 # ╠═c9885140-68b4-4ab9-a56e-0934bc54de6e
-# ╠═ff754da1-688e-40d7-99d1-a91b6a8b4ba2
-# ╠═0f7c8016-d127-4842-ac74-273f3a5ccc79
-# ╠═276bcba0-9a4d-442f-9d78-acb64bb284d9
-# ╠═7ed12177-a1e4-45c7-aa0e-bd28fa633479
 # ╠═f853312b-5da5-43d3-9b51-51dec3bce19f
-# ╠═6ab6f510-b30c-49c3-851f-e65ddb3c5757
-# ╠═49ed09fe-a492-4210-af09-0aee5b479d09
-# ╠═2459c7a6-ddad-44c6-acf7-35c2cc0cc366
+# ╟─4b6d717a-edb6-4292-bcb7-5dc44e560637
+# ╠═607cd32d-c035-4f36-ad7d-b45cf59d2347
 # ╠═0e6790ed-f7fd-49ac-939a-72ff4f782b98
 # ╠═42268bb5-c95c-45ab-bdc6-125897bb0fcf
 # ╠═1d44ba55-15e5-4691-86e1-bc6429e34938
