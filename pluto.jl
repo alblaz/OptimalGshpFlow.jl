@@ -371,6 +371,9 @@ begin
     @register_symbolic cp_r(T, p)
 end
 
+# ╔═╡ e94055a4-1440-4801-86b1-56f8adbdfcd5
+h_bub_(p_PC(265))
+
 # ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
 begin
     # ---------------------------
@@ -576,12 +579,13 @@ begin
 	ρ_b = ρ_b_(T_p_b, χ)
 	
 	dh = 2*b                       # hydraulic diameter 
-
+	S = (b*np)/2 #assuming half volume/section in each channel
 	V̇_b = abs(ṁ_b)/ρ_b
-	v_b = V̇_b/(H*W)                  # speed of the secondary fluid 
+	
+	v_b = V̇_b/S                  # speed of the secondary fluid 
 	
 	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
-	v_r_gas = V̇_r_gas/(H*W)         # hydraulic diameter 
+	v_r_gas = V̇_r_gas/S         # hydraulic diameter 
 
 	Re_b = ρ_b * v_b * dh / μ_b           # Reynolds
 	#very wrong correlation ⚠
@@ -655,6 +659,8 @@ end
 T_r_out
 
 # ╔═╡ 98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	TT = 273.15-15
 	pp = 2e4
@@ -663,6 +669,7 @@ begin
 	
 	xx_func = build_function(xx, ṁ_r, expression=Val{false});
 end;
+  ╠═╡ =#
 
 # ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
 md"---"
@@ -740,13 +747,12 @@ end
 # ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
 begin
 	eq_superheating = T_r_out ~ T_evap+ΔT_SH_
-	#eq_prop_r = 280.0 ~ T_p_r
-	#eq_prop_b = 280.0 ~ T_p_b
+	eq_inlet = h_r_in ~ h_bub_(p_PC(T_evap))
 	
-	eqs_tz = [eq_superheating]
+	eqs_tz = [eq_inlet, eq_superheating]
 	#eqs_tz = [eq_superheating, eq_prop_r]
 	#eqs_tz = [eq_superheating, eq_prop_r, eq_prop_b]
-	unknowns = [αL]#, T_p_r]
+	unknowns = [αL, ṁ_b]#, T_p_r]
 	#unknowns = [αL, T_p_r, T_p_b]
 	ps = [
 		b,
@@ -758,7 +764,7 @@ begin
 		L_PHX,
 		
 		ṁ_r,
-		ṁ_b,
+		#ṁ_b,
 		
 		T_evap,
 		#T_p_evap,
@@ -773,6 +779,7 @@ begin
 		χ,
 	]
 	@named sys = NonlinearSystem(eqs_tz, unknowns, ps)#, observed = [eq_superheating])
+	#sys1_ = structural_simplify(sys)
 	sys_ = complete(simplify(sys))
 	
 	p_ = [
@@ -806,6 +813,9 @@ begin
 	sol_.retcode
 	
 end
+
+# ╔═╡ 50cd90f5-9988-4503-a97b-bd10812a1513
+sys_
 
 # ╔═╡ 989f50ba-1014-42ba-a454-b91bbe076f6b
 sol_.resid
@@ -841,13 +851,16 @@ begin
 	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
 	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
 	T_r_EV_func = build_function(T_r_EV_dim, x, expression=Val{false});
+	
+	h_r_EV_dim = substitute(h_r_EV, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_func = build_function(h_r_EV_dim, x, expression=Val{false});
 end;
 
 # ╔═╡ c4102eaf-773a-4069-8e3d-45d7a7ac9e69
-T_r_EV_func(0.)
-
-# ╔═╡ 88d844a6-eb94-408f-9bdd-572e6f8ddf4f
-T_r_SH_dim |> simplify
+(h_r_EV_func(0.) - h_bub_(p_PC(265))) /h_bub_(p_PC(265))
 
 # ╔═╡ 8903d352-a21d-43bd-9030-e316af7de22d
 begin
@@ -903,6 +916,8 @@ sol_.ps[T_b_in]
 sin(sol_[αL])^2
 
 # ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	#https://docs.sciml.ai/NonlinearSolve/stable/solvers/nonlinear_system_solvers/#NLSolvers.jl
     logger = ConsoleLogger(stderr, Logging.Error)  # Only show errors
@@ -936,6 +951,7 @@ begin
 	
 end
 
+  ╠═╡ =#
 
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
 Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
@@ -4041,20 +4057,21 @@ version = "3.6.0+0"
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═58fa2bc3-d201-4778-bdc4-9483e3374ee8
+# ╠═e94055a4-1440-4801-86b1-56f8adbdfcd5
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
+# ╠═50cd90f5-9988-4503-a97b-bd10812a1513
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
-# ╟─08c9f46e-e683-4429-a5d6-56682232c1e7
 # ╠═c4102eaf-773a-4069-8e3d-45d7a7ac9e69
-# ╠═88d844a6-eb94-408f-9bdd-572e6f8ddf4f
-# ╟─8903d352-a21d-43bd-9030-e316af7de22d
+# ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
+# ╠═8903d352-a21d-43bd-9030-e316af7de22d
 # ╠═ad4c38f4-b78d-42c9-b868-102b1a17386d
 # ╠═352f52d6-70ec-47d7-8b46-892f6f1f6184
-# ╟─f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
-# ╟─ce0d26ff-768f-49b8-a0ef-462f2fc8f067
+# ╠═f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
+# ╠═ce0d26ff-768f-49b8-a0ef-462f2fc8f067
 # ╟─1cd63e6f-37b2-49ba-8887-2220d1df7c6f
-# ╟─6435d235-34f8-4f43-a945-7cdd62e5dce7
-# ╟─abf2c0e4-9174-497f-823d-2ca76e0f8b75
-# ╟─98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
+# ╠═6435d235-34f8-4f43-a945-7cdd62e5dce7
+# ╠═abf2c0e4-9174-497f-823d-2ca76e0f8b75
+# ╠═98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
 # ╟─38384b61-a30c-435c-a13c-228f16e6169e
 # ╟─a9587932-391a-46ad-84e0-9c4760e534af
 # ╠═8da5d4ea-0951-4e87-8e2b-45000a2cf95a
