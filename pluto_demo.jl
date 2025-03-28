@@ -545,20 +545,20 @@ end
 # ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 begin
 
-	desc = """
-`A` total heat exchange surface area of the plate heat exchanger\\
-`L` plate length\\
-`W` plate width\\
-`H` heat exchanger height\\
-`np` number of plates\\
-`ϕ` surface enlargement factor \\
-`b` pressing depth\\
-`β` chevron angle\\
-"""
+		desc = """
+	`A` total heat exchange surface area of the plate heat exchanger\\
+	`L` plate length\\
+	`W` plate width\\
+	`H` heat exchanger height\\
+	`np` number of plates\\
+	`ϕ` surface enlargement factor \\
+	`b` pressing depth\\
+	`β` chevron angle\\
+	"""
 	@parameters ṁ_r ṁ_b
 	@parameters A, W, H, np, ϕ, b, β, T_p_b, T_p_r
 	@parameters T_evap  T_b_in T_p_evap χ
-	@parameters μ_b λ_b ρ_b cp_b
+	#@parameters μ_b λ_b ρ_b cp_b
 	#@parameters μ_r_gas λ_r_gas ρ_r_gas cp_r_gas
 
 	h_dew = h_dew_(T_evap)
@@ -575,21 +575,41 @@ begin
 	λ_b = λ_b_(T_p_b, χ)
 	ρ_b = ρ_b_(T_p_b, χ)
 	
+	dh = 2*b                       # hydraulic diameter 
 
 	V̇_b = abs(ṁ_b)/ρ_b
 	v_b = V̇_b/(H*W)                  # speed of the secondary fluid 
-	dh = 2*b                       # hydraulic diameter 
 	
 	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
-	v_r_gas = V̇_r_gas/(H*W)                  # speed of the secondary fluid 
-	dh = 2*b                       # hydraulic diameter 
+	v_r_gas = V̇_r_gas/(H*W)         # hydraulic diameter 
+
+	Re_b = ρ_b * v_b * dh / μ_b           # Reynolds
+	#very wrong correlation ⚠
+	Pr_b = cp_b * μ_b / λ_b
+	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
+	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
+	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
+	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_b = Nudh_b*λ_b/dh
 	
-	@parameters th, λ_Cu, h_r_gas, h_b
+	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
+	
+	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
+	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
+	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
+	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
+	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_r_gas = Nudh_r_gas*λ_r_gas/dh
+
+
+	@parameters th, λ_Cu#, h_r_gas# h_b
 	
 	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
 	U_EV = h_b
+
 	@parameters L_PHX
 	Per_PHX = (W*ϕ+2*b)*np
+	
 	@variables αL x
 	L_EV = sin(αL)^2 * L_PHX
 	L_SH = cos(αL)^2 * L_PHX
@@ -600,8 +620,7 @@ begin
 	
 	UA_EV = U_EV * L_EV * Per_PHX
 	α_EV = UA_EV / ṁ_b / cp_b
-
-
+	
 	#---
 	
 	T_b_SH = T_evap + (T_b_in - T_evap)*exp(-α_SH*(L_SH-x))
@@ -706,8 +725,6 @@ begin
 		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
 		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
 		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-		md"""HTC gas""" = @bind htc_g_ Scrubbable(200:1:500.0, default = 200.0, format=".0s", suffix = " W/m²/K")
-		md"""HTC two-phase""" = @bind htc_tp_ Scrubbable(200:1:1500.0, default = 1200.0, format=".0s", suffix = " W/m²/K")
 	end
 	
 	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
@@ -749,8 +766,8 @@ begin
 		T_b_in,
 		T_p_b,
 		T_p_r,
-		h_b,
-		h_r_gas,
+		#h_b,
+		#h_r_gas,
 		λ_Cu,
 		th,
 
@@ -760,7 +777,7 @@ begin
 	sys_ = complete(simplify(sys))
 	
 	p_ = [
-		χ => 0.285,
+		χ => χ_,
 		
 		λ_Cu=> 300.0,
 		th => 1e-3,
@@ -778,15 +795,12 @@ begin
 		ṁ_b => ṁ_b_,
 		αL => pi/4,
 
-		h_b => htc_tp_,
-		h_r_gas => htc_g_,
-	
 		# Parameters
 		L_PHX => L_PHX_,
 		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_p_b => T_evap  + 5.0,
 		T_b_in => T_evap+ΔT_SH_+ΔT_brine_,
+		T_p_r => T_evap,
+		T_p_b => T_b_in,
 	]
 	prob_ = NonlinearProblem(sys_, [], p_, symbolic_u0 = true);
 	sol_ = NonlinearSolve.solve(prob_)
@@ -887,7 +901,7 @@ end
 sol_.ps[T_b_in]
 
 # ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
-sol_[αL]
+sin(sol_[αL])^2
 
 # ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 begin
@@ -925,31 +939,19 @@ end
 
 
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
-Pevap_ = PropsSI("P", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ 7ab03084-d007-4657-a5cd-74b13c671011
-Pcond_ = PropsSI("P", "T", 273.15+Tcond_, "Q", 1.0, refrigerant)
-
-# ╔═╡ c6e7431b-7265-40e3-b3b0-d5f06222ef5d
-T_bub_cond = PropsSI("T", "P", Pcond_, "Q", 0.0, refrigerant)
-
-# ╔═╡ 45d0ac53-420c-41cd-89a6-25dc1d017eef
-h_exit_cond = PropsSI("Hmass", "P", Pcond_, "T", T_bub_cond-ΔT_SC_, refrigerant)
-
-# ╔═╡ d7d725a2-cab6-40c0-add2-e4411d1fc942
-h_evap_in = h_exit_cond
+Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
 
 # ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
-h_dew_val = PropsSI("HMASS", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
+h_dew_val = PropsSI("HMASS", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
 
 # ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
-h_comp_val = PropsSI("HMASS", "T", 273.15+Tevap_+ΔT_SH_, "P", Pevap_, refrigerant)
+h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refrigerant)
 
 # ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
-cp_dew_val = PropsSI("C", "T", 273.15+Tevap_, "Q", 1.0, refrigerant)
+cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
 
 # ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
-Tbrine_ = Tevap_+ΔT_SH_+ΔT_brine_
+Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
 
 # ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
 html"""
@@ -4038,9 +4040,9 @@ version = "3.6.0+0"
 # ╟─7d67878c-7647-4ecc-a259-7b61861c1f8e
 # ╟─5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
-# ╟─d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
+# ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═58fa2bc3-d201-4778-bdc4-9483e3374ee8
-# ╟─25d99fb7-1c60-4ca8-a929-126ff6140af6
+# ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
 # ╟─08c9f46e-e683-4429-a5d6-56682232c1e7
 # ╠═c4102eaf-773a-4069-8e3d-45d7a7ac9e69
@@ -4058,10 +4060,6 @@ version = "3.6.0+0"
 # ╟─a9587932-391a-46ad-84e0-9c4760e534af
 # ╠═8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 # ╠═1ba60683-8370-40c9-abf0-d4a58713d708
-# ╠═7ab03084-d007-4657-a5cd-74b13c671011
-# ╠═c6e7431b-7265-40e3-b3b0-d5f06222ef5d
-# ╠═45d0ac53-420c-41cd-89a6-25dc1d017eef
-# ╠═d7d725a2-cab6-40c0-add2-e4411d1fc942
 # ╠═c550217f-e4be-4a4a-931e-39d100294441
 # ╠═e5862511-38f4-40a5-baa2-7b9a440b398c
 # ╠═3ec0a698-d433-4022-a42e-30158f951f5a
