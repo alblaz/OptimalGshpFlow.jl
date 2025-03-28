@@ -16,6 +16,9 @@ macro bind(def, element)
     #! format: on
 end
 
+# ╔═╡ bfdb6ceb-a0e0-4f87-b650-913a3579085e
+using Printf
+
 # ╔═╡ 0e6790ed-f7fd-49ac-939a-72ff4f782b98
 using Interpolations
 
@@ -88,40 +91,15 @@ md" # Optimal Flow in GSHP - UI demonstration"
 # ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
 md" ## Sub model: Evaporator"
 
-# ╔═╡ 7d67878c-7647-4ecc-a259-7b61861c1f8e
-md"""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-
 # ╔═╡ 5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 md" # Outputs"
 
 # ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
 md""" # Solving the system"""
+
+# ╔═╡ 9972656e-1389-45df-9391-18cb7711ea17
+h_r_EV_func(0.)
+
 
 # ╔═╡ ce0d26ff-768f-49b8-a0ef-462f2fc8f067
 # ╠═╡ disabled = true
@@ -263,9 +241,37 @@ begin
 	xs = pressure_vec
 	ys = superheat_vec
 	visc = [μ_gas(x,y) for x in xs, y in ys]
+
+
+
+	# Identify valid indices: only rows where all columns are non-NaN
+	valid_row_idx = findall(i -> all(!isnan, visc[i, :]), 1:length(xs))
+	# and columns where all rows are non-NaN
+	valid_col_idx = findall(j -> all(!isnan, visc[:, j]), 1:length(ys))
+	
+	# Filter the grid and matrices:
+	xs_clean = xs[valid_row_idx]
+	ys_clean = ys[valid_col_idx]
+	visc_clean = visc[valid_row_idx, valid_col_idx]
+	
+	# Now create interpolants on the cleaned grid:
+	interp_linear_visc = linear_interpolation((xs_clean, ys_clean), visc_clean, extrapolation_bc = Interpolations.Flat())
+	
+
 	cond = [λ_gas(x,y) for x in xs, y in ys]
-	interp_linear_visc = linear_interpolation((xs, ys), visc, extrapolation_bc = Interpolations.Flat())
-	interp_linear_cond = linear_interpolation((xs, ys), cond, extrapolation_bc = Interpolations.Flat())
+	
+	# Identify valid indices: only rows where all columns are non-NaN
+	valid_row_idx = findall(i -> all(!isnan, cond[i, :]), 1:length(xs))
+	# and columns where all rows are non-NaN
+	valid_col_idx = findall(j -> all(!isnan, cond[:, j]), 1:length(ys))
+	
+	# Filter the grid and matrices:
+	xs_clean = xs[valid_row_idx]
+	ys_clean = ys[valid_col_idx]
+	cond_clean = cond[valid_row_idx, valid_col_idx]
+	
+	# Now create interpolants on the cleaned grid:
+	interp_linear_cond_clean = linear_interpolation((xs_clean, ys_clean), cond_clean, extrapolation_bc = Interpolations.Flat())
 	
 	function SH(T, p)
 		T_dew = dew_temperature(modelref, p, [1.0])[1]
@@ -273,12 +279,12 @@ begin
 	end
 	function μ_g(T, p)
 		sh = SH(T, p)
-		return interp_linear_visc(p,sh)
+		return interp_linear_visc_clean(p,sh)
 	end
 	
 	function λ_g(T, p)
 		sh = SH(T, p)
-		return interp_linear_cond(p,sh)
+		return interp_linear_cond_clean(p,sh)
 	end
 	
 	
@@ -371,8 +377,8 @@ begin
     @register_symbolic cp_r(T, p)
 end
 
-# ╔═╡ e94055a4-1440-4801-86b1-56f8adbdfcd5
-h_bub_(p_PC(265))
+# ╔═╡ c4102eaf-773a-4069-8e3d-45d7a7ac9e69
+h_bub_(p_PC(0.0))
 
 # ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
 begin
@@ -571,7 +577,12 @@ begin
 	cp_r_gas = cp_r(T_p_r, P_evap)
 	μ_r_gas = μ_g(T_p_r, P_evap)
 	λ_r_gas = λ_g(T_p_r, P_evap)
-	ρ_r_gas = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:unknown)
+	ρ_r_gas = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:gas)
+	
+	cp_r_liq = cp_r(T_p_r, P_evap)
+	μ_r_liq = μ_l(T_p_r, P_evap)
+	λ_r_liq = λ_l(T_p_r, P_evap)
+	ρ_r_liq = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:liquid)
 	
 	cp_b = cp_b_(T_p_b, χ)
 	μ_b = μ_b_(T_p_b, χ)
@@ -612,7 +623,7 @@ begin
 	U_EV = 1/(1/h_b + th/λ_Cu)
 
 	@parameters L_PHX
-	Per_PHX = (W*ϕ+2*b)*np
+	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
 	
 	@variables αL x
 	L_EV = sin(αL)^2 * L_PHX
@@ -630,10 +641,7 @@ begin
 	T_b_SH = T_evap + (T_b_in - T_evap)*exp(-α_SH*(L_SH-x))
 	T_b_interface = substitute(T_b_SH, x => 0.0)
 	T_b_EV = T_evap + (T_b_interface - T_evap)*exp(-α_EV*(L_EV-x))
-	#T_r_SH = T_evap + P_r*(T_b_interface-T_evap)/(P_r-α_SH)*(exp(-α_SH*(x))-exp(-P_r*(x)))
 	T_r_SH = T_evap + (P_r*(T_b_in - T_evap)*exp(-α_SH*L_SH))/(P_r + α_SH) * (exp((P_r + α_SH)*x) - 1)/exp(P_r*x)
-
-	#T_r_SH = T_evap - (P_r*(T_b_interface - T_evap))/(P_r - α_SH) * (exp(-P_r*x) - exp(-α_SH*x))
 	T_r_out = substitute(T_r_SH, x => L_SH)
 	T_b_out = substitute(T_b_EV, x => 0.0)
 	T_r_EV = T_evap
@@ -653,10 +661,7 @@ begin
 	
 	h̃_r_EV = (substitute(h_r_EV, [x => ξ*L_PHX, T_evap => (T_evap - T_evap)/(T_b_in - T_evap), T_b_in => (T_b_in - T_evap)/(T_b_in - T_evap)])-h_dew)/(cp_b*(T_b_in - T_evap))
 	h̃_r_in = substitute(h̃_r_EV, ξ=> 0.0) |> simplify;
-end
-
-# ╔═╡ 58fa2bc3-d201-4778-bdc4-9483e3374ee8
-T_r_out
+end;
 
 # ╔═╡ 98dfb346-c9cd-4a78-96bd-9d8e0c0ab1fd
 # ╠═╡ disabled = true
@@ -789,7 +794,7 @@ begin
 		th => 1e-3,
 
 		#PHX
-		b => 1e-3,
+		b => 2e-3,
 		W => W_,
 		np => np_,
 		H => np*b*2, ### meh
@@ -813,9 +818,6 @@ begin
 	sol_.retcode
 	
 end
-
-# ╔═╡ 50cd90f5-9988-4503-a97b-bd10812a1513
-sys_
 
 # ╔═╡ 989f50ba-1014-42ba-a454-b91bbe076f6b
 sol_.resid
@@ -859,9 +861,6 @@ begin
 	h_r_EV_func = build_function(h_r_EV_dim, x, expression=Val{false});
 end;
 
-# ╔═╡ c4102eaf-773a-4069-8e3d-45d7a7ac9e69
-(h_r_EV_func(0.) - h_bub_(p_PC(265))) /h_bub_(p_PC(265))
-
 # ╔═╡ 8903d352-a21d-43bd-9030-e316af7de22d
 begin
 
@@ -901,6 +900,13 @@ begin
     # Add text labels to the left and right of the vertical line
     text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
     text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
+
+	
+	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
+    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
+    
+	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
+    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
     
     axislegend(ax, position = :lt)  # Add legend to the axis
 
@@ -953,6 +959,9 @@ end
 
   ╠═╡ =#
 
+# ╔═╡ 1a18f493-5697-4851-a7f4-a7c439ca63e6
+T_evap_
+
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
 Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
 
@@ -1000,6 +1009,7 @@ NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
 PlutoExtras = "ed5d0301-4775-4676-b788-cf71e66ff8ed"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
@@ -1033,7 +1043,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "cb462f92f422d5e218be77b11fd7b1a7f302db29"
+project_hash = "86c0cf466d94eb484000faa6b35ebffad45275f3"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fb97701c117c8162e84dfcf80215caa904aef44f"
@@ -4051,17 +4061,16 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╟─ed723b83-28ad-4938-97e8-891b40acc0db
 # ╟─c89c0195-7f93-4a49-993a-7efa861db428
-# ╟─38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╟─7d67878c-7647-4ecc-a259-7b61861c1f8e
+# ╠═38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╟─5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
-# ╠═58fa2bc3-d201-4778-bdc4-9483e3374ee8
-# ╠═e94055a4-1440-4801-86b1-56f8adbdfcd5
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
-# ╠═50cd90f5-9988-4503-a97b-bd10812a1513
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
+# ╠═1a18f493-5697-4851-a7f4-a7c439ca63e6
 # ╠═c4102eaf-773a-4069-8e3d-45d7a7ac9e69
+# ╠═9972656e-1389-45df-9391-18cb7711ea17
 # ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
 # ╠═8903d352-a21d-43bd-9030-e316af7de22d
 # ╠═ad4c38f4-b78d-42c9-b868-102b1a17386d
