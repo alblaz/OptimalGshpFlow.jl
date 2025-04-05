@@ -3,8 +3,10 @@
 ####################
 using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
-refrigerant_name, secondaryfluid_name = "R290", "INCOMP::MEA-28%"
-Q_evap=6000.
+sec_fl_name="MEG-37%"
+
+refrigerant_name, secondaryfluid_name = "R290", "INCOMP::"*sec_fl_name
+Q_evap=10000.
 evaporator = EvaporatorDesign(Q_evap, 273. - 8 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
 Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
@@ -18,14 +20,14 @@ plateheatexchanger = PlateHeatExchanger(evaporator.A, 0.5, 0.15; b=0.002, ϕ=1.1
 # borehole model #
 ##################
 dout = 0.04 #internal pipe diameter
-H=Q_evap/20
+H=Q_evap/24
 borehole = SingleUPipeBorehole(H = H, D = 4., rpo = dout/2, SDR=17., rb = 0.115/2, λg = 2., pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
 @assert norm([borehole.pipe_position[1]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 @assert norm([borehole.pipe_position[2]...]) + borehole.rpo < borehole.rb  #check that at least the pipes are inside the borehole
 
 λground = 3.
 
-Tb = 273.15 + 5
+Tb = 273.15 + 5    
 ΔTsup = 5
 ηpump = 0.4
 
@@ -49,8 +51,8 @@ borehole
 
                                         
 pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
-ϵme = ϵmsup =  sigmoid_01_to_R(0.2) 
-xms = sigmoid_01_to_R(0.2)
+ϵme = ϵmsup =  sigmoid_01_to_R(0.4) 
+xms = sigmoid_01_to_R(0.9)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1
 Ts_l, Ts_m, Ts_h = Tb - 6, Tb - 4, Tb - 2
 u0 = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Ts_l, Ts_m, Ts_h]
@@ -114,11 +116,12 @@ Q1 = [evaluate_solution(sol,p)[3] for (sol,p) in zip(sols,params)]
 ΔTs = [evaluate_solution(sol,p)[4].evaporator.superheat_region.Thh .- evaluate_solution(sol,p)[4].evaporator.twophase_region.Thl for (sol,p) in zip(sols,params)]
 Tin_bh = [evaluate_solution(sol,p)[4].evaporator.twophase_region.Thl for (sol,p) in zip(sols,params)]
 Tout_bh = [evaluate_solution(sol,p)[4].evaporator.superheat_region.Thh for (sol,p) in zip(sols,params)]
+Tevap = [evaluate_solution(sol,p)[4].evaporator.twophase_region.Tcl for (sol,p) in zip(sols,params)]
 Vs   = [p.Vs for p in params]
 T_mean=(Tin_bh+Tout_bh)/2
 
-
-Re = @. evaporator.Vs .* (2:-0.05:0.1) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
+# Q1.*(1 .- 1 ./COP1)
+Re = @. evaporator.Vs .* (2:-0.05:0.3) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
 transflow_idx = findfirst(x->x<2300,Re)
 
 ΔTsf = Tout_bh .- Tin_bh
@@ -132,18 +135,18 @@ lcop1 = lines!(ax, ΔTs, COP1, color = :dodgerblue, linewidth = 2, label = "COP1
 lcop2 = lines!(ax, ΔTs, COP2, color = :indianred, linewidth = 2, label = "COP2")
 
 # Add a secondary axis for Q1
-ax2 = Axis(fig[1, 1], xlabel = "Temperature difference [K]", ylabel = "Q1", yaxisposition = :right)
-lq1 = lines!(ax2, ΔTs, Q1, color = :green, linewidth = 2, label = "Q1")
+ax2 = Axis(fig[1, 1], xlabel = "Temperature difference [K]", ylabel = "Q1 [kW]", yaxisposition = :right)
+lq1 = lines!(ax2, ΔTs, Q1/1000, color = :green, linewidth = 2, label = "Q1")
 
 # Add dashed vertical line for the maximum of COP2
 max_COP2_index = argmax(COP2)
-lmax = lines!(ax, ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)], linestyle = :dash, color = :black)
+lmax =vlines!(ax, ΔTs[max_COP2_index], linestyle = :dash, color = :black)
 
-ltransflow = vlines!(ax,Vs[transflow_idx-1:transflow_idx] * 1000, linestyle = :dot, color = :gray)
-lΔT3flow   = vlines!(ax,Vs[ΔTsf_idx] * 1000, linestyle = :dash, color = :red)
+# ltransflow = vlines!(ax,ΔTs[transflow_idx-1:transflow_idx], linestyle = :dot, color = :gray)
+lΔT3flow   = vlines!(ax,ΔTs[ΔTsf_idx], linestyle = :dash, color = :red)
 
 # axislegend(ax, [lcop1, lcop2, lmax,ltransflow,lΔT3flow ], ["COP1", "COP2", "max(COP2)", "lam/turb", "ΔT=3°C control"], position = :rt)
-axislegend(ax, [lcop1, lcop2], ["COP1", "COP2"], position = :rt)
+axislegend(ax, [lcop1, lcop2, lq1], ["COP1", "COP2", "Q1"], position = :rt) # 
 
 # axislegend(ax, [sc1, sc2], ["One", "Two"], "Selected Dots", position = :rb,
 #     orientation = :horizontal)
@@ -153,19 +156,18 @@ hidespines!(ax2, :l, :b, :t)
 hidexdecorations!(ax2,grid = true);
 hideydecorations!(ax2,grid = true, label = false, ticklabels = false, ticks = false,);
 
-ylims!(ax,2,5.5)
-ylims!(ax2,4,10)
+
 
 # Save the first plot
-# mypath = joinpath(@__DIR__, "figures")
+mypath = joinpath(@__DIR__, "figures")
 # save(joinpath(mypath, "optimalCOP_Tb_$(round(Int, Tb))_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10)).png"), fig)
 
 # Add a subplot for T_mean vs flow rate under the existing plot
-ax3 = Axis(fig[2, 1], xlabel = "Flow rate [l/s]", ylabel = "Temperature [°C]")
+ax3 = Axis(fig[2, 1], xlabel = "Temperature difference [K]", ylabel = "Temperature [°C]")
 ltin= lines!(ax3, ΔTs, Tin_bh .- 273.15, color = :blue, linewidth = 2, label = "T_in_bh")
 ltout = lines!(ax3, ΔTs, Tout_bh .- 273.15, color = :red, linewidth = 2, label = "T_out_bh")
 ltb = lines!(ax3, ΔTs, Tb*ones(length(Vs)) .- 273.15, color = :green, linewidth = 2, label = "T_out_bh")
-Re = @. evaporator.Vs .* (2:-0.05:0.3) / (π * (dout * (1 - 2 / 17))^2 / 4) * dout * (1 - 2 / 17) * secondaryfluid.ρ.(T_mean) / secondaryfluid.μ.(T_mean)
+lte = lines!(ax3, ΔTs, Tevap .- 273.15, color = :darkblue, linewidth = 2, label = "T_evap")
 
 # Add a subplot for Reynolds number vs flow rate under the existing plots
 # ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
@@ -173,6 +175,7 @@ Re = @. evaporator.Vs .* (2:-0.05:0.3) / (π * (dout * (1 - 2 / 17))^2 / 4) * do
 
 # axislegend(ax4, [lre], ["Re"], position = :rb)
 
+axislegend(ax3, [ltb, ltin, ltout], ["Borehole wall", "Inlet borehole","Outlet borehole"], position = :rc)
 
 # # Add a subplot for Reynolds number vs flow rate under the existing plots
 # ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
@@ -184,39 +187,41 @@ Re = @. evaporator.Vs .* (2:-0.05:0.3) / (π * (dout * (1 - 2 / 17))^2 / 4) * do
 
 
 ##.
-fig
 # Add dashed vertical line for the maximum of T_mean
 # max_T_mean_index = argmax(T_mean)
 # lmax_tmean = lines!(ax3, ones(2).*Vs[max_T_mean_index]*1000, [minimum(T_mean), maximum(T_mean)], linestyle = :dash, color = :black)
 
 
 # Save the combined plot
-save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m.png"), fig)
+save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_secfl$(sec_fl_name).png"), fig)
 linkxaxes!(ax,ax2,ax3)
-fig
+# WGLMakie.ylims!(ax,2,5.5)
+WGLMakie.ylims!(ax2,4,10)
+WGLMakie.xlims!(ax,2,10)
+# fig
 
 
 ### Same plot in interactive form with Plotly
-Plots.plotly()
-# Create the plot with specified size
-p = Plots.plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, ylabel = "COP", legend = :topright, size = (600, 600))
-Plots.plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
-# Plots.plot!(twinx(p), Q1, label = "Q1", color = :green, linewidth = 2, ylabel = "Q1",axis=:right)
+# Plots.plotly()
+# # Create the plot with specified size
+# p = Plots.plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, ylabel = "COP", legend = :topright, size = (600, 600))
+# Plots.plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
+# # Plots.plot!(twinx(p), Q1, label = "Q1", color = :green, linewidth = 2, ylabel = "Q1",axis=:right)
 
-# Add dashed vertical line for the maximum of COP2
-max_COP2_index = argmax(COP2)
-Plots.plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
+# # Add dashed vertical line for the maximum of COP2
+# max_COP2_index = argmax(COP2)
+# Plots.plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
 
-# Add a subplot for T_mean vs temperature difference
-p2 = Plots.plot(ΔTs, Tin_bh .- 273.15, label = "T_in_bh", color = :blue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]", size = (600, 600))
-Plots.plot!(ΔTs, Tout_bh .- 273.15, label = "T_out_bh", color = :red, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
-Plots.plot!(ΔTs, Tb*ones(length(Vs)) .- 273.15, label = "T_b", color = :green, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
-# Combine the plots into a single figure
-p_combined = Plots.plot(p, p2, layout = (2, 1))
+# # Add a subplot for T_mean vs temperature difference
+# p2 = Plots.plot(ΔTs, Tin_bh .- 273.15, label = "T_in_bh", color = :blue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]", size = (600, 600))
+# Plots.plot!(ΔTs, Tout_bh .- 273.15, label = "T_out_bh", color = :red, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
+# Plots.plot!(ΔTs, Tb*ones(length(Vs)) .- 273.15, label = "T_b", color = :green, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
+# # Combine the plots into a single figure
+# p_combined = Plots.plot(p, p2, layout = (2, 1))
 
-# Save the plot
-mypath = joinpath(@__DIR__, "figures")
-savefig(p, joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m.html"))
+# # Save the plot
+# mypath = joinpath(@__DIR__, "figures")
+# savefig(p, joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m.html"))
 
-# Display the plot
-p_combined
+# # Display the plot
+# p_combined
