@@ -200,174 +200,10 @@ md" # Combined problem"
 # ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
 md" # BHE + Evap + Compressor"
 
-# ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	@variables ΔT_SH V_comp f_comp
-	eqs_all = [
-		# Define the inlet and outlet isentropic entropies:
-		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		
-		# Define the inlet and outlet enthalpies:
-		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
-		
-		# Enforce the isentropic condition:
-		s_comp_in ~ s_comp_out_is,
-		
-		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
-		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
-	
-		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		ṁ_r ~ V̇_comp * ρ_comp_in,
-		V̇_comp ~ f_comp * V_comp,
-		W_comp ~ ṁ_r*(h_comp_out-h_comp_in),
-
-		T_r_out ~ T_evap+ΔT_SH,
-		h_r_in ~ h_bub_(p_PC(T_evap)),
-		T_b_out ~ Tbh_in,
-		Tbh_out ~ T_b_in,
-
-		
-		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
-	    ];
-
-	
-	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_r, ρ_comp_in,V̇_comp,
-		Tbh_in, T_b_in, αL, ṁ_b,
-	T_p_b, T_p_1, T_p_2]
-
-	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
-		b,
-		W,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		#ṁ_r,
-		#ṁ_b,
-		
-		T_evap,
-		T_wall,
-		
-		#T_b_in,
-		#T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-
-		#αL,
-
-		L_bh,
-
-		UA_12,
-		UA_1w,
-		UA_2w,
-
-		#T_p_1,
-		#T_p_2,
-
-		ΔT_SH,
-	]
-	
-	guesses_all = [
-		# BH parameters
-		L_bh => 300.0,
-		UA_12 => 2,
-		UA_1w => 2,
-		UA_2w => 2,
-		
-		χ => χ_,
-
-		# Evaporator
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-		
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		ϕ => 1.189,
-		β => 30.0,
-		L_PHX => L_PHX_,
-
-		#Compressor
-		η_comp => 0.8,
-		V_comp => 0.1/50,
-
-		
-		# Operating conditions
-		f_comp => 50,
-
-		
-		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_wall => T_evap+20,
-
-		
-		T_b_in => 0.4T_evap+0.6T_wall,
-		Tbh_in => 0.6T_evap+0.4T_wall,
-
-		T_p_b => T_b_in,
-
-		T_p_1 => Tbh_in,
-		T_p_2 => Tbh_in,
-		
-		ΔT_SH => 5.0,
-		#---
-		
-		# Initial guesses:
-		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_,
-		αL => pi/2,
-
-		
-		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		s_comp_in => s_comp_out_is,
-		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		T_comp_out => T_comp_in + 10.0,
-		T_comp_out_is => T_comp_in + 10.0,
-		T_comp_in => 293.0,
-		P_comp_in => 101325.0,
-		ρ_comp_in => 1.0,
-		P_comp_out => 300000.0,
-		V̇_comp => V_comp*f_comp,
-		W_comp => 0.0,
-	
-	];
-	
-	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
-	all_coupled_ = complete(simplify(all_coupled));
-	
-	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
-
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
-	
-end
-  ╠═╡ =#
-
 # ╔═╡ 0de5ef9d-7ec8-47a2-8db2-37a115297703
 # ╠═╡ disabled = true
 #=╠═╡
 sol_all.resid
-  ╠═╡ =#
-
-# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
-# ╠═╡ disabled = true
-#=╠═╡
-sol_all[ṁ_r]
   ╠═╡ =#
 
 # ╔═╡ 8c95636c-9640-4083-a36d-2010b5a80134
@@ -1234,17 +1070,12 @@ begin
 	h̃_r_in = substitute(h̃_r_EV, ξ=> 0.0) |> simplify;
 end;
 
-# ╔═╡ 8ddc1056-dbe4-49ca-96b1-424cc5d438eb
-T_b_out
-
-# ╔═╡ 36ec422d-2323-4e05-829a-50b744d221d0
-T_b_out |> get_variables
-
 # ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
 begin
 	
 	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
 	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
+	
 	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
 
 	cp_1 = cp_b_(T_p_1, χ)
@@ -1365,9 +1196,6 @@ begin
 	
 end;
 
-# ╔═╡ 96afffa1-946b-4cc1-952d-d7388e8b49fa
-UA_12_cd_tot |> get_variables
-
 # ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
 UA_12_cd_tot |> get_variables
 #	UA_1w_cd_tot = 1/R_1w_cd_tot
@@ -1487,12 +1315,6 @@ begin
 	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
 	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
 end;
-
-# ╔═╡ fde4e685-93d0-48e2-bb05-35139125d04c
-Tbh_in
-
-# ╔═╡ 0b3651a0-9765-48e0-881c-a431b01e2e0c
-Tbh_out |> get_variables
 
 # ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
 Tbh_out
@@ -1809,9 +1631,100 @@ sol_coupled_[Tbh_in]-273.15
 sol_coupled_[T_b_in]-273.15
 
 
-# ╔═╡ 96bc2e98-fce4-48bd-8145-20811011efa0
+# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
+sol_all[ṁ_comp]
+
+# ╔═╡ 9236c70e-3799-46d2-9c7e-45b4a63388f3
+sol_all[ṁ_b]
+
+# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
+cp_r(Inf, Inf)
+
+# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
+md" # Other"
+
+# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
+
+	candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
+
+# ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
+Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
+h_dew_val = PropsSI("HMASS", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
+h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refrigerant)
+
+# ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
+cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
+T_range_cond = 25:0.1:65.0
+
+# ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
+Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
+
+# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
 begin
-	@variables ΔT_SH V_comp f_comp
+	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
+	@register_symbolic μ_brine(T, fluid)
+end
+
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
+md"---"
+
+# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+md" # Imports"
+
+# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
+# ╠═╡ disabled = true
+#=╠═╡
+using LinearAlgebra
+  ╠═╡ =#
+
+# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
+html"""
+<style>
+	main {
+		margin: 0 auto;
+		max-width: 2000px;
+    	padding-left: max(550px, 5%);
+    	padding-right: max(500px, 5%);
+	}
+</style>
+"""
+
+# ╔═╡ c900c406-5e25-467b-8771-feedfe933685
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp
 	eqs_all = [
 		# Define the inlet and outlet isentropic entropies:
 		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
@@ -1843,7 +1756,7 @@ begin
 		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
 		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
 
-		UA_12 ~ UP_12_Upipe,
+		UA_12 ~ 2.0#UP_12_Upipe,
 	    ];
 
 	
@@ -1988,94 +1901,176 @@ begin
 	all_coupled_ = complete(simplify(all_coupled));
 	
 	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
+end
+  ╠═╡ =#
+
+# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
+begin
+	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp ṁ_comp
+	eqs_all = [
+		# Define the inlet and outlet isentropic entropies:
+		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		
+		# Define the inlet and outlet enthalpies:
+		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
+		
+		# Enforce the isentropic condition:
+		s_comp_in ~ s_comp_out_is,
+		
+		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
+		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
+	
+		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		ṁ_comp ~ ṁ_r,
+		ṁ_comp ~ V̇_comp * ρ_comp_in,
+		V̇_comp ~ f_comp * V_comp,
+		W_comp ~ ṁ_comp*(h_comp_out-h_comp_in),
+
+		T_r_out ~ T_evap+ΔT_SH,
+		h_r_in ~ h_bub_(p_PC(T_evap)),
+		T_b_out ~ Tbh_in,
+		Tbh_out ~ T_b_in,
+
+		
+		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
+	    ];
+
+	
+	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_comp, ṁ_r, ρ_comp_in,V̇_comp, ṁ_comp,
+		Tbh_in, T_b_in, αL, ṁ_b,
+	T_p_b, T_p_1, T_p_2]
+
+	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
+		b,
+		W,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		#ṁ_r,
+		#ṁ_b,
+		
+		T_evap,
+		T_wall,
+		
+		#T_b_in,
+		#T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+
+		#αL,
+
+		L_bh,
+
+		UA_12,
+		UA_1w,
+		UA_2w,
+
+		#T_p_1,
+		#T_p_2,
+
+		ΔT_SH,
+	]
+	
+	guesses_all = [
+		# BH parameters
+		L_bh => 300.0,
+		UA_12 => 2,
+		UA_1w => 2,
+		UA_2w => 2,
+		
+		χ => χ_,
+
+		# Evaporator
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+		
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		ϕ => 1.189,
+		β => 30.0,
+		L_PHX => L_PHX_,
+
+		#Compressor
+		η_comp => 0.8,
+		V_comp => 0.1/50,
+
+		
+		# Operating conditions
+		f_comp => 50,
+
+		
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
+		T_wall => T_evap+20,
+
+		
+		T_b_in => 0.4T_evap+0.6T_wall,
+		Tbh_in => 0.6T_evap+0.4T_wall,
+
+		T_p_b => T_b_in,
+
+		T_p_1 => Tbh_in,
+		T_p_2 => Tbh_in,
+		
+		ΔT_SH => 5.0,
+		#---
+		
+		# Initial guesses:
+		ṁ_r => 0.4,
+		ṁ_comp => 0.4,
+		ṁ_b => 1.0,
+		αL => pi/2,
+
+		
+		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		s_comp_in => s_comp_out_is,
+		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		T_comp_out => T_comp_in + 10.0,
+		T_comp_out_is => T_comp_in + 10.0,
+		T_comp_in => 293.0,
+		P_comp_in => 101325.0,
+		ρ_comp_in => 1.0,
+		P_comp_out => 300000.0,
+		V̇_comp => V_comp*f_comp,
+		W_comp => 0.0,
+	
+	];
+	
+	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
+	all_coupled_ = complete(simplify(all_coupled));
+	
+	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
 
 	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
 	sol_all.retcode
 	
 end
-
-# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
-cp_r(Inf, Inf)
-
-# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
-md" # Other"
-
-# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
-
-	candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
-
-# ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
-Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
-h_dew_val = PropsSI("HMASS", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
-h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refrigerant)
-
-# ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
-cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
-T_range_cond = 25:0.1:65.0
-
-# ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
-Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
-
-# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
-begin
-	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
-	@register_symbolic μ_brine(T, fluid)
-end
-
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
-# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-md" # Imports"
-
-# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
-# ╠═╡ disabled = true
-#=╠═╡
-using LinearAlgebra
-  ╠═╡ =#
-
-# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
-html"""
-<style>
-	main {
-		margin: 0 auto;
-		max-width: 2000px;
-    	padding-left: max(550px, 5%);
-    	padding-right: max(500px, 5%);
-	}
-</style>
-"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -5219,11 +5214,6 @@ version = "3.6.0+0"
 # ╟─352f52d6-70ec-47d7-8b46-892f6f1f6184
 # ╟─f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 # ╟─91478fb6-9ffc-4bc2-94ff-415e11c00c6e
-# ╠═fde4e685-93d0-48e2-bb05-35139125d04c
-# ╠═8ddc1056-dbe4-49ca-96b1-424cc5d438eb
-# ╠═0b3651a0-9765-48e0-881c-a431b01e2e0c
-# ╠═36ec422d-2323-4e05-829a-50b744d221d0
-# ╠═96afffa1-946b-4cc1-952d-d7388e8b49fa
 # ╠═66def5d1-7150-44fa-96be-0540aab0e097
 # ╠═1d1d643d-0c9f-4b89-bf31-61797a59d66f
 # ╠═74af929f-2a7d-4634-9cf6-5532f65861d1
@@ -5234,13 +5224,15 @@ version = "3.6.0+0"
 # ╠═8bc50a93-46ae-4622-810b-3db773b4324f
 # ╠═0de5ef9d-7ec8-47a2-8db2-37a115297703
 # ╠═99142e7e-eed5-4ffd-b648-138c19612b47
+# ╠═9236c70e-3799-46d2-9c7e-45b4a63388f3
 # ╠═8c95636c-9640-4083-a36d-2010b5a80134
 # ╠═54ac9095-a228-4d8e-9da1-7e9eb9cb9aaf
 # ╠═bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
 # ╠═04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
 # ╠═16319944-4713-469b-882a-998a2bd11943
 # ╠═f80fb712-b95c-4767-a632-9ad4e345cc7a
-# ╠═96bc2e98-fce4-48bd-8145-20811011efa0
+# ╠═c900c406-5e25-467b-8771-feedfe933685
+# ╠═31f4a311-4b38-4868-803b-e4f263468e55
 # ╟─9ad5a652-0db4-42db-be19-b20407459252
 # ╠═ae86270b-a167-4826-8baf-01ff3ca9c675
 # ╟─d44ac0d3-c764-4df8-a326-bc853f21b3ec
