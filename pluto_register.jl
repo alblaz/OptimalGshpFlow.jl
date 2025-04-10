@@ -16,17 +16,17 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ bfdb6ceb-a0e0-4f87-b650-913a3579085e
-using Printf
+# ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
+using SpecialFunctions
 
 # ╔═╡ 57a059fe-3929-4cc5-9591-49fa7cdb18cc
 using MonteCarloMeasurements
 
+# ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
+using Distributions
+
 # ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
 using LinearAlgebra
-
-# ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
-using SpecialFunctions
 
 # ╔═╡ 0e6790ed-f7fd-49ac-939a-72ff4f782b98
 using Interpolations
@@ -79,7 +79,7 @@ using Logging
 # ╔═╡ f6b9843f-bb5e-4275-bea2-05e9d594207f
 begin
     using WGLMakie
-#    set_theme!(theme_dark())
+    set_theme!(theme_dark())
 end
 
 # ╔═╡ 1c61fab6-f56b-460b-870f-8e3a83337312
@@ -87,6 +87,9 @@ using ModelingToolkit, NonlinearSolve
 
 # ╔═╡ fa00c042-0b93-4635-ac75-4513e61671ec
 using Nemo
+
+# ╔═╡ bfdb6ceb-a0e0-4f87-b650-913a3579085e
+using Printf
 
 # ╔═╡ e5f88f64-0777-4a12-8fff-ab0c2b468a7c
 using PlutoExtras
@@ -96,6 +99,48 @@ md" # Optimal Flow in GSHP - UI demonstration"
 
 # ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
 md" ## Sub model: Evaporator"
+
+# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+    # Plot using WGLMakie
+    fig = Figure(size=(800,600))
+    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
+              title="Evaporator temperature profile")
+    
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
+    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
+	
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
+    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
+    
+    # Add a vertical dashed line at x = L_EV_func()
+    vline = L_EV_func()
+    vlines!(ax, [vline], color=:black, linestyle=:dash)
+    
+    # Choose a y-position for the text (adjust as needed)
+    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
+    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
+    
+    # Add text labels to the left and right of the vertical line
+    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
+    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
+
+	
+	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
+    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
+    
+	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
+    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
+    
+    axislegend(ax, position = :lt)  # Add legend to the axis
+
+	DataInspector(fig)
+    fig  # Display the figure
+end
+
+  ╠═╡ =#
 
 # ╔═╡ 5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 md" # Outputs"
@@ -141,18 +186,6 @@ end
 
   ╠═╡ =#
 
-# ╔═╡ 3855c48c-cdeb-4f3a-b8d2-af46bdf7373f
-sqrt(im)^2
-
-# ╔═╡ cd67618c-0412-440e-8597-5cb5dc2d659a
-conj(2+2im)
-
-# ╔═╡ e661c759-31f8-43b6-b7be-f12f5ff553b5
-# ╠═╡ disabled = true
-#=╠═╡
-
-  ╠═╡ =#
-
 # ╔═╡ 2ee23e16-15a4-41c7-aa01-77f5612dc9bd
 md""" We'll try and consider that the Rp = 0
 
@@ -162,52 +195,22 @@ The idea is to add it in a different way, I feel like it's conmfusing to mix it 
 Everything works great!
 """
 
-# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
-#=╠═╡
-# Borehole resistance in conduction
-begin
-	J = 3
-	@variables p_0 p_1 p_2 k σ s j i λ_ground χ_p χ_b r_p r_b
-	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-	A_ = f_data .+ t_sum
-	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-	M_ = KJ_mat .+ A_
-	
-	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-	
-	B_ = V_k'*inv(M_)*V_bk
-	
-	B⁻ = substitute(B_, s => -1)
-	B⁺ = substitute(B_, s => 1)
+# ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
+md" # Internal forced convection"
 
-	R⁺ = R₀⁺ .+ B⁺
-	R⁻ = R₀⁻ .+ B⁻
+# ╔═╡ d44ac0d3-c764-4df8-a326-bc853f21b3ec
+md" # U-tube: filled"
 
-	R_1b_p = R⁺
-	R_2b_p = R⁺
-	R_12_p = (2*R⁺*R⁻)/(R⁺-R⁻)
-	
-	R_1b_c = substitute(R_1b_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_2b_c = substitute(R_2b_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_12_c = substitute(R_12_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-end
-  ╠═╡ =#
+# ╔═╡ 78d7e55b-134c-4db8-a7f6-bc8e25d7f543
+md" # U tube: grouted"
 
 # ╔═╡ 85f8033b-6d5a-4732-ae44-60ae1a5300cb
 # Borehole resistance in conduction
 begin
-	J = 3
-	@variables p_0 p_1 p_2 k σ s j i λ_ground χ_p χ_b r_p r_b
+	J = BigInt(1)
+	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
 	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
+	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J] #good reasons, we take into account the pipe resistance differently (simpler)
 	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
 	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
 	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
@@ -219,138 +222,221 @@ begin
 	M_ = KJ_mat .+ A_
 	
 	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
+	R₀⁺ = substitute(R₀⁺, [χ_p => α*r_b]) |> simplify
+	R₀⁺ = substitute(R₀⁺, [σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify;
+	
 	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
+	R₀⁻ = substitute(R₀⁻, [χ_p => α*r_b]) |> simplify
+	R₀⁻ = substitute(R₀⁻, [σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify;
 	
 	B_ = V_k'*inv(M_)*V_bk
 	
 	B⁻ = substitute(B_, s => -1)
-	B⁺ = substitute(B_, s => 1)
-
-	R⁺ = R₀⁺ .+ B⁺
-	R⁻ = R₀⁻ .+ B⁻
-
-	R_1b_p = R⁺
-	R_2b_p = R⁺
-	R_12_p = (2*R⁺*R⁻)/(R⁺-R⁻)
+	B⁻ = substitute(B⁻, [p_0 => r_p/(2χ_p)]) |> simplify;
+	B⁻ = substitute(B⁻, [p_1 => r_p*χ_p/(r_b^2-χ_p^2)]) |> simplify;
+	B⁻ = substitute(B⁻, [p_2 => r_p*χ_p/(r_b^2+χ_p^2)]) |> simplify;
+	B⁻ = substitute(B⁻, [σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify;
+	B⁻ = substitute(B⁻, [χ_p => α*r_b]) |> simplify;
 	
-	R_1b_c = substitute(R_1b_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_2b_c = substitute(R_2b_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_12_c = substitute(R_12_p, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-end
+	B⁺ = substitute(B_, s => 1)
+	B⁺ = substitute(B⁺, [p_0 => r_p/(2χ_p)]) |> simplify;
+	B⁺ = substitute(B⁺, [p_1 => r_p*χ_p/(r_b^2-χ_p^2)]) |> simplify;
+	B⁺ = substitute(B⁺, [p_2 => r_p*χ_p/(r_b^2+χ_p^2)]) |> simplify;
+	B⁺ = substitute(B⁺, [σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify;
+	B⁺ = substitute(B⁺, [χ_p => α*r_b]) |> simplify;
+	
+	R⁻ = R₀⁻ + B⁻ |> simplify
+	R⁺ = R₀⁺ + B⁺ |> simplify
+	R_det = R₀⁺ - R₀⁻ |> simplify
+	
+	R_1b_p_c = R⁺
+	R_2b_p_c = R⁺
+	R_12_p_c = (2*R⁺*R⁻)/R_det |> simplify
+	
+	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify
+	R_1b_cd = substitute(R_1b_cd, [χ_p => α*r_b]) |> simplify;
+	
+	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify
+	R_2b_cd = substitute(R_2b_cd, [χ_p => α*r_b]) |> simplify;
+	
+	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)]) |> simplify
+	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]) |> simplify;
+end;
+
+# ╔═╡ c0d4559f-7c4e-4f64-8622-cc96382be789
+R_12_p_c |> simplify;
+
+# ╔═╡ fc1ca0c4-9a7c-4a57-bb60-86135d56428f
+R₀⁻ |> typeof
+
+# ╔═╡ aa0bd0ca-0d79-46bb-8c21-d0f11cd16155
+R⁻
+
+# ╔═╡ 198a4980-130d-4100-8301-ed9644eecc7b
+Symbolics.taylor(B⁻, α, 0.5, 0:1:1) |> simplify
+
+# ╔═╡ 8c0e247a-5b56-4c24-86ca-f2a42decbcd4
+f(α0) = substitute(R⁻, [α => α0])
+
+# ╔═╡ 196ed798-b29b-4222-a83a-5db5370d3d8d
+R₀⁺ - R₀⁻ |> simplify
+
+# ╔═╡ 65f43498-230e-4c05-9eaf-69e41b91ce27
+V_k'*inv(M_)*V_bk
+
+# ╔═╡ a0d86608-8091-42db-8913-f9e0504a660f
+#=╠═╡
+(R0m + bb) |> simplify |> typeof
+  ╠═╡ =#
+
+# ╔═╡ da054599-9d9d-4e22-8d8b-bde51ba0657e
+R₀⁻ |> typeof
+
+# ╔═╡ b1fa081b-b2f9-454b-8fc2-d183588597ce
+B⁺ |> typeof
 
 # ╔═╡ 30eba1d3-1856-4aa0-8d58-63ab3cf81578
-#=╠═╡
-R_12_case = substitute(R_12_c, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, σ => 1])
-  ╠═╡ =#
+R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
 
 # ╔═╡ 44cc481e-c4af-499e-b263-587ccdf145ff
+R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
+
+# ╔═╡ e4bf8b22-ff0f-4c0b-8616-bd75076c3d3b
+md" # Calculating Rs"
+
+# ╔═╡ 6d5e2b7a-3dce-4a59-b018-d6478c93b7ac
+md" ## Inner pipe"
 
 
-# ╔═╡ 89d7a812-cb03-4d73-be46-4704fb18774e
+# ╔═╡ 5f49ebab-2c7b-41d2-8ea8-5721f4f344b6
+md" # Annulus: water filled case"
+
+
+# ╔═╡ 397bfe01-a92e-41e2-a660-03f469e78b97
+md" # Annulus: grouted case"
+
+# ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
+md" # Temperature profiles"
+
+# ╔═╡ 201da2ec-f2b4-4c38-8a88-88362f53f5d0
+begin
+	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
+	
+	# We assume that our homogeneous (shifted) solution is:
+	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
+	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
+	#
+	# The boundary conditions we impose are:
+	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
+	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
+	#        T̃₁(L) = T̃₂(L)
+	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
+	
+	# Write the equations:
+	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
+	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
+	
+	# Solve the system for C1 and C2.
+	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
+	#@variables U_12 U_1w U_2w
+	@variables P_1 P_w1 P_2 P_w2
+	
+	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
+
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
+                                        λ_2 => sλ2,
+                                        γ_1 => sγ1,
+                                        γ_2 => sγ2)) for s in sol_C];
+end;
+
+# ╔═╡ e813557d-c39e-4526-b0a8-58f6129cb360
+# ╠═╡ disabled = true
+#=╠═╡
+T_1_cd_f(
+	273.15,#T_p_1,
+	0.25,# 0.255)),
+	115e-3,
+	2e-3,#th_1,
+	0.35,# 0.45)),
+	2e-3,#th_2,
+	273.15,#T_p_2,
+	20e-3,#r_p,
+	3.5,#λ_ground,
+	2.0,#λ_grout,
+	1.0,#ṁ_b,
+	300.0,#x_bh,
+	273.15+5,#T_1_in,
+	273.15+10,#T_wall,
+	300.0,#L_bh
+	0.5,#α
+)
+  ╠═╡ =#
+
+# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
+# ╠═╡ disabled = true
 #=╠═╡
 begin
-	R_plus = substitute(R⁺, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_plus = substitute(R_plus, [r_b => 0.11/2, r_p => 0.02/2, χ_p =>  0.11/3*0.9, λ_ground => 3.5, σ => 1])
+XBH = range(1e-2, 300.0, length = 300)
+TT = map(x-> eval_T1(
+	273.15,#T_p_1,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	115e-3,
+	2e-3,#th_1,
+	Particles(n_p, Uniform(0.35, 0.45)),
+	2e-3,#th_2,
+	2300,#Re_low,
+	5000,#Re_high,
+	273.15,#T_p_2,
+	20e-3,#r_p,
+	3.5,#λ_ground,
+	2.0,#λ_grout,
+	1.0,#ṁ_b,
+	x,#x_bh,
+	273.15+5,#T_1_in,
+	273.15+10,#T_wall,
+	300.0,#L_bh
+	0.3,#α
+), XBH)
 end
   ╠═╡ =#
 
-# ╔═╡ c8277438-4778-47ec-94d4-ffc089155310
+# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
 #=╠═╡
 begin
-	R_minus = substitute(R⁻, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2)])
-	R_minus = substitute(R_minus, [r_b => 0.11/2, r_p => 0.02/2, χ_p =>  0.11/3*0.9, λ_ground => 3.5, σ => 1])
+	m_T = [median(y.particles) for y in TT]
+	q_05_T = [quantile(y.particles, 0.025) for y in TT]
+	q_95_T = [quantile(y.particles, 0.975) for y in TT]
+fig_study_T = Makie.lines(XBH, m_T)
+	band!(XBH, q_05_T, q_95_T)
+	fig_study_T
 end
   ╠═╡ =#
 
-# ╔═╡ ff28f3c8-9ce7-42bf-a89c-27372a2e5b07
-#=╠═╡
-begin
-	Per_1 = pi*(D_1-th_1)
-	Per_2 = pi*(D_2-th_2)
-	Per_w = pi*(D_b)
-	
-	R_1 = 1/(Per_1*h_1)
-	R_2 = 1/(Per_2*h_2)
-	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
-	
-	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
-	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE)
-	
-	R_12 = R_1 + R_pipe_1 + R_12_c + R_pipe_1 + R_2
-	R_1w = R_1 + R_pipe_1 + R_1b_c + R_w
-	R_2w = R_2 + R_pipe_2 + R_2b_c + R_w
-	
-end
-  ╠═╡ =#
+# ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
+md" # Quick analysis: parametric study"
 
-# ╔═╡ ba17f435-dedc-43f5-86f3-a0fee0e2ea0c
-#=╠═╡
-begin
-	@variables x_bh
-	sT̃_1 = sC_1*exp(sλ1*x_bh) + sC_2*exp(sλ2*x_bh)
-	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
-	sT_1 = substitute(sT_1, [U_12 => 1/R_12])
-	
-	sT̃_2 = sC_1*sγ1*exp(sλ1*x_bh) + sC_2*sγ2*exp(sλ2*x_bh)
-	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
-	Tbh_in = T_1_in
-	Tbh_out = simplify(substitute(sT_2, x_bh=>0.0))
-
-	T1_n=build_function(sT_1, x_bh, L_bh, U_12, U_w1, U_w2, ṁ_b, cp_1_bh, cp_2_bh, T_1_in, T_wall, expression = Val{false})
-	T1_(x) =T1_n(x,Lbh_,Upp_,Upw_,Upw_,sol[ṁ2], cp_brine_, cp_brine_, T2A_(0.0), Twall_)
-	
-	T2_n=build_function(sT_2, x_bh, L_bh, U_12, U_w1, U_w2, ṁ_b, cp_1_bh, cp_2_bh, T_1_in, T_wall, expression = Val{false})
-	T2_(x) =T2_n(x,Lbh_,Upp_,Upw_,Upw_, sol[ṁ2], cp_brine_, cp_brine_, T2A_(0.0), Twall_)
-end
-  ╠═╡ =#
-
-# ╔═╡ da5839f5-0dcc-4b30-8dda-af4d0910c248
-#=╠═╡
-sT_1
-  ╠═╡ =#
-
-# ╔═╡ f0d290c1-584c-46e0-9377-3c73fec48818
-#=╠═╡
-begin
-	eq_little = [Tbh_in - Tbh_out~3.0]
-	pars_l = [
-		L_bh,
-		Per_12,
-		Per_w1,
-		Per_w2,
-		cp_1_bh,
-		cp_2_bh,
-		U_12,
-		U_w1,
-		U_w2,
-		T_wall,
-		T_1_in,
-		χ,
-	]
-	unknowns_li = [ṁ_b]
-	@named little = NonlinearSystem(eq_little, unknowns_li, pars_l)
-	l_ = simplify(little) |> complete
-	ps_l = Dict(
-		χ => χ_,
-		L_bh => 250.0,
-		U_12 => 15.0,
-		U_w1 => 20.0,
-		U_w2 => 20.0,
-		ṁ_b => 0.6,
-		T_wall => 273.15+10,
-		cp_1_bh => cp_b_(T_wall, χ),
-		cp_2_bh => cp_b_(T_wall, χ),
-		T_1_in => 273.15+3,
-		Per_12 => pi*40e-3,
-		Per_w1 => pi*40e-3,
-		Per_w2 => pi*40e-3,
-	)
-	prob_l_ = NonlinearProblem(l_, [], ps_l, symbolic_u0 = true)
-	sol_l_ = NonlinearSolve.solve(prob_l_)
-	sol_l_.resid
-	sol_l_[Tbh_out]
-end
-  ╠═╡ =#
+# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
+md"# Utilities"
 
 # ╔═╡ 1cd63e6f-37b2-49ba-8887-2220d1df7c6f
 md" # Properties"
@@ -836,7 +922,7 @@ begin
 
 	UA_SH = U_SH * L_SH * Per_PHX
 	P_r = UA_SH / ṁ_r / cp_r_gas
-	α_SH = UA_SH /ṁ_b / cp_b
+	α_SH = UA_SH / ṁ_b / cp_b
 	
 	UA_EV = U_EV * L_EV * Per_PHX
 	α_EV = UA_EV / ṁ_b / cp_b
@@ -868,161 +954,275 @@ begin
 	h̃_r_in = substitute(h̃_r_EV, ξ=> 0.0) |> simplify;
 end;
 
-# ╔═╡ 7b68eefc-1d88-42c1-a5d3-9741c8bb0b9e
+# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
 begin
-	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
-	
-	# We assume that our homogeneous (shifted) solution is:
-	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
-	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
-	#
-	# The boundary conditions we impose are:
-	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
-	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
-	#        T̃₁(L) = T̃₂(L)
-	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
-	
-	# Write the equations:
-	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
-	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
-	
-	# Solve the system for C1 and C2.
-	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
-		
-	
 	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
-	@variables cp_1_bh U_w1 cp_2_bh U_w2 Per_12 Per_w1 Per_w2
 	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
 
+	Re_(ρ, v, D, μ) = ρ * v * D / μ
+	@register_symbolic Re_(ρ, v, D, μ)
+	Pr_(cp, μ, λ) = cp * μ / λ
+	@register_symbolic Pr_(cp, μ, λ)
+	Nu_t(f, Re, Pr) = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
+	@register_symbolic Nu_t(f, Re, Pr)
+	t_index(Re, Re_low, Re_high) = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+	@register_symbolic t_index(Re, Re_low, Re_high)
+	
 	cp_1 = cp_b_(T_p_1, χ)
 	μ_1 = μ_b_(T_p_1, χ)
-	λ_1 = λ_b_(T_p_1, χ)
+	λp_1 = λ_b_(T_p_1, χ)
 	ρ_1 = ρ_b_(T_p_1, χ)
 	
 	V̇_1 = ṁ_1 / ρ_1
 	S_1 = π*D_1^2/4
-	v_1 = V̇_1 / S_1
+	v_1 = V̇_1 / S_1 |> simplify
 
-	Re_1 = ρ_1*v_1*D_1/μ_1
-	Pr_1 = cp_1*μ_1/λ_1
+	D_h_1 = D_1 - th_1
+	
+	Re_1 = Re_(ρ_1, v_1, D_h_1, μ_1)
+	Pr_1 = Pr_(cp_1, μ_1, λp_1)
 
 	Nu_lam_1 = 3.66
 	f_1 = 0.3164*Re_1^(-1//4)
-	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
-	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
+	
+	Nu_tur_1 = Nu_t(f_1, Re_1, Pr_1)
+	turb_index_1 = t_index(Re_1, Re_low, Re_high)
 
 	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
 
-	h_1 = Nu_1 * λ_1/D_1 |> simplify
+	h_1 = Nu_1 * λp_1/D_h_1 |> simplify
 
 	#---
 
 	cp_2 = cp_b_(T_p_2, χ)
 	μ_2 = μ_b_(T_p_2, χ)
-	λ_2 = λ_b_(T_p_2, χ)
+	λp_2 = λ_b_(T_p_2, χ)
 	ρ_2 = ρ_b_(T_p_2, χ)
 	
 	V̇_2 = ṁ_2 / ρ_2
 	S_2 = π*D_2^2/4
-	v_2 = V̇_2 / S_2
+	v_2 = V̇_2 / S_2 |> simplify
 
-	Re_2 = ρ_2*v_2*D_2/μ_2
-	Pr_2 = cp_2*μ_2/λ_2
+	D_h_2 = D_2 - th_2
+	
+	Re_2 = Re_(ρ_2, v_2, D_h_2, μ_2)
+	Pr_2 = Pr_(cp_2, μ_2, λp_2)
 
 	Nu_lam_2 = 3.66
 	f_2 = 0.3164*Re_1^(-1//4)
-	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
-	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
+	Nu_tur_2 = Nu_t(f_2, Re_2, Pr_2)
+	turb_index_2 = t_index(Re_2, Re_low, Re_high)
 
 	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_1*Nu_tur_2
 
-	h_2 = Nu_2 * λ_2/D_2 |> simplify
-end
+	h_2 = Nu_2 * λp_2/D_h_2 |> simplify;
+end;
 
-# ╔═╡ 3aca62fe-df4e-4b6c-a29c-73770697f4c8
-𝝺_grout
-
-# ╔═╡ 7de3b071-5366-4398-9c29-c5cb9caf6f3f
+# ╔═╡ 40cb2982-16d6-435f-b1d2-c62040416819
 begin
-	@variables U_12 U_1w U_2w
+	Per_1 = pi*(D_1-th_1)
+	Per_2 = pi*(D_2-th_2)
+	Per_w = pi*(D_b)
 	
-	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
-	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
+	R_1 = 1/(Per_1*h_1)
+	R_2 = 1/(Per_2*h_2)
+	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
 	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
+	R_pipe_1 = log((D_1-th_1)/(D_1)) / (2π*λ_PE)
+	R_pipe_2 = log((D_2-th_2)/(D_2)) / (2π*λ_PE);
+end;
 
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
-                                        λ_2 => simplify(sλ2),
-                                        γ_1 => simplify(sγ1),
-                                        γ_2 => simplify(sγ2))) for s in sol_C]
-	sol_C_full = simplify.(sol_C_full)
-	sC_1 = sol_C_full[1]
-	sC_2 = sol_C_full[2]
-end
-
-# ╔═╡ 1f40db66-ca48-4f7f-8598-3ef7cc587786
-h_1
-
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
-# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
-md"## Utilities"
-
-# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
-
-	candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
-
-# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
-T_range_cond = 25:0.1:65.0
-
-# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
+# ╔═╡ e2bd77ff-f24e-4d27-948c-d92294f2367f
 begin
-	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
-	@register_symbolic μ_brine(T, fluid)
+	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
+	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
+	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
+	
+	UA_12_cd_tot = 1/R_12_cd_tot
+	UA_1w_cd_tot = 1/R_1w_cd_tot
+	UA_2w_cd_tot = 1/R_2w_cd_tot;
+end;
+
+# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
+begin
+	@variables UA_12 UA_1w UA_2w
+	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify
+	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify;
+	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify;
+	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify;
+	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify;
+	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2))) |> simplify;
+end;
+
+# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
+begin
+	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+end;
+
+# ╔═╡ d2ff5f9e-3260-4e10-bca3-af2742b13877
+begin
+	@variables x_bh
+	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh) |> simplify
+	sT_1 = sT̃_1 + T_wall |> simplify # change of variable from homogeneous to non homogeneous
+	
+	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh) |> simplify
+	sT_2 = sT̃_2 + T_wall |> simplify# change of variable from homogeneous to non homogeneous
+	Tbh_in = T_1_in
+	Tbh_out = substitute(sT_2, x_bh=>0.0) |> simplify;
+end;
+
+# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
+begin
+	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	
+	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+
+	@variables D_bh
+	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b/2, Re_high => 5000, Re_low => 2300)
+	sT_1_cd = substitute(sT_1_cd, d_simpl);
+	
+end;
+
+# ╔═╡ 069614e1-ab70-4103-85dd-2a3b564944b5
+sT_1_cd;
+
+# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
+get_variables(sT_1_cd)
+
+# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
+simple_T_1 = substitute(sT_1_cd, [Re_low=>2300, Re_high=>5000]);
+
+# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
+T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
+
+# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
+eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
+	
+
+# ╔═╡ 8815b4d5-6ec5-4e14-b081-296e4cb17cea
+begin
+	@variables th_p, ṁ_bh
+	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh, Re_low => 2300, Re_high => 5000])
+	R_12_simplified |> get_variables
+R12_cd_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, expression=Val{false});
+eval_R12_cd_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1) = @bymap R12_cd_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1)
+	
 end
+
+# ╔═╡ 43dd5476-8109-439e-9579-e272e0d9a736
+R_12_simplified |> get_variables
+
+# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
+begin
+	XX = range(1e-2, 2.0, length = 300)
+	
+	n_p = 1000
+	YY = map(x->eval_R12_cd_f(
+		115e-3,
+		Particles(n_p, Uniform(0.35, 0.36)),
+		2e-3,
+		Particles(n_p, Uniform(0.5, 0.51)),
+		40e-3,
+		Particles(n_p, Uniform(3.5, 4.5)),
+		Particles(n_p, Uniform(1.8, 2.2)),
+		x,
+		273.15+5,
+		Particles(n_p, Uniform(0.25, 0.255)),
+		273.15+5,)
+		, XX
+	)
+end
+
+# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
+begin
+	m_Y = [median(y.particles) for y in YY]
+	q_05 = [quantile(y.particles, 0.025) for y in YY]
+	q_95 = [quantile(y.particles, 0.975) for y in YY]
+end
+
+# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
+begin
+fig_study = Makie.lines(XX, m_Y)
+	band!(XX, q_05, q_95)
+	fig_study
+end
+
+# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
+# Borehole resistance in natural convection
+begin
+	#@variables r_p r_b
+	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
+	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
+	@variables T_w_av T_1_av T_2_av T_b_av
+	@parameters g = 9.81
+
+	Nu_nc(Gr, Pr) = 0.6 + 0.387*(Gr*Pr)^(1//6)*(1+(0.559/Pr)^(9/16))^(-8/27)
+	@register_symbolic Nu_nc(Gr, Pr)
+	
+	T_f_1_w = 0.5*T_1_av + .5*T_w_av
+	T_f_2_w = 0.5*T_2_av + .5*T_w_av
+	T_f_b_w = 0.5*T_b_av + .5*T_w_av
+
+	Gr_1 = g*β_w_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
+	Gr_2 = g*β_w_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
+	Gr_b = g*β_w_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
+
+	Pr_1_nc = Pr(T_f_1_w)
+	Pr_2_nc = Pr(T_f_2_w)
+	Pr_b_nc = Pr(T_f_b_w)
+	
+	Nu_1_cv = Nu_nc(Gr_1, Pr_1_nc)
+	Nu_2_cv = Nu_nc(Gr_2, Pr_2_nc)
+	Nu_b_cv = Nu_nc(Gr_b, Pr_b_nc)
+	
+	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
+	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
+	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+
+	R_1w_cv = 1/(h_1_w*pi*D_1)
+	R_2w_cv = 1/(h_2_w*pi*D_2)
+	R_bw_cv = 1/(h_b_w*pi*D_b);
+end;
+
+# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
+begin
+	R_12_cv = R_1w_cv + R_2w_cv
+	R_1b_cv = R_1w_cv + R_bw_cv
+	R_2b_cv = R_2w_cv + R_bw_cv;
+	
+	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
+	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
+	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
+	
+	UA_12_cv_tot = 1/R_12_cv_tot
+	UA_1w_cv_tot = 1/R_1w_cv_tot
+	UA_2w_cv_tot = 1/R_2w_cv_tot;
+end;
 
 # ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
 md"## Bonds"
@@ -1184,53 +1384,84 @@ begin
 	T_b_in_func = build_function(T_b_in_sol, expression=Val{false});
 end;
 
-# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
-begin
-    # Plot using WGLMakie
-    fig = Figure(size=(800,600))
-    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
-              title="Evaporator temperature profile")
-    
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
-    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
-	
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
-    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
-    
-    # Add a vertical dashed line at x = L_EV_func()
-    vline = L_EV_func()
-    vlines!(ax, [vline], color=:black, linestyle=:dash)
-    
-    # Choose a y-position for the text (adjust as needed)
-    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
-    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
-    
-    # Add text labels to the left and right of the vertical line
-    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
-    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
-
-	
-	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
-    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
-    
-	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
-    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
-    
-    axislegend(ax, position = :lt)  # Add legend to the axis
-
-	DataInspector(fig)
-    fig  # Display the figure
-end
-
-
 # ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
 sol_.ps[T_b_in]
 
 # ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
 sin(sol_[αL])^2
 
-# ╔═╡ 1a18f493-5697-4851-a7f4-a7c439ca63e6
-T_evap_
+# ╔═╡ f0d290c1-584c-46e0-9377-3c73fec48818
+begin
+	eq_little = [Tbh_in - Tbh_out~3.0]
+	pars_l = [
+		L_bh,
+		Per_12,
+		Per_w1,
+		Per_w2,
+		cp_1_bh,
+		cp_2_bh,
+		U_12,
+		U_w1,
+		U_w2,
+		T_wall,
+		T_1_in,
+		χ,
+	]
+	unknowns_li = [ṁ_b]
+	@named little = NonlinearSystem(eq_little, unknowns_li, pars_l)
+	l_ = simplify(little) |> complete
+	ps_l = Dict(
+		χ => χ_,
+		L_bh => 250.0,
+		U_12 => 15.0,
+		U_w1 => 20.0,
+		U_w2 => 20.0,
+		ṁ_b => 0.6,
+		T_wall => 273.15+10,
+		cp_1_bh => cp_b_(T_wall, χ),
+		cp_2_bh => cp_b_(T_wall, χ),
+		T_1_in => 273.15+3,
+		Per_12 => pi*40e-3,
+		Per_w1 => pi*40e-3,
+		Per_w2 => pi*40e-3,
+	)
+	prob_l_ = NonlinearProblem(l_, [], ps_l, symbolic_u0 = true)
+	sol_l_ = NonlinearSolve.solve(prob_l_)
+	sol_l_.resid
+	sol_l_[Tbh_out]
+end
+
+# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
+md" # Other"
+
+# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
+
+	candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
 
 # ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
 Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
@@ -1244,14 +1475,23 @@ h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refriger
 # ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
 cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
 
+# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
+T_range_cond = 25:0.1:65.0
+
 # ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
 Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
 
-# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
-# ╠═╡ disabled = true
-#=╠═╡
-using LinearAlgebra
-  ╠═╡ =#
+# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
+begin
+	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
+	@register_symbolic μ_brine(T, fluid)
+end
+
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
+md"---"
+
+# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+md" # Imports"
 
 # ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
 html"""
@@ -1271,6 +1511,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
 CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -1298,6 +1539,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 Clapeyron = "~0.6.10"
 CoolProp = "~0.2.0"
 DataFrames = "~1.7.0"
+Distributions = "~0.25.117"
 Interpolations = "~0.15.1"
 MINPACK = "~1.3.0"
 ModelingToolkit = "~9.62.0"
@@ -1323,7 +1565,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "0b37c712d20fef81ecd3d213999a691a689d4367"
+project_hash = "a3676aca6c2a6af1f614febb3eeea0c166988005"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fb97701c117c8162e84dfcf80215caa904aef44f"
@@ -4386,13 +4628,11 @@ version = "3.6.0+0"
 # ╟─ed723b83-28ad-4938-97e8-891b40acc0db
 # ╟─c89c0195-7f93-4a49-993a-7efa861db428
 # ╠═38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╟─5c8d98d5-4d69-4e9d-99fc-2d04fdae9006
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
-# ╠═1a18f493-5697-4851-a7f4-a7c439ca63e6
 # ╠═c4102eaf-773a-4069-8e3d-45d7a7ac9e69
 # ╠═9972656e-1389-45df-9391-18cb7711ea17
 # ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
@@ -4400,32 +4640,60 @@ version = "3.6.0+0"
 # ╠═ad4c38f4-b78d-42c9-b868-102b1a17386d
 # ╠═352f52d6-70ec-47d7-8b46-892f6f1f6184
 # ╠═f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
-# ╠═3aca62fe-df4e-4b6c-a29c-73770697f4c8
-# ╠═3855c48c-cdeb-4f3a-b8d2-af46bdf7373f
-# ╠═cd67618c-0412-440e-8597-5cb5dc2d659a
-# ╠═e661c759-31f8-43b6-b7be-f12f5ff553b5
 # ╟─2ee23e16-15a4-41c7-aa01-77f5612dc9bd
+# ╟─9ad5a652-0db4-42db-be19-b20407459252
+# ╠═ae86270b-a167-4826-8baf-01ff3ca9c675
+# ╟─d44ac0d3-c764-4df8-a326-bc853f21b3ec
 # ╠═e0175788-3009-4494-ba16-05d1e0d7381b
+# ╟─78d7e55b-134c-4db8-a7f6-bc8e25d7f543
 # ╠═85f8033b-6d5a-4732-ae44-60ae1a5300cb
-# ╠═57a059fe-3929-4cc5-9591-49fa7cdb18cc
+# ╠═c0d4559f-7c4e-4f64-8622-cc96382be789
+# ╠═fc1ca0c4-9a7c-4a57-bb60-86135d56428f
+# ╠═aa0bd0ca-0d79-46bb-8c21-d0f11cd16155
+# ╠═198a4980-130d-4100-8301-ed9644eecc7b
+# ╠═8c0e247a-5b56-4c24-86ca-f2a42decbcd4
+# ╠═196ed798-b29b-4222-a83a-5db5370d3d8d
+# ╠═65f43498-230e-4c05-9eaf-69e41b91ce27
+# ╠═a0d86608-8091-42db-8913-f9e0504a660f
+# ╠═da054599-9d9d-4e22-8d8b-bde51ba0657e
+# ╠═b1fa081b-b2f9-454b-8fc2-d183588597ce
 # ╠═30eba1d3-1856-4aa0-8d58-63ab3cf81578
 # ╠═44cc481e-c4af-499e-b263-587ccdf145ff
-# ╠═89d7a812-cb03-4d73-be46-4704fb18774e
-# ╠═c8277438-4778-47ec-94d4-ffc089155310
-# ╠═f2310579-6f1d-4b7e-bb72-b99e11d92885
-# ╠═7b68eefc-1d88-42c1-a5d3-9741c8bb0b9e
-# ╠═ff28f3c8-9ce7-42bf-a89c-27372a2e5b07
-# ╠═7de3b071-5366-4398-9c29-c5cb9caf6f3f
-# ╠═ba17f435-dedc-43f5-86f3-a0fee0e2ea0c
-# ╠═da5839f5-0dcc-4b30-8dda-af4d0910c248
-# ╠═1f40db66-ca48-4f7f-8598-3ef7cc587786
-# ╠═f0dae363-b54b-4f43-8f75-ef1f1e525e7d
+# ╟─e4bf8b22-ff0f-4c0b-8616-bd75076c3d3b
+# ╟─6d5e2b7a-3dce-4a59-b018-d6478c93b7ac
+# ╠═40cb2982-16d6-435f-b1d2-c62040416819
+# ╟─5f49ebab-2c7b-41d2-8ea8-5721f4f344b6
+# ╠═cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
+# ╟─397bfe01-a92e-41e2-a660-03f469e78b97
+# ╠═e2bd77ff-f24e-4d27-948c-d92294f2367f
+# ╟─b7c12215-f78a-4b4f-8c4e-46228b5687dc
+# ╠═201da2ec-f2b4-4c38-8a88-88362f53f5d0
+# ╠═18160123-a854-4568-9904-1d311d11e5a9
+# ╠═03df0193-84df-4c45-8882-f3c3ca457fd1
+# ╠═d2ff5f9e-3260-4e10-bca3-af2742b13877
+# ╠═ef230968-2812-4800-bc90-b18d70c7da4f
+# ╠═069614e1-ab70-4103-85dd-2a3b564944b5
+# ╠═c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
+# ╠═5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
+# ╠═56f8523d-7a41-4c99-b56c-3a4aa919f4e7
+# ╠═f064f4ed-3840-4760-a0d3-7309ede60204
+# ╠═e813557d-c39e-4526-b0a8-58f6129cb360
+# ╠═15089d8d-0632-44f1-aa8e-e726cb5b673e
+# ╠═42556ee8-4011-4522-bd9d-512571609e36
 # ╠═f0d290c1-584c-46e0-9377-3c73fec48818
-# ╟─1cd63e6f-37b2-49ba-8887-2220d1df7c6f
-# ╠═6435d235-34f8-4f43-a945-7cdd62e5dce7
-# ╠═abf2c0e4-9174-497f-823d-2ca76e0f8b75
-# ╟─38384b61-a30c-435c-a13c-228f16e6169e
-# ╟─a9587932-391a-46ad-84e0-9c4760e534af
+# ╟─3fde0742-9054-456f-ad90-262e07f13819
+# ╠═8815b4d5-6ec5-4e14-b081-296e4cb17cea
+# ╠═43dd5476-8109-439e-9579-e272e0d9a736
+# ╠═e0c4a54e-87c8-4b24-845e-483cda6e4966
+# ╠═9058e171-6b6f-4478-a492-40cbb7cbf406
+# ╠═274c189d-8325-4634-927b-f40976190bb2
+# ╠═a9587932-391a-46ad-84e0-9c4760e534af
+# ╠═1cd63e6f-37b2-49ba-8887-2220d1df7c6f
+# ╟─6435d235-34f8-4f43-a945-7cdd62e5dce7
+# ╟─abf2c0e4-9174-497f-823d-2ca76e0f8b75
+# ╟─4b6d717a-edb6-4292-bcb7-5dc44e560637
+# ╠═607cd32d-c035-4f36-ad7d-b45cf59d2347
+# ╠═1d57cda4-8948-4b00-be29-4acbc17dd7ae
 # ╠═8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 # ╠═1ba60683-8370-40c9-abf0-d4a58713d708
 # ╠═c550217f-e4be-4a4a-931e-39d100294441
@@ -4434,8 +4702,12 @@ version = "3.6.0+0"
 # ╠═a0bf0d50-1125-4c34-b60e-4505e9edee95
 # ╠═c9885140-68b4-4ab9-a56e-0934bc54de6e
 # ╠═f853312b-5da5-43d3-9b51-51dec3bce19f
-# ╟─4b6d717a-edb6-4292-bcb7-5dc44e560637
-# ╠═607cd32d-c035-4f36-ad7d-b45cf59d2347
+# ╟─38384b61-a30c-435c-a13c-228f16e6169e
+# ╠═679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+# ╠═f0dae363-b54b-4f43-8f75-ef1f1e525e7d
+# ╠═57a059fe-3929-4cc5-9591-49fa7cdb18cc
+# ╠═086bc03f-081e-428b-b3e5-62d90a632bec
+# ╠═f2310579-6f1d-4b7e-bb72-b99e11d92885
 # ╠═0e6790ed-f7fd-49ac-939a-72ff4f782b98
 # ╠═42268bb5-c95c-45ab-bdc6-125897bb0fcf
 # ╠═1d44ba55-15e5-4691-86e1-bc6429e34938
@@ -4454,8 +4726,8 @@ version = "3.6.0+0"
 # ╠═4dd5e489-a155-48c3-b7da-0d459f6c7588
 # ╠═f6b9843f-bb5e-4275-bea2-05e9d594207f
 # ╠═1c61fab6-f56b-460b-870f-8e3a83337312
-# ╠═fbf3c417-8b31-4256-8981-84b0f0ce34b0
 # ╠═fa00c042-0b93-4635-ac75-4513e61671ec
+# ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╠═e5f88f64-0777-4a12-8fff-ab0c2b468a7c
 # ╠═c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
 # ╟─00000000-0000-0000-0000-000000000001
