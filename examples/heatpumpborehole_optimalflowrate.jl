@@ -193,7 +193,7 @@ axislegend(ax3, [ltb, ltin, ltout], ["Borehole wall", "Inlet borehole","Outlet b
 
 
 # Save the combined plot
-save(joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_secfl$(sec_fl_name).png"), fig)
+save(joinpath(mypath, "opt_combined_Tb$(round(Int, Tb - 273.15))°C_sup$(round(ΔTsup, digits=1))K_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_sf-$(sec_fl_name).png"), fig)
 linkxaxes!(ax,ax2,ax3)
 # WGLMakie.ylims!(ax,2,5.5)
 WGLMakie.ylims!(ax2,4,10)
