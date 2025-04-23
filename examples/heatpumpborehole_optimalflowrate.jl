@@ -193,35 +193,37 @@ axislegend(ax3, [ltb, ltin, ltout], ["Borehole wall", "Inlet borehole","Outlet b
 
 
 # Save the combined plot
-save(joinpath(mypath, "opt_combined_Tb$(round(Int, Tb - 273.15))°C_sup$(round(ΔTsup, digits=1))K_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_sf-$(sec_fl_name).png"), fig)
+str_save="opt_combined_Tb$(round(Int, Tb - 273.15))°C_sup$(round(ΔTsup, digits=1))K_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_sf-$(sec_fl_name)"
+save(joinpath(mypath, str_save*".png"), fig)
 linkxaxes!(ax,ax2,ax3)
 # WGLMakie.ylims!(ax,2,5.5)
 WGLMakie.ylims!(ax2,4,10)
 WGLMakie.xlims!(ax,2,10)
+WGLMakie.DataInspector(fig)
 # fig
 
 
 ### Same plot in interactive form with Plotly
-# Plots.plotly()
-# # Create the plot with specified size
-# p = Plots.plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, ylabel = "COP", legend = :topright, size = (600, 600))
-# Plots.plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
-# # Plots.plot!(twinx(p), Q1, label = "Q1", color = :green, linewidth = 2, ylabel = "Q1",axis=:right)
+Plots.plotly()
+# Create the plot with specified size
+p = Plots.plot(ΔTs, COP1, label = "COP1", color = :dodgerblue, linewidth = 2, ylabel = "COP", legend = :topright, size = (600, 600))
+Plots.plot!(ΔTs, COP2, label = "COP2", color = :indianred, linewidth = 2)
+# Plots.plot!(twinx(p), Q1, label = "Q1", color = :green, linewidth = 2, ylabel = "Q1",axis=:right)
 
-# # Add dashed vertical line for the maximum of COP2
-# max_COP2_index = argmax(COP2)
-# Plots.plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
+# Add dashed vertical line for the maximum of COP2
+max_COP2_index = argmax(COP2)
+Plots.plot!(ones(2).*ΔTs[max_COP2_index], [minimum(COP2), maximum(COP2)],label = "max", linestyle = :dash, color = :black)
 
-# # Add a subplot for T_mean vs temperature difference
-# p2 = Plots.plot(ΔTs, Tin_bh .- 273.15, label = "T_in_bh", color = :blue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]", size = (600, 600))
-# Plots.plot!(ΔTs, Tout_bh .- 273.15, label = "T_out_bh", color = :red, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
-# Plots.plot!(ΔTs, Tb*ones(length(Vs)) .- 273.15, label = "T_b", color = :green, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
-# # Combine the plots into a single figure
-# p_combined = Plots.plot(p, p2, layout = (2, 1))
+# Add a subplot for T_mean vs temperature difference
+p2 = Plots.plot(ΔTs, Tin_bh .- 273.15, label = "T_in_bh", color = :blue, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]", size = (600, 600))
+Plots.plot!(ΔTs, Tout_bh .- 273.15, label = "T_out_bh", color = :red, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
+Plots.plot!(ΔTs, Tb*ones(length(Vs)) .- 273.15, label = "T_b", color = :green, linewidth = 2, xlabel = "Temperature difference (K)", ylabel = "Temperature [°C]")
+# Combine the plots into a single figure
+p_combined = Plots.plot(p, p2, layout = (2, 1))
 
-# # Save the plot
-# mypath = joinpath(@__DIR__, "figures")
-# savefig(p, joinpath(mypath, "optimal_combined_Tb_$(round(Int, Tb - 273.15))°C_deltaTsup$(round(Int, div(ΔTsup, 1)))_$(round(Int, mod(ΔTsup, 1) * 10))_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m.html"))
+# Save the plot
+mypath = joinpath(@__DIR__, "figures")
+Plots.savefig(p, joinpath(mypath, str_save*".html"))
 
 # # Display the plot
 # p_combined
