@@ -1,0 +1,4 @@
+name = "OptimalGshpFlow"
+uuid = "cd72a1d5-80d1-4344-b188-c845244212df"
+authors = ["AV_BD <adrien.vautrin@bengtdahlgren.se>"]
+version = "0.1.0"

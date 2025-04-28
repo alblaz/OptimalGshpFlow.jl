@@ -108,6 +108,21 @@ md" # Optimal Flow in GSHP - UI demonstration"
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 md" # Sub Model: Compressor"
 
+# ╔═╡ b8eec68f-5fdb-4b7e-b2b5-d6178e364888
+@named C1 = Compressor();
+
+# ╔═╡ 19fac9f4-0240-4937-8187-756f7fafcd88
+C1p = C1 |> complete |> simplify;
+
+# ╔═╡ dc10c10b-9018-4d9e-8fa5-ee3fcfb9f28c
+prob_comp = NonlinearProblem(C1p, [], [])
+
+# ╔═╡ c0d0c5d4-df5f-441d-8215-1b347a123e71
+sol_comp = NonlinearSolve.solve(prob_comp)
+
+# ╔═╡ e1910100-2341-438c-8152-7ec84af9397b
+sol_comp[C1.h_out]
+
 # ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
 md" ## Sub model: Evaporator"
 
@@ -216,6 +231,204 @@ sol_all[T_b_in]-273.15
 # ╠═╡ disabled = true
 #=╠═╡
 sol_all[Tbh_in]-273.15
+  ╠═╡ =#
+
+# ╔═╡ 16319944-4713-469b-882a-998a2bd11943
+D_p
+
+# ╔═╡ c900c406-5e25-467b-8771-feedfe933685
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp
+	eqs_all = [
+		# Define the inlet and outlet isentropic entropies:
+		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		
+		# Define the inlet and outlet enthalpies:
+		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
+		
+		# Enforce the isentropic condition:
+		s_comp_in ~ s_comp_out_is,
+		
+		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
+		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
+	
+		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		ṁ_r ~ V̇_comp * ρ_comp_in,
+		V̇_comp ~ f_comp * V_comp,
+		W_comp ~ ṁ_r*(h_comp_out-h_comp_in),
+
+		T_r_out ~ T_evap+ΔT_SH,
+		h_r_in ~ h_bub_(p_PC(T_evap)),
+		T_b_out ~ Tbh_in,
+		Tbh_out ~ T_b_in,
+
+		
+		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
+
+		UA_12 ~ 2.0#UP_12_Upipe,
+	    ];
+
+	
+	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_r, ρ_comp_in,V̇_comp,
+		Tbh_in, T_b_in, αL, ṁ_b,
+	T_p_b, T_p_1, T_p_2,
+	UA_12]
+
+	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
+		b,
+		W,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		#ṁ_r,
+		#ṁ_b,
+		
+		T_evap,
+		T_wall,
+		
+		#T_b_in,
+		#T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+
+		#αL,
+
+		L_bh,
+
+		UA_12,
+		UA_1w,
+		UA_2w,
+
+		#T_p_1,
+		#T_p_2,
+
+		ΔT_SH,
+
+		# BHE
+		#ṁ_b
+		D_p,
+		D_b,
+		α,
+		th,
+		T_p_bh,
+		#T_p_2,
+		Re_low,
+		Re_high,
+		λ_ground,
+		λ_grout,
+		λ_PE,
+		#χ,
+	]
+	
+	guesses_all = [
+		# BH parameters
+		D_p => 40e-3,
+		D_b => 115e-3,
+		α => 0.5, #adimensional spacing
+		th => 2e-3, #some check with consistency to be done across the board
+		Re_low => 2300,
+		Re_high => 5000,
+		λ_ground => 3.5,
+		λ_grout => 2.0,
+		λ_PE => 0.4,
+		
+		L_bh => 300.0,
+		UA_1w => 2,
+		UA_2w => 2,
+		
+		χ => χ_,
+
+		# Evaporator
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+		
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		ϕ => 1.189,
+		β => 30.0,
+		L_PHX => L_PHX_,
+
+		#Compressor
+		η_comp => 0.8,
+		V_comp => 0.1/50,
+
+		
+		# Operating conditions
+		f_comp => 50,
+
+		
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
+		T_wall => T_evap+20,
+
+		
+		T_b_in => 0.4T_evap+0.6T_wall,
+		Tbh_in => 0.6T_evap+0.4T_wall,
+
+		T_p_b => T_b_in,
+		T_p_bh => T_b_in,
+
+		T_p_1 => Tbh_in,
+		T_p_2 => Tbh_in,
+		
+		ΔT_SH => 5.0,
+		#---
+		
+		# Initial guesses:
+		ṁ_r => ṁ_r_,
+		ṁ_b => ṁ_r_,
+		αL => pi/2,
+
+		
+		UA_12 => 2,
+		
+		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		s_comp_in => s_comp_out_is,
+		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		T_comp_out => T_comp_in + 10.0,
+		T_comp_out_is => T_comp_in + 10.0,
+		T_comp_in => 293.0,
+		P_comp_in => 101325.0,
+		ρ_comp_in => 1.0,
+		P_comp_out => 300000.0,
+		V̇_comp => V_comp*f_comp,
+		W_comp => 0.0,
+	
+	];
+	
+	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
+	all_coupled_ = complete(simplify(all_coupled));
+	
+	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
+end
+  ╠═╡ =#
+
+# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
   ╠═╡ =#
 
 # ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
@@ -482,238 +695,6 @@ md" # Properties"
 # ╔═╡ eac739f6-94ee-4c96-9325-23f2c58cbb5c
 
 
-# ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
-begin
-    # ---------------------------
-    # 1. Sample over the χ dimension
-    # ---------------------------
-    chi_vec = range(0.0, stop=1.0, length=100)  # adjust as needed
-    
-    # Prepare arrays for T_freeze and T_max
-    T_freeze_vals = Float64[]
-    T_max_vals = Float64[]
-    chi_valid = Float64[]
-    
-    for χ in chi_vec
-        try
-            # Try to get T_freeze for the given concentration.
-            T_f = CoolProp.PropsSI("T_freeze", "INCOMP::MEA[$χ]")
-            # Try to get the maximum temperature that CoolProp accepts.
-            T_max = CoolProp.PropsSI("T_max", "INCOMP::MEA[$χ]")
-            if isnan(T_f) || isnan(T_max)
-                continue  # skip if either is NaN
-            end
-            push!(chi_valid, χ)
-            push!(T_freeze_vals, T_f)
-            push!(T_max_vals, T_max)
-        catch e
-            # Skip concentrations that produce errors.
-        end
-    end
-    
-    # ---------------------------
-    # 2. Build 1D interpolants for T_freeze(χ) and T_max(χ)
-    # ---------------------------
-    itp_Tfreeze = LinearInterpolation(chi_valid, T_freeze_vals, extrapolation_bc=Interpolations.Flat())
-    itp_Tmax    = LinearInterpolation(chi_valid, T_max_vals, extrapolation_bc=Interpolations.Flat())
-    
-    # ---------------------------
-    # 3. Define the (χ, T̃) grid for the 2D interpolants
-    # ---------------------------
-    num_chi = length(chi_valid)
-    num_T   = 50  # number of temperature points in the grid
-    T_tilde = range(0.0, stop=1.0, length=num_T)  # nondimensional temperature
-    
-    # ---------------------------
-    # 4a. Density (ρ) Interpolant
-    # ---------------------------
-    prop_vals_rho = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        # Dimensional temperature vector: T = T̃*(T_M - T_f) + T_f.
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                # Example: compute density at pressure 1e5 Pa.
-                prop = CoolProp.PropsSI("D", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_rho[i, j] = prop
-            catch e
-                prop_vals_rho[i, j] = NaN
-            end
-        end
-    end
-    good_rows_rho = [i for i in 1:num_chi if !all(isnan, prop_vals_rho[i, :])]
-    chi_good_rho = chi_valid[good_rows_rho]
-    prop_vals_rho_good = prop_vals_rho[good_rows_rho, :]
-    itp_2D_rho = Interpolations.interpolate((chi_good_rho, collect(T_tilde)), prop_vals_rho_good, Gridded(Linear()))
-    itp_2D_rho_ext = extrapolate(itp_2D_rho, Interpolations.Flat())
-    
-    function ρ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_rho_ext(χ, T_tilde_val)
-    end
-    @register_symbolic ρ_b_(T, χ)
-    
-    # ---------------------------
-    # 4b. Thermal Conductivity (λ) Interpolant
-    # ---------------------------
-    prop_vals_lambda = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("L", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_lambda[i, j] = prop
-            catch e
-                prop_vals_lambda[i, j] = NaN
-            end
-        end
-    end
-    good_rows_lambda = [i for i in 1:num_chi if !all(isnan, prop_vals_lambda[i, :])]
-    chi_good_lambda = chi_valid[good_rows_lambda]
-    prop_vals_lambda_good = prop_vals_lambda[good_rows_lambda, :]
-    itp_2D_lambda = Interpolations.interpolate((chi_good_lambda, collect(T_tilde)), prop_vals_lambda_good, Gridded(Linear()))
-    itp_2D_lambda_ext = extrapolate(itp_2D_lambda, Interpolations.Flat())
-    
-    function λ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_lambda_ext(χ, T_tilde_val)
-    end
-    @register_symbolic λ_b_(T, χ)
-    
-    # ---------------------------
-    # 4c. Specific Heat (cp) Interpolant
-    # ---------------------------
-    prop_vals_cp = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("C", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_cp[i, j] = prop
-            catch e
-                prop_vals_cp[i, j] = NaN
-            end
-        end
-    end
-    good_rows_cp = [i for i in 1:num_chi if !all(isnan, prop_vals_cp[i, :])]
-    chi_good_cp = chi_valid[good_rows_cp]
-    prop_vals_cp_good = prop_vals_cp[good_rows_cp, :]
-    itp_2D_cp = Interpolations.interpolate((chi_good_cp, collect(T_tilde)), prop_vals_cp_good, Gridded(Linear()))
-    itp_2D_cp_ext = extrapolate(itp_2D_cp, Interpolations.Flat())
-    
-    function cp_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_cp_ext(χ, T_tilde_val)
-    end
-    @register_symbolic cp_b_(T, χ)
-    
-    # ---------------------------
-    # 4d. Viscosity (μ) Interpolant
-    # ---------------------------
-    prop_vals_mu = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("VISCOSITY", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_mu[i, j] = prop
-            catch e
-                prop_vals_mu[i, j] = NaN
-            end
-        end
-    end
-    good_rows_mu = [i for i in 1:num_chi if !all(isnan, prop_vals_mu[i, :])]
-    chi_good_mu = chi_valid[good_rows_mu]
-    prop_vals_mu_good = prop_vals_mu[good_rows_mu, :]
-    itp_2D_mu = Interpolations.interpolate((chi_good_mu, collect(T_tilde)), prop_vals_mu_good, Gridded(Linear()))
-    itp_2D_mu_ext = extrapolate(itp_2D_mu, Interpolations.Flat())
-    
-    function μ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_mu_ext(χ, T_tilde_val)
-    end
-    @register_symbolic μ_b_(T, χ)
-
-	# ---------------------------
-	# 4e. Thermal Expansion Coefficient (β) Interpolant
-	# ---------------------------
-	function β_b_(T, χ)
-	    # Get the temperature limits for concentration χ
-	    T_f = itp_Tfreeze(χ)
-	    T_M = itp_Tmax(χ)
-	    # Map the physical temperature T to the nondimensional coordinate
-	    T_tilde_val = (T - T_f) / (T_M - T_f)
-	    
-	    # Evaluate the density at (T,χ)
-	    ρ_val = itp_2D_rho_ext(χ, T_tilde_val)
-	    
-	    # Compute the gradient of the density interpolation.
-	    # This returns a tuple with derivatives with respect to the grid variables:
-	    # (∂ρ/∂χ, ∂ρ/∂T̃)
-	    grad = Interpolations.gradient(itp_2D_rho_ext, χ, T_tilde_val)
-	    
-	    # Extract the derivative with respect to the nondimensional temperature T̃.
-	    dρ_dTtilde = grad[2]
-	    # Convert derivative to physical temperature using the chain rule:
-	    dρ_dT = dρ_dTtilde / (T_M - T_f)
-	    
-	    # Return the thermal expansion coefficient:
-	    # Note the negative sign to ensure β is positive.
-	    return -dρ_dT / ρ_val
-	end
-
-	β_w_(T) = β_b_(T, 0.0)
-	@register_symbolic β_b_(T, χ)
-	@register_symbolic β_w_(T)
-
-end
-
-
-# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
-md"## Bonds"
-
-# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
-begin
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R290" => "R290 (propane)", "R134A" => "R134A"])
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-	end
-	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
-		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
-		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-	end
-
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
-end
-
 # ╔═╡ 6435d235-34f8-4f43-a945-7cdd62e5dce7
 begin
     # --- Fluid and Pressure Parameters ---
@@ -943,20 +924,208 @@ function Compressor(; name,
 	NonlinearSystem(eqs, sts, ps; name);
 end
 
-# ╔═╡ b8eec68f-5fdb-4b7e-b2b5-d6178e364888
-@named C1 = Compressor();
+# ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
+begin
+    # ---------------------------
+    # 1. Sample over the χ dimension
+    # ---------------------------
+    chi_vec = range(0.0, stop=1.0, length=100)  # adjust as needed
+    
+    # Prepare arrays for T_freeze and T_max
+    T_freeze_vals = Float64[]
+    T_max_vals = Float64[]
+    chi_valid = Float64[]
+    
+    for χ in chi_vec
+        try
+            # Try to get T_freeze for the given concentration.
+            T_f = CoolProp.PropsSI("T_freeze", "INCOMP::MEA[$χ]")
+            # Try to get the maximum temperature that CoolProp accepts.
+            T_max = CoolProp.PropsSI("T_max", "INCOMP::MEA[$χ]")
+            if isnan(T_f) || isnan(T_max)
+                continue  # skip if either is NaN
+            end
+            push!(chi_valid, χ)
+            push!(T_freeze_vals, T_f)
+            push!(T_max_vals, T_max)
+        catch e
+            # Skip concentrations that produce errors.
+        end
+    end
+    
+    # ---------------------------
+    # 2. Build 1D interpolants for T_freeze(χ) and T_max(χ)
+    # ---------------------------
+    itp_Tfreeze = LinearInterpolation(chi_valid, T_freeze_vals, extrapolation_bc=Interpolations.Flat())
+    itp_Tmax    = LinearInterpolation(chi_valid, T_max_vals, extrapolation_bc=Interpolations.Flat())
+    
+    # ---------------------------
+    # 3. Define the (χ, T̃) grid for the 2D interpolants
+    # ---------------------------
+    num_chi = length(chi_valid)
+    num_T   = 50  # number of temperature points in the grid
+    T_tilde = range(0.0, stop=1.0, length=num_T)  # nondimensional temperature
+    
+    # ---------------------------
+    # 4a. Density (ρ) Interpolant
+    # ---------------------------
+    prop_vals_rho = Array{Float64}(undef, num_chi, num_T)
+    for (i, χ) in enumerate(chi_valid)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        # Dimensional temperature vector: T = T̃*(T_M - T_f) + T_f.
+        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
+        for (j, T_val) in enumerate(T_dim)
+            try
+                # Example: compute density at pressure 1e5 Pa.
+                prop = CoolProp.PropsSI("D", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
+                prop_vals_rho[i, j] = prop
+            catch e
+                prop_vals_rho[i, j] = NaN
+            end
+        end
+    end
+    good_rows_rho = [i for i in 1:num_chi if !all(isnan, prop_vals_rho[i, :])]
+    chi_good_rho = chi_valid[good_rows_rho]
+    prop_vals_rho_good = prop_vals_rho[good_rows_rho, :]
+    itp_2D_rho = Interpolations.interpolate((chi_good_rho, collect(T_tilde)), prop_vals_rho_good, Gridded(Linear()))
+    itp_2D_rho_ext = extrapolate(itp_2D_rho, Interpolations.Flat())
+    
+    function ρ_b_(T, χ)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return itp_2D_rho_ext(χ, T_tilde_val)
+    end
+    @register_symbolic ρ_b_(T, χ)
+    
+    # ---------------------------
+    # 4b. Thermal Conductivity (λ) Interpolant
+    # ---------------------------
+    prop_vals_lambda = Array{Float64}(undef, num_chi, num_T)
+    for (i, χ) in enumerate(chi_valid)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
+        for (j, T_val) in enumerate(T_dim)
+            try
+                prop = CoolProp.PropsSI("L", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
+                prop_vals_lambda[i, j] = prop
+            catch e
+                prop_vals_lambda[i, j] = NaN
+            end
+        end
+    end
+    good_rows_lambda = [i for i in 1:num_chi if !all(isnan, prop_vals_lambda[i, :])]
+    chi_good_lambda = chi_valid[good_rows_lambda]
+    prop_vals_lambda_good = prop_vals_lambda[good_rows_lambda, :]
+    itp_2D_lambda = Interpolations.interpolate((chi_good_lambda, collect(T_tilde)), prop_vals_lambda_good, Gridded(Linear()))
+    itp_2D_lambda_ext = extrapolate(itp_2D_lambda, Interpolations.Flat())
+    
+    function λ_b_(T, χ)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return itp_2D_lambda_ext(χ, T_tilde_val)
+    end
+    @register_symbolic λ_b_(T, χ)
+    
+    # ---------------------------
+    # 4c. Specific Heat (cp) Interpolant
+    # ---------------------------
+    prop_vals_cp = Array{Float64}(undef, num_chi, num_T)
+    for (i, χ) in enumerate(chi_valid)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
+        for (j, T_val) in enumerate(T_dim)
+            try
+                prop = CoolProp.PropsSI("C", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
+                prop_vals_cp[i, j] = prop
+            catch e
+                prop_vals_cp[i, j] = NaN
+            end
+        end
+    end
+    good_rows_cp = [i for i in 1:num_chi if !all(isnan, prop_vals_cp[i, :])]
+    chi_good_cp = chi_valid[good_rows_cp]
+    prop_vals_cp_good = prop_vals_cp[good_rows_cp, :]
+    itp_2D_cp = Interpolations.interpolate((chi_good_cp, collect(T_tilde)), prop_vals_cp_good, Gridded(Linear()))
+    itp_2D_cp_ext = extrapolate(itp_2D_cp, Interpolations.Flat())
+    
+    function cp_b_(T, χ)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return itp_2D_cp_ext(χ, T_tilde_val)
+    end
+    @register_symbolic cp_b_(T, χ)
+    
+    # ---------------------------
+    # 4d. Viscosity (μ) Interpolant
+    # ---------------------------
+    prop_vals_mu = Array{Float64}(undef, num_chi, num_T)
+    for (i, χ) in enumerate(chi_valid)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
+        for (j, T_val) in enumerate(T_dim)
+            try
+                prop = CoolProp.PropsSI("VISCOSITY", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
+                prop_vals_mu[i, j] = prop
+            catch e
+                prop_vals_mu[i, j] = NaN
+            end
+        end
+    end
+    good_rows_mu = [i for i in 1:num_chi if !all(isnan, prop_vals_mu[i, :])]
+    chi_good_mu = chi_valid[good_rows_mu]
+    prop_vals_mu_good = prop_vals_mu[good_rows_mu, :]
+    itp_2D_mu = Interpolations.interpolate((chi_good_mu, collect(T_tilde)), prop_vals_mu_good, Gridded(Linear()))
+    itp_2D_mu_ext = extrapolate(itp_2D_mu, Interpolations.Flat())
+    
+    function μ_b_(T, χ)
+        T_f = itp_Tfreeze(χ)
+        T_M = itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return itp_2D_mu_ext(χ, T_tilde_val)
+    end
+    @register_symbolic μ_b_(T, χ)
 
-# ╔═╡ 19fac9f4-0240-4937-8187-756f7fafcd88
-C1p = C1 |> complete |> simplify;
+	# ---------------------------
+	# 4e. Thermal Expansion Coefficient (β) Interpolant
+	# ---------------------------
+	function β_b_(T, χ)
+	    # Get the temperature limits for concentration χ
+	    T_f = itp_Tfreeze(χ)
+	    T_M = itp_Tmax(χ)
+	    # Map the physical temperature T to the nondimensional coordinate
+	    T_tilde_val = (T - T_f) / (T_M - T_f)
+	    
+	    # Evaluate the density at (T,χ)
+	    ρ_val = itp_2D_rho_ext(χ, T_tilde_val)
+	    
+	    # Compute the gradient of the density interpolation.
+	    # This returns a tuple with derivatives with respect to the grid variables:
+	    # (∂ρ/∂χ, ∂ρ/∂T̃)
+	    grad = Interpolations.gradient(itp_2D_rho_ext, χ, T_tilde_val)
+	    
+	    # Extract the derivative with respect to the nondimensional temperature T̃.
+	    dρ_dTtilde = grad[2]
+	    # Convert derivative to physical temperature using the chain rule:
+	    dρ_dT = dρ_dTtilde / (T_M - T_f)
+	    
+	    # Return the thermal expansion coefficient:
+	    # Note the negative sign to ensure β is positive.
+	    return -dρ_dT / ρ_val
+	end
 
-# ╔═╡ dc10c10b-9018-4d9e-8fa5-ee3fcfb9f28c
-prob_comp = NonlinearProblem(C1p, [], [])
+	β_w_(T) = β_b_(T, 0.0)
+	@register_symbolic β_b_(T, χ)
+	@register_symbolic β_w_(T)
 
-# ╔═╡ c0d0c5d4-df5f-441d-8215-1b347a123e71
-sol_comp = NonlinearSolve.solve(prob_comp)
+end
 
-# ╔═╡ e1910100-2341-438c-8152-7ec84af9397b
-sol_comp[C1.h_out]
 
 # ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 begin
@@ -1070,6 +1239,137 @@ begin
 	h̃_r_in = substitute(h̃_r_EV, ξ=> 0.0) |> simplify;
 end;
 
+# ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
+begin
+	eq_superheating = T_r_out ~ T_evap+ΔT_SH_
+	eq_inlet = h_r_in ~ h_bub_(p_PC(T_evap))
+	
+	eqs_tz = [eq_inlet, eq_superheating]
+	#eqs_tz = [eq_superheating, eq_prop_r]
+	#eqs_tz = [eq_superheating, eq_prop_r, eq_prop_b]
+	unknowns = [αL, ṁ_b]#, T_p_r]
+	#unknowns = [αL, T_p_r, T_p_b]
+	ps = [
+		b,
+		W,
+		H,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		ṁ_r,
+		
+		T_evap,
+		
+		T_b_in,
+		T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+	]
+	@named sys = NonlinearSystem(eqs_tz, unknowns, ps)#, observed = [eq_superheating])
+	#sys1_ = structural_simplify(sys)
+	sys_ = complete(simplify(sys))
+	
+	p_ = [
+		χ => χ_,
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+
+		#PHX
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		H => np*b*2, ### meh
+		ϕ => 1.189,
+		β => 30.0,
+
+		# IV:
+		ṁ_r => ṁ_r_,
+		ṁ_b => ṁ_r_*4,
+		αL => pi/4,
+
+		# Parameters
+		L_PHX => L_PHX_,
+		T_evap => 273.15 + T_evap_,
+		T_b_in => T_evap+ΔT_SH_+ΔT_brine_,
+		T_p_r => T_evap,
+		T_p_b => T_b_in,
+	]
+	prob_ = NonlinearProblem(sys_, [], p_, symbolic_u0 = true);
+	sol_ = NonlinearSolve.solve(prob_)
+	sol_.retcode
+	
+end
+
+# ╔═╡ 989f50ba-1014-42ba-a454-b91bbe076f6b
+sol_.resid
+
+# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
+sol_.ps[T_b_in]
+
+# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
+sin(sol_[αL])^2
+
+# ╔═╡ 08c9f46e-e683-4429-a5d6-56682232c1e7
+begin
+
+	# Create a dictionary mapping the unknown to its solution value
+	sol_dict = Dict(unknowns .=> map(s->sol_[s], unknowns))  # or use sol_[αL] if defined that way
+	swaps = merge(Dict(p_), sol_dict)
+	
+	# Now substitute into your dimensional temperature expression
+	T_b_SH_dim = substitute(T_b_SH, swaps)
+	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
+	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
+	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
+	T_b_SH_func = build_function(T_b_SH_dim, x, expression=Val{false});
+	
+	T_b_EV_dim = substitute(T_b_EV, swaps)
+	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
+	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
+	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
+	T_b_EV_func = build_function(T_b_EV_dim, x, expression=Val{false});
+	
+	T_r_SH_dim = substitute(T_r_SH, swaps)
+	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
+	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
+	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
+	T_r_SH_func = build_function(T_r_SH_dim, x, expression=Val{false});
+	
+	T_r_EV_dim = substitute(T_r_EV, swaps)
+	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
+	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
+	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
+	T_r_EV_func = build_function(T_r_EV_dim, x, expression=Val{false});
+	
+	h_r_EV_dim = substitute(h_r_EV, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
+	h_r_EV_func = build_function(h_r_EV_dim, x, expression=Val{false});
+end;
+
+# ╔═╡ 8903d352-a21d-43bd-9030-e316af7de22d
+begin
+
+	# Now substitute into your dimensional temperature expression
+	L_EV_sol = substitute(L_EV, swaps)
+	L_EV_func = build_function(L_EV_sol, expression=Val{false});
+	
+	L_SH_sol = substitute(L_SH, swaps)
+	L_SH_func = build_function(L_SH_sol, expression=Val{false});
+	
+	T_b_in_sol = substitute(T_b_in, swaps)
+	T_b_in_sol = substitute(T_b_in_sol, swaps)
+	T_b_in_func = build_function(T_b_in_sol, expression=Val{false});
+end;
+
 # ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
 begin
 	
@@ -1123,35 +1423,6 @@ begin
 	h_2 = Nu_2 * λp_2/D_2;
 end;
 
-# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
-# Borehole resistance in natural convection
-begin
-	#@variables r_p r_b
-	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
-	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
-	@variables T_w_av T_1_av T_2_av T_b_av
-	@parameters g
-	T_f_1_w = 0.5*T_1_av + .5*T_w_av
-	T_f_2_w = 0.5*T_2_av + .5*T_w_av
-	T_f_b_w = 0.5*T_b_av + .5*T_w_av
-
-	Gr_1 = g*β_w_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
-	Gr_2 = g*β_w_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
-	Gr_b = g*β_w_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
-
-	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
-	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
-	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
-	
-	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
-	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
-	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
-
-	R_1w_cv = 1/(h_1_w*pi*D_1)
-	R_2w_cv = 1/(h_2_w*pi*D_2)
-	R_bw_cv = 1/(h_b_w*pi*D_b);
-end;
-
 # ╔═╡ 40cb2982-16d6-435f-b1d2-c62040416819
 begin
 	#@variables D_1 D_2 D_b th_1 th_2
@@ -1166,21 +1437,6 @@ begin
 	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
 	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
 
-end;
-
-# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
-begin
-	R_12_cv = R_1w_cv + R_2w_cv
-	R_1b_cv = R_1w_cv + R_bw_cv
-	R_2b_cv = R_2w_cv + R_bw_cv;
-	
-	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
-	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
-	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
-	
-	UA_12_cv_tot = 1/R_12_cv_tot
-	UA_1w_cv_tot = 1/R_1w_cv_tot
-	UA_2w_cv_tot = 1/R_2w_cv_tot;
 end;
 
 # ╔═╡ e2bd77ff-f24e-4d27-948c-d92294f2367f
@@ -1211,8 +1467,8 @@ begin
 	UP_12_Upipe |> get_variables
 end
 
-# ╔═╡ 16319944-4713-469b-882a-998a2bd11943
-D_p
+# ╔═╡ f80fb712-b95c-4767-a632-9ad4e345cc7a
+UA_12 ~ UP_12_Upipe
 
 # ╔═╡ de7deb47-9d43-4423-9fc2-4911ee6dc05a
 UA_12_cd_tot |> get_variables
@@ -1293,9 +1549,6 @@ begin
 		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
 end;
 
-# ╔═╡ f80fb712-b95c-4767-a632-9ad4e345cc7a
-UA_12 ~ UP_12_Upipe
-
 # ╔═╡ 8e6a8e3b-c991-439d-bc9b-ba436d0be550
 get_variables(sC_2)
 
@@ -1315,209 +1568,6 @@ begin
 	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
 	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
 end;
-
-# ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
-Tbh_out
-
-# ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
-sT_2 |> get_variables
-
-# ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
-fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ 837d8d99-458c-4077-8531-f25346684057
-fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ 8d38ac9f-9fe7-4cb0-aeef-f5086ab355df
-begin
-	# --- Step 1. Define your x range and convert to meters ---
-	x_m = 0:1:300.0                   # original x values in mm
-	
-	# Replace the following list comprehensions with your own functions:
-	mf = 0.01:0.05:1.5
-	Z1 = [fT1(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
-	Z2 = [fT2(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
-		
-	X = repeat(reshape(x_m, 1, length(x_m)), length(mf), 1)
-	Y = repeat(reshape(mf, length(mf), 1), 1, length(x_m))
-		
-	
-	# --- Step 4. Create a 3D surface plot with enhanced styling ---
-	fig = Figure(resolution = (800, 600))
-	ax = Axis3(fig[1, 1],
-	    title = "3D Surface Plot of Temperature Profiles",
-	    xlabel = "Distance (m)",
-	    ylabel = "Mass flow [kg/s]",
-	    zlabel = "Temperature [°C]")
-	
-	# Plot the surface. You can change the colormap or enable shading as desired.
-	surface!(ax, X, Y, Z1; colormap = :blues, shading = false, transparency = true)
-	surface!(ax, X, Y, Z2; colormap = :reds, shading = false, transparency = true)
-	
-	# (Optional) Adjust camera or aspect settings if needed, for example:
-	ax.aspect = (1, 1, 0.5)  # adjust relative axis scaling
-	# Display the figure
-	fig
-end
-
-# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
-begin
-	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	
-	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-
-	@variables D_bh
-	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
-	sT_1_cd = substitute(sT_1_cd, d_simpl);
-	
-end;
-
-# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
-get_variables(sT_1_cd)
-
-# ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
-get_variables(sT_1_cd)
-
-# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
-simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
-
-# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
-T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
-
-# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
-eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
-	
-
-# ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
-begin
-	eq_superheating = T_r_out ~ T_evap+ΔT_SH_
-	eq_inlet = h_r_in ~ h_bub_(p_PC(T_evap))
-	
-	eqs_tz = [eq_inlet, eq_superheating]
-	#eqs_tz = [eq_superheating, eq_prop_r]
-	#eqs_tz = [eq_superheating, eq_prop_r, eq_prop_b]
-	unknowns = [αL, ṁ_b]#, T_p_r]
-	#unknowns = [αL, T_p_r, T_p_b]
-	ps = [
-		b,
-		W,
-		H,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		ṁ_r,
-		
-		T_evap,
-		
-		T_b_in,
-		T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-	]
-	@named sys = NonlinearSystem(eqs_tz, unknowns, ps)#, observed = [eq_superheating])
-	#sys1_ = structural_simplify(sys)
-	sys_ = complete(simplify(sys))
-	
-	p_ = [
-		χ => χ_,
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-
-		#PHX
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		H => np*b*2, ### meh
-		ϕ => 1.189,
-		β => 30.0,
-
-		# IV:
-		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_*4,
-		αL => pi/4,
-
-		# Parameters
-		L_PHX => L_PHX_,
-		T_evap => 273.15 + T_evap_,
-		T_b_in => T_evap+ΔT_SH_+ΔT_brine_,
-		T_p_r => T_evap,
-		T_p_b => T_b_in,
-	]
-	prob_ = NonlinearProblem(sys_, [], p_, symbolic_u0 = true);
-	sol_ = NonlinearSolve.solve(prob_)
-	sol_.retcode
-	
-end
-
-# ╔═╡ 989f50ba-1014-42ba-a454-b91bbe076f6b
-sol_.resid
-
-# ╔═╡ 08c9f46e-e683-4429-a5d6-56682232c1e7
-begin
-
-	# Create a dictionary mapping the unknown to its solution value
-	sol_dict = Dict(unknowns .=> map(s->sol_[s], unknowns))  # or use sol_[αL] if defined that way
-	swaps = merge(Dict(p_), sol_dict)
-	
-	# Now substitute into your dimensional temperature expression
-	T_b_SH_dim = substitute(T_b_SH, swaps)
-	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
-	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
-	T_b_SH_dim = substitute(T_b_SH_dim, swaps)
-	T_b_SH_func = build_function(T_b_SH_dim, x, expression=Val{false});
-	
-	T_b_EV_dim = substitute(T_b_EV, swaps)
-	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
-	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
-	T_b_EV_dim = substitute(T_b_EV_dim, swaps)
-	T_b_EV_func = build_function(T_b_EV_dim, x, expression=Val{false});
-	
-	T_r_SH_dim = substitute(T_r_SH, swaps)
-	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
-	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
-	T_r_SH_dim = substitute(T_r_SH_dim, swaps)
-	T_r_SH_func = build_function(T_r_SH_dim, x, expression=Val{false});
-	
-	T_r_EV_dim = substitute(T_r_EV, swaps)
-	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
-	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
-	T_r_EV_dim = substitute(T_r_EV_dim, swaps)
-	T_r_EV_func = build_function(T_r_EV_dim, x, expression=Val{false});
-	
-	h_r_EV_dim = substitute(h_r_EV, swaps)
-	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
-	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
-	h_r_EV_dim = substitute(h_r_EV_dim, swaps)
-	h_r_EV_func = build_function(h_r_EV_dim, x, expression=Val{false});
-end;
-
-# ╔═╡ 8903d352-a21d-43bd-9030-e316af7de22d
-begin
-
-	# Now substitute into your dimensional temperature expression
-	L_EV_sol = substitute(L_EV, swaps)
-	L_EV_func = build_function(L_EV_sol, expression=Val{false});
-	
-	L_SH_sol = substitute(L_SH, swaps)
-	L_SH_func = build_function(L_SH_sol, expression=Val{false});
-	
-	T_b_in_sol = substitute(T_b_in, swaps)
-	T_b_in_sol = substitute(T_b_in_sol, swaps)
-	T_b_in_func = build_function(T_b_in_sol, expression=Val{false});
-end;
-
-# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
-sol_.ps[T_b_in]
-
-# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
-sin(sol_[αL])^2
 
 # ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
 begin
@@ -1624,296 +1674,12 @@ sol_coupled_[ṁ_b]
 # ╔═╡ b61e1f63-465f-4086-866f-6d1cd74fb355
 sin(sol_coupled_[αL])^2
 
-# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
-sol_coupled_[Tbh_in]-273.15
-
 # ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
 sol_coupled_[T_b_in]-273.15
 
 
-# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
-sol_all[ṁ_comp]
-
-# ╔═╡ 9236c70e-3799-46d2-9c7e-45b4a63388f3
-sol_all[ṁ_b]
-
-# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
-cp_r(Inf, Inf)
-
-# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
-md" # Other"
-
-# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
-
-	candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
-
-# ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
-Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
-h_dew_val = PropsSI("HMASS", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
-h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refrigerant)
-
-# ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
-cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
-
-# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
-T_range_cond = 25:0.1:65.0
-
-# ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
-Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
-
-# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
-begin
-	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
-	@register_symbolic μ_brine(T, fluid)
-end
-
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
-# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-md" # Imports"
-
-# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
-# ╠═╡ disabled = true
-#=╠═╡
-using LinearAlgebra
-  ╠═╡ =#
-
-# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
-html"""
-<style>
-	main {
-		margin: 0 auto;
-		max-width: 2000px;
-    	padding-left: max(550px, 5%);
-    	padding-right: max(500px, 5%);
-	}
-</style>
-"""
-
-# ╔═╡ c900c406-5e25-467b-8771-feedfe933685
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp
-	eqs_all = [
-		# Define the inlet and outlet isentropic entropies:
-		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		
-		# Define the inlet and outlet enthalpies:
-		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
-		
-		# Enforce the isentropic condition:
-		s_comp_in ~ s_comp_out_is,
-		
-		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
-		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
-	
-		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		ṁ_r ~ V̇_comp * ρ_comp_in,
-		V̇_comp ~ f_comp * V_comp,
-		W_comp ~ ṁ_r*(h_comp_out-h_comp_in),
-
-		T_r_out ~ T_evap+ΔT_SH,
-		h_r_in ~ h_bub_(p_PC(T_evap)),
-		T_b_out ~ Tbh_in,
-		Tbh_out ~ T_b_in,
-
-		
-		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
-
-		UA_12 ~ 2.0#UP_12_Upipe,
-	    ];
-
-	
-	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_r, ρ_comp_in,V̇_comp,
-		Tbh_in, T_b_in, αL, ṁ_b,
-	T_p_b, T_p_1, T_p_2,
-	UA_12]
-
-	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
-		b,
-		W,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		#ṁ_r,
-		#ṁ_b,
-		
-		T_evap,
-		T_wall,
-		
-		#T_b_in,
-		#T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-
-		#αL,
-
-		L_bh,
-
-		UA_12,
-		UA_1w,
-		UA_2w,
-
-		#T_p_1,
-		#T_p_2,
-
-		ΔT_SH,
-
-		# BHE
-		#ṁ_b
-		D_p,
-		D_b,
-		α,
-		th,
-		T_p_bh,
-		#T_p_2,
-		Re_low,
-		Re_high,
-		λ_ground,
-		λ_grout,
-		λ_PE,
-		#χ,
-	]
-	
-	guesses_all = [
-		# BH parameters
-		D_p => 40e-3,
-		D_b => 115e-3,
-		α => 0.5, #adimensional spacing
-		th => 2e-3, #some check with consistency to be done across the board
-		Re_low => 2300,
-		Re_high => 5000,
-		λ_ground => 3.5,
-		λ_grout => 2.0,
-		λ_PE => 0.4,
-		
-		L_bh => 300.0,
-		UA_1w => 2,
-		UA_2w => 2,
-		
-		χ => χ_,
-
-		# Evaporator
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-		
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		ϕ => 1.189,
-		β => 30.0,
-		L_PHX => L_PHX_,
-
-		#Compressor
-		η_comp => 0.8,
-		V_comp => 0.1/50,
-
-		
-		# Operating conditions
-		f_comp => 50,
-
-		
-		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_wall => T_evap+20,
-
-		
-		T_b_in => 0.4T_evap+0.6T_wall,
-		Tbh_in => 0.6T_evap+0.4T_wall,
-
-		T_p_b => T_b_in,
-		T_p_bh => T_b_in,
-
-		T_p_1 => Tbh_in,
-		T_p_2 => Tbh_in,
-		
-		ΔT_SH => 5.0,
-		#---
-		
-		# Initial guesses:
-		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_,
-		αL => pi/2,
-
-		
-		UA_12 => 2,
-		
-		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		s_comp_in => s_comp_out_is,
-		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		T_comp_out => T_comp_in + 10.0,
-		T_comp_out_is => T_comp_in + 10.0,
-		T_comp_in => 293.0,
-		P_comp_in => 101325.0,
-		ρ_comp_in => 1.0,
-		P_comp_out => 300000.0,
-		V̇_comp => V_comp*f_comp,
-		W_comp => 0.0,
-	
-	];
-	
-	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
-	all_coupled_ = complete(simplify(all_coupled));
-	
-	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
-end
-  ╠═╡ =#
-
-# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
-	
-end
-  ╠═╡ =#
+# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
+sol_coupled_[Tbh_in]-273.15
 
 # ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
 begin
@@ -2071,6 +1837,240 @@ begin
 	sol_all.retcode
 	
 end
+
+# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
+sol_all[ṁ_comp]
+
+# ╔═╡ 9236c70e-3799-46d2-9c7e-45b4a63388f3
+sol_all[ṁ_b]
+
+# ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
+Tbh_out
+
+# ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
+sT_2 |> get_variables
+
+# ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
+fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+
+# ╔═╡ 837d8d99-458c-4077-8531-f25346684057
+fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+
+# ╔═╡ 8d38ac9f-9fe7-4cb0-aeef-f5086ab355df
+begin
+	# --- Step 1. Define your x range and convert to meters ---
+	x_m = 0:1:300.0                   # original x values in mm
+	
+	# Replace the following list comprehensions with your own functions:
+	mf = 0.01:0.05:1.5
+	Z1 = [fT1(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
+	Z2 = [fT2(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
+		
+	X = repeat(reshape(x_m, 1, length(x_m)), length(mf), 1)
+	Y = repeat(reshape(mf, length(mf), 1), 1, length(x_m))
+		
+	
+	# --- Step 4. Create a 3D surface plot with enhanced styling ---
+	fig = Figure(resolution = (800, 600))
+	ax = Axis3(fig[1, 1],
+	    title = "3D Surface Plot of Temperature Profiles",
+	    xlabel = "Distance (m)",
+	    ylabel = "Mass flow [kg/s]",
+	    zlabel = "Temperature [°C]")
+	
+	# Plot the surface. You can change the colormap or enable shading as desired.
+	surface!(ax, X, Y, Z1; colormap = :blues, shading = false, transparency = true)
+	surface!(ax, X, Y, Z2; colormap = :reds, shading = false, transparency = true)
+	
+	# (Optional) Adjust camera or aspect settings if needed, for example:
+	ax.aspect = (1, 1, 0.5)  # adjust relative axis scaling
+	# Display the figure
+	fig
+end
+
+# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
+begin
+	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	
+	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+
+	@variables D_bh
+	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
+	sT_1_cd = substitute(sT_1_cd, d_simpl);
+	
+end;
+
+# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
+get_variables(sT_1_cd)
+
+# ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
+get_variables(sT_1_cd)
+
+# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
+simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
+
+# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
+T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
+
+# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
+eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
+	
+
+# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
+# Borehole resistance in natural convection
+begin
+	#@variables r_p r_b
+	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
+	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
+	@variables T_w_av T_1_av T_2_av T_b_av
+	@parameters g
+	T_f_1_w = 0.5*T_1_av + .5*T_w_av
+	T_f_2_w = 0.5*T_2_av + .5*T_w_av
+	T_f_b_w = 0.5*T_b_av + .5*T_w_av
+
+	Gr_1 = g*β_w_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
+	Gr_2 = g*β_w_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
+	Gr_b = g*β_w_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
+
+	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
+	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
+	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
+	
+	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
+	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
+	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+
+	R_1w_cv = 1/(h_1_w*pi*D_1)
+	R_2w_cv = 1/(h_2_w*pi*D_2)
+	R_bw_cv = 1/(h_b_w*pi*D_b);
+end;
+
+# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
+begin
+	R_12_cv = R_1w_cv + R_2w_cv
+	R_1b_cv = R_1w_cv + R_bw_cv
+	R_2b_cv = R_2w_cv + R_bw_cv;
+	
+	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
+	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
+	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
+	
+	UA_12_cv_tot = 1/R_12_cv_tot
+	UA_1w_cv_tot = 1/R_1w_cv_tot
+	UA_2w_cv_tot = 1/R_2w_cv_tot;
+end;
+
+# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
+cp_r(Inf, Inf)
+
+# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
+md"## Bonds"
+
+# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
+begin
+	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
+	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
+	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
+	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
+	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
+	end
+
+	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
+	end
+	
+	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
+		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
+		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
+	end
+
+	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+end
+
+# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
+md" # Other"
+
+# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
+
+	candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
+
+# ╔═╡ 1ba60683-8370-40c9-abf0-d4a58713d708
+Pevap_ = PropsSI("P", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ c550217f-e4be-4a4a-931e-39d100294441
+h_dew_val = PropsSI("HMASS", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ e5862511-38f4-40a5-baa2-7b9a440b398c
+h_comp_val = PropsSI("HMASS", "T", 273.15+T_evap_+ΔT_SH_, "P", Pevap_, refrigerant)
+
+# ╔═╡ 3ec0a698-d433-4022-a42e-30158f951f5a
+cp_dew_val = PropsSI("C", "T", 273.15+T_evap_, "Q", 1.0, refrigerant)
+
+# ╔═╡ a0bf0d50-1125-4c34-b60e-4505e9edee95
+T_range_cond = 25:0.1:65.0
+
+# ╔═╡ c9885140-68b4-4ab9-a56e-0934bc54de6e
+Tbrine_ = T_evap_+ΔT_SH_+ΔT_brine_
+
+# ╔═╡ f853312b-5da5-43d3-9b51-51dec3bce19f
+begin
+	μ_brine(T, fluid) = Unitful.ustrip(PropsSI("V", "T", T+273.15, "Q", 0.0, fluid))
+	@register_symbolic μ_brine(T, fluid)
+end
+
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
+md"---"
+
+# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+md" # Imports"
+
+# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
+# ╠═╡ disabled = true
+#=╠═╡
+using LinearAlgebra
+  ╠═╡ =#
+
+# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
+html"""
+<style>
+	main {
+		margin: 0 auto;
+		max-width: 2000px;
+    	padding-left: max(550px, 5%);
+    	padding-right: max(500px, 5%);
+	}
+</style>
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -5202,7 +5202,7 @@ version = "3.6.0+0"
 # ╠═c0d0c5d4-df5f-441d-8215-1b347a123e71
 # ╠═e1910100-2341-438c-8152-7ec84af9397b
 # ╟─c89c0195-7f93-4a49-993a-7efa861db428
-# ╠═38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╟─38cb4c93-fdeb-4839-8726-db7669682fc1
 # ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
