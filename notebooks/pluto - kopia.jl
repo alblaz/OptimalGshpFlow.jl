@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
@@ -7,7 +7,7 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     #! format: off
-    quote
+    return quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
@@ -24,9 +24,6 @@ using MonteCarloMeasurements
 
 # ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
 using Distributions
-
-# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
-using LinearAlgebra
 
 # ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
 using SpecialFunctions
@@ -108,6 +105,458 @@ md" # Optimal Flow in GSHP - UI demonstration"
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 md" # Sub Model: Compressor"
 
+# ╔═╡ b8eec68f-5fdb-4b7e-b2b5-d6178e364888
+@named C1 = Compressor();
+
+# ╔═╡ 19fac9f4-0240-4937-8187-756f7fafcd88
+C1p = C1 |> complete |> simplify;
+
+# ╔═╡ dc10c10b-9018-4d9e-8fa5-ee3fcfb9f28c
+prob_comp = NonlinearProblem(C1p, [], [])
+
+# ╔═╡ c0d0c5d4-df5f-441d-8215-1b347a123e71
+sol_comp = NonlinearSolve.solve(prob_comp)
+
+# ╔═╡ e1910100-2341-438c-8152-7ec84af9397b
+sol_comp[C1.h_out]
+
+# ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
+md" ## Sub model: Evaporator"
+
+# ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
+md""" # Solving the system"""
+
+# ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
+md" # Combined problem"
+
+# ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
+md" # BHE + Evap + Compressor"
+
+# ╔═╡ 16319944-4713-469b-882a-998a2bd11943
+D_p
+
+# ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
+md" # Internal forced convection"
+
+# ╔═╡ d44ac0d3-c764-4df8-a326-bc853f21b3ec
+md" # U-tube: filled"
+
+# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
+# Borehole resistance in natural convection
+begin
+	#@variables r_p r_b
+	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
+	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
+	@variables T_w_av T_1_av T_2_av T_b_av
+	@parameters g
+	T_f_1_w = 0.5*T_1_av + .5*T_w_av
+	T_f_2_w = 0.5*T_2_av + .5*T_w_av
+	T_f_b_w = 0.5*T_b_av + .5*T_w_av
+
+	Gr_1 = g*β_w_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
+	Gr_2 = g*β_w_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
+	Gr_b = g*β_w_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
+
+	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
+	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
+	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
+	
+	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
+	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
+	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+
+	R_1w_cv = 1/(h_1_w*pi*D_1)
+	R_2w_cv = 1/(h_2_w*pi*D_2)
+	R_bw_cv = 1/(h_b_w*pi*D_b);
+end;
+
+# ╔═╡ 78d7e55b-134c-4db8-a7f6-bc8e25d7f543
+md" # U tube: grouted"
+
+# ╔═╡ 85f8033b-6d5a-4732-ae44-60ae1a5300cb
+# Borehole resistance in conduction
+begin
+	J = 1
+	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
+	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
+	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
+	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
+	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
+	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
+	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
+	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
+	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
+	A_ = f_data .+ t_sum
+	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
+	M_ = KJ_mat .+ A_
+	
+	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
+	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
+	
+	B_ = V_k'*inv(M_)*V_bk
+	
+	B⁻ = substitute(B_, s => -1)
+	B⁺ = substitute(B_, s => 1)
+
+	R⁺ = R₀⁺ .+ B⁺
+	R⁻ = R₀⁻ .+ B⁻
+
+	R_1b_p_c = R⁺
+	R_2b_p_c = R⁺
+	R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
+	
+	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]);
+end;
+
+# ╔═╡ 30eba1d3-1856-4aa0-8d58-63ab3cf81578
+R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
+
+# ╔═╡ 44cc481e-c4af-499e-b263-587ccdf145ff
+R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
+
+# ╔═╡ 40cb2982-16d6-435f-b1d2-c62040416819
+begin
+	#@variables D_1 D_2 D_b th_1 th_2
+	Per_1 = pi*(D_1-th_1)
+	Per_2 = pi*(D_2-th_2)
+	Per_w = pi*(D_b)
+	
+	R_1 = 1/(Per_1*h_1)
+	R_2 = 1/(Per_2*h_2)
+	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
+	
+	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
+	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
+
+end;
+
+# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
+begin
+	R_12_cv = R_1w_cv + R_2w_cv
+	R_1b_cv = R_1w_cv + R_bw_cv
+	R_2b_cv = R_2w_cv + R_bw_cv;
+	
+	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
+	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
+	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
+	
+	UA_12_cv_tot = 1/R_12_cv_tot
+	UA_1w_cv_tot = 1/R_1w_cv_tot
+	UA_2w_cv_tot = 1/R_2w_cv_tot;
+end;
+
+# ╔═╡ e2bd77ff-f24e-4d27-948c-d92294f2367f
+begin
+	
+	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
+	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
+	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
+	
+	UA_12_cd_tot = 1/R_12_cd_tot
+	UA_1w_cd_tot = 1/R_1w_cd_tot
+	UA_2w_cd_tot = 1/R_2w_cd_tot;
+	
+end;
+
+# ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
+UA_12_cd_tot |> get_variables
+#	UA_1w_cd_tot = 1/R_1w_cd_tot
+#	UA_2w_cd_tot = 1/R_2w_cd_tot;
+#r_p,
+#r_b,
+#UP_12_Upipe
+
+# ╔═╡ 04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
+begin
+	@variables D_p T_p_bh
+	UP_12_Upipe = substitute(UA_12_cd_tot, [r_p => D_p/2, r_b => D_b/2, D_1 => D_p-2th, D_2 => D_p-2th, th_1 => th, th_2 => th, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, T_p_1 => T_p_bh, T_p_2 => T_p_bh])
+	UP_12_Upipe |> get_variables
+end
+
+# ╔═╡ f80fb712-b95c-4767-a632-9ad4e345cc7a
+UA_12 ~ UP_12_Upipe
+
+# ╔═╡ de7deb47-9d43-4423-9fc2-4911ee6dc05a
+UA_12_cd_tot |> get_variables
+
+# ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
+md" # Quick analysis: parametric study"
+
+# ╔═╡ 8815b4d5-6ec5-4e14-b081-296e4cb17cea
+begin
+	@variables th_p, ṁ_bh
+	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh])
+	R_12_simplified |> get_variables
+R1B_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low, expression=Val{false});
+eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low) = @bymap R1B_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low)
+	
+end
+
+# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
+begin
+XX = range(1e-2, 2.0, length = 300)
+	
+	n_p = 1000
+YY = map(x->eval_R1b(
+	115e-3,
+	Particles(n_p, Uniform(0.35, 0.36)),
+	2e-3,
+	Particles(n_p, Uniform(0.5, 0.51)),
+	40e-3,
+	Particles(n_p, Uniform(3.5, 4.5)),
+	Particles(n_p, Uniform(1.8, 2.2)),
+	x,
+	273.15+5,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	273.15+5,
+	5000,
+	2300), XX)
+end
+
+# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
+begin
+	m_Y = [median(y.particles) for y in YY]
+	q_05 = [quantile(y.particles, 0.025) for y in YY]
+	q_95 = [quantile(y.particles, 0.975) for y in YY]
+end
+
+# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
+begin
+fig_study = Makie.lines(XX, m_Y)
+	band!(XX, q_05, q_95)
+	fig_study
+end
+
+# ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
+md" # Temperature profiles"
+
+# ╔═╡ 201da2ec-f2b4-4c38-8a88-88362f53f5d0
+begin
+	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
+	
+	# We assume that our homogeneous (shifted) solution is:
+	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
+	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
+	#
+	# The boundary conditions we impose are:
+	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
+	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
+	#        T̃₁(L) = T̃₂(L)
+	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
+	
+	# Write the equations:
+	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
+	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
+	
+	# Solve the system for C1 and C2.
+	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
+end
+
+# ╔═╡ e39867fd-9323-4fc8-8e27-da4cc5ed327e
+get_variables(sλ_1)
+
+# ╔═╡ ab333b77-b3ee-4cd4-b2f9-07bbceb12377
+# ╠═╡ disabled = true
+#=╠═╡
+UA_12_cd_tot |> simplify;
+  ╠═╡ =#
+
+# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
+eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
+	
+
+# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+XBH = range(1e-2, 300.0, length = 300)
+TT = map(x-> eval_T1(
+	273.15,#T_p_1,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	115e-3,
+	2e-3,#th_1,
+	Particles(n_p, Uniform(0.35, 0.45)),
+	2e-3,#th_2,
+	2300,#Re_low,
+	5000,#Re_high,
+	273.15,#T_p_2,
+	20e-3,#r_p,
+	3.5,#λ_ground,
+	2.0,#λ_grout,
+	1.0,#ṁ_b,
+	x,#x_bh,
+	273.15+5,#T_1_in,
+	273.15+10,#T_wall,
+	300.0,#L_bh
+	0.3,#α
+), XBH)
+end
+  ╠═╡ =#
+
+# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
+#=╠═╡
+begin
+	m_T = [median(y.particles) for y in TT]
+	q_05_T = [quantile(y.particles, 0.025) for y in TT]
+	q_95_T = [quantile(y.particles, 0.975) for y in TT]
+fig_study_T = Makie.lines(XBH, m_T)
+	band!(XBH, q_05_T, q_95_T)
+	fig_study_T
+end
+  ╠═╡ =#
+
+# ╔═╡ 8e6a8e3b-c991-439d-bc9b-ba436d0be550
+#=╠═╡
+get_variables(sC_2)
+  ╠═╡ =#
+
+# ╔═╡ d2ff5f9e-3260-4e10-bca3-af2742b13877
+#=╠═╡
+begin
+	@variables x_bh
+	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
+	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
+	
+	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh)
+	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
+	Tbh_in = T_1_in
+	Tbh_out = substitute(sT_2, x_bh=>0.0);
+	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
+	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
+end;
+  ╠═╡ =#
+
+# ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
+#=╠═╡
+Tbh_out
+  ╠═╡ =#
+
+# ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
+#=╠═╡
+sT_2 |> get_variables
+  ╠═╡ =#
+
+# ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
+#=╠═╡
+fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+  ╠═╡ =#
+
+# ╔═╡ 837d8d99-458c-4077-8531-f25346684057
+#=╠═╡
+fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+  ╠═╡ =#
+
+# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
+#=╠═╡
+begin
+	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	
+	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+
+	@variables D_bh
+	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
+	sT_1_cd = substitute(sT_1_cd, d_simpl);
+	
+end;
+  ╠═╡ =#
+
+# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
+#=╠═╡
+get_variables(sT_1_cd)
+  ╠═╡ =#
+
+# ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
+#=╠═╡
+get_variables(sT_1_cd)
+  ╠═╡ =#
+
+# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
+#=╠═╡
+simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
+  ╠═╡ =#
+
+# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
+#=╠═╡
+T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
+  ╠═╡ =#
+
+# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+end;
+  ╠═╡ =#
+
+# ╔═╡ f0d290c1-584c-46e0-9377-3c73fec48818
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	eq_little = [Tbh_in - Tbh_out~3.0]
+	pars_l = [
+		L_bh,
+		Per_12,
+		Per_w1,
+		Per_w2,
+		cp_1_bh,
+		cp_2_bh,
+		U_12,
+		U_w1,
+		U_w2,
+		T_wall,
+		T_1_in,
+		χ,
+	]
+	unknowns_li = [ṁ_b]
+	@named little = NonlinearSystem(eq_little, unknowns_li, pars_l)
+	l_ = simplify(little) |> complete
+	ps_l = Dict(
+		χ => χ_,
+		L_bh => 250.0,
+		U_12 => 15.0,
+		U_w1 => 20.0,
+		U_w2 => 20.0,
+		ṁ_b => 0.6,
+		T_wall => 273.15+10,
+		cp_1_bh => cp_b_(T_wall, χ),
+		cp_2_bh => cp_b_(T_wall, χ),
+		T_1_in => 273.15+3,
+		Per_12 => pi*40e-3,
+		Per_w1 => pi*40e-3,
+		Per_w2 => pi*40e-3,
+	)
+	prob_l_ = NonlinearProblem(l_, [], ps_l, symbolic_u0 = true)
+	sol_l_ = NonlinearSolve.solve(prob_l_)
+	sol_l_.resid
+	sol_l_[Tbh_out]
+end
+  ╠═╡ =#
+
+# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
+md"# Utilities"
+
+# ╔═╡ 1cd63e6f-37b2-49ba-8887-2220d1df7c6f
+md" # Properties"
+
+# ╔═╡ 8947d51a-be91-457a-b418-b0ec61db6a86
+begin
+	    # --- Fluid and Pressure Parameters ---
+	    ref = gas_fluid = refrigerant                           # Refrigerant name
+	    modelref = SingleFluid(refrigerant)
+    # --- Fluid and Pressure Parameters ---
+    ref = gas_fluid = refrigerant                           # Refrigerant name
+    modelref = SingleFluid(refrigerant)
+	
+end
+
 # ╔═╡ 9538bfde-6ac2-4557-aaba-6b5e55f5b774
 function Compressor(; name,
 	# pars
@@ -161,68 +610,278 @@ function Compressor(; name,
 	NonlinearSystem(eqs, sts, ps; name);
 end
 
-# ╔═╡ b8eec68f-5fdb-4b7e-b2b5-d6178e364888
-@named C1 = Compressor();
-
-# ╔═╡ 19fac9f4-0240-4937-8187-756f7fafcd88
-C1p = C1 |> complete |> simplify;
-
-# ╔═╡ dc10c10b-9018-4d9e-8fa5-ee3fcfb9f28c
-prob_comp = NonlinearProblem(C1p, [], [])
-
-# ╔═╡ c0d0c5d4-df5f-441d-8215-1b347a123e71
-sol_comp = NonlinearSolve.solve(prob_comp)
-
-# ╔═╡ e1910100-2341-438c-8152-7ec84af9397b
-sol_comp[C1.h_out]
-
-# ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
-md" ## Sub model: Evaporator"
-
-# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╠═╡ disabled = true
-#=╠═╡
+# ╔═╡ 6435d235-34f8-4f43-a945-7cdd62e5dce7
 begin
-    # Plot using WGLMakie
-    fig = Figure(size=(800,600))
-    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
-              title="Evaporator temperature profile")
-    
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
-    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
-	
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
-    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
-    
-    # Add a vertical dashed line at x = L_EV_func()
-    vline = L_EV_func()
-    vlines!(ax, [vline], color=:black, linestyle=:dash)
-    
-    # Choose a y-position for the text (adjust as needed)
-    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
-    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
-    
-    # Add text labels to the left and right of the vertical line
-    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
-    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
 
-	
-	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
-    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
-    
-	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
-    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
-    
-    axislegend(ax, position = :lt)  # Add legend to the axis
+    gas_pMin = 1e3                                    # Minimum pressure: 1 kPa
+    # Get critical pressure (with fallback):
+    gas_pCrit = try
+        CoolProp.PropsSI("Pcrit", gas_fluid)
+    catch e
+        @warn "Error retrieving critical pressure for $gas_fluid, using fallback."
+        3.77e6  # fallback value in Pa
+    end
+    gas_pMax = gas_pCrit                              # Maximum pressure (Pa)
+    numPressurePoints = 200                           # Number of pressure points
+    # Logarithmically spaced pressure vector (in Pa)
+    pressure_vec = exp.(range(log(gas_pMin), log(gas_pMax), length=numPressurePoints))
 
-	DataInspector(fig)
-    fig  # Display the figure
+    # --- Superheat Parameters ---
+    superheat_min = 0.1                               # Minimum superheat (K)
+    superheat_max = 300.0                             # Maximum superheat (K)
+    numSuperheatPoints = 50                           # Number of superheat points
+    superheat_vec = range(superheat_min, superheat_max, length=numSuperheatPoints)
+
+
+    # --- Build Gas Property Matrices ---
+    # Viscosity for gas: μ_gas(p, ΔT_super)
+    function μ_gas(p, ΔT_super; fluid=gas_fluid)
+        try
+            # Get saturation temperature at pressure p (quality Q = 1.0, vapor state)
+            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
+            T_state = T_sat + ΔT_super  # Operating temperature
+            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
+        catch e
+            return NaN  # On error, return NaN
+        end
+    end
+
+    # Thermal conductivity for gas: λ_gas(p, ΔT_super)
+    function λ_gas(p, ΔT_super; fluid=gas_fluid)
+        try
+            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
+            T_state = T_sat + ΔT_super
+            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
+        catch e
+            return NaN
+        end
+    end
+
+    # Build grids for the interpolants
+    xs = pressure_vec
+    ys = superheat_vec
+
+    # Build viscosity matrix for gas over (pressure, superheat)
+    visc = [μ_gas(x, y) for x in xs, y in ys]
+    # Identify valid rows and columns (only rows/cols where every element is not NaN)
+    valid_row_idx = findall(i -> all(!isnan, visc[i, :]), 1:length(xs))
+    valid_col_idx = findall(j -> all(!isnan, visc[:, j]), 1:length(ys))
+    xs_clean = xs[valid_row_idx]
+    ys_clean = ys[valid_col_idx]
+    visc_clean = visc[valid_row_idx, valid_col_idx]
+    # Create interpolant for gas viscosity
+    interp_linear_visc = linear_interpolation((xs_clean, ys_clean), visc_clean, extrapolation_bc = Interpolations.Flat())
+
+    # Build thermal conductivity matrix for gas
+    cond = [λ_gas(x, y) for x in xs, y in ys]
+    valid_row_idx = findall(i -> all(!isnan, cond[i, :]), 1:length(xs))
+    valid_col_idx = findall(j -> all(!isnan, cond[:, j]), 1:length(ys))
+    xs_clean = xs[valid_row_idx]
+    ys_clean = ys[valid_col_idx]
+    cond_clean = cond[valid_row_idx, valid_col_idx]
+    # Create interpolant for gas thermal conductivity
+    interp_linear_cond = linear_interpolation((xs_clean, ys_clean), cond_clean, extrapolation_bc = Interpolations.Flat())
+
+    # --- Define the Superheat Function and Gas Property Lookups ---
+    function SH(T, p)
+        # Retrieve the dew temperature at pressure p; assumes saturation at quality 1.0.
+        T_dew = dew_temperature(modelref, p, [1.0])[1]
+        return T - T_dew
+    end
+
+    function μ_g_(T, p)
+        sh = SH(T, p)
+        return interp_linear_visc(p, sh)
+    end
+
+    function λ_g_(T, p)
+        sh = SH(T, p)
+        return interp_linear_cond(p, sh)
+    end
+
+    @register_symbolic μ_g_(T, p)
+    @register_symbolic λ_g_(T, p)
+
+
+    # --- Temperature/Phase and Enthalpy Functions ---
+    T_dew_(p) = dew_temperature(modelref, p, [1.0])[1]
+    T_bub_(p) = bubble_temperature(modelref, p, [1.0])[1]
+    T_PC(p)    = dew_temperature(modelref, p, [1.0])[1]
+    @register_symbolic T_dew_(p)
+    @register_symbolic T_bub_(p)
+    @register_symbolic T_PC(p)
+
+    h_dew_(p) = enthalpy(modelref, p, T_dew_(p), phase=:gas)
+    h_bub_(p) = enthalpy(modelref, p, T_bub_(p), phase=:liquid)
+    @register_symbolic h_dew_(p)
+    @register_symbolic h_bub_(p)
+
+    p_PC(T) = dew_pressure(modelref, T, [1.0])[1]
+    @register_symbolic p_PC(T)
+    @register_inverse T_PC p_PC
+
+
+    # --- Build Subcooled Liquid Property Interpolants ---
+    # Subcooling parameters: ΔT_sub = T - T_bubble (expected negative for subcooled liquid)
+    subcool_min = -30.0                  # e.g., saturated liquid = 0 K subcooling
+    subcool_max = 0.0                    # down to -30 K subcooling
+    numSubcoolPoints = 50
+    subcool_vec = range(subcool_min, subcool_max, length=numSubcoolPoints)
+
+    # Functions for subcooled liquid viscosity and conductivity
+    function μ_liq(p, ΔT_sub; fluid=gas_fluid)
+        try
+            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
+            T_state = T_sat + ΔT_sub
+            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
+        catch e
+            return NaN
+        end
+    end
+
+    function λ_liq(p, ΔT_sub; fluid=gas_fluid)
+        try
+            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
+            T_state = T_sat + ΔT_sub
+            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
+        catch e
+            return NaN
+        end
+    end
+
+    # Build the property matrices for the subcooled liquid properties
+    visc_liq = [ μ_liq(p, sc) for p in pressure_vec, sc in subcool_vec ]
+    cond_liq = [ λ_liq(p, sc) for p in pressure_vec, sc in subcool_vec ]
+    # Construct interpolants (using the full grid, assuming properties are available; adjust filtering if desired)
+    interp_linear_visc_liq = linear_interpolation((pressure_vec, subcool_vec), visc_liq, extrapolation_bc = Interpolations.Flat())
+    interp_linear_cond_liq  = linear_interpolation((pressure_vec, subcool_vec), cond_liq, extrapolation_bc = Interpolations.Flat())
+
+    # Define the subcooling function for liquid.
+    # Here, we use the bubble temperature as reference.
+    function SC(T, p)
+        return T - T_bub_(p)
+    end
+
+    function μ_l(T, p)
+        sc = SC(T, p)
+        return interp_linear_visc_liq(p, sc)
+    end
+
+    function λ_l(T, p)
+        sc = SC(T, p)
+        return interp_linear_cond_liq(p, sc)
+    end
+
+    @register_symbolic μ_l_(T, p)
+    @register_symbolic λ_l_(T, p)
+
+    # --- Refrigerant Isobaric Heat Capacity ---
+    function cp_r(T, p)
+        return Clapeyron.isobaric_heat_capacity(modelref, p, T)
+    end
+    @register_symbolic cp_r_(T, p)
 end
 
-  ╠═╡ =#
 
-# ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
-md""" # Solving the system"""
+# ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
+begin
+
+		desc = """
+	`A` total heat exchange surface area of the plate heat exchanger\\
+	`L` plate length\\
+	`W` plate width\\
+	`H` heat exchanger height\\
+	`np` number of plates\\
+	`ϕ` surface enlargement factor \\
+	`b` pressing depth\\
+	`β` chevron angle\\
+	"""
+	@parameters ṁ_r ṁ_b
+	@parameters A, W, H, np, ϕ, b, β, T_p_b, T_p_r
+	@parameters T_evap  T_b_in T_p_evap χ
+	#@parameters μ_b λ_b ρ_b cp_b
+	#@parameters μ_r_gas λ_r_gas ρ_r_gas cp_r_gas
+
+	h_dew = h_dew_(T_evap)
+	h_bub = h_bub_(T_evap)
+	P_evap = p_PC(T_evap)
+
+	cp_r_gas = cp_r(T_p_r, P_evap)
+	μ_r_gas = μ_g(T_p_r, P_evap)
+	λ_r_gas = λ_g(T_p_r, P_evap)
+	ρ_r_gas = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:gas)
+	
+	cp_r_liq = cp_r(T_p_r, P_evap)
+	μ_r_liq = μ_l(T_p_r, P_evap)
+	λ_r_liq = λ_l(T_p_r, P_evap)
+	ρ_r_liq = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:liquid)
+	
+	cp_b = cp_b_(T_p_b, χ)
+	μ_b = μ_b_(T_p_b, χ)
+	λ_b = λ_b_(T_p_b, χ)
+	ρ_b = ρ_b_(T_p_b, χ)
+	
+	dh = 2*b                       # hydraulic diameter 
+	S = (b*np)/2 #assuming half volume/section in each channel
+	V̇_b = abs(ṁ_b)/ρ_b
+	
+	v_b = V̇_b/S                  # speed of the secondary fluid 
+	
+	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
+	v_r_gas = V̇_r_gas/S         # hydraulic diameter 
+
+	Re_b = ρ_b * v_b * dh / μ_b           # Reynolds
+	#very wrong correlation ⚠
+	Pr_b = cp_b * μ_b / λ_b
+	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
+	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
+	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
+	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_b = Nudh_b*λ_b/dh
+	
+	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
+	
+	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
+	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
+	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
+	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
+	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_r_gas = Nudh_r_gas*λ_r_gas/dh
+
+
+	@parameters th, λ_Cu#, h_r_gas# h_b
+	
+	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
+	U_EV = 1/(1/h_b + th/λ_Cu)
+
+	@parameters L_PHX
+	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
+	
+	@variables αL x
+	L_EV = sin(αL)^2 * L_PHX
+	L_SH = cos(αL)^2 * L_PHX
+
+	UA_SH = U_SH * L_SH * Per_PHX
+	P_r = UA_SH / ṁ_r / cp_r_gas
+	α_SH = UA_SH /ṁ_b / cp_b
+	
+	UA_EV = U_EV * L_EV * Per_PHX
+	α_EV = UA_EV / ṁ_b / cp_b
+	
+	# ---
+	
+	T_b_SH = T_evap + (T_b_in - T_evap)*exp(-α_SH*(L_SH-x))
+	T_b_interface = substitute(T_b_SH, x => 0.0)
+	T_b_EV = T_evap + (T_b_interface - T_evap)*exp(-α_EV*(L_EV-x))
+	T_r_SH = T_evap + (P_r*(T_b_in - T_evap)*exp(-α_SH*L_SH))/(P_r + α_SH) * (exp((P_r + α_SH)*x) - 1)/exp(P_r*x)
+	T_r_out = substitute(T_r_SH, x => L_SH)
+	T_b_out = substitute(T_b_EV, x => 0.0)
+	T_r_EV = T_evap
+	h_r_interface = h_dew
+	h_r_EV = h_dew - ṁ_b*cp_b/ṁ_r*(T_b_interface-T_b_EV)
+	h_r_in = substitute(h_r_EV, x=> 0.0) |> simplify;
+
+end;
 
 # ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
 begin
@@ -355,6 +1014,231 @@ sol_.ps[T_b_in]
 # ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
 sin(sol_[αL])^2
 
+# ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
+#=╠═╡
+begin
+	
+	#eq_superheating = 
+	eq_inlet_ref = 
+	eq_T_A = 
+	eq_T_B = 
+	
+	eqs_coupled = [
+		T_r_out ~ T_evap+ΔT_SH_,
+		h_r_in ~ h_bub_(p_PC(T_evap)),
+		T_b_out ~ Tbh_in,
+		Tbh_out ~ T_b_in,
+		UA_12 ~ 2,
+		UA_1w ~ 2,
+		UA_2w ~ 2,
+	]
+
+	unknowns_coupled = [Tbh_in, T_b_in, αL, ṁ_b,
+		UA_12,
+		UA_1w,
+		UA_2w,]
+
+	ps_coupled = [
+		b,
+		W,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		ṁ_r,
+		#ṁ_b,
+		
+		T_evap,
+		T_wall,
+		
+		#T_b_in,
+		T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+
+		#αL,
+
+		L_bh,
+
+		T_p_1,
+		T_p_2,
+	]
+	@named sys_coupled = NonlinearSystem(eqs_coupled, unknowns_coupled, ps_coupled)
+
+	sys_coupled_ = complete(simplify(sys_coupled))
+	
+	p_coupled_ = [
+		L_bh => 300.0,
+		
+		χ => χ_,
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+
+		#PHX
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		ϕ => 1.189,
+		β => 30.0,
+
+		# IV:
+		ṁ_r => ṁ_r_,
+		ṁ_b => ṁ_r_,
+		αL => pi/2,
+
+		# Parameters
+		L_PHX => L_PHX_,
+		
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
+		T_wall => T_evap+20,
+
+		
+		T_b_in => 0.4T_evap+0.6T_wall,
+		Tbh_in => 0.6T_evap+0.4T_wall,
+
+		T_p_b => T_b_in,
+		T_p_1 => Tbh_in,
+		T_p_2 => Tbh_in,
+		
+		UA_12 => 2,
+		UA_1w => 2,
+		UA_2w => 2,
+	]
+	prob_coupled_ = NonlinearProblem(sys_coupled_, [], p_coupled_, symbolic_u0 = true);
+	sol_coupled_ = NonlinearSolve.solve(prob_coupled_, reltol = 1e-5)	
+end
+  ╠═╡ =#
+
+# ╔═╡ b2bef341-0f0c-4bc8-a18e-31b32798f94b
+#=╠═╡
+sol_coupled_.retcode
+  ╠═╡ =#
+
+# ╔═╡ 1d1d643d-0c9f-4b89-bf31-61797a59d66f
+#=╠═╡
+sol_coupled_.resid
+  ╠═╡ =#
+
+# ╔═╡ 74af929f-2a7d-4634-9cf6-5532f65861d1
+#=╠═╡
+sol_coupled_[ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ b61e1f63-465f-4086-866f-6d1cd74fb355
+#=╠═╡
+sin(sol_coupled_[αL])^2
+  ╠═╡ =#
+
+# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
+#=╠═╡
+sol_coupled_[Tbh_in]-273.15
+  ╠═╡ =#
+
+# ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
+#=╠═╡
+sol_coupled_[T_b_in]-273.15
+
+  ╠═╡ =#
+
+# ╔═╡ 0de5ef9d-7ec8-47a2-8db2-37a115297703
+# ╠═╡ disabled = true
+#=╠═╡
+sol_all.resid
+  ╠═╡ =#
+
+# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
+#=╠═╡
+sol_all[ṁ_comp]
+  ╠═╡ =#
+
+# ╔═╡ 9236c70e-3799-46d2-9c7e-45b4a63388f3
+#=╠═╡
+sol_all[ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ 8c95636c-9640-4083-a36d-2010b5a80134
+# ╠═╡ disabled = true
+#=╠═╡
+sol_all[T_b_in]-273.15
+  ╠═╡ =#
+
+# ╔═╡ 54ac9095-a228-4d8e-9da1-7e9eb9cb9aaf
+# ╠═╡ disabled = true
+#=╠═╡
+sol_all[Tbh_in]-273.15
+  ╠═╡ =#
+
+# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
+cp_r_(Inf, Inf)
+
+# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
+md"## Bonds"
+
+# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
+begin
+	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
+	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
+	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
+	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
+	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
+	end
+
+	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
+	end
+	
+	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
+		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
+		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
+	end
+
+	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+end
+
+# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
+md" # Other"
+
+# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
+
+	candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
+
 # ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 # ╠═╡ disabled = true
 #=╠═╡
@@ -393,11 +1277,23 @@ end
 
   ╠═╡ =#
 
-# ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
-md" # Combined problem"
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
+md"---"
 
-# ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
-md" # BHE + Evap + Compressor"
+# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+md" # Imports"
+
+# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
+html"""
+<style>
+	main {
+		margin: 0 auto;
+		max-width: 2000px;
+    	padding-left: max(550px, 5%);
+    	padding-right: max(500px, 5%);
+	}
+</style>
+"""
 
 # ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
 # ╠═╡ disabled = true
@@ -559,32 +1455,15 @@ begin
 end
   ╠═╡ =#
 
-# ╔═╡ 0de5ef9d-7ec8-47a2-8db2-37a115297703
+# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
 # ╠═╡ disabled = true
 #=╠═╡
-sol_all.resid
-  ╠═╡ =#
-
-# ╔═╡ 99142e7e-eed5-4ffd-b648-138c19612b47
-#=╠═╡
-sol_all[ṁ_comp]
-  ╠═╡ =#
-
-# ╔═╡ 9236c70e-3799-46d2-9c7e-45b4a63388f3
-#=╠═╡
-sol_all[ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ 8c95636c-9640-4083-a36d-2010b5a80134
-# ╠═╡ disabled = true
-#=╠═╡
-sol_all[T_b_in]-273.15
-  ╠═╡ =#
-
-# ╔═╡ 54ac9095-a228-4d8e-9da1-7e9eb9cb9aaf
-# ╠═╡ disabled = true
-#=╠═╡
-sol_all[Tbh_in]-273.15
+begin
+	
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
   ╠═╡ =#
 
 # ╔═╡ c900c406-5e25-467b-8771-feedfe933685
@@ -771,528 +1650,46 @@ begin
 end
   ╠═╡ =#
 
-# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
+# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
 # ╠═╡ disabled = true
 #=╠═╡
 begin
+    # Plot using WGLMakie
+    fig = Figure(size=(800,600))
+    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
+              title="Evaporator temperature profile")
+    
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
+    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
 	
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
+    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
+    
+    # Add a vertical dashed line at x = L_EV_func()
+    vline = L_EV_func()
+    vlines!(ax, [vline], color=:black, linestyle=:dash)
+    
+    # Choose a y-position for the text (adjust as needed)
+    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
+    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
+    
+    # Add text labels to the left and right of the vertical line
+    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
+    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
+
 	
-end
-  ╠═╡ =#
+	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
+    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
+    
+	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
+    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
+    
+    axislegend(ax, position = :lt)  # Add legend to the axis
 
-# ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
-md" # Internal forced convection"
-
-# ╔═╡ d44ac0d3-c764-4df8-a326-bc853f21b3ec
-md" # U-tube: filled"
-
-# ╔═╡ 78d7e55b-134c-4db8-a7f6-bc8e25d7f543
-md" # U tube: grouted"
-
-# ╔═╡ 85f8033b-6d5a-4732-ae44-60ae1a5300cb
-# Borehole resistance in conduction
-begin
-	J = 1
-	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
-	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-	A_ = f_data .+ t_sum
-	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-	M_ = KJ_mat .+ A_
-	
-	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-	
-	B_ = V_k'*inv(M_)*V_bk
-	
-	B⁻ = substitute(B_, s => -1)
-	B⁺ = substitute(B_, s => 1)
-
-	R⁺ = R₀⁺ .+ B⁺
-	R⁻ = R₀⁻ .+ B⁻
-
-	R_1b_p_c = R⁺
-	R_2b_p_c = R⁺
-	R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
-	
-	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]);
-end;
-
-# ╔═╡ 30eba1d3-1856-4aa0-8d58-63ab3cf81578
-R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
-
-# ╔═╡ 44cc481e-c4af-499e-b263-587ccdf145ff
-R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
-
-# ╔═╡ 40cb2982-16d6-435f-b1d2-c62040416819
-begin
-	#@variables D_1 D_2 D_b th_1 th_2
-	Per_1 = pi*(D_1-th_1)
-	Per_2 = pi*(D_2-th_2)
-	Per_w = pi*(D_b)
-	
-	R_1 = 1/(Per_1*h_1)
-	R_2 = 1/(Per_2*h_2)
-	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
-	
-	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
-	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
-
-end;
-
-# ╔═╡ e2bd77ff-f24e-4d27-948c-d92294f2367f
-begin
-	
-	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
-	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
-	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
-	
-	UA_12_cd_tot = 1/R_12_cd_tot
-	UA_1w_cd_tot = 1/R_1w_cd_tot
-	UA_2w_cd_tot = 1/R_2w_cd_tot;
-	
-end;
-
-# ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
-UA_12_cd_tot |> get_variables
-#	UA_1w_cd_tot = 1/R_1w_cd_tot
-#	UA_2w_cd_tot = 1/R_2w_cd_tot;
-#r_p,
-#r_b,
-#UP_12_Upipe
-
-# ╔═╡ 04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
-begin
-	@variables D_p T_p_bh
-	UP_12_Upipe = substitute(UA_12_cd_tot, [r_p => D_p/2, r_b => D_b/2, D_1 => D_p-2th, D_2 => D_p-2th, th_1 => th, th_2 => th, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, T_p_1 => T_p_bh, T_p_2 => T_p_bh])
-	UP_12_Upipe |> get_variables
+	DataInspector(fig)
+    fig  # Display the figure
 end
 
-# ╔═╡ 16319944-4713-469b-882a-998a2bd11943
-D_p
-
-# ╔═╡ de7deb47-9d43-4423-9fc2-4911ee6dc05a
-UA_12_cd_tot |> get_variables
-
-# ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
-md" # Quick analysis: parametric study"
-
-# ╔═╡ 8815b4d5-6ec5-4e14-b081-296e4cb17cea
-begin
-	@variables th_p, ṁ_bh
-	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh])
-	R_12_simplified |> get_variables
-R1B_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low, expression=Val{false});
-eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low) = @bymap R1B_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low)
-	
-end
-
-# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
-begin
-XX = range(1e-2, 2.0, length = 300)
-	
-	n_p = 1000
-YY = map(x->eval_R1b(
-	115e-3,
-	Particles(n_p, Uniform(0.35, 0.36)),
-	2e-3,
-	Particles(n_p, Uniform(0.5, 0.51)),
-	40e-3,
-	Particles(n_p, Uniform(3.5, 4.5)),
-	Particles(n_p, Uniform(1.8, 2.2)),
-	x,
-	273.15+5,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	273.15+5,
-	5000,
-	2300), XX)
-end
-
-# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
-begin
-	m_Y = [median(y.particles) for y in YY]
-	q_05 = [quantile(y.particles, 0.025) for y in YY]
-	q_95 = [quantile(y.particles, 0.975) for y in YY]
-end
-
-# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
-begin
-fig_study = Makie.lines(XX, m_Y)
-	band!(XX, q_05, q_95)
-	fig_study
-end
-
-# ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
-md" # Temperature profiles"
-
-# ╔═╡ 201da2ec-f2b4-4c38-8a88-88362f53f5d0
-begin
-	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
-	
-	# We assume that our homogeneous (shifted) solution is:
-	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
-	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
-	#
-	# The boundary conditions we impose are:
-	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
-	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
-	#        T̃₁(L) = T̃₂(L)
-	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
-	
-	# Write the equations:
-	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
-	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
-	
-	# Solve the system for C1 and C2.
-	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
-end
-
-# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
-begin
-	#@variables U_12 U_1w U_2w
-	@variables P_1 P_w1 P_2 P_w2
-	
-	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
-                                        λ_2 => sλ2,
-                                        γ_1 => sγ1,
-                                        γ_2 => sγ2)) for s in sol_C];
-end;
-
-# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
-begin
-	@variables UA_12 UA_1w UA_2w
-	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
-	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-end;
-
-# ╔═╡ f80fb712-b95c-4767-a632-9ad4e345cc7a
-UA_12 ~ UP_12_Upipe
-
-# ╔═╡ 8e6a8e3b-c991-439d-bc9b-ba436d0be550
-get_variables(sC_2)
-
-# ╔═╡ e39867fd-9323-4fc8-8e27-da4cc5ed327e
-get_variables(sλ_1)
-
-# ╔═╡ d2ff5f9e-3260-4e10-bca3-af2742b13877
-begin
-	@variables x_bh
-	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
-	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
-	
-	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh)
-	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
-	Tbh_in = T_1_in
-	Tbh_out = substitute(sT_2, x_bh=>0.0);
-	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
-	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
-end;
-
-# ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
-begin
-	
-	#eq_superheating = 
-	eq_inlet_ref = 
-	eq_T_A = 
-	eq_T_B = 
-	
-	eqs_coupled = [
-		T_r_out ~ T_evap+ΔT_SH_,
-		h_r_in ~ h_bub_(p_PC(T_evap)),
-		T_b_out ~ Tbh_in,
-		Tbh_out ~ T_b_in,
-		UA_12 ~ 2,
-		UA_1w ~ 2,
-		UA_2w ~ 2,
-	]
-
-	unknowns_coupled = [Tbh_in, T_b_in, αL, ṁ_b,
-		UA_12,
-		UA_1w,
-		UA_2w,]
-
-	ps_coupled = [
-		b,
-		W,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		ṁ_r,
-		#ṁ_b,
-		
-		T_evap,
-		T_wall,
-		
-		#T_b_in,
-		T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-
-		#αL,
-
-		L_bh,
-
-		T_p_1,
-		T_p_2,
-	]
-	@named sys_coupled = NonlinearSystem(eqs_coupled, unknowns_coupled, ps_coupled)
-
-	sys_coupled_ = complete(simplify(sys_coupled))
-	
-	p_coupled_ = [
-		L_bh => 300.0,
-		
-		χ => χ_,
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-
-		#PHX
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		ϕ => 1.189,
-		β => 30.0,
-
-		# IV:
-		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_,
-		αL => pi/2,
-
-		# Parameters
-		L_PHX => L_PHX_,
-		
-		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_wall => T_evap+20,
-
-		
-		T_b_in => 0.4T_evap+0.6T_wall,
-		Tbh_in => 0.6T_evap+0.4T_wall,
-
-		T_p_b => T_b_in,
-		T_p_1 => Tbh_in,
-		T_p_2 => Tbh_in,
-		
-		UA_12 => 2,
-		UA_1w => 2,
-		UA_2w => 2,
-	]
-	prob_coupled_ = NonlinearProblem(sys_coupled_, [], p_coupled_, symbolic_u0 = true);
-	sol_coupled_ = NonlinearSolve.solve(prob_coupled_, reltol = 1e-5)	
-end
-
-# ╔═╡ b2bef341-0f0c-4bc8-a18e-31b32798f94b
-sol_coupled_.retcode
-
-# ╔═╡ 1d1d643d-0c9f-4b89-bf31-61797a59d66f
-sol_coupled_.resid
-
-# ╔═╡ 74af929f-2a7d-4634-9cf6-5532f65861d1
-sol_coupled_[ṁ_b]
-
-# ╔═╡ b61e1f63-465f-4086-866f-6d1cd74fb355
-sin(sol_coupled_[αL])^2
-
-# ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
-sol_coupled_[T_b_in]-273.15
-
-
-# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
-sol_coupled_[Tbh_in]-273.15
-
-# ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
-Tbh_out
-
-# ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
-sT_2 |> get_variables
-
-# ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
-fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ 837d8d99-458c-4077-8531-f25346684057
-fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ 8d38ac9f-9fe7-4cb0-aeef-f5086ab355df
-begin
-	# --- Step 1. Define your x range and convert to meters ---
-	x_m = 0:1:300.0                   # original x values in mm
-	
-	# Replace the following list comprehensions with your own functions:
-	mf = 0.01:0.05:1.5
-	Z1 = [fT1(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
-	Z2 = [fT2(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
-		
-	X = repeat(reshape(x_m, 1, length(x_m)), length(mf), 1)
-	Y = repeat(reshape(mf, length(mf), 1), 1, length(x_m))
-		
-	
-	# --- Step 4. Create a 3D surface plot with enhanced styling ---
-	fig = Figure(resolution = (800, 600))
-	ax = Axis3(fig[1, 1],
-	    title = "3D Surface Plot of Temperature Profiles",
-	    xlabel = "Distance (m)",
-	    ylabel = "Mass flow [kg/s]",
-	    zlabel = "Temperature [°C]")
-	
-	# Plot the surface. You can change the colormap or enable shading as desired.
-	surface!(ax, X, Y, Z1; colormap = :blues, shading = false, transparency = true)
-	surface!(ax, X, Y, Z2; colormap = :reds, shading = false, transparency = true)
-	
-	# (Optional) Adjust camera or aspect settings if needed, for example:
-	ax.aspect = (1, 1, 0.5)  # adjust relative axis scaling
-	# Display the figure
-	fig
-end
-
-# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-end;
-  ╠═╡ =#
-
-# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
-begin
-	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	
-	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-
-	@variables D_bh
-	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
-	sT_1_cd = substitute(sT_1_cd, d_simpl);
-	
-end;
-
-# ╔═╡ ab333b77-b3ee-4cd4-b2f9-07bbceb12377
-# ╠═╡ disabled = true
-#=╠═╡
-UA_12_cd_tot |> simplify;
-  ╠═╡ =#
-
-# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
-get_variables(sT_1_cd)
-
-# ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
-get_variables(sT_1_cd)
-
-# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
-simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
-
-# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
-T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
-
-# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
-eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
-	
-
-# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-XBH = range(1e-2, 300.0, length = 300)
-TT = map(x-> eval_T1(
-	273.15,#T_p_1,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	115e-3,
-	2e-3,#th_1,
-	Particles(n_p, Uniform(0.35, 0.45)),
-	2e-3,#th_2,
-	2300,#Re_low,
-	5000,#Re_high,
-	273.15,#T_p_2,
-	20e-3,#r_p,
-	3.5,#λ_ground,
-	2.0,#λ_grout,
-	1.0,#ṁ_b,
-	x,#x_bh,
-	273.15+5,#T_1_in,
-	273.15+10,#T_wall,
-	300.0,#L_bh
-	0.3,#α
-), XBH)
-end
-  ╠═╡ =#
-
-# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
-#=╠═╡
-begin
-	m_T = [median(y.particles) for y in TT]
-	q_05_T = [quantile(y.particles, 0.025) for y in TT]
-	q_95_T = [quantile(y.particles, 0.975) for y in TT]
-fig_study_T = Makie.lines(XBH, m_T)
-	band!(XBH, q_05_T, q_95_T)
-	fig_study_T
-end
   ╠═╡ =#
 
 # ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
@@ -1333,55 +1730,98 @@ begin
 end
   ╠═╡ =#
 
-# ╔═╡ f0d290c1-584c-46e0-9377-3c73fec48818
-# ╠═╡ disabled = true
+# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
 #=╠═╡
-begin
-	eq_little = [Tbh_in - Tbh_out~3.0]
-	pars_l = [
-		L_bh,
-		Per_12,
-		Per_w1,
-		Per_w2,
-		cp_1_bh,
-		cp_2_bh,
-		U_12,
-		U_w1,
-		U_w2,
-		T_wall,
-		T_1_in,
-		χ,
-	]
-	unknowns_li = [ṁ_b]
-	@named little = NonlinearSystem(eq_little, unknowns_li, pars_l)
-	l_ = simplify(little) |> complete
-	ps_l = Dict(
-		χ => χ_,
-		L_bh => 250.0,
-		U_12 => 15.0,
-		U_w1 => 20.0,
-		U_w2 => 20.0,
-		ṁ_b => 0.6,
-		T_wall => 273.15+10,
-		cp_1_bh => cp_b_(T_wall, χ),
-		cp_2_bh => cp_b_(T_wall, χ),
-		T_1_in => 273.15+3,
-		Per_12 => pi*40e-3,
-		Per_w1 => pi*40e-3,
-		Per_w2 => pi*40e-3,
-	)
-	prob_l_ = NonlinearProblem(l_, [], ps_l, symbolic_u0 = true)
-	sol_l_ = NonlinearSolve.solve(prob_l_)
-	sol_l_.resid
-	sol_l_[Tbh_out]
-end
+using LinearAlgebra
   ╠═╡ =#
 
-# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
-md"# Utilities"
+# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
+begin
+	
+	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
+	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
+	
+	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
 
-# ╔═╡ 1cd63e6f-37b2-49ba-8887-2220d1df7c6f
-md" # Properties"
+	cp_1 = cp_b_(T_p_1, χ)
+	μ_1 = μ_b_(T_p_1, χ)
+	λp_1 = λ_b_(T_p_1, χ)
+	ρ_1 = ρ_b_(T_p_1, χ)
+	
+	V̇_1 = ṁ_1 / ρ_1
+	S_1 = π*D_1^2/4
+	v_1 = V̇_1 / S_1
+
+	Re_1_r= ρ_1*v_1*D_1/
+	Re_1 = sqrt(Re_1_r^2 + 1e-12)
+	Pr_1 = cp_1*μ_1/λp_1
+
+	Nu_lam_1 = 3.66
+	f_1 = 0.3164*Re_1^(-1//4)
+	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
+	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
+
+	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
+
+	h_1 = Nu_1 * λp_1/D_1
+
+	#---
+
+	cp_2 = cp_b_(T_p_2, χ)
+	μ_2 = μ_b_(T_p_2, χ)
+	λp_2 = λ_b_(T_p_2, χ)
+	ρ_2 = ρ_b_(T_p_2, χ)
+	
+	V̇_2 = ṁ_2 / ρ_2
+	S_2 = π*D_2^2/4
+	v_2 = V̇_2 / S_2
+
+	Re_2_r = ρ_2*v_2*D_2/μ_2
+	Re_2 = sqrt(Re_2_r^2 + 1e-12)
+	Pr_2 = cp_2*μ_2/λp_2
+
+	Nu_lam_2 = 3.66
+	f_2 = 0.3164*Re_2^(-1//4)
+	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
+	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
+
+	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_2*Nu_tur_2
+
+	h_2 = Nu_2 * λp_2/D_2;
+end;
+
+# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
+#=╠═╡
+begin
+	@variables UA_12 UA_1w UA_2w
+	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
+	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+end;
+  ╠═╡ =#
 
 # ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
 begin
@@ -1586,476 +2026,80 @@ begin
 end
 
 
-# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
-# Borehole resistance in natural convection
+# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
+#=╠═╡
 begin
-	#@variables r_p r_b
-	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
-	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
-	@variables T_w_av T_1_av T_2_av T_b_av
-	@parameters g
-	T_f_1_w = 0.5*T_1_av + .5*T_w_av
-	T_f_2_w = 0.5*T_2_av + .5*T_w_av
-	T_f_b_w = 0.5*T_b_av + .5*T_w_av
-
-	Gr_1 = g*β_w_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
-	Gr_2 = g*β_w_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
-	Gr_b = g*β_w_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
-
-	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
-	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
-	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
+	#@variables U_12 U_1w U_2w
+	@variables P_1 P_w1 P_2 P_w2
 	
-	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
-	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
-	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
 
-	R_1w_cv = 1/(h_1_w*pi*D_1)
-	R_2w_cv = 1/(h_2_w*pi*D_2)
-	R_bw_cv = 1/(h_b_w*pi*D_b);
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
+                                        λ_2 => sλ2,
+                                        γ_1 => sγ1,
+                                        γ_2 => sγ2)) for s in sol_C];
 end;
+  ╠═╡ =#
 
-# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
+# ╔═╡ 8d38ac9f-9fe7-4cb0-aeef-f5086ab355df
+#=╠═╡
 begin
-	R_12_cv = R_1w_cv + R_2w_cv
-	R_1b_cv = R_1w_cv + R_bw_cv
-	R_2b_cv = R_2w_cv + R_bw_cv;
+	# --- Step 1. Define your x range and convert to meters ---
+	x_m = 0:1:300.0                   # original x values in mm
 	
-	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
-	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
-	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
+	# Replace the following list comprehensions with your own functions:
+	mf = 0.01:0.05:1.5
+	Z1 = [fT1(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
+	Z2 = [fT2(x, 10+273.15, 10+273.15, 0.285, 2, 1, 1, 300, 5+273.15, 10+273.15, y) for x in x_m, y in mf]'.-273.15
+		
+	X = repeat(reshape(x_m, 1, length(x_m)), length(mf), 1)
+	Y = repeat(reshape(mf, length(mf), 1), 1, length(x_m))
+		
 	
-	UA_12_cv_tot = 1/R_12_cv_tot
-	UA_1w_cv_tot = 1/R_1w_cv_tot
-	UA_2w_cv_tot = 1/R_2w_cv_tot;
-end;
-
-# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
-cp_r_(Inf, Inf)
-
-# ╔═╡ 4b6d717a-edb6-4292-bcb7-5dc44e560637
-md"## Bonds"
-
-# ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
-md" # Other"
-
-# ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
-
-	candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
-
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
-# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-md" # Imports"
+	# --- Step 4. Create a 3D surface plot with enhanced styling ---
+	fig = Figure(resolution = (800, 600))
+	ax = Axis3(fig[1, 1],
+	    title = "3D Surface Plot of Temperature Profiles",
+	    xlabel = "Distance (m)",
+	    ylabel = "Mass flow [kg/s]",
+	    zlabel = "Temperature [°C]")
+	
+	# Plot the surface. You can change the colormap or enable shading as desired.
+	surface!(ax, X, Y, Z1; colormap = :blues, shading = false, transparency = true)
+	surface!(ax, X, Y, Z2; colormap = :reds, shading = false, transparency = true)
+	
+	# (Optional) Adjust camera or aspect settings if needed, for example:
+	ax.aspect = (1, 1, 0.5)  # adjust relative axis scaling
+	# Display the figure
+	fig
+end
+  ╠═╡ =#
 
 # ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
 # ╠═╡ disabled = true
 #=╠═╡
 using LinearAlgebra
   ╠═╡ =#
-
-# ╔═╡ c70fe3b1-ad7d-4538-8487-dd7c0c1296a2
-html"""
-<style>
-	main {
-		margin: 0 auto;
-		max-width: 2000px;
-    	padding-left: max(550px, 5%);
-    	padding-right: max(500px, 5%);
-	}
-</style>
-"""
-
-# ╔═╡ 6435d235-34f8-4f43-a945-7cdd62e5dce7
-begin
-
-    gas_pMin = 1e3                                    # Minimum pressure: 1 kPa
-    # Get critical pressure (with fallback):
-    gas_pCrit = try
-        CoolProp.PropsSI("Pcrit", gas_fluid)
-    catch e
-        @warn "Error retrieving critical pressure for $gas_fluid, using fallback."
-        3.77e6  # fallback value in Pa
-    end
-    gas_pMax = gas_pCrit                              # Maximum pressure (Pa)
-    numPressurePoints = 200                           # Number of pressure points
-    # Logarithmically spaced pressure vector (in Pa)
-    pressure_vec = exp.(range(log(gas_pMin), log(gas_pMax), length=numPressurePoints))
-
-    # --- Superheat Parameters ---
-    superheat_min = 0.1                               # Minimum superheat (K)
-    superheat_max = 300.0                             # Maximum superheat (K)
-    numSuperheatPoints = 50                           # Number of superheat points
-    superheat_vec = range(superheat_min, superheat_max, length=numSuperheatPoints)
-
-
-    # --- Build Gas Property Matrices ---
-    # Viscosity for gas: μ_gas(p, ΔT_super)
-    function μ_gas(p, ΔT_super; fluid=gas_fluid)
-        try
-            # Get saturation temperature at pressure p (quality Q = 1.0, vapor state)
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
-            T_state = T_sat + ΔT_super  # Operating temperature
-            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN  # On error, return NaN
-        end
-    end
-
-    # Thermal conductivity for gas: λ_gas(p, ΔT_super)
-    function λ_gas(p, ΔT_super; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
-            T_state = T_sat + ΔT_super
-            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    # Build grids for the interpolants
-    xs = pressure_vec
-    ys = superheat_vec
-
-    # Build viscosity matrix for gas over (pressure, superheat)
-    visc = [μ_gas(x, y) for x in xs, y in ys]
-    # Identify valid rows and columns (only rows/cols where every element is not NaN)
-    valid_row_idx = findall(i -> all(!isnan, visc[i, :]), 1:length(xs))
-    valid_col_idx = findall(j -> all(!isnan, visc[:, j]), 1:length(ys))
-    xs_clean = xs[valid_row_idx]
-    ys_clean = ys[valid_col_idx]
-    visc_clean = visc[valid_row_idx, valid_col_idx]
-    # Create interpolant for gas viscosity
-    interp_linear_visc = linear_interpolation((xs_clean, ys_clean), visc_clean, extrapolation_bc = Interpolations.Flat())
-
-    # Build thermal conductivity matrix for gas
-    cond = [λ_gas(x, y) for x in xs, y in ys]
-    valid_row_idx = findall(i -> all(!isnan, cond[i, :]), 1:length(xs))
-    valid_col_idx = findall(j -> all(!isnan, cond[:, j]), 1:length(ys))
-    xs_clean = xs[valid_row_idx]
-    ys_clean = ys[valid_col_idx]
-    cond_clean = cond[valid_row_idx, valid_col_idx]
-    # Create interpolant for gas thermal conductivity
-    interp_linear_cond = linear_interpolation((xs_clean, ys_clean), cond_clean, extrapolation_bc = Interpolations.Flat())
-
-    # --- Define the Superheat Function and Gas Property Lookups ---
-    function SH(T, p)
-        # Retrieve the dew temperature at pressure p; assumes saturation at quality 1.0.
-        T_dew = dew_temperature(modelref, p, [1.0])[1]
-        return T - T_dew
-    end
-
-    function μ_g_(T, p)
-        sh = SH(T, p)
-        return interp_linear_visc(p, sh)
-    end
-
-    function λ_g_(T, p)
-        sh = SH(T, p)
-        return interp_linear_cond(p, sh)
-    end
-
-    @register_symbolic μ_g_(T, p)
-    @register_symbolic λ_g_(T, p)
-
-
-    # --- Temperature/Phase and Enthalpy Functions ---
-    T_dew_(p) = dew_temperature(modelref, p, [1.0])[1]
-    T_bub_(p) = bubble_temperature(modelref, p, [1.0])[1]
-    T_PC(p)    = dew_temperature(modelref, p, [1.0])[1]
-    @register_symbolic T_dew_(p)
-    @register_symbolic T_bub_(p)
-    @register_symbolic T_PC(p)
-
-    h_dew_(p) = enthalpy(modelref, p, T_dew_(p), phase=:gas)
-    h_bub_(p) = enthalpy(modelref, p, T_bub_(p), phase=:liquid)
-    @register_symbolic h_dew_(p)
-    @register_symbolic h_bub_(p)
-
-    p_PC(T) = dew_pressure(modelref, T, [1.0])[1]
-    @register_symbolic p_PC(T)
-    @register_inverse T_PC p_PC
-
-
-    # --- Build Subcooled Liquid Property Interpolants ---
-    # Subcooling parameters: ΔT_sub = T - T_bubble (expected negative for subcooled liquid)
-    subcool_min = -30.0                  # e.g., saturated liquid = 0 K subcooling
-    subcool_max = 0.0                    # down to -30 K subcooling
-    numSubcoolPoints = 50
-    subcool_vec = range(subcool_min, subcool_max, length=numSubcoolPoints)
-
-    # Functions for subcooled liquid viscosity and conductivity
-    function μ_liq(p, ΔT_sub; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
-            T_state = T_sat + ΔT_sub
-            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    function λ_liq(p, ΔT_sub; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
-            T_state = T_sat + ΔT_sub
-            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    # Build the property matrices for the subcooled liquid properties
-    visc_liq = [ μ_liq(p, sc) for p in pressure_vec, sc in subcool_vec ]
-    cond_liq = [ λ_liq(p, sc) for p in pressure_vec, sc in subcool_vec ]
-    # Construct interpolants (using the full grid, assuming properties are available; adjust filtering if desired)
-    interp_linear_visc_liq = linear_interpolation((pressure_vec, subcool_vec), visc_liq, extrapolation_bc = Interpolations.Flat())
-    interp_linear_cond_liq  = linear_interpolation((pressure_vec, subcool_vec), cond_liq, extrapolation_bc = Interpolations.Flat())
-
-    # Define the subcooling function for liquid.
-    # Here, we use the bubble temperature as reference.
-    function SC(T, p)
-        return T - T_bub_(p)
-    end
-
-    function μ_l(T, p)
-        sc = SC(T, p)
-        return interp_linear_visc_liq(p, sc)
-    end
-
-    function λ_l(T, p)
-        sc = SC(T, p)
-        return interp_linear_cond_liq(p, sc)
-    end
-
-    @register_symbolic μ_l_(T, p)
-    @register_symbolic λ_l_(T, p)
-
-    # --- Refrigerant Isobaric Heat Capacity ---
-    function cp_r(T, p)
-        return Clapeyron.isobaric_heat_capacity(modelref, p, T)
-    end
-    @register_symbolic cp_r_(T, p)
-end
-
-
-# ╔═╡ 607cd32d-c035-4f36-ad7d-b45cf59d2347
-begin
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-	end
-	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
-		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
-		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-	end
-
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
-end
-
-# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
-begin
-	
-	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
-	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
-	
-	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
-
-	cp_1 = cp_b_(T_p_1, χ)
-	μ_1 = μ_b_(T_p_1, χ)
-	λp_1 = λ_b_(T_p_1, χ)
-	ρ_1 = ρ_b_(T_p_1, χ)
-	
-	V̇_1 = ṁ_1 / ρ_1
-	S_1 = π*D_1^2/4
-	v_1 = V̇_1 / S_1
-
-	Re_1_r= ρ_1*v_1*D_1/
-	Re_1 = sqrt(Re_1_r^2 + 1e-12)
-	Pr_1 = cp_1*μ_1/λp_1
-
-	Nu_lam_1 = 3.66
-	f_1 = 0.3164*Re_1^(-1//4)
-	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
-	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
-
-	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
-
-	h_1 = Nu_1 * λp_1/D_1
-
-	#---
-
-	cp_2 = cp_b_(T_p_2, χ)
-	μ_2 = μ_b_(T_p_2, χ)
-	λp_2 = λ_b_(T_p_2, χ)
-	ρ_2 = ρ_b_(T_p_2, χ)
-	
-	V̇_2 = ṁ_2 / ρ_2
-	S_2 = π*D_2^2/4
-	v_2 = V̇_2 / S_2
-
-	Re_2_r = ρ_2*v_2*D_2/μ_2
-	Re_2 = sqrt(Re_2_r^2 + 1e-12)
-	Pr_2 = cp_2*μ_2/λp_2
-
-	Nu_lam_2 = 3.66
-	f_2 = 0.3164*Re_2^(-1//4)
-	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
-	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
-
-	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_2*Nu_tur_2
-
-	h_2 = Nu_2 * λp_2/D_2;
-end;
-
-# ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
-begin
-
-		desc = """
-	`A` total heat exchange surface area of the plate heat exchanger\\
-	`L` plate length\\
-	`W` plate width\\
-	`H` heat exchanger height\\
-	`np` number of plates\\
-	`ϕ` surface enlargement factor \\
-	`b` pressing depth\\
-	`β` chevron angle\\
-	"""
-	@parameters ṁ_r ṁ_b
-	@parameters A, W, H, np, ϕ, b, β, T_p_b, T_p_r
-	@parameters T_evap  T_b_in T_p_evap χ
-	#@parameters μ_b λ_b ρ_b cp_b
-	#@parameters μ_r_gas λ_r_gas ρ_r_gas cp_r_gas
-
-	h_dew = h_dew_(T_evap)
-	h_bub = h_bub_(T_evap)
-	P_evap = p_PC(T_evap)
-
-	cp_r_gas = cp_r(T_p_r, P_evap)
-	μ_r_gas = μ_g(T_p_r, P_evap)
-	λ_r_gas = λ_g(T_p_r, P_evap)
-	ρ_r_gas = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:gas)
-	
-	cp_r_liq = cp_r(T_p_r, P_evap)
-	μ_r_liq = μ_l(T_p_r, P_evap)
-	λ_r_liq = λ_l(T_p_r, P_evap)
-	ρ_r_liq = 1/Clapeyron.volume(modelref, P_evap, T_p_r, phase=:liquid)
-	
-	cp_b = cp_b_(T_p_b, χ)
-	μ_b = μ_b_(T_p_b, χ)
-	λ_b = λ_b_(T_p_b, χ)
-	ρ_b = ρ_b_(T_p_b, χ)
-	
-	dh = 2*b                       # hydraulic diameter 
-	S = (b*np)/2 #assuming half volume/section in each channel
-	V̇_b = abs(ṁ_b)/ρ_b
-	
-	v_b = V̇_b/S                  # speed of the secondary fluid 
-	
-	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
-	v_r_gas = V̇_r_gas/S         # hydraulic diameter 
-
-	Re_b = ρ_b * v_b * dh / μ_b           # Reynolds
-	#very wrong correlation ⚠
-	Pr_b = cp_b * μ_b / λ_b
-	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
-	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
-	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
-	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_b = Nudh_b*λ_b/dh
-	
-	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
-	
-	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
-	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
-	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
-	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
-	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_r_gas = Nudh_r_gas*λ_r_gas/dh
-
-
-	@parameters th, λ_Cu#, h_r_gas# h_b
-	
-	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
-	U_EV = 1/(1/h_b + th/λ_Cu)
-
-	@parameters L_PHX
-	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
-	
-	@variables αL x
-	L_EV = sin(αL)^2 * L_PHX
-	L_SH = cos(αL)^2 * L_PHX
-
-	UA_SH = U_SH * L_SH * Per_PHX
-	P_r = UA_SH / ṁ_r / cp_r_gas
-	α_SH = UA_SH /ṁ_b / cp_b
-	
-	UA_EV = U_EV * L_EV * Per_PHX
-	α_EV = UA_EV / ṁ_b / cp_b
-	
-	# ---
-	
-	T_b_SH = T_evap + (T_b_in - T_evap)*exp(-α_SH*(L_SH-x))
-	T_b_interface = substitute(T_b_SH, x => 0.0)
-	T_b_EV = T_evap + (T_b_interface - T_evap)*exp(-α_EV*(L_EV-x))
-	T_r_SH = T_evap + (P_r*(T_b_in - T_evap)*exp(-α_SH*L_SH))/(P_r + α_SH) * (exp((P_r + α_SH)*x) - 1)/exp(P_r*x)
-	T_r_out = substitute(T_r_SH, x => L_SH)
-	T_b_out = substitute(T_b_EV, x => 0.0)
-	T_r_EV = T_evap
-	h_r_interface = h_dew
-	h_r_EV = h_dew - ṁ_b*cp_b/ṁ_r*(T_b_interface-T_b_EV)
-	h_r_in = substitute(h_r_EV, x=> 0.0) |> simplify;
-
-end;
-
-# ╔═╡ 8947d51a-be91-457a-b418-b0ec61db6a86
-begin
-	    # --- Fluid and Pressure Parameters ---
-	    ref = gas_fluid = refrigerant                           # Refrigerant name
-	    modelref = SingleFluid(refrigerant)
-    # --- Fluid and Pressure Parameters ---
-    ref = gas_fluid = refrigerant                           # Refrigerant name
-    modelref = SingleFluid(refrigerant)
-	
-end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
