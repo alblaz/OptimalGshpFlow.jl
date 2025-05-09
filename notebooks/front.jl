@@ -35,6 +35,21 @@ end
 # ╔═╡ a452b787-c613-4318-8031-2d8b26e41633
 @test test_comp()
 
+# ╔═╡ 0eb1d2be-0e4b-4d3d-b749-eacf94d4b864
+@named C1 = Compressor();
+
+# ╔═╡ 23e4c0a3-7dd1-4512-a9e2-da9014ce10b5
+C1.f
+
+# ╔═╡ feefb14e-9c56-485a-8a21-1c1b0c6a18d3
+@named h1 = h_tube()
+
+# ╔═╡ 24a44707-6731-4de5-8ffd-8443fb6126bf
+h1 |> typeof
+
+# ╔═╡ 0b00a068-7e00-4506-a0ae-f55d327c6aa9
+
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -252,6 +267,11 @@ version = "17.4.0+2"
 # ╟─262dc976-0745-4c28-991a-d28492bd68c2
 # ╠═f920cd82-be25-43cc-87b7-9cd79ec1d8d6
 # ╠═a452b787-c613-4318-8031-2d8b26e41633
+# ╠═0eb1d2be-0e4b-4d3d-b749-eacf94d4b864
+# ╠═23e4c0a3-7dd1-4512-a9e2-da9014ce10b5
+# ╠═feefb14e-9c56-485a-8a21-1c1b0c6a18d3
+# ╠═24a44707-6731-4de5-8ffd-8443fb6126bf
+# ╠═0b00a068-7e00-4506-a0ae-f55d327c6aa9
 # ╠═3424a320-6a07-45b3-8ed2-a7de91970a8c
 # ╠═7eca0330-21de-11f0-230c-472da605108b
 # ╠═58dab3d6-b263-45ea-8c61-8462f9402758

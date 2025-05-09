@@ -108,6 +108,9 @@ md" ## Sub model: Evaporator"
 # ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
 md""" # Solving the system"""
 
+# ╔═╡ 91699b51-0f49-4f90-8d60-ad00bf52d917
+function a end
+
 # ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
 md" # Combined problem"
 
@@ -5766,6 +5769,7 @@ version = "3.6.0+0"
 # ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
+# ╠═91699b51-0f49-4f90-8d60-ad00bf52d917
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
 # ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
