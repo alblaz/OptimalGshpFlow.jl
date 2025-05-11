@@ -16,9 +16,6 @@ using MonteCarloMeasurements
 # ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
 using Distributions
 
-# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
-using LinearAlgebra
-
 # ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
 using SpecialFunctions
 
@@ -114,190 +111,11 @@ function a end
 # ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
 md" # Combined problem"
 
-# ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	eqs_coupled = [
-		T_r_out ~ T_evap+ΔT_SH_,
-		h_r_in ~ h_bub_(p_PC(T_evap)),
-		T_b_out ~ Tbh_in,
-		Tbh_out ~ T_b_in,
-		UA_12 ~ 2.0,
-		]
-
-	unknowns_coupled = [Tbh_in, T_b_in, αL, ṁ_b, UA_12]
-
-	ps_coupled = [
-		b,
-		W,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		ṁ_r,
-		#ṁ_b,
-		
-		T_evap,
-		T_wall,
-		
-		#T_b_in,
-		T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-
-		#αL,
-
-		L_bh,
-
-		#UA_12,
-		UA_1w,
-		UA_2w,
-
-		T_p_1,
-		T_p_2,
-	]
-	@named sys_coupled = NonlinearSystem(eqs_coupled, unknowns_coupled, ps_coupled)
-
-	sys_coupled_ = complete(simplify(sys_coupled))
-	
-	p_coupled_ = [
-		L_bh => 300.0,
-		UA_12 => 2,
-		UA_1w => 2,
-		UA_2w => 2,
-		
-		χ => χ_,
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-
-		#PHX
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		ϕ => 1.189,
-		β => 30.0,
-
-		# IV:
-		ṁ_r => ṁ_r_,
-		ṁ_b => ṁ_r_,
-		αL => pi/2,
-
-		# Parameters
-		L_PHX => L_PHX_,
-		
-		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_wall => T_evap+20,
-
-		
-		T_b_in => 0.4T_evap+0.6T_wall,
-		Tbh_in => 0.6T_evap+0.4T_wall,
-
-		T_p_b => T_b_in,
-		T_p_1 => Tbh_in,
-		T_p_2 => Tbh_in,
-	]
-	prob_coupled_ = NonlinearProblem(sys_coupled_, [], p_coupled_, symbolic_u0 = true);
-	sol_coupled_ = NonlinearSolve.solve(prob_coupled_, reltol = 1e-5, abstol = 1e-5)	
-end
-  ╠═╡ =#
-
-# ╔═╡ bdda6bf9-673d-4127-8de4-4d92576a87b8
-#=╠═╡
-prob_coupled_
-  ╠═╡ =#
-
-# ╔═╡ 51248ccf-dcff-416f-9500-9e0099062c55
-#=╠═╡
-sol_coupled_.retcode
-  ╠═╡ =#
-
-# ╔═╡ 1d1d643d-0c9f-4b89-bf31-61797a59d66f
-#=╠═╡
-sol_coupled_.resid
-  ╠═╡ =#
-
-# ╔═╡ 74af929f-2a7d-4634-9cf6-5532f65861d1
-#=╠═╡
-sol_coupled_[ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ b61e1f63-465f-4086-866f-6d1cd74fb355
-#=╠═╡
-sin(sol_coupled_[αL])^2
-  ╠═╡ =#
-
-# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
-#=╠═╡
-sol_coupled_[Tbh_in]-273.15
-  ╠═╡ =#
-
-# ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
-#=╠═╡
-sol_coupled_[T_b_in]-273.15
-
-  ╠═╡ =#
-
 # ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
 md" # BHE + Evap + Compressor"
 
-# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
-	
-end
-  ╠═╡ =#
-
 # ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
 md" # Internal forced convection"
-
-# ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
-function h_tube(;name)
-	ps = @parameters begin
-		cp
-		μ
-		λ
-		ρ
-		Di
-	end
-	sts = @variables begin
-		h
-		ṁ
-	end
-	csts = @constants begin
-		Re_low = 2300
-		Re_high = 5000
-	end
-	
-	V̇ = ṁ / ρ
-	S = π * Di ^ 2 / 4
-	v = V̇ / S
-
-	Re = ρ * v * Di / μ
-	Pr = cp * μ / λ
-
-	Nu_lam = 3.66
-	f = 0.3164*Re^(-1//4)
-	Nu_tur = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
-	turb_index = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
-
-	Nu = (1-turb_index) * Nu_lam + turb_index * Nu_tur
-
-    eqs = [h ~ Nu * λ / Di]
-	
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
 
 # ╔═╡ 2da011ed-131f-48d7-baac-285b2b7d147e
 # ╠═╡ disabled = true
@@ -311,13 +129,119 @@ end
 @named h2 = h_tube()
   ╠═╡ =#
 
+# ╔═╡ 30ed60b4-8ef8-4a0a-995d-1a8e7cb1249a
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+@named Evap1 = Evaporator();
+	
+	eqs_bc = [
+		Evap1.ṁ_r ~ 1.0
+		Evap1.ṁ_b ~ 1.0
+		
+		Evap1.T_evap ~ -10+273.15
+		Evap1.T_p_r ~ Evap1.T_evap + 5
+		Evap1.T_p_b ~ Evap1.T_p_r + 5
+		
+		Evap1.T_b_in ~ -2+273.15
+		Evap1.αL ~ pi/2*0.5
+	]
+	@named bcevap = ModelingToolkit.compose(NonlinearSystem(eqs_bc, [], []; name = :CJUBUIOname), [Evap1]);
+	sbce = structural_simplify(bcevap)
+	probev = NonlinearProblem(sbce, [])
+	sol_ev = NonlinearSolve.solve(probev, Klement())
+end;
+  ╠═╡ =#
+
+# ╔═╡ e8fa9ff4-cf07-4410-9287-ecfedf2e8c32
+#=╠═╡
+sol_ev.retcode
+  ╠═╡ =#
+
+# ╔═╡ 557bea62-35b1-45d6-b1fc-34eecde31d89
+#=╠═╡
+sol_ev.resid
+  ╠═╡ =#
+
+# ╔═╡ 7d05490f-9935-4b28-bf99-d2e523767b30
+#=╠═╡
+sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in]
+  ╠═╡ =#
+
+# ╔═╡ 8d3c89a4-978c-4eda-a6f5-2aab8e86b48c
+#=╠═╡
+sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]
+  ╠═╡ =#
+
+# ╔═╡ 4f2877d3-f3e2-4926-b56e-bc52115c1dc1
+#=╠═╡
+(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface])
+  ╠═╡ =#
+
+# ╔═╡ a1cb28de-24b3-419a-9f39-8e9aac89adfa
+#=╠═╡
+((sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]))/(sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r] / sol_ev[Evap1.brine.cp] / sol_ev[Evap1.ṁ_b])
+  ╠═╡ =#
+
+# ╔═╡ f4df2ef9-62ed-4f7d-808c-0f209339c166
+#=╠═╡
+sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
+  ╠═╡ =#
+
 # ╔═╡ 54e30cff-1aa0-498b-90d9-bcf3dbe4dd4e
 md" # 1"
 
 
+# ╔═╡ 34bc09e0-e2c9-4c31-8369-784facd0fad3
+#=╠═╡
+(sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ ed25cda0-4975-4909-8c37-1eef16844a4e
+#=╠═╡
+(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]) * sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r]
+  ╠═╡ =#
+
 # ╔═╡ c96e61c1-92dd-46de-9f84-cfd87348764b
 md" # 2"
 
+
+# ╔═╡ fc2368c4-763c-4322-a3fe-6ed5ac018591
+#=╠═╡
+(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_out]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ 6596bb7e-2282-4f84-8969-2c2cf10428ec
+#=╠═╡
+(sol_ev[Evap1.h_r_interface] .- sol_ev[Evap1.h_r_in]) * sol_ev[Evap1.ṁ_r]
+
+  ╠═╡ =#
+
+# ╔═╡ 98320e7b-4e49-44df-b3eb-7d7d4800c5a1
+#=╠═╡
+sol_ev[Evap1.T_r_interface]
+  ╠═╡ =#
+
+# ╔═╡ 927cc01d-e543-463a-ae44-9caf39a2394e
+#=╠═╡
+sol_ev[Evap1.T_evap]
+  ╠═╡ =#
+
+# ╔═╡ 9cdd134d-b858-4102-9c81-29851cd0df56
+#=╠═╡
+sol_ev[Evap1.gphase.cp]
+  ╠═╡ =#
+
+# ╔═╡ 1a310cc4-aa70-46c7-9081-55603deeb921
+#=╠═╡
+sol_ev[Evap1.h1]
+  ╠═╡ =#
+
+# ╔═╡ bd3073a0-43d4-42d6-983b-e3e822c1abfb
+#=╠═╡
+sol_ev[Evap1.h2]
+
+  ╠═╡ =#
 
 # ╔═╡ 516ea25f-a9de-4171-8af7-f7ad5dbe4737
 md" ### Test props"
@@ -345,6 +269,15 @@ end
 
 # ╔═╡ a6ac71e5-7f92-4aef-b7e6-d8cde3ec41a1
 md" --- "
+
+# ╔═╡ ea575c50-e1f6-4604-9f0d-b0b12f3e698f
+# ╠═╡ disabled = true
+#=╠═╡
+@named Upipe = U_fill_R_s(J=3);
+  ╠═╡ =#
+
+# ╔═╡ 59db1579-81dc-4c1d-aeb4-895a99834cd7
+@named newsys = ModelingToolkit.compose(NonlinearSystem([], [], []; name = :name), [h1, Upipe, h2])
 
 # ╔═╡ 06c960c3-ee4f-4f7d-868e-e331d0702c2f
 # ╠═╡ disabled = true
@@ -455,17 +388,6 @@ function U_fill_R_s(;name, J::Int=1)
 	return NonlinearSystem(eqs, sts, ps; name = name);
 end
 
-# ╔═╡ ea575c50-e1f6-4604-9f0d-b0b12f3e698f
-# ╠═╡ disabled = true
-#=╠═╡
-@named Upipe = U_fill_R_s(J=3);
-  ╠═╡ =#
-
-# ╔═╡ 59db1579-81dc-4c1d-aeb4-895a99834cd7
-#=╠═╡
-@named newsys = ModelingToolkit.compose(NonlinearSystem([], [], []; name = :name), [h1, Upipe, h2])
-  ╠═╡ =#
-
 # ╔═╡ 05ab2c2c-96dd-48ad-b748-04ffb3a21d2f
 function UBorehole(;name)
 	ps = @parameters begin
@@ -534,48 +456,6 @@ R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p 
 # ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
 md" # Quick analysis: parametric study"
 
-# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-XX = range(1e-2, 2.0, length = 300)
-	
-	n_p = 1000
-YY = map(x->eval_R1b(
-	115e-3,
-	Particles(n_p, Uniform(0.35, 0.36)),
-	2e-3,
-	Particles(n_p, Uniform(0.5, 0.51)),
-	40e-3,
-	Particles(n_p, Uniform(3.5, 4.5)),
-	Particles(n_p, Uniform(1.8, 2.2)),
-	x,
-	273.15+5,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	273.15+5,
-	5000,
-	2300), XX)
-end
-  ╠═╡ =#
-
-# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
-#=╠═╡
-begin
-	m_Y = [median(y.particles) for y in YY]
-	q_05 = [quantile(y.particles, 0.025) for y in YY]
-	q_95 = [quantile(y.particles, 0.975) for y in YY]
-end
-  ╠═╡ =#
-
-# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
-#=╠═╡
-begin
-fig_study = Makie.lines(XX, m_Y)
-	band!(XX, q_05, q_95)
-	fig_study
-end
-  ╠═╡ =#
-
 # ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
 md" # Temperature profiles"
 
@@ -601,138 +481,104 @@ begin
 	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
 end
 
-# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
-begin
-	#@variables U_12 U_1w U_2w
-	@variables P_1 P_w1 P_2 P_w2
-	
-	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
-                                        λ_2 => sλ2,
-                                        γ_1 => sγ1,
-                                        γ_2 => sγ2)) for s in sol_C];
-end;
-
-# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
-# ╠═╡ disabled = true
+# ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
 #=╠═╡
-begin
-	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-end;
-  ╠═╡ =#
+function h_tube(;name)
+	ps = @parameters begin
+		cp
+		μ
+		λ
+		ρ
+		Di
+	end
+	sts = @variables begin
+		h
+		ṁ
+	end
+	csts = @constants begin
+		Re_low = 2300
+		Re_high = 5000
+	end
+	
+	V̇ = ṁ / ρ
+	S = π * Di ^ 2 / 4
+	v = V̇ / S
 
-# ╔═╡ ab333b77-b3ee-4cd4-b2f9-07bbceb12377
-# ╠═╡ disabled = true
-#=╠═╡
-UA_12_cd_tot |> simplify;
-  ╠═╡ =#
+	Re = ρ * v * Di / μ
+	Pr = cp * μ / λ
 
-# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-XBH = range(1e-2, 300.0, length = 300)
-TT = map(x-> eval_T1(
-	273.15,#T_p_1,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	115e-3,
-	2e-3,#th_1,
-	Particles(n_p, Uniform(0.35, 0.45)),
-	2e-3,#th_2,
-	2300,#Re_low,
-	5000,#Re_high,
-	273.15,#T_p_2,
-	20e-3,#r_p,
-	3.5,#λ_ground,
-	2.0,#λ_grout,
-	1.0,#ṁ_b,
-	x,#x_bh,
-	273.15+5,#T_1_in,
-	273.15+10,#T_wall,
-	300.0,#L_bh
-	0.3,#α
-), XBH)
+	Nu_lam = 3.66
+	f = 0.3164*Re^(-1//4)
+	Nu_tur = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
+	turb_index = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+
+	Nu = (1-turb_index) * Nu_lam + turb_index * Nu_tur
+
+    eqs = [h ~ Nu * λ / Di]
+	
+	return NonlinearSystem(eqs, sts, ps; name = name);
 end
   ╠═╡ =#
 
-# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
-#=╠═╡
-begin
-	m_T = [median(y.particles) for y in TT]
-	q_05_T = [quantile(y.particles, 0.025) for y in TT]
-	q_95_T = [quantile(y.particles, 0.975) for y in TT]
-fig_study_T = Makie.lines(XBH, m_T)
-	band!(XBH, q_05_T, q_95_T)
-	fig_study_T
-end
-  ╠═╡ =#
-
-# ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
+# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
 # ╠═╡ disabled = true
 #=╠═╡
-begin
-	@variables U_12 U_1w U_2w
+eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
 	
-	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
-	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
-                                        λ_2 => simplify(sλ2),
-                                        γ_1 => simplify(sγ1),
-                                        γ_2 => simplify(sγ2))) for s in sol_C]
-	sol_C_full = simplify.(sol_C_full)
-	sC_1 = sol_C_full[1]
-	sC_2 = sol_C_full[2]
-end
   ╠═╡ =#
 
 # ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
 md"# Utilities"
+
+# ╔═╡ 37de41bf-c905-480f-b0d0-fc103001656b
+begin
+	# Brine Bond Variables
+	fluid = "MEA"  # Options: "MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"
+	Tfreeze_ = 0.0  # Fluid freezing temperature in °C
+#	χ_ = 28.5 / 100  # Concentration (mass fraction)
+	ΔT_brine_ = 5.0  # Temperature difference fluid-superheat in °C
+	
+	# Evaporator Bond Variables
+	refrigerant = "R134A"  # Options: "R134A", "R290" => "R290 (propane)"
+	W_ = 0.20  # Width in meters
+	L_PHX_ = 0.30  # Length in meters
+	np_ = 20.0  # Number of plates
+	
+	# Operation Bond Variables
+	ṁ_r_ = 0.1  # Refrigerant mass flow in kg/s
+	T_evap_ = -5.0  # Evaporation temperature in °C
+	ΔT_SH_ = 7.0  # Superheating degree in K
+end
+
+# ╔═╡ fd32a044-3b7b-44bb-b279-deb1ea5c1457
+# ╠═╡ disabled = true
+#=╠═╡
+
+begin
+	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
+	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
+	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
+	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
+	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
+	end
+
+	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
+	end
+	
+	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
+		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
+		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
+	end
+
+	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+end
+  ╠═╡ =#
 
 # ╔═╡ 1cd63e6f-37b2-49ba-8887-2220d1df7c6f
 md" # Properties"
@@ -1161,6 +1007,7 @@ begin
 end
 
 # ╔═╡ 569d53eb-45d2-47d0-93cb-866018abeb4f
+#=╠═╡
 function Prop_REF_gas(;name, refrigerant::String = "R134A")
 	ps = @parameters begin
 	end
@@ -1182,8 +1029,10 @@ function Prop_REF_gas(;name, refrigerant::String = "R134A")
 
 	return NonlinearSystem(eqs, sts, ps; name = name);
 end
+  ╠═╡ =#
 
 # ╔═╡ ad17bd58-b5c6-4560-9be4-ff2eadf594d9
+#=╠═╡
 function Prop_REF_liq(;name, refrigerant::String = "R134A")
 	ps = @parameters begin
 	end
@@ -1204,6 +1053,7 @@ function Prop_REF_liq(;name, refrigerant::String = "R134A")
 
 	return NonlinearSystem(eqs, sts, ps; name = name);
 end
+  ╠═╡ =#
 
 # ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
 begin
@@ -1583,6 +1433,16 @@ end
 sol_.resid
   ╠═╡ =#
 
+# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
+#=╠═╡
+sol_.ps[T_b_in]
+  ╠═╡ =#
+
+# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
+#=╠═╡
+sin(sol_[αL])^2
+  ╠═╡ =#
+
 # ╔═╡ 08c9f46e-e683-4429-a5d6-56682232c1e7
 #=╠═╡
 begin
@@ -1683,43 +1543,8 @@ end
 
   ╠═╡ =#
 
-# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
-#=╠═╡
-sol_.ps[T_b_in]
-  ╠═╡ =#
-
-# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
-#=╠═╡
-sin(sol_[αL])^2
-  ╠═╡ =#
-
 # ╔═╡ e0e3b049-8874-44f4-a661-50e88d164e3a
 T_b_out |> get_variables
-
-# ╔═╡ 92c361eb-bb54-4565-8ac6-d6cbad4141d9
-function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
-	ps = @parameters begin
-		χ = χ0
-	end
-	sts = @variables begin
-		T = 300.0
-		cp = 1.0
-		μ = 1.0
-		λ = 1.0
-		ρ = 1.0
-		β = 1.0
-	end
-
-    eqs = [
-        cp ~ cp_b_(T, χ),
-        λ ~ λ_b_(T, χ),
-        μ ~ μ_b_(T, χ),
-        ρ ~ ρ_b_(T, χ),
-		β ~ β_b_(T, χ)
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
 
 # ╔═╡ e83823bb-e069-4e5d-9d94-b22b09135a94
 #TDL: make the htc into other components
@@ -1885,110 +1710,31 @@ function Evaporator(;name, refrigerant::String = "R134A")
 	return ModelingToolkit.compose(NonlinearSystem(eqs, sts, ps; name = name), [gphase, lphase, brine]);
 end
 
-# ╔═╡ 30ed60b4-8ef8-4a0a-995d-1a8e7cb1249a
-# ╠═╡ disabled = true
+# ╔═╡ 92c361eb-bb54-4565-8ac6-d6cbad4141d9
 #=╠═╡
-begin
-@named Evap1 = Evaporator();
-	
-	eqs_bc = [
-		Evap1.ṁ_r ~ 1.0
-		Evap1.ṁ_b ~ 1.0
-		
-		Evap1.T_evap ~ -10+273.15
-		Evap1.T_p_r ~ Evap1.T_evap + 5
-		Evap1.T_p_b ~ Evap1.T_p_r + 5
-		
-		Evap1.T_b_in ~ -2+273.15
-		Evap1.αL ~ pi/2*0.5
+function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
+	ps = @parameters begin
+		χ = χ0
+	end
+	sts = @variables begin
+		T = 300.0
+		cp = 1.0
+		μ = 1.0
+		λ = 1.0
+		ρ = 1.0
+		β = 1.0
+	end
+
+    eqs = [
+        cp ~ cp_b_(T, χ),
+        λ ~ λ_b_(T, χ),
+        μ ~ μ_b_(T, χ),
+        ρ ~ ρ_b_(T, χ),
+		β ~ β_b_(T, χ)
 	]
-	@named bcevap = ModelingToolkit.compose(NonlinearSystem(eqs_bc, [], []; name = :CJUBUIOname), [Evap1]);
-	sbce = structural_simplify(bcevap)
-	probev = NonlinearProblem(sbce, [])
-	sol_ev = NonlinearSolve.solve(probev, Klement())
-end;
-  ╠═╡ =#
 
-# ╔═╡ e8fa9ff4-cf07-4410-9287-ecfedf2e8c32
-#=╠═╡
-sol_ev.retcode
-  ╠═╡ =#
-
-# ╔═╡ 557bea62-35b1-45d6-b1fc-34eecde31d89
-#=╠═╡
-sol_ev.resid
-  ╠═╡ =#
-
-# ╔═╡ 7d05490f-9935-4b28-bf99-d2e523767b30
-#=╠═╡
-sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in]
-  ╠═╡ =#
-
-# ╔═╡ 8d3c89a4-978c-4eda-a6f5-2aab8e86b48c
-#=╠═╡
-sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]
-  ╠═╡ =#
-
-# ╔═╡ 4f2877d3-f3e2-4926-b56e-bc52115c1dc1
-#=╠═╡
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface])
-  ╠═╡ =#
-
-# ╔═╡ a1cb28de-24b3-419a-9f39-8e9aac89adfa
-#=╠═╡
-((sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]))/(sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r] / sol_ev[Evap1.brine.cp] / sol_ev[Evap1.ṁ_b])
-  ╠═╡ =#
-
-# ╔═╡ f4df2ef9-62ed-4f7d-808c-0f209339c166
-#=╠═╡
-sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
-  ╠═╡ =#
-
-# ╔═╡ 34bc09e0-e2c9-4c31-8369-784facd0fad3
-#=╠═╡
-(sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ ed25cda0-4975-4909-8c37-1eef16844a4e
-#=╠═╡
-(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]) * sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r]
-  ╠═╡ =#
-
-# ╔═╡ fc2368c4-763c-4322-a3fe-6ed5ac018591
-#=╠═╡
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_out]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ 6596bb7e-2282-4f84-8969-2c2cf10428ec
-#=╠═╡
-(sol_ev[Evap1.h_r_interface] .- sol_ev[Evap1.h_r_in]) * sol_ev[Evap1.ṁ_r]
-
-  ╠═╡ =#
-
-# ╔═╡ 98320e7b-4e49-44df-b3eb-7d7d4800c5a1
-#=╠═╡
-sol_ev[Evap1.T_r_interface]
-  ╠═╡ =#
-
-# ╔═╡ 927cc01d-e543-463a-ae44-9caf39a2394e
-#=╠═╡
-sol_ev[Evap1.T_evap]
-  ╠═╡ =#
-
-# ╔═╡ 9cdd134d-b858-4102-9c81-29851cd0df56
-#=╠═╡
-sol_ev[Evap1.gphase.cp]
-  ╠═╡ =#
-
-# ╔═╡ 1a310cc4-aa70-46c7-9081-55603deeb921
-#=╠═╡
-sol_ev[Evap1.h1]
-  ╠═╡ =#
-
-# ╔═╡ bd3073a0-43d4-42d6-983b-e3e822c1abfb
-#=╠═╡
-sol_ev[Evap1.h2]
-
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
   ╠═╡ =#
 
 # ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
@@ -2101,44 +1847,104 @@ eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_
 	
 end
 
-# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
+# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
+# ╠═╡ disabled = true
+#=╠═╡
 begin
-	@variables UA_12 UA_1w UA_2w
-	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
-	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-end;
+XX = range(1e-2, 2.0, length = 300)
+	
+	n_p = 1000
+YY = map(x->eval_R1b(
+	115e-3,
+	Particles(n_p, Uniform(0.35, 0.36)),
+	2e-3,
+	Particles(n_p, Uniform(0.5, 0.51)),
+	40e-3,
+	Particles(n_p, Uniform(3.5, 4.5)),
+	Particles(n_p, Uniform(1.8, 2.2)),
+	x,
+	273.15+5,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	273.15+5,
+	5000,
+	2300), XX)
+end
+  ╠═╡ =#
+
+# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
+#=╠═╡
+begin
+	m_Y = [median(y.particles) for y in YY]
+	q_05 = [quantile(y.particles, 0.025) for y in YY]
+	q_95 = [quantile(y.particles, 0.975) for y in YY]
+end
+  ╠═╡ =#
+
+# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
+#=╠═╡
+begin
+fig_study = Makie.lines(XX, m_Y)
+	band!(XX, q_05, q_95)
+	fig_study
+end
+  ╠═╡ =#
+
+# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+XBH = range(1e-2, 300.0, length = 300)
+TT = map(x-> eval_T1(
+	273.15,#T_p_1,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	115e-3,
+	2e-3,#th_1,
+	Particles(n_p, Uniform(0.35, 0.45)),
+	2e-3,#th_2,
+	2300,#Re_low,
+	5000,#Re_high,
+	273.15,#T_p_2,
+	20e-3,#r_p,
+	3.5,#λ_ground,
+	2.0,#λ_grout,
+	1.0,#ṁ_b,
+	x,#x_bh,
+	273.15+5,#T_1_in,
+	273.15+10,#T_wall,
+	300.0,#L_bh
+	0.3,#α
+), XBH)
+end
+  ╠═╡ =#
+
+# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
+#=╠═╡
+begin
+	m_T = [median(y.particles) for y in TT]
+	q_05_T = [quantile(y.particles, 0.025) for y in TT]
+	q_95_T = [quantile(y.particles, 0.975) for y in TT]
+fig_study_T = Makie.lines(XBH, m_T)
+	band!(XBH, q_05_T, q_95_T)
+	fig_study_T
+end
+  ╠═╡ =#
+
+# ╔═╡ ab333b77-b3ee-4cd4-b2f9-07bbceb12377
+# ╠═╡ disabled = true
+#=╠═╡
+UA_12_cd_tot |> simplify;
+  ╠═╡ =#
 
 # ╔═╡ 8e6a8e3b-c991-439d-bc9b-ba436d0be550
+#=╠═╡
 get_variables(sC_2)
+  ╠═╡ =#
 
 # ╔═╡ e39867fd-9323-4fc8-8e27-da4cc5ed327e
 get_variables(sλ_1)
 
 # ╔═╡ d2ff5f9e-3260-4e10-bca3-af2742b13877
+#=╠═╡
 begin
 	@variables x_bh
 	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
@@ -2151,6 +1957,138 @@ begin
 	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
 	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
 end;
+  ╠═╡ =#
+
+# ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	eqs_coupled = [
+		T_r_out ~ T_evap+ΔT_SH_,
+		h_r_in ~ h_bub_(p_PC(T_evap)),
+		T_b_out ~ Tbh_in,
+		Tbh_out ~ T_b_in,
+		UA_12 ~ 2.0,
+		]
+
+	unknowns_coupled = [Tbh_in, T_b_in, αL, ṁ_b, UA_12]
+
+	ps_coupled = [
+		b,
+		W,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		ṁ_r,
+		#ṁ_b,
+		
+		T_evap,
+		T_wall,
+		
+		#T_b_in,
+		T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+
+		#αL,
+
+		L_bh,
+
+		#UA_12,
+		UA_1w,
+		UA_2w,
+
+		T_p_1,
+		T_p_2,
+	]
+	@named sys_coupled = NonlinearSystem(eqs_coupled, unknowns_coupled, ps_coupled)
+
+	sys_coupled_ = complete(simplify(sys_coupled))
+	
+	p_coupled_ = [
+		L_bh => 300.0,
+		UA_12 => 2,
+		UA_1w => 2,
+		UA_2w => 2,
+		
+		χ => χ_,
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+
+		#PHX
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		ϕ => 1.189,
+		β => 30.0,
+
+		# IV:
+		ṁ_r => ṁ_r_,
+		ṁ_b => ṁ_r_,
+		αL => pi/2,
+
+		# Parameters
+		L_PHX => L_PHX_,
+		
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
+		T_wall => T_evap+20,
+
+		
+		T_b_in => 0.4T_evap+0.6T_wall,
+		Tbh_in => 0.6T_evap+0.4T_wall,
+
+		T_p_b => T_b_in,
+		T_p_1 => Tbh_in,
+		T_p_2 => Tbh_in,
+	]
+	prob_coupled_ = NonlinearProblem(sys_coupled_, [], p_coupled_, symbolic_u0 = true);
+	sol_coupled_ = NonlinearSolve.solve(prob_coupled_, reltol = 1e-5, abstol = 1e-5)	
+end
+  ╠═╡ =#
+
+# ╔═╡ bdda6bf9-673d-4127-8de4-4d92576a87b8
+#=╠═╡
+prob_coupled_
+  ╠═╡ =#
+
+# ╔═╡ 51248ccf-dcff-416f-9500-9e0099062c55
+#=╠═╡
+sol_coupled_.retcode
+  ╠═╡ =#
+
+# ╔═╡ 1d1d643d-0c9f-4b89-bf31-61797a59d66f
+#=╠═╡
+sol_coupled_.resid
+  ╠═╡ =#
+
+# ╔═╡ 74af929f-2a7d-4634-9cf6-5532f65861d1
+#=╠═╡
+sol_coupled_[ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ b61e1f63-465f-4086-866f-6d1cd74fb355
+#=╠═╡
+sin(sol_coupled_[αL])^2
+  ╠═╡ =#
+
+# ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
+#=╠═╡
+sol_coupled_[T_b_in]-273.15
+
+  ╠═╡ =#
+
+# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
+#=╠═╡
+sol_coupled_[Tbh_in]-273.15
+  ╠═╡ =#
 
 # ╔═╡ c900c406-5e25-467b-8771-feedfe933685
 # ╠═╡ disabled = true
@@ -2336,19 +2274,39 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
+  ╠═╡ =#
+
 # ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
+#=╠═╡
 Tbh_out
+  ╠═╡ =#
 
 # ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
+#=╠═╡
 sT_2 |> get_variables
+  ╠═╡ =#
 
 # ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
+#=╠═╡
 fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+  ╠═╡ =#
 
 # ╔═╡ 837d8d99-458c-4077-8531-f25346684057
+#=╠═╡
 fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+  ╠═╡ =#
 
 # ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
+#=╠═╡
 begin
 	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
 	
@@ -2359,12 +2317,17 @@ begin
 	sT_1_cd = substitute(sT_1_cd, d_simpl);
 	
 end;
+  ╠═╡ =#
 
 # ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
+#=╠═╡
 get_variables(sT_1_cd)
+  ╠═╡ =#
 
 # ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
+#=╠═╡
 get_variables(sT_1_cd)
+  ╠═╡ =#
 
 # ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
 # ╠═╡ disabled = true
@@ -2378,11 +2341,17 @@ simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3
 T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
   ╠═╡ =#
 
-# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
+# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
 # ╠═╡ disabled = true
 #=╠═╡
-eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
-	
+begin
+	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+end;
   ╠═╡ =#
 
 # ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
@@ -2563,59 +2532,120 @@ md"---"
 # ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
 md" # Imports"
 
+# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
+#=╠═╡
+begin
+	#@variables U_12 U_1w U_2w
+	@variables P_1 P_w1 P_2 P_w2
+	
+	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
+
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
+                                        λ_2 => sλ2,
+                                        γ_1 => sγ1,
+                                        γ_2 => sγ2)) for s in sol_C];
+end;
+  ╠═╡ =#
+
 # ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
 # ╠═╡ disabled = true
 #=╠═╡
 using LinearAlgebra
   ╠═╡ =#
 
-# ╔═╡ 37de41bf-c905-480f-b0d0-fc103001656b
+# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
+#=╠═╡
 begin
-	# Brine Bond Variables
-	fluid = "MEA"  # Options: "MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"
-	Tfreeze_ = 0.0  # Fluid freezing temperature in °C
-#	χ_ = 28.5 / 100  # Concentration (mass fraction)
-	ΔT_brine_ = 5.0  # Temperature difference fluid-superheat in °C
-	
-	# Evaporator Bond Variables
-	refrigerant = "R134A"  # Options: "R134A", "R290" => "R290 (propane)"
-	W_ = 0.20  # Width in meters
-	L_PHX_ = 0.30  # Length in meters
-	np_ = 20.0  # Number of plates
-	
-	# Operation Bond Variables
-	ṁ_r_ = 0.1  # Refrigerant mass flow in kg/s
-	T_evap_ = -5.0  # Evaporation temperature in °C
-	ΔT_SH_ = 7.0  # Superheating degree in K
-end
+	@variables UA_12 UA_1w UA_2w
+	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
+	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+end;
+  ╠═╡ =#
 
-# ╔═╡ fd32a044-3b7b-44bb-b279-deb1ea5c1457
+# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
+#=╠═╡
+using LinearAlgebra
+  ╠═╡ =#
+
+# ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
 # ╠═╡ disabled = true
 #=╠═╡
-
 begin
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-	end
+	@variables U_12 U_1w U_2w
 	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
-		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
-		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-	end
+	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
+	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
+	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
+	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
 
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
+                                        λ_2 => simplify(sλ2),
+                                        γ_1 => simplify(sγ1),
+                                        γ_2 => simplify(sγ2))) for s in sol_C]
+	sol_C_full = simplify.(sol_C_full)
+	sC_1 = sol_C_full[1]
+	sC_2 = sol_C_full[2]
 end
   ╠═╡ =#
 

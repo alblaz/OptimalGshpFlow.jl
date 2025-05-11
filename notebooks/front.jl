@@ -17,7 +17,7 @@ using InteractiveUtils
 using PlutoTest
 
 # ╔═╡ d40f0e1f-f60b-40e5-b79d-94f8d0afde46
-@fromparent import *#OptimalGshpFlow: test_func, χ_
+@fromparent import *
 
 # ╔═╡ 262dc976-0745-4c28-991a-d28492bd68c2
 md" # Compressor"
