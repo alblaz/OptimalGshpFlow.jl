@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.4
 
 using Markdown
 using InteractiveUtils
@@ -37,6 +37,17 @@ end
 
 # ╔═╡ 0335e609-cfa7-4961-b85b-7214aeecf92e
 using Makie
+
+# ╔═╡ 5fb03f74-ad6a-4d0b-9c6e-96c9d96132ec
+export FluidInterpolants, load_fluid, regenerate_fluid_data
+
+# ╔═╡ 2dc9195f-aebc-4407-9802-35cc85cfef85
+export ρ_b_, λ_b_, cp_b_, μ_b_, β_b_
+
+# ╔═╡ e20e2ca5-9ad4-4eda-8242-229496d0c244
+export list_available_fluids, query_fluid_property
+
+# Global variable to store loaded fluid interpolants
 
 # ╔═╡ 7af52b81-cdaa-4947-b684-3cd0b658b0a4
 const LOADED_FLUIDS = Dict{String, Any}()
@@ -110,14 +121,93 @@ ModelingToolkit.@register_symbolic cp_b_(T, χ)
 # ╔═╡ e9540434-f7c5-486a-af94-0eda47ddae0d
 ModelingToolkit.@register_symbolic μ_b_(T, χ)
 
-# ╔═╡ 69f773f7-3602-4215-9caa-019406b19268
-ModelingToolkit.@register_symbolic β_b_(T)
-
 # ╔═╡ 1d1cdfa3-a995-4286-bcf7-8f1f741810df
 ModelingToolkit.@register_symbolic β_b_(T, χ)
 
-# ╔═╡ 2dc9195f-aebc-4407-9802-35cc85cfef85
-export ρ_b_, λ_b_, cp_b_, μ_b_, β_b_
+# ╔═╡ 69f773f7-3602-4215-9caa-019406b19268
+ModelingToolkit.@register_symbolic β_b_(T)
+
+# ╔═╡ 739d9847-5a6a-4f2e-8143-167269d44be4
+"""
+    generate_all_fluid_data(output_dir=nothing; n_chi=100, n_temp=50)
+
+Generate and save data for all supported fluids.
+This is intended for package development to create or update all fluid parquet files at once.
+
+# Arguments
+- `output_dir`: Directory to save the fluid data (default: package data directory)
+- `n_chi`: Number of concentration points to sample (default: 100)
+- `n_temp`: Number of temperature points to sample (default: 50)
+
+# Returns
+- Dictionary mapping fluid names to their data directories
+"""
+function generate_all_fluid_data(output_dir=nothing; n_chi=100, n_temp=50)
+    if isnothing(output_dir)
+        output_dir = joinpath(@__DIR__, "..", "data", "fluids")
+    end
+    
+    # List of currently supported fluids
+    supported_fluids = ["water", "mea"]
+    
+    # Ensure directory exists
+    if !isdir(output_dir)
+        mkpath(output_dir)
+        @info "Created fluid data directory: $output_dir"
+    end
+    
+    results = Dict{String, String}()
+    
+    # Generate data for each fluid
+    for fluid_name in supported_fluids
+        @info "Generating data for $fluid_name..."
+        try
+            # Generate fluid data
+            fluid_data = generate_fluid_data(fluid_name, n_chi=n_chi, n_temp=n_temp)
+            
+            # Save to disk
+            fluid_dir = save_fluid_data(fluid_data, output_dir)
+            
+            # Build interpolants to verify the data
+            interpolants = build_interpolants(fluid_data)
+            
+            # Store the fluid directory in results
+            results[fluid_name] = fluid_dir
+            
+            @info "Successfully generated data for $fluid_name at $fluid_dir"
+        catch e
+            @error "Failed to generate data for $fluid_name: $e"
+        end
+    end
+    
+    @info "Completed generating fluid data for $(length(results)) out of $(length(supported_fluids)) fluids"
+    return results
+end
+
+
+# ╔═╡ 44ab047d-d1c0-4165-9525-b2c80572d796
+test = load_fluid("mea", data_dir=joinpath(@__DIR__(), "data", "fluids"))
+
+# ╔═╡ b9689240-5e8b-4e9e-8b9c-fef6c20ddfe8
+test.itp_Tfreeze
+
+# ╔═╡ bc04af84-5e7c-46c1-ab08-0f234d17e440
+lines(test.itp_Tfreeze, 0, 1.0)
+
+# ╔═╡ 20433cc4-97b7-44d0-958a-aff03fdd12ba
+pwd()
+
+# ╔═╡ 1022217d-2e51-4a88-ae93-f7bf47f0959d
+ USE_DUCKDB[]
+
+# ╔═╡ 72aef11f-3a07-43ae-821b-87f48dec2874
+init_database()
+
+# ╔═╡ 4d01cde3-4840-4e9c-ac3a-8c36c8a14f7d
+data_dir
+
+# ╔═╡ 432e6cac-14f9-4d09-9864-6500b306d5d0
+generate_fluid_data("mea")
 
 # ╔═╡ 426d5e79-f04c-4518-8faf-9832bb896d4f
 """
@@ -489,23 +579,6 @@ function load_fluid_data(fluid_name::String, data_dir::String)
     end
 end
 
-# ╔═╡ 1b699afb-5dec-4941-b8dd-c7a7e08817df
-"""
-    build_approximate_interp(func)
-
-Create an approximation wrapper that behaves like an interpolation object
-but uses the provided function directly.
-"""
-function build_approximate_interp(func)
-    # For 1D functions (T_freeze, T_max)
-    if applicable(func, 0.0)
-        return x -> func(x)
-    else
-        # For 2D functions (properties)
-        return (x, y) -> func(y, x)  # Note: we swap arguments since our property funcs are (T, χ)
-    end
-end
-
 # ╔═╡ dcea5e9a-0968-48b6-9be1-e5f6f8fe5c2a
 """
     build_interpolants(data::Dict)
@@ -601,101 +674,21 @@ function build_interpolants(data::Dict)
     )
 end
 
-# ╔═╡ fe3a9822-bcd9-4291-a2c0-3dc1a46ba2cd
+# ╔═╡ 1b699afb-5dec-4941-b8dd-c7a7e08817df
 """
-    setup_property_functions()
+    build_approximate_interp(func)
 
-Define the implementations of the fluid property functions using the loaded interpolants.
+Create an approximation wrapper that behaves like an interpolation object
+but uses the provided function directly.
 """
-function setup_property_functions()
-    # Define the fluid property functions to use the loaded interpolants
-    # These implementations preserve compatibility with Symbolics
-
-    # Define ρ_b_
-    @eval function ρ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_rho(χ, T_tilde_val)
+function build_approximate_interp(func)
+    # For 1D functions (T_freeze, T_max)
+    if applicable(func, 0.0)
+        return x -> func(x)
+    else
+        # For 2D functions (properties)
+        return (x, y) -> func(y, x)  # Note: we swap arguments since our property funcs are (T, χ)
     end
-
-    # Define λ_b_
-    @eval function λ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_lambda(χ, T_tilde_val)
-    end
-
-    # Define cp_b_
-    @eval function cp_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_cp(χ, T_tilde_val)
-    end
-
-    # Define μ_b_
-    @eval function μ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_mu(χ, T_tilde_val)
-    end
-
-    # Define β_b_
-    @eval function β_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        # Get the temperature limits for concentration χ
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        
-        # Map the physical temperature T to the nondimensional coordinate
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        
-        # Evaluate the density at (T,χ)
-        ρ_val = interp.itp_2D_rho(χ, T_tilde_val)
-        
-        # Compute the gradient of the density interpolation
-        grad = Interpolations.gradient(interp.itp_2D_rho, χ, T_tilde_val)
-        
-        # Extract the derivative with respect to the nondimensional temperature T̃
-        dρ_dTtilde = grad[2]
-        
-        # Convert derivative to physical temperature using the chain rule
-        dρ_dT = dρ_dTtilde / (T_M - T_f)
-        
-        # Return the thermal expansion coefficient
-        # Note the negative sign to ensure β is positive
-        return -dρ_dT / ρ_val
-    end
-
-    # Define single-argument version of β_b_
-    @eval β_b_(T::Number; fluid="mea") = β_b_(T, 0.0, fluid=fluid)
 end
 
 # ╔═╡ c43bc4b9-eaba-4204-a0b4-5e000b66e44e
@@ -823,8 +816,102 @@ function regenerate_fluid_data(name::String; n_chi=100, n_temp=50, output_dir=no
     return interpolants
 end
 
-# ╔═╡ 5fb03f74-ad6a-4d0b-9c6e-96c9d96132ec
-export FluidInterpolants, load_fluid, regenerate_fluid_data
+# ╔═╡ fe3a9822-bcd9-4291-a2c0-3dc1a46ba2cd
+"""
+    setup_property_functions()
+
+Define the implementations of the fluid property functions using the loaded interpolants.
+"""
+function setup_property_functions()
+    # Define the fluid property functions to use the loaded interpolants
+    # These implementations preserve compatibility with Symbolics
+
+    # Define ρ_b_
+    @eval function ρ_b_(T::Number, χ::Number; fluid="mea")
+        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
+        if isnothing(interp)
+            interp = load_fluid(fluid)
+        end
+        
+        T_f = interp.itp_Tfreeze(χ)
+        T_M = interp.itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return interp.itp_2D_rho(χ, T_tilde_val)
+    end
+
+    # Define λ_b_
+    @eval function λ_b_(T::Number, χ::Number; fluid="mea")
+        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
+        if isnothing(interp)
+            interp = load_fluid(fluid)
+        end
+        
+        T_f = interp.itp_Tfreeze(χ)
+        T_M = interp.itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return interp.itp_2D_lambda(χ, T_tilde_val)
+    end
+
+    # Define cp_b_
+    @eval function cp_b_(T::Number, χ::Number; fluid="mea")
+        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
+        if isnothing(interp)
+            interp = load_fluid(fluid)
+        end
+        
+        T_f = interp.itp_Tfreeze(χ)
+        T_M = interp.itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return interp.itp_2D_cp(χ, T_tilde_val)
+    end
+
+    # Define μ_b_
+    @eval function μ_b_(T::Number, χ::Number; fluid="mea")
+        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
+        if isnothing(interp)
+            interp = load_fluid(fluid)
+        end
+        
+        T_f = interp.itp_Tfreeze(χ)
+        T_M = interp.itp_Tmax(χ)
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        return interp.itp_2D_mu(χ, T_tilde_val)
+    end
+
+    # Define β_b_
+    @eval function β_b_(T::Number, χ::Number; fluid="mea")
+        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
+        if isnothing(interp)
+            interp = load_fluid(fluid)
+        end
+        
+        # Get the temperature limits for concentration χ
+        T_f = interp.itp_Tfreeze(χ)
+        T_M = interp.itp_Tmax(χ)
+        
+        # Map the physical temperature T to the nondimensional coordinate
+        T_tilde_val = (T - T_f) / (T_M - T_f)
+        
+        # Evaluate the density at (T,χ)
+        ρ_val = interp.itp_2D_rho(χ, T_tilde_val)
+        
+        # Compute the gradient of the density interpolation
+        grad = Interpolations.gradient(interp.itp_2D_rho, χ, T_tilde_val)
+        
+        # Extract the derivative with respect to the nondimensional temperature T̃
+        dρ_dTtilde = grad[2]
+        
+        # Convert derivative to physical temperature using the chain rule
+        dρ_dT = dρ_dTtilde / (T_M - T_f)
+        
+        # Return the thermal expansion coefficient
+        # Note the negative sign to ensure β is positive
+        return -dρ_dT / ρ_val
+    end
+
+    # Define single-argument version of β_b_
+    @eval β_b_(T::Number; fluid="mea") = β_b_(T, 0.0, fluid=fluid)
+end
 
 # ╔═╡ a0bd5972-be0e-4a3d-a2f9-6db2d24a1c4d
 """
@@ -917,11 +1004,6 @@ function query_fluid_property(fluid_name::String, property_name::String; where_c
     end
 end
 
-# ╔═╡ e20e2ca5-9ad4-4eda-8242-229496d0c244
-export list_available_fluids, query_fluid_property
-
-# Global variable to store loaded fluid interpolants
-
 # ╔═╡ b4b76a5a-1d65-4cd9-ac86-6dc4995bd02e
 """
     close_database()
@@ -982,30 +1064,6 @@ begin
     end
 close_database()
 end
-
-# ╔═╡ 44ab047d-d1c0-4165-9525-b2c80572d796
-test = load_fluid("mea", data_dir=joinpath(@__DIR__(), "data", "fluids"))
-
-# ╔═╡ b9689240-5e8b-4e9e-8b9c-fef6c20ddfe8
-test.itp_Tfreeze
-
-# ╔═╡ bc04af84-5e7c-46c1-ab08-0f234d17e440
-lines(test.itp_Tfreeze, 0, 1.0)
-
-# ╔═╡ 20433cc4-97b7-44d0-958a-aff03fdd12ba
-pwd()
-
-# ╔═╡ 1022217d-2e51-4a88-ae93-f7bf47f0959d
- USE_DUCKDB[]
-
-# ╔═╡ 72aef11f-3a07-43ae-821b-87f48dec2874
-init_database()
-
-# ╔═╡ 4d01cde3-4840-4e9c-ac3a-8c36c8a14f7d
-data_dir
-
-# ╔═╡ 432e6cac-14f9-4d09-9864-6500b306d5d0
-generate_fluid_data("mea")
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3789,6 +3847,16 @@ version = "3.6.0+0"
 # ╠═e9540434-f7c5-486a-af94-0eda47ddae0d
 # ╠═1d1cdfa3-a995-4286-bcf7-8f1f741810df
 # ╠═69f773f7-3602-4215-9caa-019406b19268
+# ╠═739d9847-5a6a-4f2e-8143-167269d44be4
+# ╠═44ab047d-d1c0-4165-9525-b2c80572d796
+# ╠═b9689240-5e8b-4e9e-8b9c-fef6c20ddfe8
+# ╠═0335e609-cfa7-4961-b85b-7214aeecf92e
+# ╠═bc04af84-5e7c-46c1-ab08-0f234d17e440
+# ╠═20433cc4-97b7-44d0-958a-aff03fdd12ba
+# ╠═1022217d-2e51-4a88-ae93-f7bf47f0959d
+# ╠═72aef11f-3a07-43ae-821b-87f48dec2874
+# ╠═4d01cde3-4840-4e9c-ac3a-8c36c8a14f7d
+# ╠═432e6cac-14f9-4d09-9864-6500b306d5d0
 # ╠═426d5e79-f04c-4518-8faf-9832bb896d4f
 # ╠═7571b2d2-489b-4c5e-b3c8-6f352fcc3830
 # ╠═d16ef005-fa61-4456-862f-0ec0cb5287a0
@@ -3804,14 +3872,5 @@ version = "3.6.0+0"
 # ╠═a0bd5972-be0e-4a3d-a2f9-6db2d24a1c4d
 # ╠═b4b76a5a-1d65-4cd9-ac86-6dc4995bd02e
 # ╠═2070c1dc-ac03-493a-a7aa-8eb7ed8538e3
-# ╠═44ab047d-d1c0-4165-9525-b2c80572d796
-# ╠═b9689240-5e8b-4e9e-8b9c-fef6c20ddfe8
-# ╠═0335e609-cfa7-4961-b85b-7214aeecf92e
-# ╠═bc04af84-5e7c-46c1-ab08-0f234d17e440
-# ╠═20433cc4-97b7-44d0-958a-aff03fdd12ba
-# ╠═1022217d-2e51-4a88-ae93-f7bf47f0959d
-# ╠═72aef11f-3a07-43ae-821b-87f48dec2874
-# ╠═4d01cde3-4840-4e9c-ac3a-8c36c8a14f7d
-# ╠═432e6cac-14f9-4d09-9864-6500b306d5d0
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
