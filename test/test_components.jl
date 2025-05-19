@@ -1,8 +1,11 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
+
+# ╔═╡ 669e0d97-47ac-4508-bd1e-ec518cd32b51
+using PlutoTest
 
 # ╔═╡ ad362982-019b-41f9-9f7e-4c20683f482f
 using ModelingToolkit
@@ -16,21 +19,50 @@ using PlutoDevMacros
 # ╔═╡ 58dab3d6-b263-45ea-8c61-8462f9402758
 using InteractiveUtils
 
-# ╔═╡ 18d06185-5416-487f-aac9-a19eceac47f7
-using PlutoTest
+# ╔═╡ 56f02466-8701-4e88-9f74-7a6e8c56b5b4
+@fromparent begin
+	import ^.Utils: *
+end
 
-# ╔═╡ d40f0e1f-f60b-40e5-b79d-94f8d0afde46
-@fromparent import *
+# ╔═╡ 0fb718a0-6069-4b84-9649-9e80e70f6d67
+# ╠═╡ disabled = true
+#=╠═╡
+list_available_fluids()
+  ╠═╡ =#
+
+# ╔═╡ cb77089b-2359-40c0-9f1c-904e98647b82
+# ╠═╡ disabled = true
+#=╠═╡
+ρ_b_(0,0)
+  ╠═╡ =#
 
 # ╔═╡ 36169c1a-3235-48bf-a5e8-f87638b7d091
-@named magna3_approx = PumpMTK.BasicPump(H_shutoff=12, Q_max=13/3600,
+# ╠═╡ disabled = true
+#=╠═╡
+@named magna3_approx = Hydraulics.BasicPump(H_shutoff=12, Q_max=13/3600,
     N_max = 50,
     P_elec_max = 185,
     H_max = 12
 )
+  ╠═╡ =#
+
+# ╔═╡ c68d5dd2-7943-4015-b4f6-86ce43006129
+# ╠═╡ disabled = true
+#=╠═╡
+Properties.DynamicIncompressibleProps()
+  ╠═╡ =#
 
 # ╔═╡ 3db26258-25df-4f07-b9c9-fededaeabc83
-@named props_mea = IncompressibleMTK.DynamicIncompressibleProps()
+# ╠═╡ disabled = true
+#=╠═╡
+@test @named props_mea = Properties.DynamicIncompressibleProps()
+  ╠═╡ =#
+
+# ╔═╡ 18d06185-5416-487f-aac9-a19eceac47f7
+# ╠═╡ disabled = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1806,8 +1838,12 @@ version = "17.4.0+2"
 """
 
 # ╔═╡ Cell order:
-# ╠═d40f0e1f-f60b-40e5-b79d-94f8d0afde46
+# ╠═56f02466-8701-4e88-9f74-7a6e8c56b5b4
+# ╠═669e0d97-47ac-4508-bd1e-ec518cd32b51
+# ╠═0fb718a0-6069-4b84-9649-9e80e70f6d67
+# ╠═cb77089b-2359-40c0-9f1c-904e98647b82
 # ╠═36169c1a-3235-48bf-a5e8-f87638b7d091
+# ╠═c68d5dd2-7943-4015-b4f6-86ce43006129
 # ╠═3db26258-25df-4f07-b9c9-fededaeabc83
 # ╠═ad362982-019b-41f9-9f7e-4c20683f482f
 # ╠═3424a320-6a07-45b3-8ed2-a7de91970a8c

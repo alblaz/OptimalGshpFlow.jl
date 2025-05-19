@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -28,96 +28,22 @@ using FileIO
 using Makie
   ╠═╡ =#
 
-# ╔═╡ ee9f209e-8f89-487d-9755-67d06b42308a
-begin
-const USE_DUCKDB = Ref(false)
-	try
-    using DuckDB
-    global USE_DUCKDB = Ref(true)
-catch
-    @warn "DuckDB not available. Long-format queries will use DataFrames filtering instead."
+# ╔═╡ 63a85758-bddf-45b5-b3e0-be33e56f38ec
+using DuckDB
+
+# ╔═╡ 3a4b4d1d-abbf-4858-891a-1e24a9b4ea5b
+using PlutoDevMacros
+
+# ╔═╡ 6480643c-069d-48ed-9750-ec00d81a3e54
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
+
+# ╔═╡ 0298656c-4941-432c-aa4a-bbc652b27d50
+@fromparent begin
+	import ^.Utils: *
 end
-end
-
-# ╔═╡ 919e2b5b-2dde-4695-af90-3061d585a27e
-
-
-# ╔═╡ fd041e24-f6b0-4018-bc9d-83b401ff1a14
-assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
-
-# ╔═╡ 7af52b81-cdaa-4947-b684-3cd0b658b0a4
-const LOADED_FLUIDS = Dict{String, Any}()
-
-# ╔═╡ 7fdb2dc7-af0b-4035-bd9d-15af34f27fd1
-const DB_CONN = Ref{Any}(nothing)
-
-# ╔═╡ 8c986457-9d64-4be5-b5b0-d39b9702e05c
-"""
-    ρ_b_(T, χ)
-
-Calculate the density of the fluid at temperature T and concentration χ.
-"""
-function ρ_b_ end
-
-# ╔═╡ 3a793d39-1f74-43f6-950a-b46dcb8a3de8
-"""
-    λ_b_(T, χ)
-
-Calculate the thermal conductivity of the fluid at temperature T and concentration χ.
-"""
-function λ_b_ end
-
-# ╔═╡ 806ebe0f-7be4-4f35-8827-eb111d3a8891
-"""
-    cp_b_(T, χ)
-
-Calculate the specific heat of the fluid at temperature T and concentration χ.
-"""
-function cp_b_ end
-
-# ╔═╡ d370d15e-07a4-49a0-a6b2-b18bb760d22f
-"""
-    μ_b_(T, χ)
-
-Calculate the viscosity of the fluid at temperature T and concentration χ.
-"""
-function μ_b_ end
-
-# ╔═╡ 64dcc6ea-d858-4c29-ad36-534afdf3c8d8
-"""
-    β_b_(T, χ)
-
-Calculate the thermal expansion coefficient of the fluid at temperature T and concentration χ.
-"""
-function β_b_ end
-
-# ╔═╡ 1a4a329b-9002-471e-9013-653d14044bf1
-"""
-    β_b_(T)
-
-Calculate the thermal expansion coefficient with default concentration (0.0).
-"""
-β_b_(T) = β_b_(T, 0.0)
-
-# Register the symbolic functions
-
-# ╔═╡ b49b1c08-a158-4721-bb2e-d2d2fc90201d
-ModelingToolkit.@register_symbolic ρ_b_(T, χ)
-
-# ╔═╡ 2009ccd1-5cec-4a3e-8865-876e0a4e50f8
-ModelingToolkit.@register_symbolic λ_b_(T, χ)
-
-# ╔═╡ ea8f6eb0-49c2-41a2-b5da-56b59ec858bd
-ModelingToolkit.@register_symbolic cp_b_(T, χ)
-
-# ╔═╡ e9540434-f7c5-486a-af94-0eda47ddae0d
-ModelingToolkit.@register_symbolic μ_b_(T, χ)
-
-# ╔═╡ 69f773f7-3602-4215-9caa-019406b19268
-ModelingToolkit.@register_symbolic β_b_(T)
-
-# ╔═╡ 1d1cdfa3-a995-4286-bcf7-8f1f741810df
-ModelingToolkit.@register_symbolic β_b_(T, χ)
 
 # ╔═╡ cde60bbc-b47a-4e00-b494-fbf23d727a4b
 function DynamicIncompressibleProps(; name::Symbol, fluid="mea", χ = 0.0)
@@ -142,1031 +68,60 @@ function DynamicIncompressibleProps(; name::Symbol, fluid="mea", χ = 0.0)
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
-# ╔═╡ 2cea8e87-57ed-44f7-b6c8-ecadd8f5c476
-@named prop_mea = DynamicIncompressibleProps()
-
-# ╔═╡ 3f91f768-0df3-4c10-a812-be77ad4c8acd
-@named constrained_sys = assemble([prop_mea], equations = [prop_mea.T ~ 300.0])
-
-# ╔═╡ b82098eb-625b-4c65-a53b-93faf0a6ca08
-simpl_sys = structural_simplify(constrained_sys)
-
-# ╔═╡ d7ef0f07-b101-4d95-b4b0-e947273d6408
-prop_props = NonlinearProblem(simpl_sys, [])
-
-# ╔═╡ 1a7c7164-3c4f-462c-9932-0e87d701e3fc
-sol = solve(prop_props)
-
-# ╔═╡ 8d378110-499e-491f-84ef-3c4a015dd154
-sol[prop_mea.ρ]
-
-# ╔═╡ 7361f38f-ae8d-4565-a46d-1ff8cf39d4a7
-new_prop = ModelingToolkit.remake(prop_props, p = [prop_mea.χ => 0.4])
-
-# ╔═╡ 6a695499-d87f-467e-9bbc-842f0b76986e
-new_sol = solve(new_prop)
-
-# ╔═╡ dfd753fe-5e0b-4cc9-8165-91ba78d32ef9
-new_sol[prop_mea.ρ]
-
-# ╔═╡ 426d5e79-f04c-4518-8faf-9832bb896d4f
-"""
-    FluidInterpolants
-
-Stores the interpolation functions for a fluid's properties.
-"""
-struct FluidInterpolants
-    name::String
-    chi_valid::Vector{Float64}
-    itp_Tfreeze::Interpolations.Extrapolation
-    itp_Tmax::Interpolations.Extrapolation
-    itp_2D_rho::Interpolations.Extrapolation
-    itp_2D_lambda::Interpolations.Extrapolation
-    itp_2D_cp::Interpolations.Extrapolation
-    itp_2D_mu::Interpolations.Extrapolation
-end
-
-# ╔═╡ 7571b2d2-489b-4c5e-b3c8-6f352fcc3830
-"""
-    init_database(db_path::String="")
-
-Initialize the DuckDB connection and set up necessary tables.
-If db_path is empty, uses an in-memory database.
-Returns true if successful, false otherwise.
-"""
-function init_database(db_path::String="")
-    if !USE_DUCKDB[]
-        return false
-    end
-    
-    try
-        if isnothing(DB_CONN[])
-            # Use in-memory DB if no path provided
-            conn_str = isempty(db_path) ? ":memory:" : db_path
-            DB_CONN[] = DuckDB.DB(conn_str)
-        end
-        return true
-    catch e
-        @warn "Failed to initialize DuckDB: $e"
-        return false
-    end
-end
-
-# ╔═╡ d16ef005-fa61-4456-862f-0ec0cb5287a0
-function list_available_fluids(data_dir=nothing)
-    if isnothing(data_dir)
-        data_dir = joinpath(@__DIR__, "..", "data", "fluids")
-    end
-    
-    if !isdir(data_dir)
-        @warn "Data directory does not exist: $data_dir"
-        return String[]
-    end
-    
-    # Check for the properties file which should contain all fluids
-    properties_path = joinpath(data_dir, "properties.parquet")
-    
-    if !isfile(properties_path)
-        @info "No fluid datasets found in $data_dir. Use regenerate_fluid_data() to create some."
-        return String[]
-    end
-    
-    # Read the unique fluid names from the properties file
-    try
-        if USE_DUCKDB[] && init_database()
-            con = DuckDB.connect(DB_CONN[])
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW properties AS 
-                SELECT * FROM parquet_scan('$(properties_path)');
-            """)
-            
-            # Get unique fluids
-            result = DuckDB.execute(con, "SELECT DISTINCT fluid FROM properties") |> DataFrame
-            return result.fluid
-        else
-            properties = read_parquet(properties_path) |> DataFrame
-            return unique(properties.fluid)
-        end
-    catch e
-        @warn "Error reading fluid data: $e"
-        return String[]
-    end
-end
-
-# ╔═╡ 7f3d7705-8e7f-46dc-9c52-9fc6978f38d5
-function generate_fluid_data(fluid_name::String, coolprop_id::String; n_chi=100, n_temp=50)
-    # Sample over the χ dimension
-    chi_vec = range(0.0, stop=1.0, length=n_chi)
-    
-    # Prepare arrays for data
-    T_freeze_vals = Float64[]
-    T_max_vals = Float64[]
-    chi_valid = Float64[]
-    
-    # Collect freezing and max temperatures
-    for χ in chi_vec
-        try
-            fluid_str = "$coolprop_id[$χ]"
-            T_f = CoolProp.PropsSI("T_FREEZE", fluid_str)
-            T_max = CoolProp.PropsSI("T_MAX", fluid_str)
-            if !isnan(T_f) && !isnan(T_max)
-                push!(chi_valid, χ)
-                push!(T_freeze_vals, T_f)
-                push!(T_max_vals, T_max)
-            end
-        catch e
-            # Skip invalid concentrations
-        end
-    end
-    
-    # Prepare for property interpolations
-    T_tilde = range(0.0, stop=1.0, length=n_temp)
-    
-    # Create DataFrames for temperature limits
-    df_freezing = DataFrame(chi = chi_valid, T_freeze = T_freeze_vals)
-    df_max_temps = DataFrame(chi = chi_valid, T_max = T_max_vals)
-    
-    # Initialize property data collections for each property type
-    density_data = Vector{NamedTuple{(:chi, :T_tilde, :value), Tuple{Float64, Float64, Float64}}}()
-    conductivity_data = Vector{NamedTuple{(:chi, :T_tilde, :value), Tuple{Float64, Float64, Float64}}}()
-    specific_heat_data = Vector{NamedTuple{(:chi, :T_tilde, :value), Tuple{Float64, Float64, Float64}}}()
-    viscosity_data = Vector{NamedTuple{(:chi, :T_tilde, :value), Tuple{Float64, Float64, Float64}}}()
-    
-    # Collect property data
-    for (i, χ) in enumerate(chi_valid)
-        T_f = T_freeze_vals[i]
-        T_M = T_max_vals[i]
-        fluid_str = "$coolprop_id[$χ]"
-        
-        for (j, t̃) in enumerate(T_tilde)
-            T_val = t̃ * (T_M - T_f) + T_f
-            
-            try
-                # Density
-                ρ = CoolProp.PropsSI("D", "P", 1e5, "T", T_val, fluid_str)
-                if !isnan(ρ)
-                    push!(density_data, (chi=χ, T_tilde=t̃, value=ρ))
-                end
-                
-                # Thermal conductivity
-                λ = CoolProp.PropsSI("CONDUCTIVITY", "P", 1e5, "T", T_val, fluid_str)
-                if !isnan(λ)
-                    push!(conductivity_data, (chi=χ, T_tilde=t̃, value=λ))
-                end
-                
-                # Specific heat
-                cp = CoolProp.PropsSI("C", "P", 1e5, "T", T_val, fluid_str)
-                if !isnan(cp)
-                    push!(specific_heat_data, (chi=χ, T_tilde=t̃, value=cp))
-                end
-                
-                # Viscosity
-                μ = CoolProp.PropsSI("VISCOSITY", "P", 1e5, "T", T_val, fluid_str)
-                if !isnan(μ)
-                    push!(viscosity_data, (chi=χ, T_tilde=t̃, value=μ))
-                end
-            catch e
-                # Skip problematic points
-            end
-        end
-    end
-    
-    # Convert to DataFrames
-    df_density = DataFrame(chi = [d.chi for d in density_data], 
-                           T_tilde = [d.T_tilde for d in density_data], 
-                           value = [d.value for d in density_data])
-    
-    df_conductivity = DataFrame(chi = [d.chi for d in conductivity_data], 
-                                T_tilde = [d.T_tilde for d in conductivity_data], 
-                                value = [d.value for d in conductivity_data])
-    
-    df_specific_heat = DataFrame(chi = [d.chi for d in specific_heat_data], 
-                                T_tilde = [d.T_tilde for d in specific_heat_data], 
-                                value = [d.value for d in specific_heat_data])
-    
-    df_viscosity = DataFrame(chi = [d.chi for d in viscosity_data], 
-                            T_tilde = [d.T_tilde for d in viscosity_data], 
-                            value = [d.value for d in viscosity_data])
-    
-    # Create property DataFrame in long format for storage
-    property_data = vcat(
-        DataFrame(chi = [d.chi for d in density_data], 
-                T_tilde = [d.T_tilde for d in density_data], 
-                property = fill("density", length(density_data)),
-                value = [d.value for d in density_data]),
-                
-        DataFrame(chi = [d.chi for d in conductivity_data], 
-                T_tilde = [d.T_tilde for d in conductivity_data], 
-                property = fill("thermal_conductivity", length(conductivity_data)),
-                value = [d.value for d in conductivity_data]),
-                
-        DataFrame(chi = [d.chi for d in specific_heat_data], 
-                T_tilde = [d.T_tilde for d in specific_heat_data], 
-                property = fill("specific_heat", length(specific_heat_data)),
-                value = [d.value for d in specific_heat_data]),
-                
-        DataFrame(chi = [d.chi for d in viscosity_data], 
-                T_tilde = [d.T_tilde for d in viscosity_data], 
-                property = fill("viscosity", length(viscosity_data)),
-                value = [d.value for d in viscosity_data])
-    )
-    
-    # Return both the long-format data for storage and the separate DataFrames for interpolation
-    return Dict(
-        "name" => fluid_name,
-        "freezing" => df_freezing,
-        "max_temps" => df_max_temps,
-        "properties" => property_data,  # Long-format data for storage
-        "rho" => df_density,            # Additional fields for build_interpolants
-        "lambda" => df_conductivity,
-        "cp" => df_specific_heat,
-        "mu" => df_viscosity
-    )
-end
-
-# ╔═╡ 7a09b7e1-5a6c-4d03-8b55-36d1d376531f
-function save_fluid_data(data_dict::Dict, output_dir::String)
-    fluid_name = data_dict["name"]
-    
-    try
-        # Make sure directory exists
-        if !isdir(output_dir)
-            mkpath(output_dir)
-        end
-        
-        # Add fluid name column to each dataframe
-        freezing_df = data_dict["freezing"]
-        freezing_df.fluid = fill(fluid_name, nrow(freezing_df))
-        
-        max_temps_df = data_dict["max_temps"]
-        max_temps_df.fluid = fill(fluid_name, nrow(max_temps_df))
-        
-        properties_df = data_dict["properties"]
-        properties_df.fluid = fill(fluid_name, nrow(properties_df))
-        
-        # Paths to the global parquet files
-        freezing_path = joinpath(output_dir, "freezing.parquet")
-        max_temps_path = joinpath(output_dir, "max_temps.parquet")
-        properties_path = joinpath(output_dir, "properties.parquet")
-        
-        # Use GC.gc() to encourage garbage collection before file operations
-        GC.gc()
-        
-        # Load existing data or create new dataframes
-        if isfile(freezing_path)
-            existing_freezing = read_parquet(freezing_path) |> DataFrame
-            combined_freezing = vcat(existing_freezing, freezing_df)
-            # Write to a temp file first, then move
-            temp_path = freezing_path * ".temp"
-            write_parquet(temp_path, combined_freezing)
-            mv(temp_path, freezing_path, force=true)
-        else
-            write_parquet(freezing_path, freezing_df)
-        end
-        
-        GC.gc()
-        
-        if isfile(max_temps_path)
-            existing_max_temps = read_parquet(max_temps_path) |> DataFrame
-            combined_max_temps = vcat(existing_max_temps, max_temps_df)
-            # Write to a temp file first, then move
-            temp_path = max_temps_path * ".temp"
-            write_parquet(temp_path, combined_max_temps)
-            mv(temp_path, max_temps_path, force=true)
-        else
-            write_parquet(max_temps_path, max_temps_df)
-        end
-        
-        GC.gc()
-        
-        if isfile(properties_path)
-            existing_properties = read_parquet(properties_path) |> DataFrame
-            combined_properties = vcat(existing_properties, properties_df)
-            # Write to a temp file first, then move
-            temp_path = properties_path * ".temp"
-            write_parquet(temp_path, combined_properties)
-            mv(temp_path, properties_path, force=true)
-        else
-            write_parquet(properties_path, properties_df)
-        end
-        
-        # Register with DuckDB if available
-        if USE_DUCKDB[] && init_database()
-            con = DuckDB.connect(DB_CONN[])
-            
-            # Register the parquet files with DuckDB
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW freezing AS 
-                SELECT * FROM parquet_scan('$(freezing_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW max_temps AS 
-                SELECT * FROM parquet_scan('$(max_temps_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW properties AS 
-                SELECT * FROM parquet_scan('$(properties_path)');
-            """)
-        end
-        
-        return output_dir
-    catch e
-        @error "Failed to save fluid data: $e"
-        rethrow()
-    end
-end
-
-# ╔═╡ aa0c2982-4be1-4ff9-ab86-5708d16ed087
-function load_fluid_data(fluid_name::String, data_dir::String)
-    # Check if the directory exists
-    if !isdir(data_dir)
-        error("Data directory not found: $data_dir")
-    end
-    
-    try
-        # Check if files exist
-        freezing_path = joinpath(data_dir, "freezing.parquet")
-        max_temps_path = joinpath(data_dir, "max_temps.parquet")
-        properties_path = joinpath(data_dir, "properties.parquet")
-        
-        for path in [freezing_path, max_temps_path, properties_path]
-            if !isfile(path)
-                error("Required data file not found: $path")
-            end
-        end
-        
-        # Use DuckDB if available, otherwise use direct DataFrame loading
-        if USE_DUCKDB[] && init_database()
-            con = DuckDB.connect(DB_CONN[])
-            
-            # Register the parquet files with DuckDB if not already registered
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW freezing AS 
-                SELECT * FROM parquet_scan('$(freezing_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW max_temps AS 
-                SELECT * FROM parquet_scan('$(max_temps_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW properties AS 
-                SELECT * FROM parquet_scan('$(properties_path)');
-            """)
-            
-            # Query the tables with fluid filter
-            freezing = DuckDB.execute(con, "SELECT chi, T_freeze FROM freezing WHERE fluid = '$(lowercase(fluid_name))'") |> DataFrame
-            max_temps = DuckDB.execute(con, "SELECT chi, T_max FROM max_temps WHERE fluid = '$(lowercase(fluid_name))'") |> DataFrame
-            
-            # Query and filter the properties data
-            density = DuckDB.execute(con, """
-                SELECT chi, T_tilde, value 
-                FROM properties 
-                WHERE property = 'density' AND fluid = '$(lowercase(fluid_name))'
-            """) |> DataFrame
-            
-            thermal_conductivity = DuckDB.execute(con, """
-                SELECT chi, T_tilde, value 
-                FROM properties 
-                WHERE property = 'thermal_conductivity' AND fluid = '$(lowercase(fluid_name))'
-            """) |> DataFrame
-            
-            specific_heat = DuckDB.execute(con, """
-                SELECT chi, T_tilde, value 
-                FROM properties 
-                WHERE property = 'specific_heat' AND fluid = '$(lowercase(fluid_name))'
-            """) |> DataFrame
-            
-            viscosity = DuckDB.execute(con, """
-                SELECT chi, T_tilde, value 
-                FROM properties 
-                WHERE property = 'viscosity' AND fluid = '$(lowercase(fluid_name))'
-            """) |> DataFrame
-        else
-            # Fallback to direct DataFrame loading using Parquet.jl
-            freezing_all = read_parquet(freezing_path) |> DataFrame
-            max_temps_all = read_parquet(max_temps_path) |> DataFrame
-            properties_all = read_parquet(properties_path) |> DataFrame
-            
-            # Filter by fluid name
-            freezing = filter(row -> row.fluid == lowercase(fluid_name), freezing_all)[:, [:chi, :T_freeze]]
-            max_temps = filter(row -> row.fluid == lowercase(fluid_name), max_temps_all)[:, [:chi, :T_max]]
-            
-            # Filter properties by fluid and property type
-            properties_filtered = filter(row -> row.fluid == lowercase(fluid_name), properties_all)
-            density = filter(row -> row.property == "density", properties_filtered)[:, [:chi, :T_tilde, :value]]
-            thermal_conductivity = filter(row -> row.property == "thermal_conductivity", properties_filtered)[:, [:chi, :T_tilde, :value]]
-            specific_heat = filter(row -> row.property == "specific_heat", properties_filtered)[:, [:chi, :T_tilde, :value]] 
-            viscosity = filter(row -> row.property == "viscosity", properties_filtered)[:, [:chi, :T_tilde, :value]]
-        end
-        
-        # Return with the key names that build_interpolants expects
-        return Dict(
-            "name" => fluid_name,
-            "freezing" => freezing,
-            "max_temps" => max_temps,
-            "rho" => density,
-            "lambda" => thermal_conductivity,
-            "cp" => specific_heat,
-            "mu" => viscosity
-        )
-    catch e
-        @error "Error loading fluid data for $fluid_name: $e"
-        rethrow()
-    end
-end
-
-# ╔═╡ dcea5e9a-0968-48b6-9be1-e5f6f8fe5c2a
-function build_interpolants(data::Dict)
-    fluid_name = data["name"]
-    
-    # Normal interpolation based on data
-    # Extract data for 1D interpolations
-    freezing_df = data["freezing"]
-    max_temps_df = data["max_temps"]
-    
-    chi_valid = freezing_df.chi
-    T_freeze_vals = freezing_df.T_freeze
-    T_max_vals = max_temps_df.T_max
-    
-    # Build 1D interpolants
-    itp_Tfreeze = LinearInterpolation(chi_valid, T_freeze_vals, extrapolation_bc=Interpolations.Flat())
-    itp_Tmax = LinearInterpolation(chi_valid, T_max_vals, extrapolation_bc=Interpolations.Flat())
-    
-    # Build 2D interpolants for properties
-    function build_2D_interpolant(prop_df)
-        # Group data by chi and T_tilde to reconstruct the 2D grid
-        chi_unique = sort(unique(prop_df.chi))
-        t_tilde_unique = sort(unique(prop_df.T_tilde))
-        
-        # Create a matrix to hold values
-        values_matrix = Array{Float64}(undef, length(chi_unique), length(t_tilde_unique))
-        values_matrix .= NaN
-        
-        # Map from chi, T_tilde to indices
-        chi_to_idx = Dict(chi => i for (i, chi) in enumerate(chi_unique))
-        t_to_idx = Dict(t => i for (i, t) in enumerate(t_tilde_unique))
-        
-        # Fill the matrix with values
-        for row in eachrow(prop_df)
-            i = chi_to_idx[row.chi]
-            j = t_to_idx[row.T_tilde]
-            values_matrix[i, j] = row.value
-        end
-        
-        # Find rows with valid data
-        good_rows = [i for i in 1:size(values_matrix, 1) 
-                     if !all(isnan, view(values_matrix, i, :))]
-        
-        if isempty(good_rows)
-            error("No valid data for interpolation")
-        end
-        
-        # Extract valid data
-        chi_good = chi_unique[good_rows]
-        values_good = values_matrix[good_rows, :]
-        
-        # Create interpolation
-        itp_2D = Interpolations.interpolate((chi_good, t_tilde_unique), values_good, Gridded(Linear()))
-        return extrapolate(itp_2D, Interpolations.Flat())
-    end
-    
-    # Build interpolants for each property
-    itp_2D_rho = build_2D_interpolant(data["rho"])
-    itp_2D_lambda = build_2D_interpolant(data["lambda"])
-    itp_2D_cp = build_2D_interpolant(data["cp"])
-    itp_2D_mu = build_2D_interpolant(data["mu"])
-    
-    return FluidInterpolants(
-        fluid_name,
-        chi_valid,
-        itp_Tfreeze,
-        itp_Tmax,
-        itp_2D_rho,
-        itp_2D_lambda,
-        itp_2D_cp,
-        itp_2D_mu
-    )
-end
-
-# ╔═╡ 0d8c17ff-4e71-4cfd-8087-ffa424a9eab5
-function load_fluid(fluid_name::String; data_dir=nothing)
-    if isnothing(data_dir)
-        data_dir = joinpath(@__DIR__, "..", "data", "fluids")
-    end
-    
-    # Check if the fluid has already been loaded
-    if haskey(LOADED_FLUIDS, lowercase(fluid_name))
-        return LOADED_FLUIDS[lowercase(fluid_name)]
-    end
-    
-    # Load the fluid data
-    data = load_fluid_data(fluid_name, data_dir)
-    
-    # Build interpolants
-    interpolants = build_interpolants(data)
-    
-    # Store in the cache
-    LOADED_FLUIDS[lowercase(fluid_name)] = interpolants
-    
-    return interpolants
-end
-
-# ╔═╡ 1b699afb-5dec-4941-b8dd-c7a7e08817df
-"""
-    build_approximate_interp(func)
-
-Create an approximation wrapper that behaves like an interpolation object
-but uses the provided function directly.
-"""
-function build_approximate_interp(func)
-    # For 1D functions (T_freeze, T_max)
-    if applicable(func, 0.0)
-        return x -> func(x)
-    else
-        # For 2D functions (properties)
-        return (x, y) -> func(y, x)  # Note: we swap arguments since our property funcs are (T, χ)
-    end
-end
-
-# ╔═╡ fe3a9822-bcd9-4291-a2c0-3dc1a46ba2cd
-"""
-    setup_property_functions()
-
-Define the implementations of the fluid property functions using the loaded interpolants.
-"""
-function setup_property_functions()
-    # Define the fluid property functions to use the loaded interpolants
-    # These implementations preserve compatibility with Symbolics
-
-    # Define ρ_b_
-    @eval function ρ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_rho(χ, T_tilde_val)
-    end
-
-    # Define λ_b_
-    @eval function λ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_lambda(χ, T_tilde_val)
-    end
-
-    # Define cp_b_
-    @eval function cp_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_cp(χ, T_tilde_val)
-    end
-
-    # Define μ_b_
-    @eval function μ_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return interp.itp_2D_mu(χ, T_tilde_val)
-    end
-
-    # Define β_b_
-    @eval function β_b_(T::Number, χ::Number; fluid="mea")
-        interp = get(LOADED_FLUIDS, lowercase(fluid), nothing)
-        if isnothing(interp)
-            interp = load_fluid(fluid)
-        end
-        
-        # Get the temperature limits for concentration χ
-        T_f = interp.itp_Tfreeze(χ)
-        T_M = interp.itp_Tmax(χ)
-        
-        # Map the physical temperature T to the nondimensional coordinate
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        
-        # Evaluate the density at (T,χ)
-        ρ_val = interp.itp_2D_rho(χ, T_tilde_val)
-        
-        # Compute the gradient of the density interpolation
-        grad = Interpolations.gradient(interp.itp_2D_rho, χ, T_tilde_val)
-        
-        # Extract the derivative with respect to the nondimensional temperature T̃
-        dρ_dTtilde = grad[2]
-        
-        # Convert derivative to physical temperature using the chain rule
-        dρ_dT = dρ_dTtilde / (T_M - T_f)
-        
-        # Return the thermal expansion coefficient
-        # Note the negative sign to ensure β is positive
-        return -dρ_dT / ρ_val
-    end
-
-    # Define single-argument version of β_b_
-    @eval β_b_(T::Number; fluid="mea") = β_b_(T, 0.0, fluid=fluid)
-end
-
-# ╔═╡ 739d9847-5a6a-4f2e-8143-167269d44be4
-function generate_all_supported_fluids(; output_dir=nothing, n_chi=100, n_temp=50)
-    # Use absolute paths to avoid confusion with relative paths
-    if isnothing(output_dir)
-        # Get the absolute path to the package root directory
-        pkg_root = dirname(dirname(abspath(@__FILE__)))
-        output_dir = joinpath(pkg_root, "data", "fluids")
-    else
-        output_dir = abspath(output_dir)
-    end
-    # Define mapping between simple fluid names and CoolProp fluid identifiers
-	fluid_map = Dict(
-	    # Freezium and Ice Slurries
-	    "fre" => "INCOMP::FRE",      # Freezium, Potassium Formate
-	    "iceea" => "INCOMP::IceEA",  # Ice slurry with Ethanol
-	    "icena" => "INCOMP::IceNA",  # Ice slurry with NaCl
-	    "icepg" => "INCOMP::IcePG",  # Ice slurry with Propylene Glycol
-	    
-	    # Lithium Bromide solution
-	    "libr" => "INCOMP::LiBr",    # Lithium-bromide solution
-	    
-	    # Ammonia-based solutions
-	    "mam" => "INCOMP::MAM",      # Ammonia (NH3) - aqueous
-	    "mam2" => "INCOMP::MAM2",    # Melinder Ammonia
-	    
-	    # Calcium Chloride solutions
-	    "mca" => "INCOMP::MCA",      # Calcium Chloride (CaCl2) - aqueous
-	    "mca2" => "INCOMP::MCA2",    # Melinder Calcium Chloride
-	    
-	    # Ethanol solutions
-	    "mea" => "INCOMP::MEA",      # Ethyl Alcohol (Ethanol) - aqueous
-	    "mea2" => "INCOMP::MEA2",    # Melinder Ethanol
-	    
-	    # Ethylene Glycol solutions
-	    "meg" => "INCOMP::MEG",      # Ethylene Glycol - aqueous
-	    "meg2" => "INCOMP::MEG2",    # Melinder Ethylene Glycol
-	    
-	    # Glycerol solutions
-	    "mgl" => "INCOMP::MGL",      # Glycerol - aqueous
-	    "mgl2" => "INCOMP::MGL2",    # Melinder Glycerol
-	    
-	    # Seawater
-	    "mitsw" => "INCOMP::MITSW",  # MIT Seawater
-	    
-	    # Potassium-based solutions
-	    "mka" => "INCOMP::MKA",      # Potassium Acetate - aqueous
-	    "mka2" => "INCOMP::MKA2",    # Melinder Potassium Acetate
-	    "mkc" => "INCOMP::MKC",      # Potassium Carbonate - aqueous
-	    "mkc2" => "INCOMP::MKC2",    # Melinder Potassium Carbonate
-	    "mkf" => "INCOMP::MKF",      # Potassium Formate - aqueous
-	    
-	    # Lithium Chloride solution
-	    "mli" => "INCOMP::MLI",      # Lithium Chloride - aqueous
-	    
-	    # Methanol solutions
-	    "mma" => "INCOMP::MMA",      # Methyl Alcohol (Methanol) - aqueous
-	    "mma2" => "INCOMP::MMA2",    # Melinder Methanol
-	    
-	    # Magnesium Chloride solutions
-	    "mmg" => "INCOMP::MMG",      # Magnesium Chloride - aqueous
-	    "mmg2" => "INCOMP::MMG2",    # Melinder Magnesium Chloride
-	    
-	    # Sodium Chloride solutions
-	    "mna" => "INCOMP::MNA",      # Sodium Chloride - aqueous
-	    "mna2" => "INCOMP::MNA2",    # Melinder Sodium Chloride
-	    
-	    # Propylene Glycol solutions
-	    "mpg" => "INCOMP::MPG",      # Propylene Glycol - aqueous
-	    "mpg2" => "INCOMP::MPG2",    # Melinder Propylene Glycol
-	    
-	    # VDI fluids
-	    "vca" => "INCOMP::VCA",      # VDI Calcium Chloride
-	    "vkc" => "INCOMP::VKC",      # VDI Potassium Carbonate
-	    "vma" => "INCOMP::VMA",      # VDI Methanol
-	    "vmg" => "INCOMP::VMG",      # VDI Magnesium Chloride
-	    "vna" => "INCOMP::VNA"       # VDI Sodium Chloride
-	)
-    
-    # Ensure directory exists
-    try
-        if !isdir(output_dir)
-            mkpath(output_dir)
-            @info "Created fluid data directory: $output_dir"
-        end
-    catch e
-        @error "Failed to create output directory $output_dir: $e"
-        return false
-    end
-    
-    # Track results for both successful and in-memory only fluids
-    results = Dict{String, String}()
-    memory_only = String[]
-    
-    # Store all fluid data separately first, then combine at the end
-    all_freezing = Dict{String, DataFrame}()
-    all_max_temps = Dict{String, DataFrame}()
-    all_properties = Dict{String, DataFrame}()
-    
-    # Generate data for each fluid
-    for (simple_name, coolprop_id) in fluid_map
-        @info "Generating data for $simple_name (using $coolprop_id)..."
-        try
-            # Generate fluid data using CoolProp identifier
-            fluid_data = generate_fluid_data(simple_name, coolprop_id, n_chi=n_chi, n_temp=n_temp)
-            
-            # Add fluid name column to each dataframe
-            freezing_df = deepcopy(fluid_data["freezing"])
-            freezing_df.fluid = fill(simple_name, nrow(freezing_df))
-            
-            max_temps_df = deepcopy(fluid_data["max_temps"])
-            max_temps_df.fluid = fill(simple_name, nrow(max_temps_df))
-            
-            properties_df = deepcopy(fluid_data["properties"])
-            properties_df.fluid = fill(simple_name, nrow(properties_df))
-            
-            # Store in memory
-            all_freezing[simple_name] = freezing_df
-            all_max_temps[simple_name] = max_temps_df
-            all_properties[simple_name] = properties_df
-            
-            # Build interpolants 
-            interpolants = build_interpolants(fluid_data)
-            LOADED_FLUIDS[lowercase(simple_name)] = interpolants
-            
-            @info "Successfully generated data for $simple_name"
-            
-        catch e
-            @error "Failed to generate data for $simple_name: $e"
-        end
-    end
-    
-    # Now that all data is generated, combine and write to disk in one go
-    try
-        # Combine all the DataFrames
-        freezing_combined = vcat(collect(values(all_freezing))...)
-        max_temps_combined = vcat(collect(values(all_max_temps))...)
-        properties_combined = vcat(collect(values(all_properties))...)
-        
-        # Write the combined data
-        freezing_path = joinpath(output_dir, "freezing.parquet")
-        max_temps_path = joinpath(output_dir, "max_temps.parquet")
-        properties_path = joinpath(output_dir, "properties.parquet")
-        
-        # Force GC to release any file handles
-        GC.gc()
-        
-        # Write data to fresh files
-        write_parquet(freezing_path, freezing_combined)
-        write_parquet(max_temps_path, max_temps_combined)
-        write_parquet(properties_path, properties_combined)
-        
-        # Register with DuckDB if available
-        if USE_DUCKDB[] && init_database()
-            con = DuckDB.connect(DB_CONN[])
-            
-            # Register the parquet files with DuckDB
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW freezing AS 
-                SELECT * FROM parquet_scan('$(freezing_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW max_temps AS 
-                SELECT * FROM parquet_scan('$(max_temps_path)');
-            """)
-            
-            DuckDB.execute(con, """
-                CREATE OR REPLACE VIEW properties AS 
-                SELECT * FROM parquet_scan('$(properties_path)');
-            """)
-        end
-        
-        # Mark each fluid as successfully saved
-        for name in keys(all_freezing)
-            results[name] = output_dir
-        end
-        
-    catch e
-        @error "Failed to write combined fluid data: $e"
-        # If we fail to write to disk, mark all fluids as memory-only
-        memory_only = collect(keys(all_freezing))
-    end
-    
-    # Setup property functions
-    setup_property_functions()
-    
-    # Summary
-    if isempty(results)
-        if !isempty(memory_only)
-            @info "Generated in-memory data for $(length(memory_only)) fluids: $(join(memory_only, ", "))"
-        else
-            @warn "No fluid data was successfully generated."
-        end
-    else
-        @info "Successfully saved data for $(length(results)) fluids to disk: $(join(keys(results), ", "))"
-        if !isempty(memory_only)
-            @info "Additionally, $(length(memory_only)) fluids are available in memory only: $(join(memory_only, ", "))"
-        end
-    end
-    
-    return results
-end
-
-# ╔═╡ a624bc34-a760-41f3-8db3-734c9b0e7b3f
-# Create a proper output directory path
-function generate_all_fluid_data(output_dir=nothing; n_chi=100, n_temp=50)
-    if isnothing(output_dir)
-        # Make sure to use the correct path relative to the project root
-        # NOT inside the src directory
-        pkg_root = dirname(dirname(abspath(@__FILE__)))
-        output_dir = joinpath(pkg_root, "data", "fluids")
-    end
-    
-    @info "Will save fluid data to: $output_dir"
-    
-    # Ensure the directory exists
-    try
-        if !isdir(output_dir)
-            mkpath(output_dir)
-            @info "Created fluid data directory: $output_dir"
-        end
-    catch e
-        @error "Failed to create directory: $e"
-        return false
-    end
-    
-    # Call the function with the proper directory
-    return generate_all_supported_fluids(output_dir=output_dir)
-end
-
-# ╔═╡ 7d63c4da-88f8-4d00-8d34-28b526768603
+# ╔═╡ 6cc03224-ec11-467a-9559-ba36edd7f4ec
 # ╠═╡ skip_as_script = true
 #=╠═╡
-generate_all_fluid_data(joinpath(@__DIR__(), "data", "fluids"))
+ρ_b_(0.0, 0.0)
   ╠═╡ =#
 
-# ╔═╡ c9adc754-772a-45d6-9f4e-4578b60ad7df
-"""
-    regenerate_fluid_data(name::String; n_chi=100, n_temp=50, output_dir=nothing)
+# ╔═╡ 2cea8e87-57ed-44f7-b6c8-ecadd8f5c476
+# ╠═╡ skip_as_script = true
+#=╠═╡
+@named prop_mea = DynamicIncompressibleProps()
+  ╠═╡ =#
 
-Regenerate fluid data with specified sampling parameters.
-"""
-function regenerate_fluid_data(name::String; n_chi=100, n_temp=50, output_dir=nothing)
-    if isnothing(output_dir)
-        output_dir = joinpath(@__DIR__(), "..", "data", "fluids")
-    end
-    
-    @info "Regenerating fluid data for $name with n_chi=$n_chi, n_temp=$n_temp..."
-    fluid_data = generate_fluid_data(name, n_chi=n_chi, n_temp=n_temp)
-    
-    # Ensure directory exists
-    if !isdir(output_dir)
-        try
-            mkpath(output_dir)
-        catch e
-            @warn "Cannot create data directory $output_dir: $e. Will continue with in-memory data only."
-        end
-    end
-    
-    # Try to save, but continue even if it fails
-    try
-        save_fluid_data(fluid_data, output_dir)
-    catch e
-        @warn "Could not save fluid data: $e. Will continue with in-memory data only."
-    end
-    
-    interpolants = build_interpolants(fluid_data)
-    
-    # Update the cache
-    LOADED_FLUIDS[lowercase(name)] = interpolants
-    
-    # Update the actual property functions with implementations using the loaded data
-    setup_property_functions()
-    
-    return interpolants
-end
+# ╔═╡ fd041e24-f6b0-4018-bc9d-83b401ff1a14
+assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
 
-# ╔═╡ a0bd5972-be0e-4a3d-a2f9-6db2d24a1c4d
-function query_fluid_property(fluid_name::String, property_name::String; where_clause::String="")
-    # Map property aliases to standard names
-    property_mapping = Dict(
-        "density" => "density",
-        "rho" => "density",
-        "thermal_conductivity" => "thermal_conductivity",
-        "lambda" => "thermal_conductivity",
-        "specific_heat" => "specific_heat",
-        "cp" => "specific_heat",
-        "viscosity" => "viscosity",
-        "mu" => "viscosity"
-    )
-    
-    property_key = get(property_mapping, lowercase(property_name), property_name)
-    
-    # Ensure we have the fluid loaded
-    if !haskey(LOADED_FLUIDS, lowercase(fluid_name))
-        load_fluid(fluid_name)
-    end
-    
-    data_dir = joinpath(@__DIR__, "..", "data", "fluids")
-    properties_path = joinpath(data_dir, "properties.parquet")
-    
-    if !isfile(properties_path)
-        error("Cannot query properties: data file not found at $properties_path")
-    end
-    
-    # If DuckDB is available, use it for querying
-    if USE_DUCKDB[] && init_database()
-        con = DuckDB.connect(DB_CONN[])
-        
-        # Register the parquet file if not already registered
-        DuckDB.execute(con, """
-            CREATE OR REPLACE VIEW properties AS 
-            SELECT * FROM parquet_scan('$(properties_path)');
-        """)
-        
-        query = """
-            SELECT chi, T_tilde, value 
-            FROM properties 
-            WHERE property = '$(property_key)' AND fluid = '$(lowercase(fluid_name))'
-        """
-        
-        if !isempty(where_clause)
-            query *= " AND $(where_clause)"
-        end
-        
-        result = DuckDB.execute(con, query) |> DataFrame
-        return result
-    else
-        # Fallback to DataFrame filtering
-        properties = read_parquet(properties_path) |> DataFrame
-        
-        # Filter by fluid and property
-        result = filter(row -> row.fluid == lowercase(fluid_name) && row.property == property_key, properties)
-        
-        # Handle where_clause using simple parsing (limited functionality)
-        if !isempty(where_clause)
-            if occursin("=", where_clause)
-                # Simple equality
-                field, value = split(where_clause, "=")
-                field = strip(field)
-                value = parse(Float64, strip(value))
-                result = filter(row -> getproperty(row, Symbol(field)) ≈ value, result)
-            elseif occursin("BETWEEN", uppercase(where_clause))
-                # Simple BETWEEN
-                parts = split(uppercase(where_clause), "BETWEEN")
-                field = strip(lowercase(parts[1]))
-                range_parts = split(parts[2], "AND")
-                lower = parse(Float64, strip(range_parts[1]))
-                upper = parse(Float64, strip(range_parts[2]))
-                result = filter(row -> lower ≤ getproperty(row, Symbol(field)) ≤ upper, result)
-            else
-                @warn "Complex where_clause not supported with DataFrame filtering: $where_clause"
-            end
-        end
-        
-        return result[:, [:chi, :T_tilde, :value]]
-    end
-end
+# ╔═╡ 3f91f768-0df3-4c10-a812-be77ad4c8acd
+#=╠═╡
+@named constrained_sys = assemble([prop_mea], equations = [prop_mea.T ~ 300.0])
+  ╠═╡ =#
 
-# ╔═╡ b4b76a5a-1d65-4cd9-ac86-6dc4995bd02e
-"""
-    close_database()
+# ╔═╡ b82098eb-625b-4c65-a53b-93faf0a6ca08
+#=╠═╡
+simpl_sys = structural_simplify(constrained_sys)
+  ╠═╡ =#
 
-Close the DuckDB connection if it's open.
-"""
-function close_database()
-    if USE_DUCKDB[] && !isnothing(DB_CONN[])
-        try
-            close(DB_CONN[])
-            DB_CONN[] = nothing
-        catch e
-            @warn "Error closing database connection: $e"
-        end
-    end
-end
+# ╔═╡ d7ef0f07-b101-4d95-b4b0-e947273d6408
+#=╠═╡
+prop_props = NonlinearProblem(simpl_sys, [])
+  ╠═╡ =#
 
-# Preload MEA as the default fluid at module initialization
+# ╔═╡ 1a7c7164-3c4f-462c-9932-0e87d701e3fc
+#=╠═╡
+sol = solve(prop_props)
+  ╠═╡ =#
+
+# ╔═╡ 8d378110-499e-491f-84ef-3c4a015dd154
+#=╠═╡
+sol[prop_mea.ρ]
+  ╠═╡ =#
+
+# ╔═╡ 7361f38f-ae8d-4565-a46d-1ff8cf39d4a7
+#=╠═╡
+new_prop = ModelingToolkit.remake(prop_props, p = [prop_mea.χ => 0.4])
+  ╠═╡ =#
+
+# ╔═╡ 6a695499-d87f-467e-9bbc-842f0b76986e
+#=╠═╡
+new_sol = solve(new_prop)
+  ╠═╡ =#
+
+# ╔═╡ dfd753fe-5e0b-4cc9-8165-91ba78d32ef9
+#=╠═╡
+new_sol[prop_mea.ρ]
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1179,6 +134,8 @@ Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 Parquet = "626c502c-15b0-58ad-a749-f091afb673ae"
+PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
+PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 
 [compat]
 CoolProp = "~0.2.1"
@@ -1189,6 +146,8 @@ Interpolations = "~0.15.1"
 Makie = "~0.22.4"
 ModelingToolkit = "~9.78.0"
 Parquet = "~0.8.5"
+PlutoDevMacros = "~0.9.0"
+PlutoTest = "~0.2.2"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -1197,7 +156,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "7da17982664f559135cccc27ab0f989bb6496765"
+project_hash = "ee480c444016eb39212b24f0bfd65a017ceeb7c3"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1469,6 +428,12 @@ deps = ["Static", "StaticArrayInterface"]
 git-tree-sha1 = "05ba0d07cd4fd8b7a39541e31a7b0254704ea581"
 uuid = "fb6a15b2-703c-40df-9091-08a04967cfa9"
 version = "0.1.13"
+
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "062c5e1a5bf6ada13db96a4ae4749a4c2234f521"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.3.9"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -2194,6 +1159,12 @@ git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.28"
 
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "7134810b1afce04bbc1045ca1985fbe81ce17653"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.5"
+
 [[deps.IfElse]]
 git-tree-sha1 = "debdd00ffef04665ccbb3e150747a77560e8fad1"
 uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
@@ -2381,6 +1352,12 @@ deps = ["CommonMark", "Glob", "JuliaSyntax", "PrecompileTools", "TOML"]
 git-tree-sha1 = "56b382cd34b1a80f63211a0b009461915915bf9e"
 uuid = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 version = "2.1.2"
+
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "c47892541d03e5dc63467f8964c9f2b415dfe718"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.46"
 
 [[deps.JuliaSyntax]]
 git-tree-sha1 = "937da4713526b96ac9a178e2035019d3b78ead4a"
@@ -3028,6 +2005,18 @@ deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random"
 git-tree-sha1 = "3ca9a356cd2e113c420f2c13bea19f8d3fb1cb18"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
 version = "1.4.3"
+
+[[deps.PlutoDevMacros]]
+deps = ["JuliaInterpreter", "Logging", "MacroTools", "Pkg", "TOML"]
+git-tree-sha1 = "72f65885168722413c7b9a9debc504c7e7df7709"
+uuid = "a0499f29-c39b-4c5c-807c-88074221b949"
+version = "0.9.0"
+
+[[deps.PlutoTest]]
+deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
+git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
+uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+version = "0.2.2"
 
 [[deps.PoissonRandom]]
 deps = ["Random"]
@@ -3933,9 +2922,13 @@ version = "3.6.0+0"
 # ╠═122c8036-63f1-4deb-8e1d-4dcf471bd298
 # ╠═924b8d55-a8f9-4f1a-b1e0-31601ff811c9
 # ╠═0335e609-cfa7-4961-b85b-7214aeecf92e
+# ╠═63a85758-bddf-45b5-b3e0-be33e56f38ec
+# ╠═3a4b4d1d-abbf-4858-891a-1e24a9b4ea5b
+# ╠═6480643c-069d-48ed-9750-ec00d81a3e54
+# ╠═0298656c-4941-432c-aa4a-bbc652b27d50
 # ╠═cde60bbc-b47a-4e00-b494-fbf23d727a4b
+# ╠═6cc03224-ec11-467a-9559-ba36edd7f4ec
 # ╠═2cea8e87-57ed-44f7-b6c8-ecadd8f5c476
-# ╠═919e2b5b-2dde-4695-af90-3061d585a27e
 # ╠═fd041e24-f6b0-4018-bc9d-83b401ff1a14
 # ╠═3f91f768-0df3-4c10-a812-be77ad4c8acd
 # ╠═b82098eb-625b-4c65-a53b-93faf0a6ca08
@@ -3945,36 +2938,5 @@ version = "3.6.0+0"
 # ╠═7361f38f-ae8d-4565-a46d-1ff8cf39d4a7
 # ╠═6a695499-d87f-467e-9bbc-842f0b76986e
 # ╠═dfd753fe-5e0b-4cc9-8165-91ba78d32ef9
-# ╠═7d63c4da-88f8-4d00-8d34-28b526768603
-# ╠═ee9f209e-8f89-487d-9755-67d06b42308a
-# ╠═7af52b81-cdaa-4947-b684-3cd0b658b0a4
-# ╠═7fdb2dc7-af0b-4035-bd9d-15af34f27fd1
-# ╟─8c986457-9d64-4be5-b5b0-d39b9702e05c
-# ╟─3a793d39-1f74-43f6-950a-b46dcb8a3de8
-# ╟─806ebe0f-7be4-4f35-8827-eb111d3a8891
-# ╟─d370d15e-07a4-49a0-a6b2-b18bb760d22f
-# ╟─64dcc6ea-d858-4c29-ad36-534afdf3c8d8
-# ╟─1a4a329b-9002-471e-9013-653d14044bf1
-# ╠═b49b1c08-a158-4721-bb2e-d2d2fc90201d
-# ╠═2009ccd1-5cec-4a3e-8865-876e0a4e50f8
-# ╠═ea8f6eb0-49c2-41a2-b5da-56b59ec858bd
-# ╠═e9540434-f7c5-486a-af94-0eda47ddae0d
-# ╠═1d1cdfa3-a995-4286-bcf7-8f1f741810df
-# ╠═69f773f7-3602-4215-9caa-019406b19268
-# ╠═739d9847-5a6a-4f2e-8143-167269d44be4
-# ╠═a624bc34-a760-41f3-8db3-734c9b0e7b3f
-# ╟─426d5e79-f04c-4518-8faf-9832bb896d4f
-# ╟─7571b2d2-489b-4c5e-b3c8-6f352fcc3830
-# ╟─d16ef005-fa61-4456-862f-0ec0cb5287a0
-# ╟─7f3d7705-8e7f-46dc-9c52-9fc6978f38d5
-# ╟─7a09b7e1-5a6c-4d03-8b55-36d1d376531f
-# ╟─aa0c2982-4be1-4ff9-ab86-5708d16ed087
-# ╟─0d8c17ff-4e71-4cfd-8087-ffa424a9eab5
-# ╟─dcea5e9a-0968-48b6-9be1-e5f6f8fe5c2a
-# ╟─1b699afb-5dec-4941-b8dd-c7a7e08817df
-# ╟─c9adc754-772a-45d6-9f4e-4578b60ad7df
-# ╟─fe3a9822-bcd9-4291-a2c0-3dc1a46ba2cd
-# ╟─a0bd5972-be0e-4a3d-a2f9-6db2d24a1c4d
-# ╟─b4b76a5a-1d65-4cd9-ac86-6dc4995bd02e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

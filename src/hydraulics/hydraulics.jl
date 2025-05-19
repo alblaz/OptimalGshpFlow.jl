@@ -1,4 +1,4 @@
-module PumpMTK
+module Hydraulics
 
 include("pluto_pump.jl")
 

@@ -1,11 +1,16 @@
 module OptimalGshpFlow
 
-include("properties/properties.jl")
-include("hydraulics/hydraulics.jl")
-#include("thermodynamic_cycle/thermodynamic_cycle.jl")
+# Include and export the Utils module
+include("utils/Utils.jl")
+#export Utils
+Utils.initialize_properties()
+# Include and export the Properties module
+include("properties/Properties.jl")
+include("hydraulics/Hydraulics.jl")
+#export Properties
 
-#import .PumpMTK
+# Include other modules as needed
+#include("hydraulics/hydraulics.jl")
+include("thermodynamic_cycle/Thermodynamic_cycle.jl")
 
-#include("utils.jl")
-
-end # module OptimalGshpFlowac
+end # module OptimalGshpFlow

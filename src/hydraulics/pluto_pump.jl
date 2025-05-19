@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -8,7 +8,10 @@ using InteractiveUtils
 using ModelingToolkit, NonlinearSolve
 
 # ╔═╡ ddb5e99b-ad0f-4349-8ded-995d53ca80a2
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoTest
+  ╠═╡ =#
 
 # ╔═╡ 43bcb0af-4332-4163-b0ff-cf78b6019b6d
 using PlutoDevMacros
@@ -218,14 +221,19 @@ estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
   ╠═╡ =#
 
 # ╔═╡ 047ed44a-752e-47b6-8731-dc4c9523a316
+# ╠═╡ skip_as_script = true
+#=╠═╡
 @named magna3_approx = BasicPump(H_shutoff=12, Q_max=13/3600,
     N_max = 50,
     P_elec_max = 185,
     H_max = 12
 )
+  ╠═╡ =#
 
 # ╔═╡ 0a6b3604-cd36-48a0-a179-a680e0404b09
+#=╠═╡
 typeof(magna3_approx)
+  ╠═╡ =#
 
 # ╔═╡ 23818aa2-3f98-442c-b3d4-b534877ebde4
 assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)

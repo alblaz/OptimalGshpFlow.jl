@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -11,16 +11,28 @@ using PlutoDevMacros
 using Printf
 
 # ╔═╡ 57a059fe-3929-4cc5-9591-49fa7cdb18cc
+# ╠═╡ disabled = true
+#=╠═╡
 using MonteCarloMeasurements
+  ╠═╡ =#
 
 # ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
+# ╠═╡ disabled = true
+#=╠═╡
 using Distributions
+  ╠═╡ =#
+
+# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
+using LinearAlgebra
 
 # ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
 using SpecialFunctions
 
 # ╔═╡ 0e6790ed-f7fd-49ac-939a-72ff4f782b98
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using Interpolations
+  ╠═╡ =#
 
 # ╔═╡ 42268bb5-c95c-45ab-bdc6-125897bb0fcf
 using Clapeyron
@@ -47,7 +59,10 @@ using NLSolvers
 using PETSc
 
 # ╔═╡ bc6d9b90-734e-4d9d-be0f-104a3b99aea2
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoUI
+  ╠═╡ =#
 
 # ╔═╡ 8857ee4a-9620-4071-ae78-6e63ea0b7f0e
 using CoolProp
@@ -56,16 +71,28 @@ using CoolProp
 using Unitful
 
 # ╔═╡ 0405ca05-0ca9-4b6c-ac93-91e5f50cab91
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using Markdown
+  ╠═╡ =#
 
 # ╔═╡ c691da35-ff83-4dc6-af9f-2be03d95187a
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using InteractiveUtils
+  ╠═╡ =#
 
 # ╔═╡ 79bc4f64-38b6-460d-b244-b3d25de13009
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using DataFrames
+  ╠═╡ =#
 
 # ╔═╡ 4dd5e489-a155-48c3-b7da-0d459f6c7588
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using Logging
+  ╠═╡ =#
 
 # ╔═╡ f6b9843f-bb5e-4275-bea2-05e9d594207f
 # ╠═╡ skip_as_script = true
@@ -83,866 +110,35 @@ using ModelingToolkit, NonlinearSolve
 using Nemo
 
 # ╔═╡ e5f88f64-0777-4a12-8fff-ab0c2b468a7c
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoExtras
+  ╠═╡ =#
+
+# ╔═╡ badf578f-6cc7-48c2-8693-370856d659dd
+@fromparent begin
+	import *
+	#import ^.Utils: *
+	#import ^.Properties: *
+end
+
+# ╔═╡ cc7c330a-c450-4339-a194-259ff91e42b9
+
 
 # ╔═╡ 60f2ad1f-33e1-4003-ad15-963f6f0eddd6
+#=╠═╡
 md""" # TDL:
 
 - outliers interpolation
 - try coupling
 
 """
-
-# ╔═╡ ed723b83-28ad-4938-97e8-891b40acc0db
-md" # Optimal Flow in GSHP - UI demonstration"
+  ╠═╡ =#
 
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
+#=╠═╡
 md" # Sub Model: Compressor"
-
-# ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
-md" ## Sub model: Evaporator"
-
-# ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
-md""" # Solving the system"""
-
-# ╔═╡ 91699b51-0f49-4f90-8d60-ad00bf52d917
-function a end
-
-# ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
-md" # Combined problem"
-
-# ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
-md" # BHE + Evap + Compressor"
-
-# ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
-md" # Internal forced convection"
-
-# ╔═╡ 2da011ed-131f-48d7-baac-285b2b7d147e
-# ╠═╡ disabled = true
-#=╠═╡
-@named h1 = h_tube()
   ╠═╡ =#
-
-# ╔═╡ 075e8fb2-89ff-4936-8c67-ca8e90159a5a
-# ╠═╡ disabled = true
-#=╠═╡
-@named h2 = h_tube()
-  ╠═╡ =#
-
-# ╔═╡ 30ed60b4-8ef8-4a0a-995d-1a8e7cb1249a
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-@named Evap1 = Evaporator();
-	
-	eqs_bc = [
-		Evap1.ṁ_r ~ 1.0
-		Evap1.ṁ_b ~ 1.0
-		
-		Evap1.T_evap ~ -10+273.15
-		Evap1.T_p_r ~ Evap1.T_evap + 5
-		Evap1.T_p_b ~ Evap1.T_p_r + 5
-		
-		Evap1.T_b_in ~ -2+273.15
-		Evap1.αL ~ pi/2*0.5
-	]
-	@named bcevap = ModelingToolkit.compose(NonlinearSystem(eqs_bc, [], []; name = :CJUBUIOname), [Evap1]);
-	sbce = structural_simplify(bcevap)
-	probev = NonlinearProblem(sbce, [])
-	sol_ev = NonlinearSolve.solve(probev, Klement())
-end;
-  ╠═╡ =#
-
-# ╔═╡ e8fa9ff4-cf07-4410-9287-ecfedf2e8c32
-#=╠═╡
-sol_ev.retcode
-  ╠═╡ =#
-
-# ╔═╡ 557bea62-35b1-45d6-b1fc-34eecde31d89
-#=╠═╡
-sol_ev.resid
-  ╠═╡ =#
-
-# ╔═╡ 7d05490f-9935-4b28-bf99-d2e523767b30
-#=╠═╡
-sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in]
-  ╠═╡ =#
-
-# ╔═╡ 8d3c89a4-978c-4eda-a6f5-2aab8e86b48c
-#=╠═╡
-sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]
-  ╠═╡ =#
-
-# ╔═╡ 4f2877d3-f3e2-4926-b56e-bc52115c1dc1
-#=╠═╡
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface])
-  ╠═╡ =#
-
-# ╔═╡ a1cb28de-24b3-419a-9f39-8e9aac89adfa
-#=╠═╡
-((sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]))/(sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r] / sol_ev[Evap1.brine.cp] / sol_ev[Evap1.ṁ_b])
-  ╠═╡ =#
-
-# ╔═╡ f4df2ef9-62ed-4f7d-808c-0f209339c166
-#=╠═╡
-sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
-  ╠═╡ =#
-
-# ╔═╡ 54e30cff-1aa0-498b-90d9-bcf3dbe4dd4e
-md" # 1"
-
-
-# ╔═╡ 34bc09e0-e2c9-4c31-8369-784facd0fad3
-#=╠═╡
-(sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ ed25cda0-4975-4909-8c37-1eef16844a4e
-#=╠═╡
-(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]) * sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r]
-  ╠═╡ =#
-
-# ╔═╡ c96e61c1-92dd-46de-9f84-cfd87348764b
-md" # 2"
-
-
-# ╔═╡ fc2368c4-763c-4322-a3fe-6ed5ac018591
-#=╠═╡
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_out]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-  ╠═╡ =#
-
-# ╔═╡ 6596bb7e-2282-4f84-8969-2c2cf10428ec
-#=╠═╡
-(sol_ev[Evap1.h_r_interface] .- sol_ev[Evap1.h_r_in]) * sol_ev[Evap1.ṁ_r]
-
-  ╠═╡ =#
-
-# ╔═╡ 98320e7b-4e49-44df-b3eb-7d7d4800c5a1
-#=╠═╡
-sol_ev[Evap1.T_r_interface]
-  ╠═╡ =#
-
-# ╔═╡ 927cc01d-e543-463a-ae44-9caf39a2394e
-#=╠═╡
-sol_ev[Evap1.T_evap]
-  ╠═╡ =#
-
-# ╔═╡ 9cdd134d-b858-4102-9c81-29851cd0df56
-#=╠═╡
-sol_ev[Evap1.gphase.cp]
-  ╠═╡ =#
-
-# ╔═╡ 1a310cc4-aa70-46c7-9081-55603deeb921
-#=╠═╡
-sol_ev[Evap1.h1]
-  ╠═╡ =#
-
-# ╔═╡ bd3073a0-43d4-42d6-983b-e3e822c1abfb
-#=╠═╡
-sol_ev[Evap1.h2]
-
-  ╠═╡ =#
-
-# ╔═╡ 516ea25f-a9de-4171-8af7-f7ad5dbe4737
-md" ### Test props"
-
-# ╔═╡ 5a09f303-e92a-4285-90cd-8541b8b24220
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	tvars = @variables begin
-	end
-	@named props = SF_props()
-	teqs = [props.T ~ 300.0, props.χ ~ 0.5]
-	@named propsys = ModelingToolkit.compose(NonlinearSystem(teqs, tvars, [], name=:y7gfvufiio), props)
-	spropsys = structural_simplify(propsys)
-	#works!
-	u0_props = [
-		props.T => 300.0,
-		props.χ => 0.28,
-	]
-	pprops = NonlinearProblem(spropsys, u0_props)
-	NonlinearSolve.solve(pprops)
-	pprops[props.λ]
-end
-  ╠═╡ =#
-
-# ╔═╡ a6ac71e5-7f92-4aef-b7e6-d8cde3ec41a1
-md" --- "
-
-# ╔═╡ ea575c50-e1f6-4604-9f0d-b0b12f3e698f
-# ╠═╡ disabled = true
-#=╠═╡
-@named Upipe = U_fill_R_s(J=3);
-  ╠═╡ =#
-
-# ╔═╡ 59db1579-81dc-4c1d-aeb4-895a99834cd7
-@named newsys = ModelingToolkit.compose(NonlinearSystem([], [], []; name = :name), [h1, Upipe, h2])
-
-# ╔═╡ 06c960c3-ee4f-4f7d-868e-e331d0702c2f
-# ╠═╡ disabled = true
-#=╠═╡
-structural_simplify(newsys)
-  ╠═╡ =#
-
-# ╔═╡ d44ac0d3-c764-4df8-a326-bc853f21b3ec
-md" # U-tube: filled"
-
-# ╔═╡ 78d7e55b-134c-4db8-a7f6-bc8e25d7f543
-md" # U tube: grouted"
-
-# ╔═╡ 85f8033b-6d5a-4732-ae44-60ae1a5300cb
-# Borehole resistance in conduction
-begin
-	J = 1
-	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
-	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-	A_ = f_data .+ t_sum
-	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-	M_ = KJ_mat .+ A_
-	
-	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-	
-	B_ = V_k'*inv(M_)*V_bk
-	
-	B⁻ = substitute(B_, s => -1)
-	B⁺ = substitute(B_, s => 1)
-
-	R⁺ = R₀⁺ .+ B⁺
-	R⁻ = R₀⁻ .+ B⁻
-
-	R_1b_p_c = R⁺
-	R_2b_p_c = R⁺
-	R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
-	
-	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]);
-end;
-
-# ╔═╡ 4e1330f1-5eb5-48ea-888a-02d599658b40
-function U_fill_R_s(;name, J::Int=1)
-	ps = @parameters begin
-		λ_ground = 3.5
-		λ_grout = 2.0
-		r_p = 40e-3/2
-		r_b = 115e-3/2
-		α = 0.5 #"centered"
-	end
-	sts = @variables begin
-		RΔ12
-		RΔ1b
-		RΔ2b
-	end
-	begin
-		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
-		
-		V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-		V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-		#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-		t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-		St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-		t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-		f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-		t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-		A_ = f_data .+ t_sum
-		KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-		M_ = KJ_mat .+ A_
-		
-		R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-		R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-		
-		B_ = V_k'*inv(M_)*V_bk
-		
-		B⁻ = substitute(B_, s => -1)
-		B⁺ = substitute(B_, s => 1)
-	
-		R⁺ = R₀⁺ .+ B⁺
-		R⁻ = R₀⁻ .+ B⁻
-	
-		R_1b_p_c = R⁺
-		R_2b_p_c = R⁺
-		R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
-		
-		exp_R_1b = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_2b = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(R_12_cd, [χ_p => α*r_b]);
-	end
-
-    eqs = [
-        exp_R_12 ~ RΔ12,
-        exp_R_1b ~ RΔ1b,
-        exp_R_2b ~ RΔ2b,
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-
-# ╔═╡ 05ab2c2c-96dd-48ad-b748-04ffb3a21d2f
-function UBorehole(;name)
-	ps = @parameters begin
-		λ_ground = 3.5
-		λ_grout = 2.0
-		r_p = 40e-3/2
-		r_b = 115e-3/2
-		α = 0.5 #"centered"
-	end
-	sts = @variables begin
-		RΔ12
-		RΔ1b
-		RΔ2b
-	end
-	begin
-		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
-		
-		V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-		V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-		#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-		t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-		St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-		t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-		f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-		t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-		A_ = f_data .+ t_sum
-		KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-		M_ = KJ_mat .+ A_
-		
-		R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-		R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-		
-		B_ = V_k'*inv(M_)*V_bk
-		
-		B⁻ = substitute(B_, s => -1)
-		B⁺ = substitute(B_, s => 1)
-	
-		R⁺ = R₀⁺ .+ B⁺
-		R⁻ = R₀⁻ .+ B⁻
-	
-		R_1b_p_c = R⁺
-		R_2b_p_c = R⁺
-		R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
-		
-		exp_R_1b = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_2b = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(R_12_cd, [χ_p => α*r_b]);
-	end
-
-    eqs = [
-        exp_R_12 ~ RΔ12,
-        exp_R_1b ~ RΔ1b,
-        exp_R_2b ~ RΔ2b,
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-
-# ╔═╡ 30eba1d3-1856-4aa0-8d58-63ab3cf81578
-R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
-
-# ╔═╡ 44cc481e-c4af-499e-b263-587ccdf145ff
-R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
-
-# ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
-md" # Quick analysis: parametric study"
-
-# ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
-md" # Temperature profiles"
-
-# ╔═╡ 201da2ec-f2b4-4c38-8a88-88362f53f5d0
-begin
-	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
-	
-	# We assume that our homogeneous (shifted) solution is:
-	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
-	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
-	#
-	# The boundary conditions we impose are:
-	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
-	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
-	#        T̃₁(L) = T̃₂(L)
-	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
-	
-	# Write the equations:
-	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
-	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
-	
-	# Solve the system for C1 and C2.
-	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
-end
-
-# ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
-#=╠═╡
-function h_tube(;name)
-	ps = @parameters begin
-		cp
-		μ
-		λ
-		ρ
-		Di
-	end
-	sts = @variables begin
-		h
-		ṁ
-	end
-	csts = @constants begin
-		Re_low = 2300
-		Re_high = 5000
-	end
-	
-	V̇ = ṁ / ρ
-	S = π * Di ^ 2 / 4
-	v = V̇ / S
-
-	Re = ρ * v * Di / μ
-	Pr = cp * μ / λ
-
-	Nu_lam = 3.66
-	f = 0.3164*Re^(-1//4)
-	Nu_tur = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
-	turb_index = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
-
-	Nu = (1-turb_index) * Nu_lam + turb_index * Nu_tur
-
-    eqs = [h ~ Nu * λ / Di]
-	
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-  ╠═╡ =#
-
-# ╔═╡ f064f4ed-3840-4760-a0d3-7309ede60204
-# ╠═╡ disabled = true
-#=╠═╡
-eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
-	
-  ╠═╡ =#
-
-# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
-md"# Utilities"
-
-# ╔═╡ 37de41bf-c905-480f-b0d0-fc103001656b
-begin
-	# Brine Bond Variables
-	fluid = "MEA"  # Options: "MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"
-	Tfreeze_ = 0.0  # Fluid freezing temperature in °C
-#	χ_ = 28.5 / 100  # Concentration (mass fraction)
-	ΔT_brine_ = 5.0  # Temperature difference fluid-superheat in °C
-	
-	# Evaporator Bond Variables
-	refrigerant = "R134A"  # Options: "R134A", "R290" => "R290 (propane)"
-	W_ = 0.20  # Width in meters
-	L_PHX_ = 0.30  # Length in meters
-	np_ = 20.0  # Number of plates
-	
-	# Operation Bond Variables
-	ṁ_r_ = 0.1  # Refrigerant mass flow in kg/s
-	T_evap_ = -5.0  # Evaporation temperature in °C
-	ΔT_SH_ = 7.0  # Superheating degree in K
-end
-
-# ╔═╡ fd32a044-3b7b-44bb-b279-deb1ea5c1457
-# ╠═╡ disabled = true
-#=╠═╡
-
-begin
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-	end
-	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
-		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
-		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-	end
-
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
-end
-  ╠═╡ =#
-
-# ╔═╡ 1cd63e6f-37b2-49ba-8887-2220d1df7c6f
-md" # Properties"
-
-# ╔═╡ eac739f6-94ee-4c96-9325-23f2c58cbb5c
-begin
-	# Example function f (e.g., dew_temperature) that takes pressure p and returns a value.
-	function f(p)
-	    try
-	        return CoolProp.PropsSI("T", "P", p, "Q", 1.0, refrigerant)
-	    catch e
-	        return NaN
-	    end
-	end
-	
-	# Utility function to check if the function value is valid (not NaN)
-	isvalid(x) = !isnan(x)
-	
-	# Find validity boundary in one direction (dir can be :min or :max)
-	function find_validity_boundary(f, seed; factor=2.0, tol=1e-3, dir=:min)
-	    # Initialize
-	    p = seed
-	    fp = f(p)
-	    
-	    # If the seed itself is not valid, return error:
-	    if !isvalid(fp)
-	        error("Seed value produced NaN!")
-	    end
-	
-	    # Step 1: Expand until failure detected
-	    while isvalid(f(p))
-	        if dir == :min
-	            p /= factor  # decrease pressure
-	        else  # :max
-	            p *= factor  # increase pressure
-	        end
-	    end
-	    
-	    # Now p is invalid; set up bracket
-	    if dir == :min
-	        p_low = p  # invalid
-	        p_high = p * factor  # previous valid (because we divided last time)
-	    else
-	        p_low = p / factor  # previous valid
-	        p_high = p  # invalid
-	    end
-	    
-	    # Step 2: Refine the boundary using bisection
-	    while abs(p_high - p_low) > tol
-	        p_mid = (p_low + p_high) / 2
-	        if isvalid(f(p_mid))
-	            if dir == :min
-	                p_high = p_mid  # move upward (we want the lowest valid)
-	            else
-	                p_low = p_mid   # move upward (we want the highest valid)
-	            end
-	        else
-	            if dir == :min
-	                p_low = p_mid
-	            else
-	                p_high = p_mid
-	            end
-	        end
-	    end
-	    
-	    # For :min, return the highest pressure that is just valid,
-	    # for :max, return the lowest pressure that is just valid.
-	    return (p_low + p_high) / 2
-	end
-	
-	# Usage example
-	seed_pressure = 1e4  # starting with 100 kPa
-	min_valid_pressure = 390#find_validity_boundary(f, seed_pressure; factor=2.0, tol=1e-3, dir=:min)
-	max_valid_pressure = 4.056e6#find_validity_boundary(f, seed_pressure; factor=2.0, tol=1e-3, dir=:max)
-end
-
-# ╔═╡ 1fb782fb-b07c-4019-85c6-0f6f5b027709
-max_valid_pressure
-
-# ╔═╡ 8eee2a67-0ae5-4087-927b-8dd95125fa3a
-min_valid_pressure
-
-# ╔═╡ bceac1e3-20e6-421e-9908-32d0354ae1c0
-# Function to compute the largest rectangle in a binary matrix.
-# Returns the best rectangle as (row_min, row_max, col_min, col_max) and its area.
-function largest_valid_submatrix(B)
-    m, n = size(B)
-    height = zeros(Int, n)  # height histogram for each column
-    best_area = 0
-    best_coords = (1, 1, 1, 1)
-
-    for i in 1:m
-        # Update histogram: if B[i,j] is valid then increment, else reset to 0.
-        for j in 1:n
-            height[j] = B[i, j] ? height[j] + 1 : 0
-        end
-        # Compute largest rectangle in histogram for this row.
-        # We'll use a stack; the algorithm is similar to the classic one.
-        stack = Int[]  # will store column indices
-        # Process columns from 1 to n and add a sentinel at the end.
-        for j in 1:(n+1)
-            cur_height = (j <= n) ? height[j] : 0
-            while !isempty(stack) && cur_height < height[stack[end]]
-                h = height[pop!(stack)]
-                # Determine width of the rectangle
-                w = isempty(stack) ? j - 1 : j - stack[end] - 1
-                area = h * w
-                if area > best_area
-                    best_area = area
-                    row_max = i
-                    row_min = i - h + 1
-                    col_min = isempty(stack) ? 1 : stack[end] + 1
-                    col_max = j - 1
-                    best_coords = (row_min, row_max, col_min, col_max)
-                end
-            end
-            push!(stack, j)
-        end
-    end
-    return best_coords, best_area
-end
-
-# ╔═╡ 6435d235-34f8-4f43-a945-7cdd62e5dce7
-begin
-    # -----------------------------
-    # Fluid and Pressure Parameters
-    # -----------------------------
-    gas_fluid = "R134A"                        # refrigerant name
-    modelref = SingleFluid("R134A")
-
-    # Pressure limits (assumed to come from a validity boundary algorithm)
-    gas_pMin = min_valid_pressure                  # minimum valid pressure
-    gas_pMax = max_valid_pressure
-    try
-        # Use the critical pressure if available, but do not exceed it
-        gas_pMax = min(gas_pMax, CoolProp.PropsSI("Pcrit", gas_fluid))
-    catch
-        # if error, gas_pMax remains
-    end
-
-    numPressurePoints = 300                        # number of pressure points
-    # Pressure vector, logarithmically spaced (in Pa)
-    pressure_vec = exp.(range(log(gas_pMin*2), log(gas_pMax*(1-1e-9)), length=numPressurePoints))
-
-
-
-	dew_temp_values = [dew_temperature(modelref, p, [1.0])[1] for p in pressure_vec]
-	valid_indices = findall(!isnan, dew_temp_values)
-	pressure_dew_clean = pressure_vec[valid_indices]
-	dew_temp_clean = dew_temp_values[valid_indices]
-	itp_dew =  linear_interpolation((pressure_dew_clean),
-                                                  dew_temp_clean,
-                                                  extrapolation_bc = Interpolations.Linear())
-	T_dew_etp(p) = itp_dew(p)
-	@register_symbolic T_dew_etp(p) 
-
-	bub_temp_values = [bubble_temperature(modelref, p, [1.0])[1] for p in pressure_vec]
-	valid_indices = findall(!isnan, bub_temp_values)
-	pressure_bub_clean = pressure_vec[valid_indices]
-	bub_temp_clean = bub_temp_values[valid_indices]
-	itp_bub = linear_interpolation((pressure_bub_clean), bub_temp_clean,
-	                               extrapolation_bc = Interpolations.Linear())
-	T_bub_etp(p) = itp_bub(p)
-	@register_symbolic T_bub_etp(p)
-
-
-	
-    # -----------------------------
-    # Superheat Parameters
-    # -----------------------------
-    superheat_min = 0.1                            # minimum superheat (K)
-    superheat_max = 300.0                          # maximum superheat (K)
-    numSuperheatPoints = 50                        # number of superheat points
-    superheat_vec = range(superheat_min, superheat_max, length=numSuperheatPoints)
-
-    # -----------------------------
-    # Define Gas Property Functions
-    # -----------------------------
-    # Gas viscosity function: μ_gas(p, ΔT_super)
-    function μ_gas(p, ΔT_super; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
-            T_state = T_sat + ΔT_super
-            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN  # Return NaN on failure
-        end
-    end
-
-    # Gas thermal conductivity function: λ_gas(p, ΔT_super)
-    function λ_gas(p, ΔT_super; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 1.0, fluid)
-            T_state = T_sat + ΔT_super
-            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    # -----------------------------
-    # Build Gas Property Matrices and Filter with Largest Rectangle
-    # -----------------------------
-    xs = pressure_vec
-    ys = superheat_vec
-
-    # Build the property matrix for gas viscosity
-    visc = [μ_gas(x, y) for x in xs, y in ys]
-    # Create a Boolean mask: true when the value is not NaN
-    B_visc = .!isnan.(visc)
-    # Find largest valid submatrix in gas viscosity
-    coords, area = largest_valid_submatrix(B_visc)
-    rmin, rmax, cmin, cmax = coords
-    # Extract the valid subgrid for viscosity
-    visc_clean = visc[rmin:rmax, cmin:cmax]
-    xs_visc_clean = xs[rmin:rmax]
-    ys_visc_clean = ys[cmin:cmax]
-    # Create linear interpolant with flat extrapolation for viscosity
-    interp_linear_visc = linear_interpolation((xs_visc_clean, ys_visc_clean),
-                                              visc_clean,
-                                              extrapolation_bc = Interpolations.Flat())
-
-    # Build the property matrix for gas thermal conductivity
-    cond = [λ_gas(x, y) for x in xs, y in ys]
-    # Create a Boolean mask for conductivity matrix
-    B_cond = .!isnan.(cond)
-    # Find largest valid submatrix in gas conductivity
-    coords_cond, area_cond = largest_valid_submatrix(B_cond)
-    rmin_cond, rmax_cond, cmin_cond, cmax_cond = coords_cond
-    # Extract the valid subgrid for thermal conductivity
-    cond_clean = cond[rmin_cond:rmax_cond, cmin_cond:cmax_cond]
-    xs_cond_clean = xs[rmin_cond:rmax_cond]
-    ys_cond_clean = ys[cmin_cond:cmax_cond]
-    # Create linear interpolant with flat extrapolation for conductivity
-    interp_linear_cond = linear_interpolation((xs_cond_clean, ys_cond_clean),
-                                              cond_clean,
-                                              extrapolation_bc = Interpolations.Flat())
-
-    # -----------------------------
-    # Define the Superheat and Gas Property Lookup Functions
-    # -----------------------------
-    function SH(T, p)
-        # Retrieve dew temperature at pressure p (saturation, quality 1.0)
-        T_dew = T_dew_etp(p)
-        return T - T_dew
-    end
-
-    # These are the functions that will be used downstream
-    function μ_g(T, p)
-        sh = SH(T, p)
-        return interp_linear_visc(p, sh)
-    end
-
-    function λ_g(T, p)
-        sh = SH(T, p)
-        return interp_linear_cond(p, sh)
-    end
-
-    @register_symbolic μ_g(T, p)
-    @register_symbolic λ_g(T, p)
-
-    # -----------------------------
-    # Temperature/Phase and Enthalpy Functions
-    # -----------------------------
-    T_dew_(p) = dew_temperature(modelref, p, [1.0])[1]
-    T_bub_(p) = bubble_temperature(modelref, p, [1.0])[1]
-    T_PC(p)   = dew_temperature(modelref, p, [1.0])[1]
-    @register_symbolic T_dew_(p)
-    @register_symbolic T_bub_(p)
-    @register_symbolic T_PC(p)
-
-    h_dew_(p) = enthalpy(modelref, p, T_dew_(p), phase=:gas)
-    h_bub_(p) = enthalpy(modelref, p, T_bub_(p), phase=:liquid)
-    @register_symbolic h_dew_(p)
-    @register_symbolic h_bub_(p)
-
-    p_PC(T) = dew_pressure(modelref, T, [1.0])[1]
-    @register_symbolic p_PC(T)
-    @register_inverse T_PC p_PC
-
-    # -----------------------------
-    # Build Subcooled Liquid Property Interpolants
-    # -----------------------------
-    # Subcooling parameters: ΔT_sub = T - T_bubble (negative for subcooled liquids)
-    subcool_min = -30.0                 # e.g., 0 K subcooling (saturated liquid) to -30 K
-    subcool_max = 0.0
-    numSubcoolPoints = 50
-    subcool_vec = range(subcool_min, subcool_max, length=numSubcoolPoints)
-
-    # Subcooled liquid viscosity function: μ_liq(p, ΔT_sub)
-    function μ_liq(p, ΔT_sub; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
-            T_state = T_sat + ΔT_sub
-            return CoolProp.PropsSI("VISCOSITY", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    # Subcooled liquid thermal conductivity function: λ_liq(p, ΔT_sub)
-    function λ_liq(p, ΔT_sub; fluid=gas_fluid)
-        try
-            T_sat = CoolProp.PropsSI("T", "P", p, "Q", 0.0, fluid)
-            T_state = T_sat + ΔT_sub
-            return CoolProp.PropsSI("L", "P", p, "T", T_state, fluid)
-        catch e
-            return NaN
-        end
-    end
-
-    # Build property matrices for subcooled liquid properties over (pressure, ΔT_sub)
-    visc_liq = [μ_liq(p, sc) for p in pressure_vec, sc in subcool_vec]
-    cond_liq = [λ_liq(p, sc) for p in pressure_vec, sc in subcool_vec]
-
-    # Now use the largest valid rectangle approach for subcooled liquid viscosity
-    B_visc_liq = .!isnan.(visc_liq)
-    coords_liq, area_liq = largest_valid_submatrix(B_visc_liq)
-    rmin_liq, rmax_liq, cmin_liq, cmax_liq = coords_liq
-    visc_liq_clean = visc_liq[rmin_liq:rmax_liq, cmin_liq:cmax_liq]
-    xs_visc_liq_clean = pressure_vec[rmin_liq:rmax_liq]
-    ys_visc_liq_clean = subcool_vec[cmin_liq:cmax_liq]
-    interp_linear_visc_liq = linear_interpolation((xs_visc_liq_clean, ys_visc_liq_clean),
-                                                  visc_liq_clean,
-                                                  extrapolation_bc = Interpolations.Flat())
-
-    # And for subcooled liquid thermal conductivity
-    B_cond_liq = .!isnan.(cond_liq)
-    coords_cond_liq, area_cond_liq = largest_valid_submatrix(B_cond_liq)
-    rmin_cond_liq, rmax_cond_liq, cmin_cond_liq, cmax_cond_liq = coords_cond_liq
-    cond_liq_clean = cond_liq[rmin_cond_liq:rmax_cond_liq, cmin_cond_liq:cmax_cond_liq]
-    xs_cond_liq_clean = pressure_vec[rmin_cond_liq:rmax_cond_liq]
-    ys_cond_liq_clean = subcool_vec[cmin_cond_liq:cmax_cond_liq]
-    interp_linear_cond_liq = linear_interpolation((xs_cond_liq_clean, ys_cond_liq_clean),
-                                                  cond_liq_clean,
-                                                  extrapolation_bc = Interpolations.Flat())
-
-    # Define the subcooling function (using bubble temperature as reference)
-    function SC(T, p)
-        return T - T_bub_etp(p)
-    end
-
-    # Liquid property lookup functions (for subcooled liquid)
-    function μ_l(T, p)
-        sc = SC(T, p)
-        return interp_linear_visc_liq(p, sc)
-    end
-
-    function λ_l(T, p)
-        sc = SC(T, p)
-        return interp_linear_cond_liq(p, sc)
-    end
-
-    @register_symbolic μ_l(T, p)
-    @register_symbolic λ_l(T, p)
-
-    # -----------------------------
-    # Refrigerant Isobaric Heat Capacity
-    # -----------------------------
-    function cp_r(T, p)
-        return Clapeyron.isobaric_heat_capacity(modelref, p, T)
-    end
-    @register_symbolic cp_r(T, p)
-end
 
 # ╔═╡ 9538bfde-6ac2-4557-aaba-6b5e55f5b774
 function Compressor(; name,
@@ -997,266 +193,15 @@ function Compressor(; name,
 	NonlinearSystem(eqs, sts, ps; name);
 end
 
-# ╔═╡ 3cd0e1aa-f35e-4455-ae74-5973bbedd54d
-begin
-	
-		ρ_g_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:gas)
-		ρ_l_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:liquid)
-		@register_symbolic ρ_l_(p, T)
-		@register_symbolic ρ_g_(p, T)
-end
-
-# ╔═╡ 569d53eb-45d2-47d0-93cb-866018abeb4f
+# ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
 #=╠═╡
-function Prop_REF_gas(;name, refrigerant::String = "R134A")
-	ps = @parameters begin
-	end
-	sts = @variables begin
-		p = 1e5
-		T = 300.0
-		cp = 1.0
-		μ = 1.0
-		λ = 1.0
-		ρ = 1.0
-	end
-
-    eqs = [
-        cp ~ cp_r(T, p),
-        λ ~ λ_g(T, p),
-        μ ~ μ_g(T, p),
-        ρ ~ ρ_g_(p, T)
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
+md" ## Sub model: Evaporator"
   ╠═╡ =#
 
-# ╔═╡ ad17bd58-b5c6-4560-9be4-ff2eadf594d9
+# ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
 #=╠═╡
-function Prop_REF_liq(;name, refrigerant::String = "R134A")
-	ps = @parameters begin
-	end
-	sts = @variables begin
-		p = 1e5
-		T = 300.0
-		cp = 1.0
-		μ = 1.0
-		λ = 1.0
-		ρ = 1.0
-	end
-    eqs = [
-        cp ~ cp_r(T, p),
-        λ ~ λ_l(T, p),
-        μ ~ μ_l(T, p),
-        ρ ~ ρ_l_(p, T),
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
+md""" # Solving the system"""
   ╠═╡ =#
-
-# ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
-begin
-    # ---------------------------
-    # 1. Sample over the χ dimension
-    # ---------------------------
-    chi_vec = range(0.0, stop=1.0, length=100)  # adjust as needed
-    
-    # Prepare arrays for T_freeze and T_max
-    T_freeze_vals = Float64[]
-    T_max_vals = Float64[]
-    chi_valid = Float64[]
-    
-    for χ in chi_vec
-        try
-            # Try to get T_freeze for the given concentration.
-            T_f = CoolProp.PropsSI("T_freeze", "INCOMP::MEA[$χ]")
-            # Try to get the maximum temperature that CoolProp accepts.
-            T_max = CoolProp.PropsSI("T_max", "INCOMP::MEA[$χ]")
-            if isnan(T_f) || isnan(T_max)
-                continue  # skip if either is NaN
-            end
-            push!(chi_valid, χ)
-            push!(T_freeze_vals, T_f)
-            push!(T_max_vals, T_max)
-        catch e
-            # Skip concentrations that produce errors.
-        end
-    end
-    
-    # ---------------------------
-    # 2. Build 1D interpolants for T_freeze(χ) and T_max(χ)
-    # ---------------------------
-    itp_Tfreeze = LinearInterpolation(chi_valid, T_freeze_vals, extrapolation_bc=Interpolations.Flat())
-    itp_Tmax    = LinearInterpolation(chi_valid, T_max_vals, extrapolation_bc=Interpolations.Flat())
-    
-    # ---------------------------
-    # 3. Define the (χ, T̃) grid for the 2D interpolants
-    # ---------------------------
-    num_chi = length(chi_valid)
-    num_T   = 50  # number of temperature points in the grid
-    T_tilde = range(0.0, stop=1.0, length=num_T)  # nondimensional temperature
-    
-    # ---------------------------
-    # 4a. Density (ρ) Interpolant
-    # ---------------------------
-    prop_vals_rho = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        # Dimensional temperature vector: T = T̃*(T_M - T_f) + T_f.
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                # Example: compute density at pressure 1e5 Pa.
-                prop = CoolProp.PropsSI("D", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_rho[i, j] = prop
-            catch e
-                prop_vals_rho[i, j] = NaN
-            end
-        end
-    end
-    good_rows_rho = [i for i in 1:num_chi if !all(isnan, prop_vals_rho[i, :])]
-    chi_good_rho = chi_valid[good_rows_rho]
-    prop_vals_rho_good = prop_vals_rho[good_rows_rho, :]
-    itp_2D_rho = Interpolations.interpolate((chi_good_rho, collect(T_tilde)), prop_vals_rho_good, Gridded(Linear()))
-    itp_2D_rho_ext = extrapolate(itp_2D_rho, Interpolations.Flat())
-    
-    function ρ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_rho_ext(χ, T_tilde_val)
-    end
-    @register_symbolic ρ_b_(T, χ)
-    
-    # ---------------------------
-    # 4b. Thermal Conductivity (λ) Interpolant
-    # ---------------------------
-    prop_vals_lambda = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("L", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_lambda[i, j] = prop
-            catch e
-                prop_vals_lambda[i, j] = NaN
-            end
-        end
-    end
-    good_rows_lambda = [i for i in 1:num_chi if !all(isnan, prop_vals_lambda[i, :])]
-    chi_good_lambda = chi_valid[good_rows_lambda]
-    prop_vals_lambda_good = prop_vals_lambda[good_rows_lambda, :]
-    itp_2D_lambda = Interpolations.interpolate((chi_good_lambda, collect(T_tilde)), prop_vals_lambda_good, Gridded(Linear()))
-    itp_2D_lambda_ext = extrapolate(itp_2D_lambda, Interpolations.Flat())
-    
-    function λ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_lambda_ext(χ, T_tilde_val)
-    end
-    @register_symbolic λ_b_(T, χ)
-    
-    # ---------------------------
-    # 4c. Specific Heat (cp) Interpolant
-    # ---------------------------
-    prop_vals_cp = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("C", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_cp[i, j] = prop
-            catch e
-                prop_vals_cp[i, j] = NaN
-            end
-        end
-    end
-    good_rows_cp = [i for i in 1:num_chi if !all(isnan, prop_vals_cp[i, :])]
-    chi_good_cp = chi_valid[good_rows_cp]
-    prop_vals_cp_good = prop_vals_cp[good_rows_cp, :]
-    itp_2D_cp = Interpolations.interpolate((chi_good_cp, collect(T_tilde)), prop_vals_cp_good, Gridded(Linear()))
-    itp_2D_cp_ext = extrapolate(itp_2D_cp, Interpolations.Flat())
-    
-    function cp_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_cp_ext(χ, T_tilde_val)
-    end
-    @register_symbolic cp_b_(T, χ)
-    
-    # ---------------------------
-    # 4d. Viscosity (μ) Interpolant
-    # ---------------------------
-    prop_vals_mu = Array{Float64}(undef, num_chi, num_T)
-    for (i, χ) in enumerate(chi_valid)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_dim = [t̃*(T_M - T_f) + T_f for t̃ in T_tilde]
-        for (j, T_val) in enumerate(T_dim)
-            try
-                prop = CoolProp.PropsSI("VISCOSITY", "P", 1e5, "T", T_val, "INCOMP::MEA[$χ]")
-                prop_vals_mu[i, j] = prop
-            catch e
-                prop_vals_mu[i, j] = NaN
-            end
-        end
-    end
-    good_rows_mu = [i for i in 1:num_chi if !all(isnan, prop_vals_mu[i, :])]
-    chi_good_mu = chi_valid[good_rows_mu]
-    prop_vals_mu_good = prop_vals_mu[good_rows_mu, :]
-    itp_2D_mu = Interpolations.interpolate((chi_good_mu, collect(T_tilde)), prop_vals_mu_good, Gridded(Linear()))
-    itp_2D_mu_ext = extrapolate(itp_2D_mu, Interpolations.Flat())
-    
-    function μ_b_(T, χ)
-        T_f = itp_Tfreeze(χ)
-        T_M = itp_Tmax(χ)
-        T_tilde_val = (T - T_f) / (T_M - T_f)
-        return itp_2D_mu_ext(χ, T_tilde_val)
-    end
-    @register_symbolic μ_b_(T, χ)
-
-	# ---------------------------
-	# 4e. Thermal Expansion Coefficient (β) Interpolant
-	# ---------------------------
-	function β_b_(T, χ)
-	    # Get the temperature limits for concentration χ
-	    T_f = itp_Tfreeze(χ)
-	    T_M = itp_Tmax(χ)
-	    # Map the physical temperature T to the nondimensional coordinate
-	    T_tilde_val = (T - T_f) / (T_M - T_f)
-	    
-	    # Evaluate the density at (T,χ)
-	    ρ_val = itp_2D_rho_ext(χ, T_tilde_val)
-	    
-	    # Compute the gradient of the density interpolation.
-	    # This returns a tuple with derivatives with respect to the grid variables:
-	    # (∂ρ/∂χ, ∂ρ/∂T̃)
-	    grad = Interpolations.gradient(itp_2D_rho_ext, χ, T_tilde_val)
-	    
-	    # Extract the derivative with respect to the nondimensional temperature T̃.
-	    dρ_dTtilde = grad[2]
-	    # Convert derivative to physical temperature using the chain rule:
-	    dρ_dT = dρ_dTtilde / (T_M - T_f)
-	    
-	    # Return the thermal expansion coefficient:
-	    # Note the negative sign to ensure β is positive.
-	    return -dρ_dT / ρ_val
-	end
-
-	β_b_(T) = β_b_(T, 0.0)
-	@register_symbolic β_b_(T, χ)
-	@register_symbolic β_b_(T)
-
-end
-
 
 # ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 begin
@@ -1433,16 +378,6 @@ end
 sol_.resid
   ╠═╡ =#
 
-# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
-#=╠═╡
-sol_.ps[T_b_in]
-  ╠═╡ =#
-
-# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
-#=╠═╡
-sin(sol_[αL])^2
-  ╠═╡ =#
-
 # ╔═╡ 08c9f46e-e683-4429-a5d6-56682232c1e7
 #=╠═╡
 begin
@@ -1501,462 +436,63 @@ begin
 end;
   ╠═╡ =#
 
-# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╔═╡ ad4c38f4-b78d-42c9-b868-102b1a17386d
+#=╠═╡
+sol_.ps[T_b_in]
+  ╠═╡ =#
+
+# ╔═╡ 352f52d6-70ec-47d7-8b46-892f6f1f6184
+#=╠═╡
+sin(sol_[αL])^2
+  ╠═╡ =#
+
+# ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 # ╠═╡ disabled = true
 #=╠═╡
 begin
-    # Plot using WGLMakie
-    fig = Figure(size=(800,600))
-    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
-              title="Evaporator temperature profile")
+	#https://docs.sciml.ai/NonlinearSolve/stable/solvers/nonlinear_system_solvers/#NLSolvers.jl
+    logger = ConsoleLogger(stderr, Logging.Error)  # Only show errors
+	valid_sols = Any[]
+    # Get variable names as strings and then as symbols
+    names_unk = string.(unknowns)
+    var_names_sym = Symbol.(names_unk)
     
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
-    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
-	
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
-    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
-    
-    # Add a vertical dashed line at x = L_EV_func()
-    vline = L_EV_func()
-    vlines!(ax, [vline], color=:black, linestyle=:dash)
-    
-    # Choose a y-position for the text (adjust as needed)
-    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
-    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
-    
-    # Add text labels to the left and right of the vertical line
-    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
-    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
+    # Global DataFrame columns: Solver and the unknowns
+    col_names = [:Solver; var_names_sym...]
+    results_df = DataFrame([name => Any[] for name in col_names]...)
 
+    for alg in candidate_solvers
+        solver_name = string(typeof(alg))
+        try
+            sol_ = Logging.with_logger(logger) do
+                NonlinearSolve.solve(prob_, alg)
+            end
+            # Create a dictionary where keys are Symbols
+            sol_dict = Dict(var_names_sym .=> sol_.u)
+            # Merge with a dictionary for the solver name:
+            row_dict = merge(Dict(:Solver => solver_name), sol_dict)
+			#row_dict.LA = sol_["LA"]
+            # You can push the dictionary directly as a row:
+            push!(results_df, row_dict)
+            valid_sols= [valid_sols]
+        catch e
+        end
+    end
+    results_df;
 	
-	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
-    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
-    
-	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
-    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
-    
-    axislegend(ax, position = :lt)  # Add legend to the axis
-
-	DataInspector(fig)
-    fig  # Display the figure
 end
 
+  ╠═╡ =#
+
+# ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
+#=╠═╡
+md" # Combined problem"
   ╠═╡ =#
 
 # ╔═╡ e0e3b049-8874-44f4-a661-50e88d164e3a
+# ╠═╡ disabled = true
+#=╠═╡
 T_b_out |> get_variables
-
-# ╔═╡ e83823bb-e069-4e5d-9d94-b22b09135a94
-#TDL: make the htc into other components
-function Evaporator(;name, refrigerant::String = "R134A")
-	ps = @parameters begin
-		W = 0.2, [description = "Plate Heat eXchanger width"]
-		np = 20.0, [description = "Total number of plate"]
-		ϕ = 1.118, [description = "Surface enlargment factor"]
-		b = 2e-3, [description = "Pressing depth "]
-		β = 30, [description = "Chevron angle (°)"]
-		χ = 0.38, [description = "Secondary fluid concentration"]
-		L_PHX = 0.3, [description = "Plate Heat eXchanger length"]
-		th = 1e-3, [description = "Plate thickness"]
-		λ_Cu = 300.0, [description = "Wall (copper) thermal conductivity"]
-	end
-	sts = @variables begin
-		ṁ_r = 1.0
-		ṁ_b = 1.0
-		T_p_b = 1.0
-		T_p_r = 1.0
-		T_evap = 1.0
-		T_b_in = 1.0
-		αL = 1.0
-		T_b_interface = 1.0
-		T_r_interface = 1.0
-		T_r_out = 1.0
-		T_b_out = 1.0
-		h_r_interface = 1.0
-		h_r_in = 1.0
-		K_SH_r_ = 1.0
-		K_EV_r_ = 1.0
-		K_SH_b_ = 1.0
-
-		h1 = 1.0
-		h2 = 1.0
-	end
-
-	h_dew = h_dew_(T_evap)
-	h_bub = h_bub_(T_evap)
-	p_evap = p_PC(T_evap)
-
-	@named gphase = Prop_REF_gas()
-	@named lphase = Prop_REF_liq()
-	@named brine = Prop_SF(χ0 = χ)
-
-	#aliases
-	
-	cp_r_gas = gphase.cp
-	μ_r_gas = gphase.μ
-	λ_r_gas = gphase.λ
-	ρ_r_gas = gphase.ρ
-	
-	cp_r_liq = lphase.cp
-	μ_r_liq = lphase.μ
-	λ_r_liq = lphase.λ
-	ρ_r_liq = lphase.ρ
-	
-	cp_b = brine.cp
-	μ_b = brine.μ
-	λ_b = brine.λ
-	ρ_b = brine.ρ
-	
-	dh = 2*b                       # hydraulic diameter 
-	S = (b*np)/2 #assuming half volume/section in each channel
-	V̇_b = abs(ṁ_b)/ρ_b
-	
-	v_b = V̇_b/S                  # speed of the secondary fluid 
-	
-	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
-	v_r_gas = V̇_r_gas/S
-
-	Re_raw_b = ρ_b * v_b * dh / μ_b           # Reynolds
-	Re_b = sqrt(Re_raw_b^2 + 1e-12) # < maybe solves some NaN problems?
-	
-	Pr_b = cp_b * μ_b / λ_b
-	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
-	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
-	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
-	#very wrong correlation ⚠
-	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_b = Nudh_b*λ_b/dh
-	
-	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
-	
-	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
-	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
-	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
-	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
-	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_r_gas = Nudh_r_gas*λ_r_gas/dh
-
-
-	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
-	U_EV = 1/(1/h_b + th/λ_Cu)
-
-	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
-	
-	L_EV = sin(αL)^2 * L_PHX
-	L_SH = cos(αL)^2 * L_PHX
-	#L_SH = L_PHX
-
-	UA_SH = U_SH * L_SH * Per_PHX
-	UA_SH = L_SH * Per_PHX
-	UA_EV = U_EV * L_EV * Per_PHX
-	UA_EV = L_EV * Per_PHX
-
-	# "right" side of the HX; superheating.
-	# Term regarding the superheated gas
-	K_SH_r_ = 2e3 / ṁ_r / cp_r_gas
-	# Term regarding the brine (single phase)
-	K_SH_b_ = 2e3 / ṁ_b / cp_b
-
-	# "left" side of the HX: evaporation.
-	# Term regarding the brine (single phase)
-	K_EV_b_ = UA_EV / ṁ_b / cp_b
-	
-	# --- SH
-	
-	#variables that will not be present in the end system
-	@variables x_SH
-	T_b_SH = T_evap
-		+ (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)
-		+ (K_SH_b_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*exp(-(K_SH_b_+K_SH_r_)*(L_SH-x_SH))
-	#T_b_SH = T_evap + (T_b_in - T_evap)*exp(-K_SH_b_*x)
-	T_b_interface_ = substitute(T_b_SH, x_SH => 0.0)
-	#T_b_interface_ = substitute(T_b_SH, x => L_SH)
-
-	#T_r_SH = T_evap + (α_r_*(T_b_in - T_evap)*exp(-α_SH_*L_SH))/(α_r_ + α_SH_) * (exp((α_r_ + α_SH_)*x) - 1)/exp(α_r_*x)
-	#T_r_SH = T_evap + (K_SH_r_*(T_b_in - T_evap))/(K_SH_r_ + K_SH_b_)*(1 - exp(-(K_SH_r_ + K_SH_b_)*x))
-	T_r_SH = T_evap + (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*(1 - exp(-(K_SH_b_+K_SH_r_)*x_SH))
-
-	
-	# --- EV
-
-	#variables that will not be present in the end system
-	@variables x_EV
-	
-	T_b_EV = T_evap + (T_b_interface_ - T_evap)*exp(-K_EV_b_*(L_EV-x_EV))
-	T_r_EV = T_evap
-	h_r_EV = h_dew - ṁ_b*cp_b/ṁ_r*(T_b_interface_-T_b_EV)
-
-	eqs = [
-		h1 ~ h_b
-		h2 ~ h_r_gas
-		K_SH_r_ ~ K_SH_r_
-		K_SH_b_ ~ K_SH_b_
-		K_EV_r_ ~ K_EV_r_
-		p_evap ~ lphase.p
-		p_evap ~ gphase.p
-		
-		T_p_r ~ lphase.T
-		T_p_r ~ gphase.T
-		
-		T_p_b ~ brine.T
-		
-		T_b_interface ~ T_b_interface_
-		T_r_interface ~ substitute(T_r_SH, x_SH => 0.0)
-		T_r_out ~ substitute(T_r_SH, x_SH => L_SH)
-		T_b_out ~ substitute(T_b_EV, x_EV => 0.0)
-		h_r_interface ~ h_dew
-		h_r_in ~ substitute(h_r_EV, x_EV=> 0.0)
-	]
-	return ModelingToolkit.compose(NonlinearSystem(eqs, sts, ps; name = name), [gphase, lphase, brine]);
-end
-
-# ╔═╡ 92c361eb-bb54-4565-8ac6-d6cbad4141d9
-#=╠═╡
-function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
-	ps = @parameters begin
-		χ = χ0
-	end
-	sts = @variables begin
-		T = 300.0
-		cp = 1.0
-		μ = 1.0
-		λ = 1.0
-		ρ = 1.0
-		β = 1.0
-	end
-
-    eqs = [
-        cp ~ cp_b_(T, χ),
-        λ ~ λ_b_(T, χ),
-        μ ~ μ_b_(T, χ),
-        ρ ~ ρ_b_(T, χ),
-		β ~ β_b_(T, χ)
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-  ╠═╡ =#
-
-# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
-begin
-	
-	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
-	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
-	
-	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
-
-	cp_1 = cp_b_(T_p_1, χ)
-	μ_1 = μ_b_(T_p_1, χ)
-	λp_1 = λ_b_(T_p_1, χ)
-	ρ_1 = ρ_b_(T_p_1, χ)
-	
-	V̇_1 = ṁ_1 / ρ_1
-	S_1 = π*D_1^2/4
-	v_1 = V̇_1 / S_1
-
-	Re_1 = ρ_1*v_1*D_1/μ_1
-	Pr_1 = cp_1*μ_1/λp_1
-
-	Nu_lam_1 = 3.66
-	f_1 = 0.3164*Re_1^(-1//4)
-	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
-	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
-
-	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
-
-	h_1 = Nu_1 * λp_1/D_1
-
-	#---
-
-	cp_2 = cp_b_(T_p_2, χ)
-	μ_2 = μ_b_(T_p_2, χ)
-	λp_2 = λ_b_(T_p_2, χ)
-	ρ_2 = ρ_b_(T_p_2, χ)
-	
-	V̇_2 = ṁ_2 / ρ_2
-	S_2 = π*D_2^2/4
-	v_2 = V̇_2 / S_2
-
-	Re_2 = ρ_2*v_2*D_2/μ_2
-	Pr_2 = cp_2*μ_2/λp_2
-
-	Nu_lam_2 = 3.66
-	f_2 = 0.3164*Re_1^(-1//4)
-	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
-	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
-
-	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_1*Nu_tur_2
-
-	h_2 = Nu_2 * λp_2/D_2;
-end;
-
-# ╔═╡ 40cb2982-16d6-435f-b1d2-c62040416819
-begin
-	#@variables D_1 D_2 D_b th_1 th_2
-	Per_1 = pi*(D_1-th_1)
-	Per_2 = pi*(D_2-th_2)
-	Per_w = pi*(D_b)
-	
-	R_1 = 1/(Per_1*h_1)
-	R_2 = 1/(Per_2*h_2)
-	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
-	
-	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
-	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
-
-end;
-
-# ╔═╡ e2bd77ff-f24e-4d27-948c-d92294f2367f
-begin
-	
-	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
-	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
-	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
-	
-	UA_12_cd_tot = 1/R_12_cd_tot
-	UA_1w_cd_tot = 1/R_1w_cd_tot
-	UA_2w_cd_tot = 1/R_2w_cd_tot;
-	
-end;
-
-# ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
-UA_12_cd_tot |> get_variables
-#	UA_1w_cd_tot = 1/R_1w_cd_tot
-#	UA_2w_cd_tot = 1/R_2w_cd_tot;
-#r_p,
-#r_b,
-#UP_12_Upipe
-
-# ╔═╡ 04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
-begin
-	@variables D_p T_p_bh
-	UP_12_Upipe = substitute(UA_12_cd_tot, [r_p => D_p/2, r_b => D_b/2, D_1 => D_p-2th, D_2 => D_p-2th, th_1 => th, th_2 => th, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, T_p_1 => T_p_bh, T_p_2 => T_p_bh])
-	UP_12_Upipe |> get_variables
-end
-
-# ╔═╡ de7deb47-9d43-4423-9fc2-4911ee6dc05a
-UA_12_cd_tot |> get_variables
-
-# ╔═╡ 8815b4d5-6ec5-4e14-b081-296e4cb17cea
-begin
-	@variables th_p, ṁ_bh
-	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh])
-	R_12_simplified |> get_variables
-R1B_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low, expression=Val{false});
-eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low) = @bymap R1B_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low)
-	
-end
-
-# ╔═╡ e0c4a54e-87c8-4b24-845e-483cda6e4966
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-XX = range(1e-2, 2.0, length = 300)
-	
-	n_p = 1000
-YY = map(x->eval_R1b(
-	115e-3,
-	Particles(n_p, Uniform(0.35, 0.36)),
-	2e-3,
-	Particles(n_p, Uniform(0.5, 0.51)),
-	40e-3,
-	Particles(n_p, Uniform(3.5, 4.5)),
-	Particles(n_p, Uniform(1.8, 2.2)),
-	x,
-	273.15+5,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	273.15+5,
-	5000,
-	2300), XX)
-end
-  ╠═╡ =#
-
-# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
-#=╠═╡
-begin
-	m_Y = [median(y.particles) for y in YY]
-	q_05 = [quantile(y.particles, 0.025) for y in YY]
-	q_95 = [quantile(y.particles, 0.975) for y in YY]
-end
-  ╠═╡ =#
-
-# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
-#=╠═╡
-begin
-fig_study = Makie.lines(XX, m_Y)
-	band!(XX, q_05, q_95)
-	fig_study
-end
-  ╠═╡ =#
-
-# ╔═╡ 15089d8d-0632-44f1-aa8e-e726cb5b673e
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-XBH = range(1e-2, 300.0, length = 300)
-TT = map(x-> eval_T1(
-	273.15,#T_p_1,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	115e-3,
-	2e-3,#th_1,
-	Particles(n_p, Uniform(0.35, 0.45)),
-	2e-3,#th_2,
-	2300,#Re_low,
-	5000,#Re_high,
-	273.15,#T_p_2,
-	20e-3,#r_p,
-	3.5,#λ_ground,
-	2.0,#λ_grout,
-	1.0,#ṁ_b,
-	x,#x_bh,
-	273.15+5,#T_1_in,
-	273.15+10,#T_wall,
-	300.0,#L_bh
-	0.3,#α
-), XBH)
-end
-  ╠═╡ =#
-
-# ╔═╡ 42556ee8-4011-4522-bd9d-512571609e36
-#=╠═╡
-begin
-	m_T = [median(y.particles) for y in TT]
-	q_05_T = [quantile(y.particles, 0.025) for y in TT]
-	q_95_T = [quantile(y.particles, 0.975) for y in TT]
-fig_study_T = Makie.lines(XBH, m_T)
-	band!(XBH, q_05_T, q_95_T)
-	fig_study_T
-end
-  ╠═╡ =#
-
-# ╔═╡ ab333b77-b3ee-4cd4-b2f9-07bbceb12377
-# ╠═╡ disabled = true
-#=╠═╡
-UA_12_cd_tot |> simplify;
-  ╠═╡ =#
-
-# ╔═╡ 8e6a8e3b-c991-439d-bc9b-ba436d0be550
-#=╠═╡
-get_variables(sC_2)
-  ╠═╡ =#
-
-# ╔═╡ e39867fd-9323-4fc8-8e27-da4cc5ed327e
-get_variables(sλ_1)
-
-# ╔═╡ d2ff5f9e-3260-4e10-bca3-af2742b13877
-#=╠═╡
-begin
-	@variables x_bh
-	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
-	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
-	
-	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh)
-	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
-	Tbh_in = T_1_in
-	Tbh_out = substitute(sT_2, x_bh=>0.0);
-	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
-	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
-end;
   ╠═╡ =#
 
 # ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
@@ -2079,15 +615,41 @@ sol_coupled_[ṁ_b]
 sin(sol_coupled_[αL])^2
   ╠═╡ =#
 
+# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
+#=╠═╡
+sol_coupled_[Tbh_in]-273.15
+  ╠═╡ =#
+
 # ╔═╡ be518053-81ce-44eb-9fb7-b4e2c998755f
 #=╠═╡
 sol_coupled_[T_b_in]-273.15
 
   ╠═╡ =#
 
-# ╔═╡ 5191ed40-a917-4d63-95e0-3efa29501720
+# ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
 #=╠═╡
-sol_coupled_[Tbh_in]-273.15
+md" # BHE + Evap + Compressor"
+  ╠═╡ =#
+
+# ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
+# ╠═╡ disabled = true
+#=╠═╡
+UA_12_cd_tot |> get_variables
+#	UA_1w_cd_tot = 1/R_1w_cd_tot
+#	UA_2w_cd_tot = 1/R_2w_cd_tot;
+#r_p,
+#r_b,
+#UP_12_Upipe
+  ╠═╡ =#
+
+# ╔═╡ 04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@variables D_p T_p_bh
+	UP_12_Upipe = substitute(UA_12_cd_tot, [r_p => D_p/2, r_b => D_b/2, D_1 => D_p-2th, D_2 => D_p-2th, th_1 => th, th_2 => th, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, T_p_1 => T_p_bh, T_p_2 => T_p_bh])
+	UP_12_Upipe |> get_variables
+end
   ╠═╡ =#
 
 # ╔═╡ c900c406-5e25-467b-8771-feedfe933685
@@ -2285,180 +847,483 @@ begin
 end
   ╠═╡ =#
 
-# ╔═╡ 94978409-840d-4523-821c-96a20ebd2411
+# ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
 #=╠═╡
-Tbh_out
+md" # Internal forced convection"
   ╠═╡ =#
 
-# ╔═╡ 9773c5a1-bc3a-47f8-bd64-1659cebf09b1
-#=╠═╡
-sT_2 |> get_variables
-  ╠═╡ =#
-
-# ╔═╡ 56ec718e-7c9f-4e63-853d-65c959f1439a
-#=╠═╡
-fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-  ╠═╡ =#
-
-# ╔═╡ 837d8d99-458c-4077-8531-f25346684057
-#=╠═╡
-fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-  ╠═╡ =#
-
-# ╔═╡ ef230968-2812-4800-bc90-b18d70c7da4f
-#=╠═╡
-begin
-	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	
-	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-
-	@variables D_bh
-	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
-	sT_1_cd = substitute(sT_1_cd, d_simpl);
-	
-end;
-  ╠═╡ =#
-
-# ╔═╡ c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
-#=╠═╡
-get_variables(sT_1_cd)
-  ╠═╡ =#
-
-# ╔═╡ 2ae189b5-9158-4d80-9630-fef4859b05de
-#=╠═╡
-get_variables(sT_1_cd)
-  ╠═╡ =#
-
-# ╔═╡ 5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
+# ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
 # ╠═╡ disabled = true
 #=╠═╡
-simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
-  ╠═╡ =#
-
-# ╔═╡ 56f8523d-7a41-4c99-b56c-3a4aa919f4e7
-# ╠═╡ disabled = true
-#=╠═╡
-T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
-  ╠═╡ =#
-
-# ╔═╡ 03df0193-84df-4c45-8882-f3c3ca457fd1
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-end;
-  ╠═╡ =#
-
-# ╔═╡ e0175788-3009-4494-ba16-05d1e0d7381b
-# Borehole resistance in natural convection
-begin
-	#@variables r_p r_b
-	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
-	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
-	@variables T_w_av T_1_av T_2_av T_b_av
-	@parameters g
-	T_f_1_w = 0.5*T_1_av + .5*T_w_av
-	T_f_2_w = 0.5*T_2_av + .5*T_w_av
-	T_f_b_w = 0.5*T_b_av + .5*T_w_av
-
-	Gr_1 = g*β_b_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
-	Gr_2 = g*β_b_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
-	Gr_b = g*β_b_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
-
-	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
-	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
-	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
+function h_tube(;name)
+	ps = @parameters begin
+		cp
+		μ
+		λ
+		ρ
+		Di
+	end
+	sts = @variables begin
+		h
+		ṁ
+	end
+	csts = @constants begin
+		Re_low = 2300
+		Re_high = 5000
+	end
 	
-	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
-	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
-	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+	V̇ = ṁ / ρ
+	S = π * Di ^ 2 / 4
+	v = V̇ / S
 
-	R_1w_cv = 1/(h_1_w*pi*D_1)
-	R_2w_cv = 1/(h_2_w*pi*D_2)
-	R_bw_cv = 1/(h_b_w*pi*D_b);
-end;
+	Re = ρ * v * Di / μ
+	Pr = cp * μ / λ
 
-# ╔═╡ cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
-begin
-	R_12_cv = R_1w_cv + R_2w_cv
-	R_1b_cv = R_1w_cv + R_bw_cv
-	R_2b_cv = R_2w_cv + R_bw_cv;
+	Nu_lam = 3.66
+	f = 0.3164*Re^(-1//4)
+	Nu_tur = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
+	turb_index = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+
+	Nu = (1-turb_index) * Nu_lam + turb_index * Nu_tur
+
+    eqs = [h ~ Nu * λ / Di]
 	
-	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
-	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
-	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
-	
-	UA_12_cv_tot = 1/R_12_cv_tot
-	UA_1w_cv_tot = 1/R_1w_cv_tot
-	UA_2w_cv_tot = 1/R_2w_cv_tot;
-end;
-
-# ╔═╡ f0d290c1-584c-46e0-9377-3c73fec48818
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	eq_little = [Tbh_in - Tbh_out~3.0]
-	pars_l = [
-		L_bh,
-		Per_12,
-		Per_w1,
-		Per_w2,
-		cp_1_bh,
-		cp_2_bh,
-		U_12,
-		U_w1,
-		U_w2,
-		T_wall,
-		T_1_in,
-		χ,
-	]
-	unknowns_li = [ṁ_b]
-	@named little = NonlinearSystem(eq_little, unknowns_li, pars_l)
-	l_ = simplify(little) |> complete
-	ps_l = Dict(
-		χ => χ_,
-		L_bh => 250.0,
-		U_12 => 15.0,
-		U_w1 => 20.0,
-		U_w2 => 20.0,
-		ṁ_b => 0.6,
-		T_wall => 273.15+10,
-		cp_1_bh => cp_b_(T_wall, χ),
-		cp_2_bh => cp_b_(T_wall, χ),
-		T_1_in => 273.15+3,
-		Per_12 => pi*40e-3,
-		Per_w1 => pi*40e-3,
-		Per_w2 => pi*40e-3,
-	)
-	prob_l_ = NonlinearProblem(l_, [], ps_l, symbolic_u0 = true)
-	sol_l_ = NonlinearSolve.solve(prob_l_)
-	sol_l_.resid
-	sol_l_[Tbh_out]
+	return NonlinearSystem(eqs, sts, ps; name = name);
 end
   ╠═╡ =#
 
-# ╔═╡ 269fe50b-de21-43da-bd7b-bc4e8753fd18
+# ╔═╡ 2da011ed-131f-48d7-baac-285b2b7d147e
 # ╠═╡ disabled = true
 #=╠═╡
-cp_r(Inf, Inf)
+@named h1 = h_tube()
   ╠═╡ =#
 
-# ╔═╡ b1bbe22d-0468-452e-8fd2-870c8f6bbd56
+# ╔═╡ 075e8fb2-89ff-4936-8c67-ca8e90159a5a
 # ╠═╡ disabled = true
 #=╠═╡
-β_b_(0.0)
+@named h2 = h_tube()
   ╠═╡ =#
 
-# ╔═╡ 244ccf5e-9dbf-4aae-b7c0-8aebbfc819bd
-test_func(x) = 2x
+# ╔═╡ 92c361eb-bb54-4565-8ac6-d6cbad4141d9
+# ╠═╡ disabled = true
+#=╠═╡
+function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
+	ps = @parameters begin
+		χ = χ0
+	end
+	sts = @variables begin
+		T = 300.0
+		cp = 1.0
+		μ = 1.0
+		λ = 1.0
+		ρ = 1.0
+		β = 1.0
+	end
+
+    eqs = [
+        cp ~ cp_b_(T, χ),
+        λ ~ λ_b_(T, χ),
+        μ ~ μ_b_(T, χ),
+        ρ ~ ρ_b_(T, χ),
+		β ~ β_b_(T, χ)
+	]
+
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
+  ╠═╡ =#
+
+# ╔═╡ 3cd0e1aa-f35e-4455-ae74-5973bbedd54d
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+		ρ_g_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:gas)
+		ρ_l_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:liquid)
+		@register_symbolic ρ_l_(p, T)
+		@register_symbolic ρ_g_(p, T)
+end
+  ╠═╡ =#
+
+# ╔═╡ 569d53eb-45d2-47d0-93cb-866018abeb4f
+# ╠═╡ disabled = true
+#=╠═╡
+function Prop_REF_gas(;name, refrigerant::String = "R134A")
+	ps = @parameters begin
+	end
+	sts = @variables begin
+		p = 1e5
+		T = 300.0
+		cp = 1.0
+		μ = 1.0
+		λ = 1.0
+		ρ = 1.0
+	end
+
+    eqs = [
+        cp ~ cp_r(T, p),
+        λ ~ λ_g(T, p),
+        μ ~ μ_g(T, p),
+        ρ ~ ρ_g_(p, T)
+	]
+
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
+  ╠═╡ =#
+
+# ╔═╡ ad17bd58-b5c6-4560-9be4-ff2eadf594d9
+# ╠═╡ disabled = true
+#=╠═╡
+function Prop_REF_liq(;name, refrigerant::String = "R134A")
+	ps = @parameters begin
+	end
+	sts = @variables begin
+		p = 1e5
+		T = 300.0
+		cp = 1.0
+		μ = 1.0
+		λ = 1.0
+		ρ = 1.0
+	end
+    eqs = [
+        cp ~ cp_r(T, p),
+        λ ~ λ_l(T, p),
+        μ ~ μ_l(T, p),
+        ρ ~ ρ_l_(p, T),
+	]
+
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
+  ╠═╡ =#
+
+# ╔═╡ e83823bb-e069-4e5d-9d94-b22b09135a94
+# ╠═╡ disabled = true
+#=╠═╡
+#TDL: make the htc into other components
+function Evaporator(;name, refrigerant::String = "R134A")
+	ps = @parameters begin
+		W = 0.2, [description = "Plate Heat eXchanger width"]
+		np = 20.0, [description = "Total number of plate"]
+		ϕ = 1.118, [description = "Surface enlargment factor"]
+		b = 2e-3, [description = "Pressing depth "]
+		β = 30, [description = "Chevron angle (°)"]
+		χ = 0.38, [description = "Secondary fluid concentration"]
+		L_PHX = 0.3, [description = "Plate Heat eXchanger length"]
+		th = 1e-3, [description = "Plate thickness"]
+		λ_Cu = 300.0, [description = "Wall (copper) thermal conductivity"]
+	end
+	sts = @variables begin
+		ṁ_r = 1.0
+		ṁ_b = 1.0
+		T_p_b = 1.0
+		T_p_r = 1.0
+		T_evap = 1.0
+		T_b_in = 1.0
+		αL = 1.0
+		T_b_interface = 1.0
+		T_r_interface = 1.0
+		T_r_out = 1.0
+		T_b_out = 1.0
+		h_r_interface = 1.0
+		h_r_in = 1.0
+		K_SH_r_ = 1.0
+		K_EV_r_ = 1.0
+		K_SH_b_ = 1.0
+
+		h1 = 1.0
+		h2 = 1.0
+	end
+
+	h_dew = h_dew_(T_evap)
+	h_bub = h_bub_(T_evap)
+	p_evap = p_PC(T_evap)
+
+	@named gphase = Prop_REF_gas()
+	@named lphase = Prop_REF_liq()
+	@named brine = Prop_SF(χ0 = χ)
+
+	#aliases
+	
+	cp_r_gas = gphase.cp
+	μ_r_gas = gphase.μ
+	λ_r_gas = gphase.λ
+	ρ_r_gas = gphase.ρ
+	
+	cp_r_liq = lphase.cp
+	μ_r_liq = lphase.μ
+	λ_r_liq = lphase.λ
+	ρ_r_liq = lphase.ρ
+	
+	cp_b = brine.cp
+	μ_b = brine.μ
+	λ_b = brine.λ
+	ρ_b = brine.ρ
+	
+	dh = 2*b                       # hydraulic diameter 
+	S = (b*np)/2 #assuming half volume/section in each channel
+	V̇_b = abs(ṁ_b)/ρ_b
+	
+	v_b = V̇_b/S                  # speed of the secondary fluid 
+	
+	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
+	v_r_gas = V̇_r_gas/S
+
+	Re_raw_b = ρ_b * v_b * dh / μ_b           # Reynolds
+	Re_b = sqrt(Re_raw_b^2 + 1e-12) # < maybe solves some NaN problems?
+	
+	Pr_b = cp_b * μ_b / λ_b
+	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
+	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
+	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
+	#very wrong correlation ⚠
+	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_b = Nudh_b*λ_b/dh
+	
+	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
+	
+	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
+	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
+	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
+	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
+	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
+	h_r_gas = Nudh_r_gas*λ_r_gas/dh
+
+
+	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
+	U_EV = 1/(1/h_b + th/λ_Cu)
+
+	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
+	
+	L_EV = sin(αL)^2 * L_PHX
+	L_SH = cos(αL)^2 * L_PHX
+	#L_SH = L_PHX
+
+	UA_SH = U_SH * L_SH * Per_PHX
+	UA_SH = L_SH * Per_PHX
+	UA_EV = U_EV * L_EV * Per_PHX
+	UA_EV = L_EV * Per_PHX
+
+	# "right" side of the HX; superheating.
+	# Term regarding the superheated gas
+	K_SH_r_ = 2e3 / ṁ_r / cp_r_gas
+	# Term regarding the brine (single phase)
+	K_SH_b_ = 2e3 / ṁ_b / cp_b
+
+	# "left" side of the HX: evaporation.
+	# Term regarding the brine (single phase)
+	K_EV_b_ = UA_EV / ṁ_b / cp_b
+	
+	# --- SH
+	
+	#variables that will not be present in the end system
+	@variables x_SH
+	T_b_SH = T_evap
+		+ (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)
+		+ (K_SH_b_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*exp(-(K_SH_b_+K_SH_r_)*(L_SH-x_SH))
+	#T_b_SH = T_evap + (T_b_in - T_evap)*exp(-K_SH_b_*x)
+	T_b_interface_ = substitute(T_b_SH, x_SH => 0.0)
+	#T_b_interface_ = substitute(T_b_SH, x => L_SH)
+
+	#T_r_SH = T_evap + (α_r_*(T_b_in - T_evap)*exp(-α_SH_*L_SH))/(α_r_ + α_SH_) * (exp((α_r_ + α_SH_)*x) - 1)/exp(α_r_*x)
+	#T_r_SH = T_evap + (K_SH_r_*(T_b_in - T_evap))/(K_SH_r_ + K_SH_b_)*(1 - exp(-(K_SH_r_ + K_SH_b_)*x))
+	T_r_SH = T_evap + (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*(1 - exp(-(K_SH_b_+K_SH_r_)*x_SH))
+
+	
+	# --- EV
+
+	#variables that will not be present in the end system
+	@variables x_EV
+	
+	T_b_EV = T_evap + (T_b_interface_ - T_evap)*exp(-K_EV_b_*(L_EV-x_EV))
+	T_r_EV = T_evap
+	h_r_EV = h_dew - ṁ_b*cp_b/ṁ_r*(T_b_interface_-T_b_EV)
+
+	eqs = [
+		h1 ~ h_b
+		h2 ~ h_r_gas
+		K_SH_r_ ~ K_SH_r_
+		K_SH_b_ ~ K_SH_b_
+		K_EV_r_ ~ K_EV_r_
+		p_evap ~ lphase.p
+		p_evap ~ gphase.p
+		
+		T_p_r ~ lphase.T
+		T_p_r ~ gphase.T
+		
+		T_p_b ~ brine.T
+		
+		T_b_interface ~ T_b_interface_
+		T_r_interface ~ substitute(T_r_SH, x_SH => 0.0)
+		T_r_out ~ substitute(T_r_SH, x_SH => L_SH)
+		T_b_out ~ substitute(T_b_EV, x_EV => 0.0)
+		h_r_interface ~ h_dew
+		h_r_in ~ substitute(h_r_EV, x_EV=> 0.0)
+	]
+	return ModelingToolkit.compose(NonlinearSystem(eqs, sts, ps; name = name), [gphase, lphase, brine]);
+end
+  ╠═╡ =#
+
+# ╔═╡ 30ed60b4-8ef8-4a0a-995d-1a8e7cb1249a
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+@named Evap1 = Evaporator();
+	
+	eqs_bc = [
+		Evap1.ṁ_r ~ 1.0
+		Evap1.ṁ_b ~ 1.0
+		
+		Evap1.T_evap ~ -10+273.15
+		Evap1.T_p_r ~ Evap1.T_evap + 5
+		Evap1.T_p_b ~ Evap1.T_p_r + 5
+		
+		Evap1.T_b_in ~ -2+273.15
+		Evap1.αL ~ pi/2*0.5
+	]
+	@named bcevap = ModelingToolkit.compose(NonlinearSystem(eqs_bc, [], []; name = :CJUBUIOname), [Evap1]);
+	sbce = structural_simplify(bcevap)
+	probev = NonlinearProblem(sbce, [])
+	sol_ev = NonlinearSolve.solve(probev, Klement())
+end;
+  ╠═╡ =#
+
+# ╔═╡ e8fa9ff4-cf07-4410-9287-ecfedf2e8c32
+#=╠═╡
+sol_ev.retcode
+  ╠═╡ =#
+
+# ╔═╡ 557bea62-35b1-45d6-b1fc-34eecde31d89
+#=╠═╡
+sol_ev.resid
+  ╠═╡ =#
+
+# ╔═╡ 7d05490f-9935-4b28-bf99-d2e523767b30
+#=╠═╡
+sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in]
+  ╠═╡ =#
+
+# ╔═╡ 8d3c89a4-978c-4eda-a6f5-2aab8e86b48c
+#=╠═╡
+sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]
+  ╠═╡ =#
+
+# ╔═╡ 4f2877d3-f3e2-4926-b56e-bc52115c1dc1
+#=╠═╡
+(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface])
+  ╠═╡ =#
+
+# ╔═╡ a1cb28de-24b3-419a-9f39-8e9aac89adfa
+#=╠═╡
+((sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]))/(sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r] / sol_ev[Evap1.brine.cp] / sol_ev[Evap1.ṁ_b])
+  ╠═╡ =#
+
+# ╔═╡ f4df2ef9-62ed-4f7d-808c-0f209339c166
+#=╠═╡
+sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
+  ╠═╡ =#
+
+# ╔═╡ 54e30cff-1aa0-498b-90d9-bcf3dbe4dd4e
+#=╠═╡
+md" # 1"
+
+  ╠═╡ =#
+
+# ╔═╡ 34bc09e0-e2c9-4c31-8369-784facd0fad3
+#=╠═╡
+(sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ ed25cda0-4975-4909-8c37-1eef16844a4e
+#=╠═╡
+(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]) * sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r]
+  ╠═╡ =#
+
+# ╔═╡ c96e61c1-92dd-46de-9f84-cfd87348764b
+#=╠═╡
+md" # 2"
+
+  ╠═╡ =#
+
+# ╔═╡ fc2368c4-763c-4322-a3fe-6ed5ac018591
+#=╠═╡
+(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_out]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
+  ╠═╡ =#
+
+# ╔═╡ 6596bb7e-2282-4f84-8969-2c2cf10428ec
+#=╠═╡
+(sol_ev[Evap1.h_r_interface] .- sol_ev[Evap1.h_r_in]) * sol_ev[Evap1.ṁ_r]
+
+  ╠═╡ =#
+
+# ╔═╡ 98320e7b-4e49-44df-b3eb-7d7d4800c5a1
+#=╠═╡
+sol_ev[Evap1.T_r_interface]
+  ╠═╡ =#
+
+# ╔═╡ 927cc01d-e543-463a-ae44-9caf39a2394e
+#=╠═╡
+sol_ev[Evap1.T_evap]
+  ╠═╡ =#
+
+# ╔═╡ 9cdd134d-b858-4102-9c81-29851cd0df56
+#=╠═╡
+sol_ev[Evap1.gphase.cp]
+  ╠═╡ =#
+
+# ╔═╡ 1a310cc4-aa70-46c7-9081-55603deeb921
+#=╠═╡
+sol_ev[Evap1.h1]
+  ╠═╡ =#
+
+# ╔═╡ bd3073a0-43d4-42d6-983b-e3e822c1abfb
+#=╠═╡
+sol_ev[Evap1.h2]
+
+  ╠═╡ =#
+
+# ╔═╡ 516ea25f-a9de-4171-8af7-f7ad5dbe4737
+#=╠═╡
+md" ### Test props"
+  ╠═╡ =#
+
+# ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
+#=╠═╡
+md" # Quick analysis: parametric study"
+  ╠═╡ =#
+
+# ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	m_Y = [median(y.particles) for y in YY]
+	q_05 = [quantile(y.particles, 0.025) for y in YY]
+	q_95 = [quantile(y.particles, 0.975) for y in YY]
+end
+  ╠═╡ =#
+
+# ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+fig_study = Makie.lines(XX, m_Y)
+	band!(XX, q_05, q_95)
+	fig_study
+end
+  ╠═╡ =#
+
+# ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
+#=╠═╡
+md" # Temperature profiles"
+  ╠═╡ =#
+
+# ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
+#=╠═╡
+md"# Utilities"
+  ╠═╡ =#
 
 # ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
+#=╠═╡
 md" # Other"
+  ╠═╡ =#
 
 # ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 candidate_solvers = [
@@ -2488,165 +1353,20 @@ candidate_solvers = [
     #PETScSNES(),
 	];
 
-# ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
-# ╠═╡ disabled = true
+# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
 #=╠═╡
-begin
-	#https://docs.sciml.ai/NonlinearSolve/stable/solvers/nonlinear_system_solvers/#NLSolvers.jl
-    logger = ConsoleLogger(stderr, Logging.Error)  # Only show errors
-	valid_sols = Any[]
-    # Get variable names as strings and then as symbols
-    names_unk = string.(unknowns)
-    var_names_sym = Symbol.(names_unk)
-    
-    # Global DataFrame columns: Solver and the unknowns
-    col_names = [:Solver; var_names_sym...]
-    results_df = DataFrame([name => Any[] for name in col_names]...)
-
-    for alg in candidate_solvers
-        solver_name = string(typeof(alg))
-        try
-            sol_ = Logging.with_logger(logger) do
-                NonlinearSolve.solve(prob_, alg)
-            end
-            # Create a dictionary where keys are Symbols
-            sol_dict = Dict(var_names_sym .=> sol_.u)
-            # Merge with a dictionary for the solver name:
-            row_dict = merge(Dict(:Solver => solver_name), sol_dict)
-			#row_dict.LA = sol_["LA"]
-            # You can push the dictionary directly as a row:
-            push!(results_df, row_dict)
-            valid_sols= [valid_sols]
-        catch e
-        end
-    end
-    results_df;
-	
-end
-
+md"---"
   ╠═╡ =#
 
-# ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-md"---"
-
 # ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-md" # Imports"
-
-# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
 #=╠═╡
-begin
-	#@variables U_12 U_1w U_2w
-	@variables P_1 P_w1 P_2 P_w2
-	
-	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
-                                        λ_2 => sλ2,
-                                        γ_1 => sγ1,
-                                        γ_2 => sγ2)) for s in sol_C];
-end;
+md" # Imports"
   ╠═╡ =#
 
 # ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
 # ╠═╡ disabled = true
 #=╠═╡
 using LinearAlgebra
-  ╠═╡ =#
-
-# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
-#=╠═╡
-begin
-	@variables UA_12 UA_1w UA_2w
-	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
-	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-end;
-  ╠═╡ =#
-
-# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
-#=╠═╡
-using LinearAlgebra
-  ╠═╡ =#
-
-# ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	@variables U_12 U_1w U_2w
-	
-	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
-	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
-                                        λ_2 => simplify(sλ2),
-                                        γ_1 => simplify(sγ1),
-                                        γ_2 => simplify(sγ2))) for s in sol_C]
-	sol_C_full = simplify.(sol_C_full)
-	sC_1 = sol_C_full[1]
-	sC_2 = sol_C_full[2]
-end
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2709,7 +1429,7 @@ WGLMakie = "~0.11.1"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.3"
 manifest_format = "2.0"
 project_hash = "1201214bb7975dcb0fce1c2fd021a6d42751f3ef"
 
@@ -4646,7 +3366,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.5+0"
+version = "0.8.1+2"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
@@ -5790,16 +4510,15 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╠═3efb8ab9-1d4b-4408-b224-a85611388348
+# ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
+# ╠═badf578f-6cc7-48c2-8693-370856d659dd
+# ╠═cc7c330a-c450-4339-a194-259ff91e42b9
 # ╟─60f2ad1f-33e1-4003-ad15-963f6f0eddd6
-# ╟─ed723b83-28ad-4938-97e8-891b40acc0db
 # ╟─ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 # ╠═9538bfde-6ac2-4557-aaba-6b5e55f5b774
-# ╟─c89c0195-7f93-4a49-993a-7efa861db428
-# ╠═38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
+# ╠═c89c0195-7f93-4a49-993a-7efa861db428
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
-# ╠═91699b51-0f49-4f90-8d60-ad00bf52d917
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b
 # ╠═08c9f46e-e683-4429-a5d6-56682232c1e7
@@ -5851,68 +4570,14 @@ version = "3.6.0+0"
 # ╠═1a310cc4-aa70-46c7-9081-55603deeb921
 # ╠═bd3073a0-43d4-42d6-983b-e3e822c1abfb
 # ╟─516ea25f-a9de-4171-8af7-f7ad5dbe4737
-# ╠═5a09f303-e92a-4285-90cd-8541b8b24220
-# ╟─a6ac71e5-7f92-4aef-b7e6-d8cde3ec41a1
-# ╟─4e1330f1-5eb5-48ea-888a-02d599658b40
-# ╟─05ab2c2c-96dd-48ad-b748-04ffb3a21d2f
-# ╠═ea575c50-e1f6-4604-9f0d-b0b12f3e698f
-# ╠═59db1579-81dc-4c1d-aeb4-895a99834cd7
-# ╠═06c960c3-ee4f-4f7d-868e-e331d0702c2f
-# ╠═ae86270b-a167-4826-8baf-01ff3ca9c675
-# ╟─d44ac0d3-c764-4df8-a326-bc853f21b3ec
-# ╠═e0175788-3009-4494-ba16-05d1e0d7381b
-# ╟─78d7e55b-134c-4db8-a7f6-bc8e25d7f543
-# ╠═85f8033b-6d5a-4732-ae44-60ae1a5300cb
-# ╠═30eba1d3-1856-4aa0-8d58-63ab3cf81578
-# ╠═44cc481e-c4af-499e-b263-587ccdf145ff
-# ╠═40cb2982-16d6-435f-b1d2-c62040416819
-# ╠═cf85c83b-a0cc-4b29-ac7c-0ab3cd13e148
-# ╠═e2bd77ff-f24e-4d27-948c-d92294f2367f
-# ╠═de7deb47-9d43-4423-9fc2-4911ee6dc05a
 # ╟─3fde0742-9054-456f-ad90-262e07f13819
-# ╠═8815b4d5-6ec5-4e14-b081-296e4cb17cea
-# ╠═e0c4a54e-87c8-4b24-845e-483cda6e4966
 # ╠═9058e171-6b6f-4478-a492-40cbb7cbf406
 # ╠═274c189d-8325-4634-927b-f40976190bb2
 # ╠═57a059fe-3929-4cc5-9591-49fa7cdb18cc
 # ╠═086bc03f-081e-428b-b3e5-62d90a632bec
 # ╠═f2310579-6f1d-4b7e-bb72-b99e11d92885
 # ╟─b7c12215-f78a-4b4f-8c4e-46228b5687dc
-# ╠═201da2ec-f2b4-4c38-8a88-88362f53f5d0
-# ╠═f2be30ec-1250-4edc-bbf9-bc249458e93c
-# ╠═18160123-a854-4568-9904-1d311d11e5a9
-# ╠═8e6a8e3b-c991-439d-bc9b-ba436d0be550
-# ╠═e39867fd-9323-4fc8-8e27-da4cc5ed327e
-# ╠═d2ff5f9e-3260-4e10-bca3-af2742b13877
-# ╠═94978409-840d-4523-821c-96a20ebd2411
-# ╠═9773c5a1-bc3a-47f8-bd64-1659cebf09b1
-# ╠═56ec718e-7c9f-4e63-853d-65c959f1439a
-# ╠═837d8d99-458c-4077-8531-f25346684057
-# ╠═03df0193-84df-4c45-8882-f3c3ca457fd1
-# ╠═ef230968-2812-4800-bc90-b18d70c7da4f
-# ╠═ab333b77-b3ee-4cd4-b2f9-07bbceb12377
-# ╠═c5058fc0-b6f4-4e1e-a073-76cdfe270e6d
-# ╠═2ae189b5-9158-4d80-9630-fef4859b05de
-# ╠═5e3d2961-7ad0-4bc1-a7af-6e1214e165c2
-# ╠═56f8523d-7a41-4c99-b56c-3a4aa919f4e7
-# ╠═f064f4ed-3840-4760-a0d3-7309ede60204
-# ╠═15089d8d-0632-44f1-aa8e-e726cb5b673e
-# ╠═42556ee8-4011-4522-bd9d-512571609e36
-# ╠═78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
-# ╠═f0d290c1-584c-46e0-9377-3c73fec48818
 # ╟─a9587932-391a-46ad-84e0-9c4760e534af
-# ╠═37de41bf-c905-480f-b0d0-fc103001656b
-# ╠═fd32a044-3b7b-44bb-b279-deb1ea5c1457
-# ╟─1cd63e6f-37b2-49ba-8887-2220d1df7c6f
-# ╠═eac739f6-94ee-4c96-9325-23f2c58cbb5c
-# ╠═1fb782fb-b07c-4019-85c6-0f6f5b027709
-# ╠═8eee2a67-0ae5-4087-927b-8dd95125fa3a
-# ╠═6435d235-34f8-4f43-a945-7cdd62e5dce7
-# ╠═bceac1e3-20e6-421e-9908-32d0354ae1c0
-# ╠═abf2c0e4-9174-497f-823d-2ca76e0f8b75
-# ╠═269fe50b-de21-43da-bd7b-bc4e8753fd18
-# ╠═b1bbe22d-0468-452e-8fd2-870c8f6bbd56
-# ╠═244ccf5e-9dbf-4aae-b7c0-8aebbfc819bd
 # ╟─1d57cda4-8948-4b00-be29-4acbc17dd7ae
 # ╠═8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 # ╟─38384b61-a30c-435c-a13c-228f16e6169e
