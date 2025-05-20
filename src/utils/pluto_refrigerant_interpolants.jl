@@ -362,10 +362,12 @@ function list_available_refrigerants()
 end
 
 # ╔═╡ 52e0f9f1-e6f0-4fd5-8067-d23ce2fa430a
-list_available_refrigerants()
+list_available_refrigerants() |> length
 
 # ╔═╡ cc4ed7af-0741-4f75-8ccf-18a69d3ac813
-generate_refrigerant_data("R404A")
+for ref in CoolProp.coolpropfluids
+	generate_refrigerant_data(ref)
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
