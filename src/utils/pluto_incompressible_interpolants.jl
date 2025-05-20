@@ -34,6 +34,12 @@ using DuckDB
 # ╔═╡ 55af818e-c1c4-449d-b807-cc29b2b1ea55
 using PlutoDevMacros
 
+# ╔═╡ 7d63c4da-88f8-4d00-8d34-28b526768603
+# ╠═╡ disabled = true
+#=╠═╡
+generate_all_fluid_data(joinpath(@__DIR__(), "data", "fluids"))
+  ╠═╡ =#
+
 # ╔═╡ 7af52b81-cdaa-4947-b684-3cd0b658b0a4
 const LOADED_FLUIDS = Dict{String, Any}()
 
@@ -976,12 +982,6 @@ function generate_all_fluid_data(output_dir=nothing; n_chi=100, n_temp=50)
     return generate_all_supported_fluids(output_dir=output_dir)
 end
 
-# ╔═╡ 7d63c4da-88f8-4d00-8d34-28b526768603
-# ╠═╡ disabled = true
-#=╠═╡
-generate_all_fluid_data(joinpath(@__DIR__(), "data", "fluids"))
-  ╠═╡ =#
-
 # ╔═╡ c9adc754-772a-45d6-9f4e-4578b60ad7df
 """
     regenerate_fluid_data(name::String; n_chi=100, n_temp=50, output_dir=nothing)
@@ -1153,7 +1153,7 @@ PlutoDevMacros = "~0.9.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "680fc2b65b07259369140629107459c4c683a0ed"
 
@@ -2888,7 +2888,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

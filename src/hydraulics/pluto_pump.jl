@@ -231,9 +231,7 @@ estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
   ╠═╡ =#
 
 # ╔═╡ 0a6b3604-cd36-48a0-a179-a680e0404b09
-#=╠═╡
 typeof(magna3_approx)
-  ╠═╡ =#
 
 # ╔═╡ 23818aa2-3f98-442c-b3d4-b534877ebde4
 assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
@@ -245,38 +243,26 @@ assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(Nonline
   ╠═╡ =#
 
 # ╔═╡ b8b86b9e-8ab6-481a-800b-72984b7fc975
-#=╠═╡
 link_eqs = [
     magna3_approx.ρ  ~ props.ρ,
     magna3_approx.cp ~ props.cp,
 	magna3_approx.H ~ 5.0,
   ]
-  ╠═╡ =#
 
 # ╔═╡ 1834813b-918f-4cd2-811c-bf394b66f968
-#=╠═╡
 @named new_sys = assemble([magna3_approx, props], equations = link_eqs);
-  ╠═╡ =#
 
 # ╔═╡ 0a159a20-c999-4a9e-86b0-ced412d5a089
-#=╠═╡
 system   = structural_simplify(new_sys)
-  ╠═╡ =#
 
 # ╔═╡ bde6c506-a783-468c-ba9c-dc3304616920
-#=╠═╡
 prob = NonlinearProblem(system, [])
-  ╠═╡ =#
 
 # ╔═╡ 927959f5-ab92-4e60-bcfa-eea1645e7be4
-#=╠═╡
 sol = solve(prob)
-  ╠═╡ =#
 
 # ╔═╡ d13fa76d-7915-4361-948f-2ec5644633f9
-#=╠═╡
 @test sol[magna3_approx.V̇] ≈ 0.002758031668260459
-  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
