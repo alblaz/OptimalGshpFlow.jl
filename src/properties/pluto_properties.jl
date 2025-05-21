@@ -40,13 +40,91 @@ using PlutoDevMacros
 using PlutoTest
   ╠═╡ =#
 
-# ╔═╡ 0298656c-4941-432c-aa4a-bbc652b27d50
-@fromparent begin
-	import ^.Utils: *
-end
-
 # ╔═╡ cde60bbc-b47a-4e00-b494-fbf23d727a4b
 function DynamicIncompressibleProps(; name::Symbol, fluid="mea", χ = 0.0)
+    pars = @parameters begin
+		χ = χ
+	end
+    vars = @variables begin
+		ρ = 1000.0
+		λ = 0.7
+		cp = 4180
+		μ = 1e-6
+		β = 1.0
+		T = 300.0
+	end
+    eqs  = [
+		ρ ~ ρ_b_(T, χ)
+		λ ~ λ_b_(T, χ)
+		cp ~ cp_b_(T, χ)
+		μ ~ μ_b_(T, χ)
+		β ~ β_b_(T, χ)
+    ]
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 3ef4b401-0d97-4257-ae0d-b4f3453aeee2
+
+		T_out_is = T_in + 10.0
+		s_out_is = Clapeyron.entropy(modelref, P_out, T_out_is, phase="unknown")
+		s_in = s_out_is
+		h_in = Clapeyron.enthalpy(modelref, P_in, T_in, phase="unknown")
+		h_out_is = Clapeyron.enthalpy(modelref, P_out, T_out_is, phase="unknown")
+		h_out = Clapeyron.enthalpy(modelref, P_out, T_out_is, phase="unknown")
+		W = 0.0
+		V̇ = f * V
+		ṁ = V̇ * 1.0
+		ρ_in = 1.0
+	end
+	eqs = [
+		# Define the inlet and outlet isentropic entropies:
+		s_in ~ Clapeyron.entropy(modelref, P_in, T_in, phase="unknown"),
+		s_out_is ~ Clapeyron.entropy(modelref, P_out, T_out_is, phase="unknown"),
+		
+		# Define the inlet and outlet enthalpies:
+		h_in ~ Clapeyron.enthalpy(modelref, P_in, T_in, phase="unknown"),
+		h_out_is ~ Clapeyron.enthalpy(modelref, P_out, T_out_is, phase="unknown"),
+		h_out ~ Clapeyron.enthalpy(modelref, P_out, T_out, phase="unknown"),
+		
+		# Enforce the isentropic condition:
+		s_in ~ s_out_is,
+		
+		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
+		η ~ (h_out_is - h_in) / (h_out - h_in),
+	
+		ρ_in ~ Clapeyron.mass_density(modelref, P_in, T_in, phase="unknown"),
+		ṁ ~ V̇ * ρ_in,
+
+# ╔═╡ 98d5f72c-c40f-4b73-819f-a68e54caae09
+function DynamicRefrigerantProps(; name::Symbol, fluid="mea", χ = 0.0)
+	modelref = 
+    pars = @parameters begin
+	end
+    vars = @variables begin
+		cp = 4180
+		ρ = 1000.0
+		β = 1.0
+		T = 300.0
+		s = 0.0
+		
+		λ = 0.7
+		μ = 1e-6
+	end
+    eqs  = [
+		μ ~ μ_r_(h, p)
+		λ ~ λ_r_(h, p)
+
+		h ~ Clapeyron.enthalpy(modelref, p, T, phase="unknown"),
+		s ~ Clapeyron.entropy(modelref, p, T, phase="unknown"),
+		ρ ~ Clapeyron.mass_density(modelref, p, T, phase="unknown")
+		cp ~ cp_r_(h, p)
+		β ~ β_r_(h, p)
+    ]
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 6edefe43-35ec-44cf-8e71-3e0d29194ceb
+function DynamicRefrigerantPropsCoolProp(; name::Symbol, fluid="mea", χ = 0.0)
     pars = @parameters begin
 		χ = χ
 	end
@@ -123,9 +201,18 @@ new_sol = solve(new_prop)
 new_sol[prop_mea.ρ]
   ╠═╡ =#
 
+# ╔═╡ 0298656c-4941-432c-aa4a-bbc652b27d50
+@fromparent begin
+	import ^.Utils: *
+end
+
+# ╔═╡ f8fba1f7-b1b9-47f6-810e-34f9d6d24f87
+using Clapeyron
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
 CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DuckDB = "d2f5444f-75bc-4fdf-ac35-56f514c445e1"
@@ -138,6 +225,7 @@ PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 
 [compat]
+Clapeyron = "~0.6.12"
 CoolProp = "~0.2.1"
 DataFrames = "~1.7.0"
 DuckDB = "~1.2.2"
@@ -154,9 +242,9 @@ PlutoTest = "~0.2.2"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "ee480c444016eb39212b24f0bfd65a017ceeb7c3"
+project_hash = "ad1cce0f3c4a5b7f504dd35c588217e28f0c46ea"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -332,6 +420,19 @@ git-tree-sha1 = "f21cfd4950cb9f0587d5067e69405ad2acd27b87"
 uuid = "62783981-4cbd-42fc-bca8-16325de8dc4b"
 version = "0.1.6"
 
+[[deps.BlackBoxOptim]]
+deps = ["CPUTime", "Compat", "Distributed", "Distributions", "JSON", "LinearAlgebra", "Printf", "Random", "Requires", "SpatialIndexing", "StatsBase"]
+git-tree-sha1 = "9c203a2515b5eeab8f2987614d2b1db83ef03542"
+uuid = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
+version = "0.6.3"
+
+    [deps.BlackBoxOptim.extensions]
+    BlackBoxOptimRealtimePlotServerExt = ["HTTP", "Sockets"]
+
+    [deps.BlackBoxOptim.weakdeps]
+    HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+    Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
+
 [[deps.BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
 git-tree-sha1 = "a8c0f363186263d75e97a41878d10dd842797561"
@@ -373,6 +474,11 @@ git-tree-sha1 = "5a97e67919535d6841172016c9530fd69494e5ec"
 uuid = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
 version = "0.2.6"
 
+[[deps.CPUTime]]
+git-tree-sha1 = "2dcc50ea6a0a1ef6440d6eecd0fe3813e5671f45"
+uuid = "a9c8d775-2e2e-55fc-8582-045d282d599e"
+version = "1.0.0"
+
 [[deps.CRC32c]]
 uuid = "8bf52ea8-c179-5cab-976a-9e18b702a9bc"
 version = "1.11.0"
@@ -389,6 +495,12 @@ git-tree-sha1 = "e329286945d0cfc04456972ea732551869af1cfc"
 uuid = "4e9b3aee-d8a1-5a3d-ad8b-7d824db253f0"
 version = "1.0.1+0"
 
+[[deps.CSV]]
+deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
+git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
+uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+version = "0.10.15"
+
 [[deps.Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "2ac646d71d0d24b44f3f8c84da8c9f4d70fb67df"
@@ -400,18 +512,13 @@ deps = ["DataAPI", "Future", "Missings", "Printf", "Requires", "Statistics", "Un
 git-tree-sha1 = "1568b28f91293458345dabba6a5ea3f183250a61"
 uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 version = "0.10.8"
+weakdeps = ["JSON", "RecipesBase", "SentinelArrays", "StructTypes"]
 
     [deps.CategoricalArrays.extensions]
     CategoricalArraysJSONExt = "JSON"
     CategoricalArraysRecipesBaseExt = "RecipesBase"
     CategoricalArraysSentinelArraysExt = "SentinelArrays"
     CategoricalArraysStructTypesExt = "StructTypes"
-
-    [deps.CategoricalArrays.weakdeps]
-    JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
-    SentinelArrays = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
-    StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -422,6 +529,30 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.Clapeyron]]
+deps = ["BlackBoxOptim", "CSV", "DiffResults", "Downloads", "FillArrays", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "NLSolvers", "OrderedCollections", "PackedVectorsOfVectors", "PositiveFactorizations", "PrecompileTools", "Preferences", "Roots", "Scratch", "SparseArrays", "StableTasks", "StaticArrays", "Tables", "UUIDs"]
+git-tree-sha1 = "aac869dc44f6b9eec07ee8a5ad7d8b297706bac7"
+uuid = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+version = "0.6.12"
+
+    [deps.Clapeyron.extensions]
+    ClapeyronCoolPropExt = "CoolProp"
+    ClapeyronJutulDarcyExt = "JutulDarcy"
+    ClapeyronMetaheuristicsExt = "Metaheuristics"
+    ClapeyronMultiComponentFlashExt = "MultiComponentFlash"
+    ClapeyronSuperancillaries = "EoSSuperancillaries"
+    ClapeyronSymbolicsExt = "Symbolics"
+    ClapeyronUnitfulExt = "Unitful"
+
+    [deps.Clapeyron.weakdeps]
+    CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
+    EoSSuperancillaries = "c1bf003f-4e47-49d9-bdfd-5a4051db3c04"
+    JutulDarcy = "82210473-ab04-4dce-b31b-11573c4f8e0a"
+    Metaheuristics = "bcdb8e00-2c21-11e9-3065-2b553b22f898"
+    MultiComponentFlash = "35e5bd01-9722-4017-9deb-64a5d32478ff"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.CloseOpenIntervals]]
 deps = ["Static", "StaticArrayInterface"]
@@ -1312,6 +1443,12 @@ git-tree-sha1 = "42d5f897009e7ff2cf88db414a389e5ed1bdd023"
 uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.10.0"
 
+[[deps.IterativeSolvers]]
+deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
+git-tree-sha1 = "59545b0a2b27208b0650df0a46b8e3019f85055b"
+uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
+version = "0.9.4"
+
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
@@ -1328,6 +1465,18 @@ deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.4"
+
+[[deps.JSON3]]
+deps = ["Dates", "Mmap", "Parsers", "PrecompileTools", "StructTypes", "UUIDs"]
+git-tree-sha1 = "196b41e5a854b387d99e5ede2de3fcb4d0422aae"
+uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+version = "1.14.2"
+
+    [deps.JSON3.extensions]
+    JSON3ArrowExt = ["ArrowTypes"]
+
+    [deps.JSON3.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
 
 [[deps.Jieko]]
 deps = ["ExproniconLite"]
@@ -1745,6 +1894,12 @@ git-tree-sha1 = "491bdcdc943fcbc4c005900d7463c9f216aabf4c"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
 version = "1.6.4"
 
+[[deps.NLSolvers]]
+deps = ["IterativeSolvers", "LinearAlgebra", "PositiveFactorizations", "Printf", "Statistics"]
+git-tree-sha1 = "78a8c11e01b159a546495dae68aa7f787547b75f"
+uuid = "337daf1e-9722-11e9-073e-8b9effe078ba"
+version = "0.5.0"
+
 [[deps.NLSolversBase]]
 deps = ["ADTypes", "DifferentiationInterface", "Distributed", "FiniteDiff", "ForwardDiff"]
 git-tree-sha1 = "b14c7be6046e7d48e9063a0053f95ee0fc954176"
@@ -1895,7 +2050,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1948,6 +2103,11 @@ deps = ["Base64", "CEnum", "ImageCore", "IndirectArrays", "OffsetArrays", "libpn
 git-tree-sha1 = "cf181f0b1e6a18dfeb0ee8acc4a9d1672499626c"
 uuid = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 version = "0.4.4"
+
+[[deps.PackedVectorsOfVectors]]
+git-tree-sha1 = "78a46960967e9e37f81dbf7f61b45b0159637afe"
+uuid = "7713531c-48ef-4bdd-9821-9ff7a8736089"
+version = "0.1.2"
 
 [[deps.Packing]]
 deps = ["GeometryBasics"]
@@ -2217,6 +2377,26 @@ git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
 uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
 version = "0.5.1+0"
 
+[[deps.Roots]]
+deps = ["Accessors", "CommonSolve", "Printf"]
+git-tree-sha1 = "3ac13765751ffc81e3531223782d9512f6023f71"
+uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+version = "2.2.7"
+
+    [deps.Roots.extensions]
+    RootsChainRulesCoreExt = "ChainRulesCore"
+    RootsForwardDiffExt = "ForwardDiff"
+    RootsIntervalRootFindingExt = "IntervalRootFinding"
+    RootsSymPyExt = "SymPy"
+    RootsSymPyPythonCallExt = "SymPyPythonCall"
+
+    [deps.Roots.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    IntervalRootFinding = "d2bf35a9-74e0-55ec-b149-d360ff49b807"
+    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+    SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
+
 [[deps.RoundingEmulator]]
 git-tree-sha1 = "40b9edad2e5287e05bd413a38f61a8ff55b9557b"
 uuid = "5eaf0fd0-dfba-4ccb-bf02-d820a40db705"
@@ -2409,6 +2589,11 @@ version = "0.4.19"
     CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
     Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 
+[[deps.SpatialIndexing]]
+git-tree-sha1 = "84efe17c77e1f2156a7a0d8a7c163c1e1c7bdaed"
+uuid = "d4ead438-fe20-5cc5-a293-4fd39a41b74c"
+version = "0.1.6"
+
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
 git-tree-sha1 = "41852b8679f78c8d8961eeadc8f62cef861a52e3"
@@ -2424,6 +2609,11 @@ deps = ["Random"]
 git-tree-sha1 = "95af145932c2ed859b63329952ce8d633719f091"
 uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
 version = "1.0.3"
+
+[[deps.StableTasks]]
+git-tree-sha1 = "c4f6610f85cb965bee5bfafa64cbeeda55a4e0b2"
+uuid = "91464d47-22a1-43fe-8b7f-2d57ee82463f"
+version = "0.1.7"
 
 [[deps.StackViews]]
 deps = ["OffsetArrays"]
@@ -2529,6 +2719,12 @@ version = "0.7.1"
     LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[[deps.StructTypes]]
+deps = ["Dates", "UUIDs"]
+git-tree-sha1 = "159331b30e94d7b11379037feeb9b690950cace8"
+uuid = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
+version = "1.11.0"
 
 [[deps.StyledStrings]]
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
@@ -2761,6 +2957,11 @@ git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
 uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
 version = "1.0.0"
 
+[[deps.WorkerUtilities]]
+git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"
+uuid = "76eceee3-57b5-4d4a-8e66-0e911cebbf60"
+version = "1.6.1"
+
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
 git-tree-sha1 = "b8b243e47228b4a3877f1dd6aee0c5d56db7fcf4"
@@ -2927,6 +3128,10 @@ version = "3.6.0+0"
 # ╠═6480643c-069d-48ed-9750-ec00d81a3e54
 # ╠═0298656c-4941-432c-aa4a-bbc652b27d50
 # ╠═cde60bbc-b47a-4e00-b494-fbf23d727a4b
+# ╠═f8fba1f7-b1b9-47f6-810e-34f9d6d24f87
+# ╠═3ef4b401-0d97-4257-ae0d-b4f3453aeee2
+# ╠═98d5f72c-c40f-4b73-819f-a68e54caae09
+# ╠═6edefe43-35ec-44cf-8e71-3e0d29194ceb
 # ╠═6cc03224-ec11-467a-9559-ba36edd7f4ec
 # ╠═2cea8e87-57ed-44f7-b6c8-ecadd8f5c476
 # ╠═fd041e24-f6b0-4018-bc9d-83b401ff1a14

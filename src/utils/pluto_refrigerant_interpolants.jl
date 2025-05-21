@@ -39,28 +39,22 @@ using CoolProp
 
 # Get the path from the parent module if possible
 
-# ╔═╡ 37b8e10e-40f9-4ebf-bcbd-e89e30226d3c
+# ╔═╡ 52e0f9f1-e6f0-4fd5-8067-d23ce2fa430a
 const REF_DB_PATH = @isdefined(Utils) && isdefined(Utils, :REFRIGERANT_DATA_PATH) ? 
                    Utils.REFRIGERANT_DATA_PATH : 
                    joinpath(dirname(dirname(dirname(@__FILE__))), "data", "refrigerants")
 
-# ╔═╡ 7a8cf5ed-e12d-453a-be87-8299b6e1f128
+const REFRIGERANT_METADATA_FILE = joinpath(REF_DB_PATH, "refrigerants_metadata.parquet")
+const REFRIGERANT_PROPERTIES_FILE = joinpath(REF_DB_PATH, "refrigerants_properties.parquet")
 const DEFAULT_REFRIGERANT = "R134a"
-
-# Cache for loaded refrigerant interpolants - similar to LOADED_FLUIDS
-
-# ╔═╡ 570b5dc8-70d6-492b-a9a1-3edfee582db2
 const LOADED_REFRIGERANTS = Dict{String, Dict{String, Any}}()
 
-# Define global file paths for consolidated database
+function mkdir_if_not_exists(path)
+    if !isdir(path)
+        mkpath(path)
+    end
+end
 
-# ╔═╡ c74273d4-8a23-4990-859c-13e5523708b7
-const REFRIGERANT_METADATA_FILE = joinpath(REF_DB_PATH, "refrigerants_metadata.parquet")
-
-# ╔═╡ 069afd46-0098-4f4f-b2bc-4a255d9739eb
-const REFRIGERANT_PROPERTIES_FILE = joinpath(REF_DB_PATH, "refrigerants_properties.parquet")
-
-# ╔═╡ d84bfee2-7f88-45aa-a04c-8a8044548bb7
 function get_property_ranges(refrigerant::String)
     # Retrieve critical properties
     T_crit = CoolProp.PropsSI("Tcrit", refrigerant)
@@ -74,7 +68,464 @@ function get_property_ranges(refrigerant::String)
     return T_range, p_range
 end
 
+function initialize_refrigerant(refrigerant::String)
+    refrigerant = lowercase(refrigerant)
+    
+    if haskey(LOADED_REFRIGERANTS, refrigerant)
+        return LOADED_REFRIGERANTS[refrigerant]
+    end
+    
+    # Load the data for this refrigerant
+    data = load_refrigerant_data(refrigerant)
+    
+    # Create interpolation functions for each property
+    T_range = data.T_range
+    p_range = data.p_range
+    T_sat_range = data.T_sat_range
+    
+    # Create 2D interpolations for main properties (D, H, S, C, L, M)
+    D_itp = linear_interpolation((T_range, p_range), data.data_D, extrapolation_bc=Flat())
+    H_itp = linear_interpolation((T_range, p_range), data.data_H, extrapolation_bc=Flat())
+    S_itp = linear_interpolation((T_range, p_range), data.data_S, extrapolation_bc=Flat())
+    C_itp = linear_interpolation((T_range, p_range), data.data_C, extrapolation_bc=Flat())
+    L_itp = linear_interpolation((T_range, p_range), data.data_L, extrapolation_bc=Flat())
+    M_itp = linear_interpolation((T_range, p_range), data.data_M, extrapolation_bc=Flat())
+    
+    # Create 1D interpolations for saturation properties
+    p_sat_liq_itp = linear_interpolation(T_sat_range, data.p_sat_liq, extrapolation_bc=Flat())
+    p_sat_vap_itp = linear_interpolation(T_sat_range, data.p_sat_vap, extrapolation_bc=Flat())
+    
+    # Store all interpolators in a Dict
+    interpolants = Dict(
+        "name" => data.name,
+        "D" => D_itp,
+        "H" => H_itp,
+        "S" => S_itp,
+        "C" => C_itp,
+        "L" => L_itp,
+        "M" => M_itp,
+        "p_sat_liq" => p_sat_liq_itp,
+        "p_sat_vap" => p_sat_vap_itp
+    )
+    
+    # Cache for future use
+    LOADED_REFRIGERANTS[refrigerant] = interpolants
+    
+    return interpolants
+end
+
+# ╔═╡ b41c17c5-0325-424e-b968-2b1c2a7246a9
+"""
+    setup_refrigerant_functions()
+
+Define the implementations of the refrigerant property functions using the loaded interpolants.
+"""
+function setup_refrigerant_functions()
+    # Define the ρ_r_ function (density)
+    @eval function ρ_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.D(T, p)
+    end
+
+    # Define h_r_ function (enthalpy)
+    @eval function h_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.H(T, p)
+    end
+
+    # Define s_r_ function (entropy)
+    @eval function s_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.S(T, p)
+    end
+
+    # Define cp_r_ function (specific heat)
+    @eval function cp_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.C(T, p)
+    end
+
+    # Define λ_r_ function (thermal conductivity)
+    @eval function λ_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.L(T, p)
+    end
+
+    # Define μ_r_ function (dynamic viscosity)
+    @eval function μ_r_(T::Number, p::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.M(T, p)
+    end
+
+    # Define p_sat_liq_r_ function (saturation pressure - liquid)
+    @eval function p_sat_liq_r_(T::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.p_sat_liq(T)
+    end
+
+    # Define p_sat_vap_r_ function (saturation pressure - vapor)
+    @eval function p_sat_vap_r_(T::Number; refrigerant=DEFAULT_REFRIGERANT)
+        interp = get(LOADED_REFRIGERANTS, lowercase(refrigerant), nothing)
+        if isnothing(interp)
+            interp = initialize_refrigerant(refrigerant)
+        end
+        return interp.p_sat_vap(T)
+    end
+end
+
+# ╔═╡ 77d4e548-3823-4e69-b347-a977aa09b2da
+"""
+    initialize_refrigerant_properties()
+
+Initialize refrigerant property functions and load the default refrigerant.
+"""
+function initialize_refrigerant_properties()
+    # Define the refrigerant property functions implementations
+    setup_refrigerant_functions()
+    
+    # Register with ModelingToolkit
+    #register_refrigerant_symbols()
+    
+    # Load default refrigerant
+    if !haskey(LOADED_REFRIGERANTS, lowercase(DEFAULT_REFRIGERANT))
+        try
+            initialize_refrigerant(DEFAULT_REFRIGERANT)
+        catch e
+            @warn "Could not load refrigerant data: $e"
+        end
+    end
+end
+
+# ╔═╡ 2c78b4c3-e214-4a8e-bbcb-6dca96a5409a
+# Register density function
+    ModelingToolkit.@register_symbolic ρ_r_(T, p)
+    
+    # Register enthalpy function
+
+# ╔═╡ c47149cc-e74c-4c0f-b1a7-3dc85f90be58
+ModelingToolkit.@register_symbolic h_r_(T, p)
+    
+    # Register entropy function
+
+# ╔═╡ 91578bc9-0d3b-4c17-aaec-e591ec1d6804
+ModelingToolkit.@register_symbolic s_r_(T, p)
+    
+    # Register specific heat function
+
+# ╔═╡ d1bb4eea-9d01-4858-b71a-906ef576a753
+ModelingToolkit.@register_symbolic cp_r_(T, p)
+    
+    # Register thermal conductivity function
+
+# ╔═╡ c0073343-c62a-4e8f-b4a3-717113312601
+ModelingToolkit.@register_symbolic λ_r_(T, p)
+    
+    # Register dynamic viscosity function
+
+# ╔═╡ 7a46985b-7239-42eb-abe2-6f39fdac46a6
+ModelingToolkit.@register_symbolic μ_r_(T, p)
+    
+    # Register saturation pressure functions
+
+# ╔═╡ 4d5b8247-73ab-4006-80c9-a82a2a2609cf
+ModelingToolkit.@register_symbolic p_sat_liq_r_(T)
+
+# ╔═╡ 38b5ea3f-12da-4851-8379-2f5d0ea641b2
+ModelingToolkit.@register_symbolic p_sat_vap_r_(T)
+
+# ╔═╡ 0bccffd2-5e41-40d4-b088-a15a4cd20a3e
+initialize_refrigerant_properties()
+
+# ╔═╡ 0e194b86-afcf-4390-a32d-cafda8a29905
+function list_available_refrigerants()
+    if isfile(REFRIGERANT_METADATA_FILE)
+        metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
+        return unique(metadata.refrigerant)
+    else
+        return String[]
+    end
+end
+
+# ╔═╡ 2b1f38e0-301f-4ed9-9be7-410c4369e426
+# ╠═╡ disabled = true
+#=╠═╡
+function mkdir_if_not_exists(path)
+    if !isdir(path)
+        mkpath(path)
+    end
+end
+  ╠═╡ =#
+
+# ╔═╡ efabaacf-c212-4880-b484-108658efbe10
+function mkdir_if_not_exists(path)
+    if !isdir(path)
+        mkpath(path)
+    end
+end
+
+# ╔═╡ 7a8cf5ed-e12d-453a-be87-8299b6e1f128
+# ╠═╡ disabled = true
+#=╠═╡
+const DEFAULT_REFRIGERANT = "R134a"
+
+# Cache for loaded refrigerant interpolants - similar to LOADED_FLUIDS
+  ╠═╡ =#
+
+# ╔═╡ aafe8e6b-a7db-4ef4-a359-e990ff367a04
+# Get the path from the parent module if possible
+const REF_DB_PATH = @isdefined(Utils) && isdefined(Utils, :REFRIGERANT_DATA_PATH) ? 
+                   Utils.REFRIGERANT_DATA_PATH : 
+                   joinpath(dirname(dirname(dirname(@__FILE__))), "data", "refrigerants")
+
+# ╔═╡ c74273d4-8a23-4990-859c-13e5523708b7
+# ╠═╡ disabled = true
+#=╠═╡
+const REFRIGERANT_METADATA_FILE = joinpath(REF_DB_PATH, "refrigerants_metadata.parquet")
+  ╠═╡ =#
+
+# ╔═╡ 069afd46-0098-4f4f-b2bc-4a255d9739eb
+# ╠═╡ disabled = true
+#=╠═╡
+const REFRIGERANT_PROPERTIES_FILE = joinpath(REF_DB_PATH, "refrigerants_properties.parquet")
+  ╠═╡ =#
+
 # ╔═╡ 07cf6dfa-d223-4e92-a7c6-6f2db4490ff4
+# ╠═╡ disabled = true
+#=╠═╡
+function create_refrigerant_interpolant(refrigerant::String, property::String)
+    T_range, p_range = get_property_ranges(refrigerant)
+    
+    # Create a grid of property values
+    prop_data = zeros(length(T_range), length(p_range))
+    
+    # For each temperature and pressure, compute the property
+    for (i, T) in enumerate(T_range)
+        for (j, p) in enumerate(p_range)
+            try
+                prop_data[i, j] = CoolProp.PropsSI(property, "T", T, "P", p, refrigerant)
+            catch e
+                # Handle errors (e.g., beyond saturation curve)
+                prop_data[i, j] = NaN
+            end
+        end
+    end
+    
+    # Replace NaNs with valid neighboring values
+    for i in 1:size(prop_data, 1)
+        for j in 1:size(prop_data, 2)
+            if isnan(prop_data[i, j])
+                # Find nearest non-NaN value
+                valid_indices = findall(!isnan, prop_data)
+                if !isempty(valid_indices)
+                    # Fixed: Properly access components of CartesianIndex
+                    distances = [sqrt((i-idx[1])^2 + (j-idx[2])^2) for idx in valid_indices]
+                    _, min_idx = findmin(distances)
+                    best_idx = valid_indices[min_idx]
+                    prop_data[i, j] = prop_data[best_idx]  # Use CartesianIndex directly
+                else
+                    prop_data[i, j] = 0.0  # Fallback value if all are NaN
+                end
+            end
+        end
+    end
+    
+    return prop_data, T_range, p_range
+end
+
+# Utility function to create directory if it doesn't exist
+  ╠═╡ =#
+
+# ╔═╡ 7c311c11-ac07-41d9-9f98-46e881207368
+# ╠═╡ disabled = true
+#=╠═╡
+function list_available_refrigerants()
+    if isfile(REFRIGERANT_METADATA_FILE)
+        metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
+        return unique(metadata.refrigerant)
+    else
+        return String[]
+    end
+end
+  ╠═╡ =#
+
+# ╔═╡ fbc0addc-2ad0-49c0-985d-2c2fbd2586d9
+# ╠═╡ disabled = true
+#=╠═╡
+function save_to_consolidated_database(metadata_df::DataFrame, properties_df::DataFrame)
+    # Check if files exist and load existing data if they do
+    if isfile(REFRIGERANT_METADATA_FILE)
+        existing_metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
+        # Remove any existing data for this refrigerant to avoid duplication
+        filter!(row -> row.refrigerant != metadata_df.refrigerant[1], existing_metadata)
+        # Append new metadata
+        metadata_df = vcat(existing_metadata, metadata_df)
+    end
+    
+    if isfile(REFRIGERANT_PROPERTIES_FILE)
+        existing_properties = Parquet.read_parquet(REFRIGERANT_PROPERTIES_FILE) |> DataFrame
+        # Remove any existing data for this refrigerant to avoid duplication
+        filter!(row -> row.refrigerant != properties_df.refrigerant[1], existing_properties)
+        # Append new properties
+        properties_df = vcat(existing_properties, properties_df)
+    end
+    
+    # Save consolidated data
+    Parquet.write_parquet(REFRIGERANT_METADATA_FILE, metadata_df)
+    Parquet.write_parquet(REFRIGERANT_PROPERTIES_FILE, properties_df)
+    
+    println("Saved refrigerant data to consolidated database")
+end
+  ╠═╡ =#
+
+# ╔═╡ d713fddc-7512-4aed-b484-086c1f019198
+const REFRIGERANT_METADATA_FILE = joinpath(REF_DB_PATH, "refrigerants_metadata.parquet")
+
+# ╔═╡ 07153c2d-be3b-4263-a80b-6a007e7de1e5
+# ╠═╡ disabled = true
+#=╠═╡
+function generate_refrigerant_data(refrigerant::String)
+    mkdir_if_not_exists(REF_DB_PATH)
+    
+    properties = [
+        "D", # Density
+        "H", # Enthalpy
+        "S", # Entropy
+        "C", # Specific heat capacity
+        "L", # Thermal conductivity
+        "M"  # Dynamic viscosity
+    ]
+    
+    property_data = Dict()
+    T_range = nothing
+    p_range = nothing
+    
+    for prop in properties
+        println("Generating data for $refrigerant property: $prop")
+        data, T_range_new, p_range_new = create_refrigerant_interpolant(refrigerant, prop)
+        
+        # Use the first property's ranges for all
+        if isnothing(T_range)
+            T_range = T_range_new
+            p_range = p_range_new
+        end
+        
+        property_data[prop] = data
+    end
+    
+    # Also generate saturation curves
+    T_sat_range = LinRange(CoolProp.PropsSI("Ttriple", refrigerant), 
+                         0.99 * CoolProp.PropsSI("Tcrit", refrigerant), 100)
+    
+    p_sat_liq = zeros(length(T_sat_range))
+    p_sat_vap = zeros(length(T_sat_range))
+    
+    for (i, T) in enumerate(T_sat_range)
+        try
+            p_sat_liq[i] = CoolProp.PropsSI("P", "T", T, "Q", 0, refrigerant)
+            p_sat_vap[i] = CoolProp.PropsSI("P", "T", T, "Q", 1, refrigerant)
+        catch e
+            p_sat_liq[i] = NaN
+            p_sat_vap[i] = NaN
+        end
+    end
+    
+    # Create metadata dataframe
+    metadata_df = DataFrame(
+        refrigerant = refrigerant,
+        T_min = minimum(T_range),
+        T_max = maximum(T_range),
+        T_count = length(T_range),
+        p_min = minimum(p_range),
+        p_max = maximum(p_range),
+        p_count = length(p_range),
+        T_sat_min = minimum(T_sat_range),
+        T_sat_max = maximum(T_sat_range),
+        T_sat_count = length(T_sat_range)
+    )
+    
+    # Create properties dataframe in tall format
+    property_rows = []
+    
+    # Process 2D properties (D, H, S, C, L, M)
+    for property in properties
+        for (i, T) in enumerate(T_range)
+            for (j, p) in enumerate(p_range)
+                value = property_data[property][i, j]
+                push!(property_rows, (
+                    refrigerant = refrigerant,
+                    property = property,
+                    T = T,
+                    p = p,
+                    value = value
+                ))
+            end
+        end
+    end
+    
+    # Process saturation data
+    for (i, T) in enumerate(T_sat_range)
+        push!(property_rows, (
+            refrigerant = refrigerant,
+            property = "p_sat_liq", 
+            T = T,
+            p = NaN,
+            value = p_sat_liq[i]
+        ))
+        
+        push!(property_rows, (
+            refrigerant = refrigerant,
+            property = "p_sat_vap",
+            T = T,
+            p = NaN,
+            value = p_sat_vap[i]
+        ))
+    end
+    
+    properties_df = DataFrame(property_rows)
+    
+    # Save the data to consolidated files
+    save_to_consolidated_database(metadata_df, properties_df)
+    
+    # Return in-memory format for immediate use
+    return (
+        name = refrigerant,
+        T_range = T_range, 
+        p_range = p_range, 
+        T_sat_range = T_sat_range,
+        data_D = property_data["D"],
+        data_H = property_data["H"],
+        data_S = property_data["S"],
+        data_C = property_data["C"],
+        data_L = property_data["L"],
+        data_M = property_data["M"],
+        p_sat_liq = p_sat_liq,
+        p_sat_vap = p_sat_vap
+    )
+end
+  ╠═╡ =#
+
+# ╔═╡ 8cdf46e3-8331-4a48-9c74-8ae7f38b11de
 function create_refrigerant_interpolant(refrigerant::String, property::String)
     T_range, p_range = get_property_ranges(refrigerant)
     
@@ -117,40 +568,119 @@ end
 
 # Utility function to create directory if it doesn't exist
 
-# ╔═╡ 2b1f38e0-301f-4ed9-9be7-410c4369e426
-function mkdir_if_not_exists(path)
-    if !isdir(path)
-        mkpath(path)
+# ╔═╡ 570b5dc8-70d6-492b-a9a1-3edfee582db2
+# ╠═╡ disabled = true
+#=╠═╡
+const LOADED_REFRIGERANTS = Dict{String, Dict{String, Any}}()
+
+# Define global file paths for consolidated database
+  ╠═╡ =#
+
+# ╔═╡ 7ff0b9bb-88fb-47ce-b603-0fb686a8b223
+# ╠═╡ disabled = true
+#=╠═╡
+function load_refrigerant_data(refrigerant::String)
+    refrigerant = lowercase(refrigerant)
+    
+    if !isfile(REFRIGERANT_METADATA_FILE) || !isfile(REFRIGERANT_PROPERTIES_FILE)
+        println("Generating data for $refrigerant...")
+        return generate_refrigerant_data(refrigerant)
+    else
+        println("Loading data for $refrigerant from consolidated database...")
+        
+        # Load metadata
+        all_metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
+        refrigerant_metadata = filter(row -> lowercase(row.refrigerant) == refrigerant, all_metadata)
+        
+        if isempty(refrigerant_metadata)
+            println("Refrigerant $refrigerant not found in database, generating data...")
+            return generate_refrigerant_data(refrigerant)
+        end
+        
+        metadata = first(refrigerant_metadata)
+        
+        # Reconstruct ranges
+        T_range = LinRange(metadata.T_min, metadata.T_max, metadata.T_count)
+        p_range = exp10.(LinRange(log10(metadata.p_min), log10(metadata.p_max), metadata.p_count))
+        T_sat_range = LinRange(metadata.T_sat_min, metadata.T_sat_max, metadata.T_sat_count)
+        
+        # Load properties
+        all_properties = Parquet.read_parquet(REFRIGERANT_PROPERTIES_FILE) |> DataFrame
+        refrigerant_properties = filter(row -> lowercase(row.refrigerant) == refrigerant, all_properties)
+        
+        # Reconstruct data matrices and vectors
+        property_data = Dict()
+        
+        # Initialize matrices for each property
+        for prop in ["D", "H", "S", "C", "L", "M"]
+            property_data[prop] = zeros(length(T_range), length(p_range))
+        end
+        
+        p_sat_liq = zeros(length(T_sat_range))
+        p_sat_vap = zeros(length(T_sat_range))
+        
+        # Fill in data
+        for row in eachrow(refrigerant_properties)
+            if row.property in ["D", "H", "S", "C", "L", "M"]
+                # 2D property - find indices
+                i = findfirst(T -> isapprox(T, row.T), T_range)
+                j = findfirst(p -> isapprox(p, row.p), p_range)
+                if !isnothing(i) && !isnothing(j)
+                    property_data[row.property][i, j] = row.value
+                end
+            elseif row.property == "p_sat_liq"
+                i = findfirst(T -> isapprox(T, row.T), T_sat_range)
+                if !isnothing(i)
+                    p_sat_liq[i] = row.value
+                end
+            elseif row.property == "p_sat_vap"
+                i = findfirst(T -> isapprox(T, row.T), T_sat_range)
+                if !isnothing(i)
+                    p_sat_vap[i] = row.value
+                end
+            end
+        end
+        
+        return (
+            name = metadata.refrigerant,
+            T_range = T_range, 
+            p_range = p_range, 
+            T_sat_range = T_sat_range,
+            data_D = property_data["D"],
+            data_H = property_data["H"],
+            data_S = property_data["S"],
+            data_C = property_data["C"],
+            data_L = property_data["L"],
+            data_M = property_data["M"],
+            p_sat_liq = p_sat_liq,
+            p_sat_vap = p_sat_vap
+        )
     end
 end
+  ╠═╡ =#
 
-# ╔═╡ fbc0addc-2ad0-49c0-985d-2c2fbd2586d9
-function save_to_consolidated_database(metadata_df::DataFrame, properties_df::DataFrame)
-    # Check if files exist and load existing data if they do
-    if isfile(REFRIGERANT_METADATA_FILE)
-        existing_metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
-        # Remove any existing data for this refrigerant to avoid duplication
-        filter!(row -> row.refrigerant != metadata_df.refrigerant[1], existing_metadata)
-        # Append new metadata
-        metadata_df = vcat(existing_metadata, metadata_df)
-    end
-    
-    if isfile(REFRIGERANT_PROPERTIES_FILE)
-        existing_properties = Parquet.read_parquet(REFRIGERANT_PROPERTIES_FILE) |> DataFrame
-        # Remove any existing data for this refrigerant to avoid duplication
-        filter!(row -> row.refrigerant != properties_df.refrigerant[1], existing_properties)
-        # Append new properties
-        properties_df = vcat(existing_properties, properties_df)
-    end
-    
-    # Save consolidated data
-    Parquet.write_parquet(REFRIGERANT_METADATA_FILE, metadata_df)
-    Parquet.write_parquet(REFRIGERANT_PROPERTIES_FILE, properties_df)
-    
-    println("Saved refrigerant data to consolidated database")
-end
+# ╔═╡ 37b8e10e-40f9-4ebf-bcbd-e89e30226d3c
+# ╠═╡ disabled = true
+#=╠═╡
+const REF_DB_PATH = @isdefined(Utils) && isdefined(Utils, :REFRIGERANT_DATA_PATH) ? 
+                   Utils.REFRIGERANT_DATA_PATH : 
+                   joinpath(dirname(dirname(dirname(@__FILE__))), "data", "refrigerants")
+  ╠═╡ =#
 
-# ╔═╡ 07153c2d-be3b-4263-a80b-6a007e7de1e5
+# ╔═╡ 551fdee9-bfc7-41cb-b34f-55f0c791961e
+const LOADED_REFRIGERANTS = Dict{String, Dict{String, Any}}()
+
+# Define global file paths for consolidated database
+
+# ╔═╡ 42393a53-fad6-436a-9658-c57e5504c9ab
+const DEFAULT_REFRIGERANT = "R134a"
+
+# Cache for loaded refrigerant interpolants - similar to LOADED_FLUIDS
+
+# ╔═╡ e2f17d36-ec9f-4ae1-b42e-1dabc14bfb0e
+const REFRIGERANT_PROPERTIES_FILE = joinpath(REF_DB_PATH, "refrigerants_properties.parquet")
+
+# ╔═╡ 819722ed-55c3-4383-bc03-8445b5b22291
 function generate_refrigerant_data(refrigerant::String)
     mkdir_if_not_exists(REF_DB_PATH)
     
@@ -271,7 +801,7 @@ function generate_refrigerant_data(refrigerant::String)
     )
 end
 
-# ╔═╡ 7ff0b9bb-88fb-47ce-b603-0fb686a8b223
+# ╔═╡ cbe11304-22ee-4eea-8d73-0ec9464f020a
 function load_refrigerant_data(refrigerant::String)
     refrigerant = lowercase(refrigerant)
     
@@ -351,22 +881,44 @@ function load_refrigerant_data(refrigerant::String)
     end
 end
 
-# ╔═╡ 7c311c11-ac07-41d9-9f98-46e881207368
-function list_available_refrigerants()
-    if isfile(REFRIGERANT_METADATA_FILE)
-        metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
-        return unique(metadata.refrigerant)
-    else
-        return String[]
-    end
+# ╔═╡ e69cc47c-5860-4f42-afb8-caf81d136ed4
+function get_property_ranges(refrigerant::String)
+    # Retrieve critical properties
+    T_crit = CoolProp.PropsSI("Tcrit", refrigerant)
+    p_crit = CoolProp.PropsSI("pcrit", refrigerant)
+    T_triple = CoolProp.PropsSI("Ttriple", refrigerant)
+    
+    # Define ranges
+    T_range = LinRange(T_triple, 0.95 * T_crit, 100)
+    p_range = 10.0 .^ LinRange(log10(1e4), log10(0.95 * p_crit), 100)
+    
+    return T_range, p_range
 end
 
-# ╔═╡ 52e0f9f1-e6f0-4fd5-8067-d23ce2fa430a
-list_available_refrigerants() |> length
-
-# ╔═╡ cc4ed7af-0741-4f75-8ccf-18a69d3ac813
-for ref in CoolProp.coolpropfluids
-	generate_refrigerant_data(ref)
+# ╔═╡ 7e9019cc-6c93-4d1c-b13e-a612ea7e4dac
+function save_to_consolidated_database(metadata_df::DataFrame, properties_df::DataFrame)
+    # Check if files exist and load existing data if they do
+    if isfile(REFRIGERANT_METADATA_FILE)
+        existing_metadata = Parquet.read_parquet(REFRIGERANT_METADATA_FILE) |> DataFrame
+        # Remove any existing data for this refrigerant to avoid duplication
+        filter!(row -> row.refrigerant != metadata_df.refrigerant[1], existing_metadata)
+        # Append new metadata
+        metadata_df = vcat(existing_metadata, metadata_df)
+    end
+    
+    if isfile(REFRIGERANT_PROPERTIES_FILE)
+        existing_properties = Parquet.read_parquet(REFRIGERANT_PROPERTIES_FILE) |> DataFrame
+        # Remove any existing data for this refrigerant to avoid duplication
+        filter!(row -> row.refrigerant != properties_df.refrigerant[1], existing_properties)
+        # Append new properties
+        properties_df = vcat(existing_properties, properties_df)
+    end
+    
+    # Save consolidated data
+    Parquet.write_parquet(REFRIGERANT_METADATA_FILE, metadata_df)
+    Parquet.write_parquet(REFRIGERANT_PROPERTIES_FILE, properties_df)
+    
+    println("Saved refrigerant data to consolidated database")
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2387,7 +2939,7 @@ version = "1.4.0"
 
 [[deps.URIs]]
 git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
-uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
+uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1f4"
 version = "1.5.2"
 
 [[deps.UUIDs]]
@@ -2507,6 +3059,28 @@ version = "1.2.3+0"
 # ╠═7ff0b9bb-88fb-47ce-b603-0fb686a8b223
 # ╠═7c311c11-ac07-41d9-9f98-46e881207368
 # ╠═52e0f9f1-e6f0-4fd5-8067-d23ce2fa430a
-# ╠═cc4ed7af-0741-4f75-8ccf-18a69d3ac813
+# ╠═aafe8e6b-a7db-4ef4-a359-e990ff367a04
+# ╠═42393a53-fad6-436a-9658-c57e5504c9ab
+# ╠═551fdee9-bfc7-41cb-b34f-55f0c791961e
+# ╠═d713fddc-7512-4aed-b484-086c1f019198
+# ╠═e2f17d36-ec9f-4ae1-b42e-1dabc14bfb0e
+# ╠═e69cc47c-5860-4f42-afb8-caf81d136ed4
+# ╠═8cdf46e3-8331-4a48-9c74-8ae7f38b11de
+# ╠═efabaacf-c212-4880-b484-108658efbe10
+# ╠═7e9019cc-6c93-4d1c-b13e-a612ea7e4dac
+# ╠═819722ed-55c3-4383-bc03-8445b5b22291
+# ╠═cbe11304-22ee-4eea-8d73-0ec9464f020a
+# ╠═0e194b86-afcf-4390-a32d-cafda8a29905
+# ╠═b41c17c5-0325-424e-b968-2b1c2a7246a9
+# ╠═77d4e548-3823-4e69-b347-a977aa09b2da
+# ╠═2c78b4c3-e214-4a8e-bbcb-6dca96a5409a
+# ╠═c47149cc-e74c-4c0f-b1a7-3dc85f90be58
+# ╠═91578bc9-0d3b-4c17-aaec-e591ec1d6804
+# ╠═d1bb4eea-9d01-4858-b71a-906ef576a753
+# ╠═c0073343-c62a-4e8f-b4a3-717113312601
+# ╠═7a46985b-7239-42eb-abe2-6f39fdac46a6
+# ╠═4d5b8247-73ab-4006-80c9-a82a2a2609cf
+# ╠═38b5ea3f-12da-4851-8379-2f5d0ea641b2
+# ╠═0bccffd2-5e41-40d4-b088-a15a4cd20a3e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

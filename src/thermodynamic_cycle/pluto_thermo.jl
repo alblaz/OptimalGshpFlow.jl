@@ -122,20 +122,19 @@ using PlutoExtras
 	#import ^.Properties: *
 end
 
+# ╔═╡ 620512d8-06c0-4421-a0c6-ba250901b5c6
+
+
 # ╔═╡ 60f2ad1f-33e1-4003-ad15-963f6f0eddd6
-#=╠═╡
 md""" # TDL:
 
 - outliers interpolation
 - try coupling
 
 """
-  ╠═╡ =#
 
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
-#=╠═╡
 md" # Sub Model: Compressor"
-  ╠═╡ =#
 
 # ╔═╡ 9538bfde-6ac2-4557-aaba-6b5e55f5b774
 function Compressor(; name,
@@ -191,14 +190,10 @@ function Compressor(; name,
 end
 
 # ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
-#=╠═╡
 md" ## Sub model: Evaporator"
-  ╠═╡ =#
 
 # ╔═╡ 1b08d63a-db57-44c7-b1ec-10acbcaa7951
-#=╠═╡
 md""" # Solving the system"""
-  ╠═╡ =#
 
 # ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 begin
@@ -444,9 +439,7 @@ sin(sol_[αL])^2
   ╠═╡ =#
 
 # ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
-#=╠═╡
 md" # Combined problem"
-  ╠═╡ =#
 
 # ╔═╡ e0e3b049-8874-44f4-a661-50e88d164e3a
 # ╠═╡ disabled = true
@@ -586,9 +579,7 @@ sol_coupled_[T_b_in]-273.15
   ╠═╡ =#
 
 # ╔═╡ 582d6677-b554-4c95-aeac-cfff776a70ad
-#=╠═╡
 md" # BHE + Evap + Compressor"
-  ╠═╡ =#
 
 # ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
 # ╠═╡ disabled = true
@@ -807,9 +798,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 9ad5a652-0db4-42db-be19-b20407459252
-#=╠═╡
 md" # Internal forced convection"
-  ╠═╡ =#
 
 # ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
 # ╠═╡ disabled = true
@@ -1181,10 +1170,8 @@ sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
   ╠═╡ =#
 
 # ╔═╡ 54e30cff-1aa0-498b-90d9-bcf3dbe4dd4e
-#=╠═╡
 md" # 1"
 
-  ╠═╡ =#
 
 # ╔═╡ 34bc09e0-e2c9-4c31-8369-784facd0fad3
 #=╠═╡
@@ -1197,10 +1184,8 @@ md" # 1"
   ╠═╡ =#
 
 # ╔═╡ c96e61c1-92dd-46de-9f84-cfd87348764b
-#=╠═╡
 md" # 2"
 
-  ╠═╡ =#
 
 # ╔═╡ fc2368c4-763c-4322-a3fe-6ed5ac018591
 #=╠═╡
@@ -1240,14 +1225,10 @@ sol_ev[Evap1.h2]
   ╠═╡ =#
 
 # ╔═╡ 516ea25f-a9de-4171-8af7-f7ad5dbe4737
-#=╠═╡
 md" ### Test props"
-  ╠═╡ =#
 
 # ╔═╡ 3fde0742-9054-456f-ad90-262e07f13819
-#=╠═╡
 md" # Quick analysis: parametric study"
-  ╠═╡ =#
 
 # ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
 # ╠═╡ disabled = true
@@ -1270,19 +1251,13 @@ end
   ╠═╡ =#
 
 # ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
-#=╠═╡
 md" # Temperature profiles"
-  ╠═╡ =#
 
 # ╔═╡ a9587932-391a-46ad-84e0-9c4760e534af
-#=╠═╡
 md"# Utilities"
-  ╠═╡ =#
 
 # ╔═╡ 1d57cda4-8948-4b00-be29-4acbc17dd7ae
-#=╠═╡
 md" # Other"
-  ╠═╡ =#
 
 # ╔═╡ 8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 candidate_solvers = [
@@ -1351,14 +1326,10 @@ end
   ╠═╡ =#
 
 # ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
-#=╠═╡
 md"---"
-  ╠═╡ =#
 
 # ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-#=╠═╡
 md" # Imports"
-  ╠═╡ =#
 
 # ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
 # ╠═╡ disabled = true
@@ -1367,7 +1338,9 @@ using LinearAlgebra
   ╠═╡ =#
 
 # ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
+#=╠═╡
 using LinearAlgebra
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -4610,6 +4583,7 @@ version = "3.6.0+0"
 # ╠═e01e0c08-459e-4636-8fef-b0f6790ee964
 # ╠═a943d92d-2672-4f52-9b9e-bfa51f042bcf
 # ╠═badf578f-6cc7-48c2-8693-370856d659dd
+# ╠═620512d8-06c0-4421-a0c6-ba250901b5c6
 # ╟─60f2ad1f-33e1-4003-ad15-963f6f0eddd6
 # ╟─ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 # ╠═9538bfde-6ac2-4557-aaba-6b5e55f5b774

@@ -1,6 +1,6 @@
 module Properties
 
 # Include utility functions
-include("pluto_incompressible.jl")
+include("pluto_properties.jl")
 
 end # module Properties
