@@ -16,6 +16,15 @@ using PlutoTest
 # ╔═╡ 43bcb0af-4332-4163-b0ff-cf78b6019b6d
 using PlutoDevMacros
 
+# ╔═╡ 323644f4-7830-4e47-a659-0a60c7cd715d
+@fromparent begin
+	using ..Utils
+	using ..Properties
+end
+
+# ╔═╡ 3d0aaaa3-84b5-4e6c-bcd5-f1cc9d119cb8
+ρ_b_(0.0, 0.0)
+
 # ╔═╡ cbbb4405-a362-4b5c-9fbd-c4ec0048d59c
 function pump_params_from_basics(;
     H_shutoff,  # Shutoff head (m)
@@ -73,6 +82,9 @@ function estimate_pump_params(;
         g = g
     )
 end
+
+# ╔═╡ b834339d-c934-49dd-a656-6b490ff768be
+@named testP = Properties.DynamicRefrigerantProps();
 
 # ╔═╡ 848d5692-5611-405e-949e-78617399cbc1
 function Pump(; name::Symbol,
@@ -198,6 +210,8 @@ function BasicPump(;name,
 end
 
 # ╔═╡ 1a54e829-a289-483e-a698-383cd98ae977
+# ╠═╡ disabled = true
+#=╠═╡
 function StaticFluidProps(; name::Symbol)
     pars = @parameters begin
 		cp₀ = 4180.0
@@ -213,6 +227,7 @@ function StaticFluidProps(; name::Symbol)
     ]
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
+  ╠═╡ =#
 
 # ╔═╡ 1d57f670-9b09-4727-a7ce-1bb6053422bb
 # ╠═╡ skip_as_script = true
@@ -231,38 +246,60 @@ estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
   ╠═╡ =#
 
 # ╔═╡ 0a6b3604-cd36-48a0-a179-a680e0404b09
+# ╠═╡ skip_as_script = true
+#=╠═╡
 typeof(magna3_approx)
+  ╠═╡ =#
 
 # ╔═╡ 23818aa2-3f98-442c-b3d4-b534877ebde4
+# ╠═╡ skip_as_script = true
+#=╠═╡
 assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
+  ╠═╡ =#
 
 # ╔═╡ 304dec29-6edb-4101-849a-73f2404e2c25
 # ╠═╡ skip_as_script = true
 #=╠═╡
-@named props = StaticFluidProps()
+@named props = DynamicIncompressibleProps()
   ╠═╡ =#
 
 # ╔═╡ b8b86b9e-8ab6-481a-800b-72984b7fc975
+# ╠═╡ skip_as_script = true
+#=╠═╡
 link_eqs = [
     magna3_approx.ρ  ~ props.ρ,
     magna3_approx.cp ~ props.cp,
 	magna3_approx.H ~ 5.0,
   ]
+  ╠═╡ =#
 
 # ╔═╡ 1834813b-918f-4cd2-811c-bf394b66f968
+# ╠═╡ skip_as_script = true
+#=╠═╡
 @named new_sys = assemble([magna3_approx, props], equations = link_eqs);
+  ╠═╡ =#
 
 # ╔═╡ 0a159a20-c999-4a9e-86b0-ced412d5a089
+# ╠═╡ skip_as_script = true
+#=╠═╡
 system   = structural_simplify(new_sys)
+  ╠═╡ =#
 
 # ╔═╡ bde6c506-a783-468c-ba9c-dc3304616920
+#=╠═╡
 prob = NonlinearProblem(system, [])
+  ╠═╡ =#
 
 # ╔═╡ 927959f5-ab92-4e60-bcfa-eea1645e7be4
+#=╠═╡
 sol = solve(prob)
+  ╠═╡ =#
 
 # ╔═╡ d13fa76d-7915-4361-948f-2ec5644633f9
+# ╠═╡ skip_as_script = true
+#=╠═╡
 @test sol[magna3_approx.V̇] ≈ 0.002758031668260459
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -283,7 +320,7 @@ PlutoTest = "~0.2.2"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "dee5b10337a41298c1cc80b623e792a381b03fd3"
 
@@ -1404,7 +1441,7 @@ version = "0.3.27+1"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
@@ -2041,9 +2078,12 @@ version = "17.4.0+2"
 # ╠═ba5f9663-efad-4d35-87b3-180d250c0166
 # ╠═ddb5e99b-ad0f-4349-8ded-995d53ca80a2
 # ╠═43bcb0af-4332-4163-b0ff-cf78b6019b6d
+# ╠═323644f4-7830-4e47-a659-0a60c7cd715d
+# ╠═3d0aaaa3-84b5-4e6c-bcd5-f1cc9d119cb8
 # ╟─cbbb4405-a362-4b5c-9fbd-c4ec0048d59c
 # ╟─b8772ba8-99ae-4ecf-ba53-5d3f2e836f2a
 # ╟─c61d042e-c0fd-4522-b7c1-1d46b78a2e62
+# ╠═b834339d-c934-49dd-a656-6b490ff768be
 # ╠═848d5692-5611-405e-949e-78617399cbc1
 # ╠═1a54e829-a289-483e-a698-383cd98ae977
 # ╠═1d57f670-9b09-4727-a7ce-1bb6053422bb

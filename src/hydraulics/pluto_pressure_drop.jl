@@ -13,338 +13,1189 @@ using PlutoTest
 # ╔═╡ d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
 using PlutoDevMacros
 
-# ╔═╡ e29a0e73-f453-44f0-8222-bfedc1db7306
+# ╔═╡ b550df61-460e-4d63-8509-17e697033c87
+using SpecialFunctions
+
+# ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
+@fromparent begin
+	using ..Utils
+	using ..Properties
+end
+
+# ╔═╡ 16a55253-ec0f-457e-aab5-618a12f6c251
+Utils.ρ_b_(0.0, 0.0)
+
+# ╔═╡ aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╠═╡ skip_as_script = true
 #=╠═╡
-function pump_params_from_basics(;
-    H_shutoff,  # Shutoff head (m)
-    Q_max,      # Maximum flow rate (m³/s)
-    Q_BEP,      # Flow rate at best efficiency point (m³/s)
-    η_BEP,      # Efficiency at best efficiency point (decimal)
-    η_motor,    # Motor efficiency (decimal)
-    N = 50.0,   # Rotational speed (rev/s, typically 50Hz)
-    D = 0.1,    # Impeller diameter (m)
-    g = 9.81    # Gravity (m/s²)
-)
-    # Calculate head at BEP using the quadratic curve
-    # H = H_shutoff * (1 - (Q/Q_max)²)
-    H_BEP = H_shutoff * (1 - (Q_BEP/Q_max)^2)
-    
-    # Convert to dimensionless parameters
-    φ_BEP = Q_BEP / (N * D^3)          # Flow coefficient at BEP
-    ψ₀ = H_shutoff * g / (N^2 * D^2)    # Dead-head coefficient
-    
-    # Calculate K parameter 
-    K = ψ₀ / (Q_max / (N * D^3))^2      # Head curve shape parameter
-    
-    return (
-        N = N,
-        D = D,
-        ψ₀ = ψ₀,
-        K = K,
-        φ_BEP = φ_BEP,
-        η_max = η_BEP,
-        η_motor = η_motor
-    )
-end
+md"""
+# Correlations for straight tubes
+"""
   ╠═╡ =#
 
-# ╔═╡ 933b9401-d127-4b44-bde5-99c99e8bb124
-# ╠═╡ skip_as_script = true
-#=╠═╡
-function estimate_pump_params(;
-    H_shutoff = 12,  # Shutoff head (m)
-    Q_max = 13/3600,      # Maximum flow (m³/s)
-    N = 50.0/60.0,  # Rotational speed (rev/s)
-    D = 0.1,    # Impeller diameter (m)
-    g = 9.81    # Gravity (m/s²)
-)
-    # Typical values
-    Q_BEP = 0.8 * Q_max  # BEP typically around 80% of max flow
-    η_BEP = 0.75         # Typical peak efficiency for medium-sized pumps
-    η_motor = 0.9        # Typical motor efficiency
+# ╔═╡ ff1be30a-fb09-4ecd-884f-3fe44f43cd92
+
+"""
+Calculate friction factor using a smooth transition between laminar and turbulent regimes.
+Uses error function for smooth transition between Re_low and Re_high.
+"""
+function friction_factor_smooth(Re, ε_D; Re_low=2300, Re_high=4000)
+    # Laminar flow
+    f_lam = 64.0 / Re
     
-    return pump_params_from_basics(
-        H_shutoff = H_shutoff,
-        Q_max = Q_max,
-        Q_BEP = Q_BEP,
-        η_BEP = η_BEP,
-        η_motor = η_motor,
-        N = N,
-        D = D,
+    # Turbulent flow using Haaland equation (explicit approximation to Colebrook-White)
+    f_turb = (1.0 / (-1.8 * log10((ε_D/3.7)^1.11 + 6.9/Re)))^2
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+# ╔═╡ 3ca7a788-85b9-466c-89e0-fabd1cf5d0db
+"""
+Calculate friction factor using Gnielinski correlation with smooth transition.
+Valid for 2300 < Re < 5e6 and 0 < ε/D < 0.05.
+"""
+function friction_factor_gnielinski(Re, ε_D; Re_low=2300, Re_high=4000)
+    # Laminar flow
+    f_lam = 64.0 / Re
+    
+    # Turbulent flow using Colebrook-White equation
+    f_turb = (1.0 / (-2.0 * log10(ε_D / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+# ╔═╡ f1ed8017-c3f6-4fdd-8352-d571b577aded
+"""
+Calculate friction factor using Swamee-Jain equation with smooth transition.
+Valid for 5000 < Re < 10^8 and 10^-6 < ε/D < 0.05.
+"""
+function friction_factor_swamee_jain(Re, ε_D; Re_low=2300, Re_high=4000)
+    # Laminar flow
+    f_lam = 64.0 / Re
+    
+    # Swamee-Jain equation for turbulent flow
+    f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/(Re^0.9)))^2
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+# ╔═╡ 7830ef5f-a6b6-43e5-bcc8-cea0b38f830a
+"""
+Calculates pressure drop in a straight pipe using the specified friction factor function.
+"""
+function pressure_drop_straight_pipe(ṁ, D, L, ρ, μ, ε; friction_func=friction_factor_smooth, Re_low=2300, Re_high=4000)
+    A = π * (D/2)^2
+    v = ṁ / (ρ * A)
+    Re = ρ * v * D / μ
+    ε_D = ε / D
+    
+    f = friction_func(Re, ε_D; Re_low=Re_low, Re_high=Re_high)
+    
+    return f * (L/D) * 0.5 * ρ * v^2
+end
+
+# ╔═╡ 8a0ea5b2-6d00-40b2-a0b1-b988450ba3d9
+md"""
+# Correlations for bends
+"""
+
+# ╔═╡ c9c6d38d-0094-46ec-8445-8ae71e2cde62
+"""
+Calculate the loss coefficient for pipe bends using the Idelchik correlation.
+θ: bend angle in degrees
+R: bend radius
+D: pipe diameter
+Re: Reynolds number
+"""
+function k_bend_idelchik(θ, R, D, Re)
+    # Radius ratio
+    R_D = R/D
+    
+    # Base coefficient for 90° bends
+    if R_D < 1.0
+        A = 1.0
+    elseif R_D <= 1.5
+        A = 0.9
+    elseif R_D <= 2.0
+        A = 0.8
+    elseif R_D <= 4.0
+        A = 0.7
+    elseif R_D <= 6.0
+        A = 0.6
+    elseif R_D <= 8.0
+        A = 0.55
+    elseif R_D <= 10.0
+        A = 0.5
+    else
+        A = 0.4
+    end
+    
+    # Reynolds number correction
+    B = 1.0
+    if Re < 2e5
+        B *= (2e5/Re)^0.2
+    end
+    
+    # Angle correction
+    C = 0.01 * θ * (0.25 * θ * (0.5 * θ / 90)^0.5)
+    
+    # Total coefficient
+    k = A * B * C
+    
+    return k
+end
+
+# ╔═╡ 05b2abef-8893-4c7a-9ece-60dda7f78f25
+"""
+Calculate the loss coefficient for a U-bend (180°) based on bend radius and pipe diameter.
+"""
+function k_ubend(R, D, Re)
+    return k_bend_idelchik(180.0, R, D, Re)
+end
+
+# ╔═╡ 2437813d-aa72-4b9a-9816-6ad6430f10c5
+"""
+Calculate the loss coefficient for a 90° bend based on bend radius and pipe diameter.
+"""
+function k_90bend(R, D, Re)
+    return k_bend_idelchik(90.0, R, D, Re)
+end
+
+# ╔═╡ fe4deb09-0ad9-4266-aa08-a52bc79d2f34
+"""
+Generic bend loss coefficient formula from Miller's Internal Flow Systems.
+θ: bend angle in degrees
+R: bend radius
+D: pipe diameter
+Re: Reynolds number
+"""
+function k_bend_miller(θ, R, D, Re)
+    # Radius ratio
+    R_D = R/D
+    
+    # Basic resistance coefficient for smooth bends
+    K1 = 0.0175 * θ * (R_D)^(-0.5)
+    
+    # Reynolds number correction
+    if Re <= 1e4
+        K_Re = 1.6 * (1e4/Re)^0.2
+    else
+        K_Re = 1.0
+    end
+    
+    return K1 * K_Re
+end
+
+# ╔═╡ 1f72eb23-8bd0-4671-89d6-67b68d1c9e4c
+"""
+Calculate the loss coefficient for a 180° bend in an annular channel (coaxial BHE return bend).
+Do: Outer diameter of the annular channel
+Di: Inner diameter of the annular channel
+Re: Reynolds number based on hydraulic diameter
+
+This function estimates the loss coefficient for the 180° transition from the inner pipe 
+to the annular channel in a coaxial BHE, based on Crane TP-410 data.
+"""
+function k_annular_180bend(Do, Di, Re)
+    # Calculate hydraulic diameter
+    Dh = Do - Di
+    
+    # Estimate the centerline radius of the bend
+    # For a typical coaxial BHE, the centerline radius is approximately
+    # from the center of inner pipe to the middle of the annular gap
+    R = Di/2 + (Do - Di)/4
+    
+    # Calculate the R/D ratio (using hydraulic diameter)
+    R_D = R / Dh
+    
+    # Determine loss coefficient based on R/D ratio from Crane TP-410
+    if R_D <= 1.0
+        K = 1.75
+    elseif R_D <= 1.5
+        K = 1.10
+    elseif R_D <= 2.0
+        K = 0.95
+    elseif R_D <= 3.0
+        K = 0.60
+    elseif R_D <= 4.0
+        K = 0.45
+    elseif R_D <= 6.0
+        K = 0.20
+    elseif R_D <= 8.0
+        K = 0.16
+    elseif R_D <= 12.0
+        K = 0.10
+    else
+        K = 0.10  # Minimum value for very large R/D
+    end
+    
+    # Reynolds number correction (for low Reynolds numbers)
+    if Re < 2e5
+        K *= (2e5/Re)^0.2
+    end
+    
+    return K
+end
+
+
+# ╔═╡ 2f9ffd26-092a-4f0e-a7b9-3f7b0d2ceb5b
+"""
+Calculate pressure drop in a pipe bend.
+"""
+function pressure_drop_bend(ṁ, D, k, ρ)
+    A = π * (D/2)^2
+    v = ṁ / (ρ * A)
+    return k * 0.5 * ρ * v^2
+end
+
+# ╔═╡ b4f7ef3a-58c9-4d32-a341-9a77f2953bf4
+"""
+Calculate hydraulic diameter for annular flow between concentric cylinders.
+Do: Outer diameter
+Di: Inner diameter
+"""
+function hydraulic_diameter_annular(Do, Di)
+    return Do - Di
+end
+
+# ╔═╡ 1be7c232-55b8-4a06-9323-9203ba9c409d
+"""
+Calculate friction factor for laminar flow in a concentric annular channel.
+Re: Reynolds number based on hydraulic diameter
+κ: Diameter ratio (Di/Do)
+"""
+function friction_factor_annular_laminar(Re, κ)
+    # Laminar flow friction factor in annular ducts
+    # κ = Di/Do is the diameter ratio
+    return 64.0 / Re * ((1 - κ^2) / (1 - κ^2 + (1 + κ^2) * log(κ)))
+end
+
+# ╔═╡ dd8cddd6-5b34-4161-882a-c2708e01e3a6
+"""
+Calculate friction factor for annular flow using a smooth transition
+between laminar and turbulent regimes.
+"""
+function friction_factor_annular(Re, ε_Dh, κ; Re_low=2300, Re_high=4000)
+    # Laminar flow
+    f_lam = friction_factor_annular_laminar(Re, κ)
+    
+    # Turbulent flow using modified Colebrook-White
+    f_turb = (1.0 / (-2.0 * log10(ε_Dh / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+# ╔═╡ a5da0c1c-5451-4228-9201-2baf274d6efb
+"""
+Calculate pressure drop in an annular channel.
+"""
+function pressure_drop_annular(ṁ, Do, Di, L, ρ, μ, ε; Re_low=2300, Re_high=4000)
+    Dh = hydraulic_diameter_annular(Do, Di)
+    A = π * (Do^2 - Di^2) / 4
+    v = ṁ / (ρ * A)
+    Re = ρ * v * Dh / μ
+    ε_Dh = ε / Dh
+    κ = Di / Do
+    
+    f = friction_factor_annular(Re, ε_Dh, κ; Re_low=Re_low, Re_high=Re_high)
+    
+    return f * (L/Dh) * 0.5 * ρ * v^2
+end
+
+# ╔═╡ 884fae8d-2455-4aab-8780-8837bdd92e51
+"""
+Calculate head loss in an annular channel.
+"""
+function head_loss_annular(ṁ, Do, Di, L, ρ, μ, ε; Re_low=2300, Re_high=4000, g=9.81)
+    Dh = hydraulic_diameter_annular(Do, Di)
+    A = π * (Do^2 - Di^2) / 4
+    v = ṁ / (ρ * A)
+    Re = ρ * v * Dh / μ
+    ε_Dh = ε / Dh
+    κ = Di / Do
+    
+    f = friction_factor_annular(Re, ε_Dh, κ; Re_low=Re_low, Re_high=Re_high)
+    
+    return f * (L/Dh) * (v^2 / (2*g))
+end
+
+# ╔═╡ 70ff62fc-73b3-4020-bf18-6da05b5498b3
+md"""
+# MTK Components for Straight Tubes
+"""
+
+# ╔═╡ 39be2637-45e9-4790-98c1-5815c20428e2
+"""
+Create a nonlinear system for a straight pipe section using the Gnielinski correlation.
+"""
+function StraightTubeGnielinski(; name::Symbol, 
+                                 L = 1.0,        # Length [m]
+                                 Di = 0.01,      # Inner diameter [m]
+                                 ε = 1.5e-6,     # Roughness [m]
+                                 g = 9.81,       # Gravity [m/s²]
+                                 Re_low = 2300,  # Lower transition Reynolds number
+                                 Re_high = 4000) # Upper transition Reynolds number
+    
+    pars = @parameters begin
+        L = L           # Length [m]
+        Di = Di         # Inner diameter [m]
+        ε = ε           # Roughness [m]
+        g = g           # Gravity [m/s²]
+        Re_low = Re_low # Lower transition Reynolds number
+        Re_high = Re_high # Upper transition Reynolds number
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Re = 1000.0     # Reynolds number
+        f = 0.03        # Friction factor
+        ε_D = 0.0015    # Relative roughness
+        Δp = 1000.0     # Pressure drop [Pa]
+        H = 0.1         # Head loss [m]
+        f_lam = 0.064   # Laminar friction factor
+        f_turb = 0.04   # Turbulent friction factor
+        trans_factor = 0.0 # Transition factor
+        A = 0.0001      # Flow area [m²]
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Flow area and velocity
+        A ~ π * (Di/2)^2,
+        v ~ V̇ / A,
+        
+        # Reynolds number
+        Re ~ ρ * v * Di / μ,
+        
+        # Relative roughness
+        ε_D ~ ε / Di,
+        
+        # Laminar friction factor
+        f_lam ~ 64.0 / Re,
+        
+        # Turbulent friction factor using Gnielinski
+        f_turb ~ (1.0 / (-2.0 * log10(ε_D / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2,
+        
+        # Smooth transition between laminar and turbulent regimes
+        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
+        
+        # Combined friction factor
+        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        
+        # Pressure drop calculation
+        Δp ~ f * (L/Di) * 0.5 * ρ * v^2,
+        
+        # Head loss calculation
+        H ~ f * (L/Di) * (v^2 / (2*g))
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 42cf47b7-6bab-4d93-8db4-5c69e11d88fc
+"""
+Create a nonlinear system for a straight pipe section using the Swamee-Jain approximation.
+"""
+function StraightTubeSwameeJain(; name::Symbol, 
+                                 L = 1.0,        # Length [m]
+                                 Di = 0.01,      # Inner diameter [m]
+                                 ε = 1.5e-6,     # Roughness [m]
+                                 g = 9.81,       # Gravity [m/s²]
+                                 Re_low = 2300,  # Lower transition Reynolds number
+                                 Re_high = 4000) # Upper transition Reynolds number
+    
+    pars = @parameters begin
+        L = L           # Length [m]
+        Di = Di         # Inner diameter [m]
+        ε = ε           # Roughness [m]
+        g = g           # Gravity [m/s²]
+        Re_low = Re_low # Lower transition Reynolds number
+        Re_high = Re_high # Upper transition Reynolds number
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Re = 1000.0     # Reynolds number
+        f = 0.03        # Friction factor
+        ε_D = 0.0015    # Relative roughness
+        Δp = 1000.0     # Pressure drop [Pa]
+        H = 0.1         # Head loss [m]
+        f_lam = 0.064   # Laminar friction factor
+        f_turb = 0.04   # Turbulent friction factor
+        trans_factor = 0.0 # Transition factor
+        A = 0.0001      # Flow area [m²]
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Flow area and velocity
+        A ~ π * (Di/2)^2,
+        v ~ V̇ / A,
+        
+        # Reynolds number
+        Re ~ ρ * v * Di / μ,
+        
+        # Relative roughness
+        ε_D ~ ε / Di,
+        
+        # Laminar friction factor
+        f_lam ~ 64.0 / Re,
+        
+        # Turbulent friction factor using Swamee-Jain
+        f_turb ~ 0.25 / (log10(ε_D/3.7 + 5.74/(Re^0.9)))^2,
+        
+        # Smooth transition between laminar and turbulent regimes
+        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
+        
+        # Combined friction factor
+        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        
+        # Pressure drop calculation
+        Δp ~ f * (L/Di) * 0.5 * ρ * v^2,
+        
+        # Head loss calculation
+        H ~ f * (L/Di) * (v^2 / (2*g))
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ d5ab6b70-0e50-47fc-a385-f77fea33955a
+md"""
+# MTK Components for Bends
+"""
+
+# ╔═╡ 03bcd530-a71a-4b1c-a84e-cc0f9d54571e
+"""
+Create a nonlinear system for a pipe bend with a specified angle.
+"""
+function PipeBend(; name::Symbol, 
+                   θ = 90.0,       # Bend angle [degrees]
+                   R = 0.05,       # Bend radius [m]
+                   Di = 0.01,      # Inner diameter [m]
+                   g = 9.81)       # Gravity [m/s²]
+    
+    pars = @parameters begin
+        θ = θ           # Bend angle [degrees]
+        R = R           # Bend radius [m]
+        Di = Di         # Inner diameter [m]
+        g = g           # Gravity [m/s²]
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Re = 1000.0     # Reynolds number
+        k = 0.5         # Loss coefficient
+        R_D = 5.0       # Radius to diameter ratio
+        L_eq = 1.0      # Equivalent length [m]
+        Δp = 100.0      # Pressure drop [Pa]
+        H = 0.01        # Head loss [m]
+        A = 0.0001      # Flow area [m²]
+        A_coeff = 0.7   # Base coefficient for angle
+        B_coeff = 1.0   # Reynolds number correction
+        C_coeff = 0.1   # Angle correction
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Flow area and velocity
+        A ~ π * (Di/2)^2,
+        v ~ V̇ / A,
+        
+        # Reynolds number
+        Re ~ ρ * v * Di / μ,
+        
+        # Radius to diameter ratio
+        R_D ~ R / Di,
+        
+        # Base coefficient for angles (simplified for MTK compatibility)
+        A_coeff ~ ifelse(R_D < 1.0, 1.0, 
+                 ifelse(R_D < 2.0, 0.9 - 0.1*(R_D - 1.0),
+                 ifelse(R_D < 4.0, 0.8 - 0.05*(R_D - 2.0),
+                 ifelse(R_D < 6.0, 0.7 - 0.05*(R_D - 4.0),
+                 ifelse(R_D < 8.0, 0.6 - 0.025*(R_D - 6.0),
+                 ifelse(R_D < 10.0, 0.55 - 0.025*(R_D - 8.0),
+                       0.5 - 0.01*(R_D - 10.0))))))),
+        
+        # Reynolds number correction
+        B_coeff ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
+        
+        # Angle correction
+        C_coeff ~ 0.01 * θ * (0.25 * θ * (0.5 * θ / 90)^0.5),
+        
+        # Loss coefficient
+        k ~ A_coeff * B_coeff * C_coeff,
+        
+        # Equivalent length calculation (for integration with straight pipe sections)
+        L_eq ~ k * Di / 0.025, # Assume f≈0.025 for typical turbulent flow
+        
+        # Pressure drop calculation
+        Δp ~ k * 0.5 * ρ * v^2,
+        
+        # Head loss calculation
+        H ~ k * (v^2 / (2*g))
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 44a50c57-fe46-4ed6-ac59-04cb0e1e3387
+"""
+Create a nonlinear system for a 90-degree pipe bend.
+"""
+function PipeBend90(; name::Symbol, kwargs...)
+    return PipeBend(; name=name, θ=90.0, kwargs...)
+end
+
+# ╔═╡ 6d45fad3-e405-47d2-8bf8-b8898f7a108a
+"""
+Create a nonlinear system for a U-bend (180-degree pipe bend).
+"""
+function PipeBendU(; name::Symbol, kwargs...)
+    return PipeBend(; name=name, θ=180.0, kwargs...)
+end
+
+# ╔═╡ d654c8f0-3b41-4388-840b-acb46263a832
+md"""
+# MTK Components for Annular Flow
+"""
+
+# ╔═╡ b4a22da7-888b-4842-aa87-5020c7c0e958
+"""
+Create a nonlinear system for flow in a concentric annular channel.
+"""
+function AnnularChannel(; name::Symbol, 
+                         L = 1.0,        # Length [m]
+                         Do = 0.02,      # Outer diameter [m]
+                         Di = 0.01,      # Inner diameter [m]
+                         ε = 1.5e-6,     # Roughness [m]
+                         g = 9.81,       # Gravity [m/s²]
+                         Re_low = 2300,  # Lower transition Reynolds number
+                         Re_high = 4000) # Upper transition Reynolds number
+    
+    pars = @parameters begin
+        L = L           # Length [m]
+        Do = Do         # Outer diameter [m]
+        Di = Di         # Inner diameter [m]
+        ε = ε           # Roughness [m]
+        g = g           # Gravity [m/s²]
+        Re_low = Re_low # Lower transition Reynolds number
+        Re_high = Re_high # Upper transition Reynolds number
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        κ = 0.5         # Diameter ratio (Di/Do)
+        Dh = 0.01       # Hydraulic diameter [m]
+        A = 0.0001      # Flow area [m²]
+        Re = 1000.0     # Reynolds number
+        f = 0.03        # Friction factor
+        ε_Dh = 0.0015   # Relative roughness
+        Δp = 1000.0     # Pressure drop [Pa]
+        H = 0.1         # Head loss [m]
+        f_lam = 0.064   # Laminar friction factor
+        f_turb = 0.04   # Turbulent friction factor
+        trans_factor = 0.0 # Transition factor
+        lam_factor = 1.0  # Laminar correction for annular flow
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Diameter ratio
+        κ ~ Di / Do,
+        
+        # Hydraulic diameter
+        Dh ~ Do - Di,
+        
+        # Flow area
+        A ~ π * (Do^2 - Di^2) / 4,
+        
+        # Velocity calculation
+        v ~ V̇ / A,
+        
+        # Reynolds number
+        Re ~ ρ * v * Dh / μ,
+        
+        # Relative roughness
+        ε_Dh ~ ε / Dh,
+        
+        # Laminar correction factor for annular flow
+        lam_factor ~ (1 - κ^2) / (1 - κ^2 + (1 + κ^2) * log(κ)),
+        
+        # Laminar friction factor for annular flow
+        f_lam ~ 64.0 / Re * lam_factor,
+        
+        # Turbulent friction factor using Colebrook-White with hydraulic diameter
+        f_turb ~ (1.0 / (-2.0 * log10(ε_Dh / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2,
+        
+        # Smooth transition between laminar and turbulent regimes
+        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
+        
+        # Combined friction factor
+        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        
+        # Pressure drop calculation
+        Δp ~ f * (L/Dh) * 0.5 * ρ * v^2,
+        
+        # Head loss calculation
+        H ~ f * (L/Dh) * (v^2 / (2*g))
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 2cc54f8b-2c27-4a99-b54d-d0bdeb3e4696
+"""
+Create a nonlinear system for a 180° bend in an annular channel (coaxial BHE).
+"""
+function AnnularBend180(; name::Symbol, 
+                         Do = 0.02,      # Outer diameter [m]
+                         Di = 0.01,      # Inner diameter [m]
+                         g = 9.81)       # Gravity [m/s²]
+    
+    pars = @parameters begin
+        Do = Do         # Outer diameter [m]
+        Di = Di         # Inner diameter [m]
+        g = g           # Gravity [m/s²]
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Dh = 0.01       # Hydraulic diameter [m]
+        A = 0.0001      # Flow area [m²]
+        Re = 1000.0     # Reynolds number
+        k = 0.5         # Loss coefficient
+        R = 0.01        # Estimated centerline radius [m]
+        R_D = 2.0       # Radius to hydraulic diameter ratio
+        Δp = 100.0      # Pressure drop [Pa]
+        H = 0.01        # Head loss [m]
+        K_base = 0.95   # Base loss coefficient from R/D ratio
+        K_Re = 1.0      # Reynolds number correction factor
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Hydraulic diameter
+        Dh ~ Do - Di,
+        
+        # Flow area
+        A ~ π * (Do^2 - Di^2) / 4,
+        
+        # Velocity calculation
+        v ~ V̇ / A,
+        
+        # Reynolds number
+        Re ~ ρ * v * Dh / μ,
+        
+        # Estimate centerline radius (from center of inner pipe to middle of annular gap)
+        R ~ (Do - Di)/4,
+        
+        # Radius to hydraulic diameter ratio
+        R_D ~ R / Dh,
+        
+        # Base loss coefficient (simplified piecewise function for MTK compatibility)
+        K_base ~ ifelse(R_D <= 1.0, 1.75,
+                 ifelse(R_D <= 1.5, 1.10,
+                 ifelse(R_D <= 2.0, 0.95,
+                 ifelse(R_D <= 3.0, 0.60,
+                 ifelse(R_D <= 4.0, 0.45,
+                 ifelse(R_D <= 6.0, 0.20,
+                 ifelse(R_D <= 8.0, 0.16,
+                       0.10))))))),
+        
+        # Reynolds number correction
+        K_Re ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
+        
+        # Total loss coefficient
+        k ~ K_base * K_Re,
+        
+        # Pressure drop calculation
+        Δp ~ k * 0.5 * ρ * v^2,
+        
+        # Head loss calculation
+        H ~ k * (v^2 / (2*g))
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 6133d3f4-34cb-463f-bddc-9dce93b642a3
+"""
+Create a complete U-pipe borehole heat exchanger model.
+The model includes:
+- Downward pipe flow
+- U-bend at the bottom
+- Upward pipe flow
+
+Returns a ModelingToolkit system representing the entire BHE pressure drop.
+"""
+function BHE_Upipe_Hydraulic(; name::Symbol,
+                    depth = 100.0,     # Borehole depth [m]
+                    Di_ = 0.032,        # Inner diameter of the pipes [m]
+                    ε = 1.5e-6,        # Pipe roughness [m]
+                    U_radius = 0.064,  # U-bend radius [m]
+                    spacing = 0.075,   # Spacing between pipes (center to center) [m]
+                    Re_low = 2300,     # Lower transition Reynolds number
+                    Re_high = 4000,    # Upper transition Reynolds number
+                    g = 9.81)          # Gravity [m/s²]
+    pars = @parameters begin
+		depth = depth
+		Di = Di_
+	end
+    # Create the individual components
+    @named downpipe = StraightTubeSwameeJain(
+        L = depth,
+        Di = Di,
+        ε = ε,
+        Re_low = Re_low,
+        Re_high = Re_high,
         g = g
     )
-end
-  ╠═╡ =#
-
-# ╔═╡ e9a8b977-74c2-4fae-8bc4-26169971ee34
-function PressureDropTubeGnielskiCorrelation(; name::Symbol,
-        )
-    pars = @parameters begin
-		Di = 10e-2
-		L = 100
-    end
-
-    vars = @variables begin
-        V̇ = 0.1      # volumetric flow [m^3/s]
-        ρ = 1000.0   # density [kg/m^3]
-        ṁ = 1.0      # mass flow [kg/s]
-        H = 10.0     # head [m]
-        Δp = 10.0     # head [m]
-        k = 0.01     # flow coeff
-        
-        # Flags for operational limits
-        exceeding_max_speed = false    # true when N > N_max
-        exceeding_max_power = false    # true when P_elec > P_elec_max
-        exceeding_max_head = false     # true when H > H_max
-    end
-
-    eqs = [
-      # mass continuity
-      ṁ       ~ ρ * V̇,
-    ]
-
-    return NonlinearSystem(eqs, vars, pars, name=name)
-end
-
-# ╔═╡ 81db886c-93df-4b12-a5e7-cdae4a68a752
-function PressureDropTube(; name::Symbol,
-        )
-    pars = @parameters begin
-		Di = 10e-2
-		L = 100
-    end
-
-    vars = @variables begin
-        V̇ = 0.1      # volumetric flow [m^3/s]
-        ρ = 1000.0   # density [kg/m^3]
-        ṁ = 1.0      # mass flow [kg/s]
-        H = 10.0     # head [m]
-        Δp = 10.0     # head [m]
-        k = 0.01     # flow coeff
-        
-        # Flags for operational limits
-        exceeding_max_speed = false    # true when N > N_max
-        exceeding_max_power = false    # true when P_elec > P_elec_max
-        exceeding_max_head = false     # true when H > H_max
-    end
-
-    eqs = [
-      # mass continuity
-      ṁ       ~ ρ * V̇,
-    ]
-
-    return NonlinearSystem(eqs, vars, pars, name=name)
-end
-
-# ╔═╡ ecda767c-efff-465a-8c36-9b0fd4612eec
-# ╠═╡ skip_as_script = true
-#=╠═╡
-function Pump(; name::Symbol,
-        N         = 1.0,        # rotational speed [1/s]
-        D         = 0.1,        # impeller diameter [m]
-        g         = 9.81,       # gravity [m/s^2]
-        ψ₀        = 0.5,        # dead‐head coeff
-        K         = 0.3,        # head‐curve shape
-        φ_BEP     = 0.08,       # BEP flow coeff
-        η_max     = 0.85,       # peak hydraulic efficiency
-        η_motor   = 0.9,        # motor efficiency
-        N_max     = 1.2,        # maximum rotational speed [1/s]
-        P_elec_max = 1000.0,    # maximum electrical power [W]
-        H_max     = 20.0,       # maximum head [m]
-        )
-    pars = @parameters begin
-        N         = N        # rotational speed [1/s]
-        D         = D        # impeller diameter [m]
-        g         = g        # gravity [m/s^2]
-        ψ₀        = ψ₀       # dead‐head coeff
-        K         = K        # head‐curve shape
-        φ_BEP     = φ_BEP    # BEP flow coeff
-        η_max     = η_max    # peak hydraulic efficiency
-        η_motor   = η_motor  # motor efficiency
-        N_max     = N_max    # maximum rotational speed
-        P_elec_max = P_elec_max # maximum electrical power
-        H_max     = H_max    # maximum head
-    end
-
-    vars = @variables begin
-        V̇ = 0.1      # volumetric flow [m^3/s]
-        ρ = 1000.0   # density [kg/m^3]
-        ṁ = 1.0      # mass flow [kg/s]
-        cp = 4180    # specific heat [J/(kg·K)]
-        H = 10.0     # head [m]
-        φ = 0.01     # flow coeff
-        ψ = 0.1      # head coeff
-        κ = 0.01     # power coeff
-        η = 0.5      # hydraulic efficiency
-        P_shaft = 100.0  # shaft power [W]
-        P_elec = 100.0   # electrical power [W]
-        
-        # Flags for operational limits
-        exceeding_max_speed = false    # true when N > N_max
-        exceeding_max_power = false    # true when P_elec > P_elec_max
-        exceeding_max_head = false     # true when H > H_max
-    end
-
-    eqs = [
-      # mass continuity
-      ṁ       ~ ρ * V̇,
-
-      # dimensionless groups
-      φ        ~ V̇       / (N * D^3),
-      ψ        ~ g * H    / (N^2 * D^2),
-      
-      P_shaft  ~ κ * ρ * N^3 * D^5,
-
-      # performance curves
-      ψ        ~ ψ₀ - K * φ^2,
-      η        ~ η_max * (1 - ((φ - φ_BEP)/φ_BEP)^2),
-      κ        ~ ψ * φ / η,
-
-      # electrical consumption & heating
-      P_elec   ~ P_shaft / η_motor,
-      
-      # Operational limit flags
-      exceeding_max_speed ~ N > N_max,
-      exceeding_max_power ~ P_elec > P_elec_max,
-      exceeding_max_head ~ H > H_max,
-    ]
-
-    return NonlinearSystem(eqs, vars, pars, name=name)
-end
-  ╠═╡ =#
-
-# ╔═╡ b600ba43-6f71-4012-bb2a-00850b1d0511
-# ╠═╡ skip_as_script = true
-#=╠═╡
-function BasicPump(;name,
-    H_shutoff = 12,  # Shutoff head (m)
-    Q_max = 13/3600,      # Maximum flow (m³/s)
-    N = 50.0/60.0,  # Default to 50Hz
-    D = 0.1,    # Default impeller diameter [m]
-    g = 9.81,   # Default gravity [m/s²]
-    N_max = 1.2 * N,  # Default maximum speed 20% above nominal
-    P_elec_max = nothing,  # Default max power, will be calculated if not provided
-    H_max = nothing   # Default max head, will be calculated if not provided
-)
-    # Calculate pump parameters based on basic info
-    ppars = estimate_pump_params(
-        H_shutoff = H_shutoff, 
-        Q_max = Q_max,
-        N = N,
-        D = D,
+    
+    @named ubend = PipeBendU(
+        R = U_radius,
+        Di = Di,
         g = g
     )
     
-    # Calculate default maximum values if not provided
-    if isnothing(P_elec_max)
-        # Estimate max power at BEP
-        H_BEP = H_shutoff * (1 - (ppars.φ_BEP * N * D^3 / Q_max)^2)
-        P_hydraulic_BEP = ppars.φ_BEP * N * D^3 * H_BEP * g * 1000.0  # ρ=1000 kg/m³
-        P_elec_max = P_hydraulic_BEP / (ppars.η_max * ppars.η_motor) * 1.2  # 20% safety margin
-    end
-    
-    if isnothing(H_max)
-        H_max = H_shutoff * 1.1  # Max head is typically slightly above shutoff head
-    end
-    
-    # Create pump with calculated parameters
-    p = Pump(; name=name,
-        N         = ppars.N,         
-        D         = ppars.D,        
-        g         = g,       
-        ψ₀        = ppars.ψ₀,        
-        K         = ppars.K,        
-        φ_BEP     = ppars.φ_BEP,   
-        η_max     = ppars.η_max,    
-        η_motor   = ppars.η_motor,
-        N_max     = N_max,
-        P_elec_max = P_elec_max,
-        H_max     = H_max
+    @named uppipe = StraightTubeSwameeJain(
+        L = depth,
+        Di = Di,
+        ε = ε,
+        Re_low = Re_low,
+        Re_high = Re_high,
+        g = g
     )
-    return p
-end
-  ╠═╡ =#
+    
+    @named fluid = Properties.DynamicIncompressibleProps(fluid="mea", χ = 0.0)
+    
+    # Create connection equations
+    components_eqs = [
+        # Connect the fluid properties to all components
+        downpipe.ρ ~ fluid.ρ,
+        downpipe.μ ~ fluid.μ,
+        ubend.ρ ~ fluid.ρ,
+        ubend.μ ~ fluid.μ,
+        uppipe.ρ ~ fluid.ρ,
+        uppipe.μ ~ fluid.μ,
+        
+        # Connect the flow between components
+        downpipe.ṁ ~ ubend.ṁ,
+        ubend.ṁ ~ uppipe.ṁ
+    ]
 
-# ╔═╡ ead20518-83ed-4a10-a3d3-e16309edd386
-# ╠═╡ skip_as_script = true
-#=╠═╡
-function StaticFluidProps(; name::Symbol)
-    pars = @parameters begin
-		cp₀ = 4180.0
-		ρ₀ = 1000.0
-	end
+
+    # Add total pressure drop and head variables
+    vars = @variables Δp_total H_total
+    sys_eqs = [
+        Δp_total ~ downpipe.Δp + ubend.Δp + uppipe.Δp,
+        H_total ~ downpipe.H + ubend.H + uppipe.H
+    ]
+
+	eqs = [components_eqs; sys_eqs]
+	
+    # Create the complete system
+    components = [downpipe, ubend, uppipe, fluid]
+	
+    bhe_system = compose(NonlinearSystem(eqs, vars, pars, name=name), components)
+    return bhe_system
+end
+
+# ╔═╡ f2018932-3171-41fc-a5bb-34d7cecf23c1
+@named bhc1 = BHE_Upipe_Hydraulic()
+
+# ╔═╡ 13044570-a39c-4dc6-81ec-ddf14bd3a3e3
+bhc1.Di
+
+# ╔═╡ 7eacc8aa-924d-4801-9b59-3486871dcf74
+bhc1.uppipe.Di
+
+# ╔═╡ 5c7117e9-9fe4-4a5b-bc75-50428ea76e38
+"""
+Create a complete coaxial borehole heat exchanger model.
+The model includes:
+- Inner pipe (usually the supply)
+- 180° annular bend at the bottom
+- Annular channel (usually the return)
+
+Returns a ModelingToolkit system representing the entire coaxial BHE pressure drop.
+"""
+function BHE_Coaxial_Hydraulic(; name::Symbol,
+                      depth = 100.0,     # Borehole depth [m]
+                      Di_inner = 0.032,  # Inner diameter of the inner pipe [m]
+                      Do_inner = 0.040,  # Outer diameter of the inner pipe [m]
+                      Di_outer = 0.060,  # Inner diameter of the outer pipe [m]
+                      ε_inner = 1.5e-6,  # Inner pipe roughness [m]
+                      ε_outer = 1.5e-6,  # Outer pipe roughness [m]
+                      flow_direction = :center_in, # :center_in or :annulus_in
+                      Re_low = 2300,     # Lower transition Reynolds number
+                      Re_high = 4000,    # Upper transition Reynolds number
+                      g = 9.81)          # Gravity [m/s²]
+    
+    # Create the individual components
+    @named inner_pipe = StraightTubeSwameeJain(
+        L = depth,
+        Di = Di_inner,
+        ε = ε_inner,
+        Re_low = Re_low,
+        Re_high = Re_high,
+        g = g
+    )
+    
+    @named annular_bend = AnnularBend180(
+        Di = Do_inner,
+        Do = Di_outer,
+        g = g
+    )
+    
+    @named annular_channel = AnnularChannel(
+        L = depth,
+        Di = Do_inner,
+        Do = Di_outer,
+        ε = ε_outer,
+        Re_low = Re_low,
+        Re_high = Re_high,
+        g = g
+    )
+    
+    @named fluid = Properties.DynamicIncompressibleProps(fluid="mea", χ = 0.0)
+    
+    # Create connection equations
+    eqs = [
+        # Connect the fluid properties to all components
+        inner_pipe.ρ ~ fluid.ρ,
+        inner_pipe.μ ~ fluid.μ,
+        annular_bend.ρ ~ fluid.ρ,
+        annular_bend.μ ~ fluid.μ,
+        annular_channel.ρ ~ fluid.ρ,
+        annular_channel.μ ~ fluid.μ,
+        
+        # Connect the flow between components
+        inner_pipe.ṁ ~ annular_bend.ṁ,
+        annular_bend.ṁ ~ annular_channel.ṁ
+    ]
+    
+    # Create the complete system
+    components = [inner_pipe, annular_bend, annular_channel, fluid]
+    bhe_system = compose(NonlinearSystem(eqs, [], [], name=name), components)
+	return bhe_system
+    
+    # Add total pressure drop and head variables
+    @variables Δp_total H_total
+    
+    # If flow direction is from annulus to center, reverse the components order
+    if flow_direction == :annulus_in
+        total_eqs = [
+            Δp_total ~ annular_channel.Δp + annular_bend.Δp + inner_pipe.Δp,
+            H_total ~ annular_channel.H + annular_bend.H + inner_pipe.H
+        ]
+    else # Default: center_in
+        total_eqs = [
+            Δp_total ~ inner_pipe.Δp + annular_bend.Δp + annular_channel.Δp,
+            H_total ~ inner_pipe.H + annular_bend.H + annular_channel.H
+        ]
+    end
+    
+    @named complete_system = compose(NonlinearSystem(total_eqs, [Δp_total, H_total], [], name=name), [bhe_system])
+    
+    return complete_system
+end
+
+# ╔═╡ 35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
+"""
+Create a single U-pipe borehole heat exchanger model with custom fluid properties.
+This is a convenience function that allows setting the flow rate and fluid properties.
+"""
+function create_Upipe_BHE(; name::Symbol,
+                          depth = 100.0,     # Borehole depth [m]
+                          Di = 0.032,        # Inner diameter of the pipes [m]
+                          ε = 1.5e-6,        # Pipe roughness [m]
+                          U_radius = 0.064,  # U-bend radius [m]
+                          spacing = 0.075,   # Spacing between pipes (center to center) [m]
+                          flow_rate = 0.0005, # Volumetric flow rate [m³/s]
+                          ρ = 1000.0,        # Fluid density [kg/m³]
+                          μ = 0.001,         # Fluid dynamic viscosity [Pa·s]
+                          Re_low = 2300,     # Lower transition Reynolds number
+                          Re_high = 4000)    # Upper transition Reynolds number
+    
+    # Create BHE system
+    @named bhe = BHE_Upipe_Hydraulic(
+        depth = depth,
+        Di = Di,
+        ε = ε,
+        U_radius = U_radius,
+        spacing = spacing,
+        Re_low = Re_low,
+        Re_high = Re_high
+    )
+    
+    # Create constraints
+    constraints = [
+        bhe.downpipe.V̇ ~ flow_rate,
+        bhe.fluid.ρ₀ ~ ρ,
+        bhe.fluid.μ₀ ~ μ
+    ]
+    
+    # Create the constrained system
+    @named complete_system = compose(NonlinearSystem(constraints, [], [], name=name), [bhe])
+    
+    return complete_system
+end
+
+# ╔═╡ 358d1b83-52aa-4704-9347-44b06324d2c0
+"""
+Create a coaxial borehole heat exchanger model with custom fluid properties.
+This is a convenience function that allows setting the flow rate and fluid properties.
+"""
+function create_Coaxial_BHE(; name,
+                            depth = 100.0,     # Borehole depth [m]
+                            Di_inner = 0.032,  # Inner diameter of the inner pipe [m]
+                            Do_inner = 0.040,  # Outer diameter of the inner pipe [m]
+                            Di_outer = 0.060,  # Inner diameter of the outer pipe [m]
+                            ε_inner = 1.5e-6,  # Inner pipe roughness [m]
+                            ε_outer = 1.5e-6,  # Outer pipe roughness [m]
+                            flow_direction = :center_in, # :center_in or :annulus_in
+                            flow_rate = 0.0005, # Volumetric flow rate [m³/s]
+                            ρ = 1000.0,        # Fluid density [kg/m³]
+                            μ = 0.001,         # Fluid dynamic viscosity [Pa·s]
+                            Re_low = 2300,     # Lower transition Reynolds number
+                            Re_high = 4000)    # Upper transition Reynolds number
+    
+    # Create BHE system
+    @named bhe = BHE_Coaxial_Hydraulic(
+        depth = depth,
+        Di_inner = Di_inner,
+        Do_inner = Do_inner,
+        Di_outer = Di_outer,
+        ε_inner = ε_inner,
+        ε_outer = ε_outer,
+        flow_direction = flow_direction,
+        Re_low = Re_low,
+        Re_high = Re_high
+    )
+    
+    # Create constraints based on flow direction
+    if flow_direction == :annulus_in
+        flow_constraints = [bhe.annular_channel.V̇ ~ flow_rate]
+    else # Default: center_in
+        flow_constraints = [bhe.inner_pipe.V̇ ~ flow_rate]
+    end
+    
+    # Add fluid property constraints
+    constraints = [
+        flow_constraints...,
+        bhe.fluid.ρ₀ ~ ρ,
+        bhe.fluid.μ₀ ~ μ
+    ]
+    
+    # Create the constrained system
+    @named complete_system = compose(NonlinearSystem(constraints, [], [], name=name), [bhe])
+    
+    return complete_system
+end
+
+# ╔═╡ b7db97a8-131f-42a4-9a5d-32a97d442944
+@named bhe = BHE_Coaxial_Hydraulic()
+
+# ╔═╡ 37613c1a-e4fb-45a4-ab2d-c331a7346378
+bhe.inner_pipe.v
+
+# ╔═╡ 1c05f96c-85a3-4832-b374-b9f23ca432eb
+@named c2 = create_Coaxial_BHE()
+
+# ╔═╡ 415c838f-034b-4250-ae34-f1163ea9276e
+md"""
+# Utility Functions
+"""
+
+# ╔═╡ ed71cc0c-bea0-49ab-a676-eb4cf0fc68ac
+"""
+Assemble multiple hydraulic components into a series connection.
+"""
+function assemble_series(systems::Vector{<:NonlinearSystem}; name::Symbol)
+    # Create equations to link the systems in series
+    equations = []
+    
+    # Link consecutive components - flow and fluid properties must be the same
+    for i in 1:length(systems)-1
+        push!(equations, systems[i].V̇ ~ systems[i+1].V̇)
+        push!(equations, systems[i].ṁ ~ systems[i+1].ṁ)
+        push!(equations, systems[i].ρ ~ systems[i+1].ρ)
+        push!(equations, systems[i].μ ~ systems[i+1].μ)
+    end
+    
+    # Total pressure drop and head loss is the sum of all components
     vars = @variables begin
-		cp
-		ρ
-	end
+        Δp_total = 0.0   # Total pressure drop [Pa]
+        H_total = 0.0    # Total head loss [m]
+    end
+    
+    # Add equations for total pressure drop and head loss
+    push!(equations, Δp_total ~ sum(system.Δp for system in systems))
+    push!(equations, H_total ~ sum(system.H for system in systems))
+    
+    # Create the combined system
+    return compose(NonlinearSystem(equations, vars, [], name=name), systems)
+end
+
+# ╔═╡ 579fbb8e-fd3f-4bc2-9143-3c93db35fe67
+"""
+Create a full pipeline with a series of components.
+"""
+function create_pipeline(components::Vector{<:NonlinearSystem}; 
+                         name::Symbol, 
+                         flow_rate=nothing, 
+                         pressure_drop=nothing)
+    # Assemble the pipeline in series
+    @named pipeline = assemble_series(components)
+    
+    # Add constraints based on specified inputs
+    constraints = []
+    
+    if !isnothing(flow_rate)
+        # Fix the flow rate if provided
+        push!(constraints, components[1].V̇ ~ flow_rate)
+    end
+    
+    if !isnothing(pressure_drop)
+        # Fix the pressure drop if provided
+        push!(constraints, pipeline.Δp_total ~ pressure_drop)
+    end
+    
+    # Create the final constrained system
+    final_system = compose(NonlinearSystem(constraints, [], [], name=name), [pipeline])
+    
+    return structural_simplify(final_system)
+end
+
+# ╔═╡ 7de4397f-f32c-446b-82c0-35a1f8dffda4
+# ╠═╡ disabled = true
+#=╠═╡
+"""
+Create a basic fluid properties component.
+"""
+function StaticFluidProps(; name::Symbol,
+                           ρ₀ = 1000.0,  # Default density [kg/m³]
+                           μ₀ = 0.001)   # Default viscosity [Pa·s]
+    pars = @parameters begin
+        ρ₀ = ρ₀
+        μ₀ = μ₀
+    end
+    vars = @variables begin
+        ρ
+        μ
+    end
     eqs  = [
-      cp ~ cp₀,
-      ρ  ~ ρ₀
+      ρ ~ ρ₀,
+      μ ~ μ₀
     ]
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
   ╠═╡ =#
 
-# ╔═╡ 1fefd7de-6984-4f55-b7c1-e5ef045eaec3
+# ╔═╡ 8124b17c-f071-4903-8af1-976e555649f2
+md"""
+# Example Usage
+"""
+
+# ╔═╡ 9e827af5-06a6-4283-9633-596b68a3b25d
 #=╠═╡
-estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
+"""
+Create an example pipeline with straight sections and bends.
+"""
+function example_pipeline()
+    # Create pipeline components
+    @named inlet_pipe = StraightTubeSwameeJain(L=2.0, Di=0.02, ε=1e-6)
+    @named bend1 = PipeBend90(R=0.06, Di=0.02)
+    @named middle_pipe = StraightTubeSwameeJain(L=1.5, Di=0.02, ε=1e-6)
+    @named bend2 = PipeBendU(R=0.08, Di=0.02)
+    @named outlet_pipe = StraightTubeSwameeJain(L=3.0, Di=0.02, ε=1e-6)
+    @named fluid = StaticFluidProps()
+    
+    # Create connection equations
+    eqs = [
+        inlet_pipe.ρ ~ fluid.ρ,
+        inlet_pipe.μ ~ fluid.μ,
+        bend1.ρ ~ fluid.ρ,
+        bend1.μ ~ fluid.μ,
+        middle_pipe.ρ ~ fluid.ρ,
+        middle_pipe.μ ~ fluid.μ,
+        bend2.ρ ~ fluid.ρ,
+        bend2.μ ~ fluid.μ,
+        outlet_pipe.ρ ~ fluid.ρ,
+        outlet_pipe.μ ~ fluid.μ,
+        
+        # Specify flow rate
+        inlet_pipe.V̇ ~ 0.0005  # 0.5 L/s
+    ]
+    
+    # Create the complete system
+    components = [inlet_pipe, bend1, middle_pipe, bend2, outlet_pipe]
+    @named pipeline = compose(NonlinearSystem(eqs, [], [], name=:pipeline), 
+                             [components..., fluid])
+    
+    # Simplify the system
+    return pipeline
+end
   ╠═╡ =#
 
-# ╔═╡ 401e0a7c-796f-4e3a-bace-1a5957a1e527
+# ╔═╡ 76d7f0f3-ef01-453d-85ac-a21a6bba1d08
 #=╠═╡
-@named magna3_approx = BasicPump(H_shutoff=12, Q_max=13/3600,
-    N_max = 50,
-    P_elec_max = 185,
-    H_max = 12
-)
-  ╠═╡ =#
-
-# ╔═╡ 93bc9f05-ff1f-43c8-929a-37e96fdf0b8f
-#=╠═╡
-typeof(magna3_approx)
-  ╠═╡ =#
-
-# ╔═╡ c828356b-8830-4558-8868-eb5bad6a0cdf
-assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
-
-# ╔═╡ dd622bef-b25e-455e-89ed-bb1811462812
-#=╠═╡
-@named props = StaticFluidProps()
-  ╠═╡ =#
-
-# ╔═╡ d95b95a6-435b-48a6-a047-936ca98e6b7c
-#=╠═╡
-link_eqs = [
-    magna3_approx.ρ  ~ props.ρ,
-    magna3_approx.cp ~ props.cp,
-	magna3_approx.H ~ 5.0,
-  ]
-  ╠═╡ =#
-
-# ╔═╡ a8af819c-5dd5-4db2-9455-07eb05a01a15
-#=╠═╡
-@named new_sys = assemble([magna3_approx, props], equations = link_eqs);
-  ╠═╡ =#
-
-# ╔═╡ 022372da-3b1a-4ce4-9b4a-7c9765a167c0
-#=╠═╡
-system   = structural_simplify(new_sys)
-  ╠═╡ =#
-
-# ╔═╡ ff9cb7b3-56de-4b34-8eba-25b637c3defe
-#=╠═╡
-prob = NonlinearProblem(system, [])
-  ╠═╡ =#
-
-# ╔═╡ e79e9d80-386f-4cc5-862a-d62a8c0941f2
-#=╠═╡
-sol = solve(prob)
-  ╠═╡ =#
-
-# ╔═╡ 50c37ec4-4541-48df-a251-50b6efc1edbb
-#=╠═╡
-@test sol[magna3_approx.V̇] ≈ 0.002758031668260459
+example_pipeline()
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -354,12 +1205,14 @@ ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 ModelingToolkit = "~9.78.0"
 NonlinearSolve = "~4.8.0"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
+SpecialFunctions = "~2.5.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -368,7 +1221,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "dee5b10337a41298c1cc80b623e792a381b03fd3"
+project_hash = "73dde5c43c3a2e989ef6ae7178c10c42ca88e859"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -2124,23 +2977,52 @@ version = "17.4.0+2"
 # ╠═32204332-17e4-4a4c-980e-ddc75d244f51
 # ╠═46143377-5b05-4648-89f0-1b1dc43ae51f
 # ╠═d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
-# ╠═e29a0e73-f453-44f0-8222-bfedc1db7306
-# ╠═933b9401-d127-4b44-bde5-99c99e8bb124
-# ╠═b600ba43-6f71-4012-bb2a-00850b1d0511
-# ╠═e9a8b977-74c2-4fae-8bc4-26169971ee34
-# ╠═81db886c-93df-4b12-a5e7-cdae4a68a752
-# ╠═ecda767c-efff-465a-8c36-9b0fd4612eec
-# ╠═ead20518-83ed-4a10-a3d3-e16309edd386
-# ╠═1fefd7de-6984-4f55-b7c1-e5ef045eaec3
-# ╠═401e0a7c-796f-4e3a-bace-1a5957a1e527
-# ╠═93bc9f05-ff1f-43c8-929a-37e96fdf0b8f
-# ╠═c828356b-8830-4558-8868-eb5bad6a0cdf
-# ╠═dd622bef-b25e-455e-89ed-bb1811462812
-# ╠═d95b95a6-435b-48a6-a047-936ca98e6b7c
-# ╠═a8af819c-5dd5-4db2-9455-07eb05a01a15
-# ╠═022372da-3b1a-4ce4-9b4a-7c9765a167c0
-# ╠═ff9cb7b3-56de-4b34-8eba-25b637c3defe
-# ╠═e79e9d80-386f-4cc5-862a-d62a8c0941f2
-# ╠═50c37ec4-4541-48df-a251-50b6efc1edbb
+# ╠═b550df61-460e-4d63-8509-17e697033c87
+# ╠═6f95a236-229a-4f68-be72-a8085f3aa025
+# ╠═16a55253-ec0f-457e-aab5-618a12f6c251
+# ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
+# ╟─ff1be30a-fb09-4ecd-884f-3fe44f43cd92
+# ╟─3ca7a788-85b9-466c-89e0-fabd1cf5d0db
+# ╟─f1ed8017-c3f6-4fdd-8352-d571b577aded
+# ╟─7830ef5f-a6b6-43e5-bcc8-cea0b38f830a
+# ╟─8a0ea5b2-6d00-40b2-a0b1-b988450ba3d9
+# ╟─c9c6d38d-0094-46ec-8445-8ae71e2cde62
+# ╟─05b2abef-8893-4c7a-9ece-60dda7f78f25
+# ╟─2437813d-aa72-4b9a-9816-6ad6430f10c5
+# ╟─fe4deb09-0ad9-4266-aa08-a52bc79d2f34
+# ╟─1f72eb23-8bd0-4671-89d6-67b68d1c9e4c
+# ╟─2f9ffd26-092a-4f0e-a7b9-3f7b0d2ceb5b
+# ╟─b4f7ef3a-58c9-4d32-a341-9a77f2953bf4
+# ╟─1be7c232-55b8-4a06-9323-9203ba9c409d
+# ╟─dd8cddd6-5b34-4161-882a-c2708e01e3a6
+# ╟─a5da0c1c-5451-4228-9201-2baf274d6efb
+# ╟─884fae8d-2455-4aab-8780-8837bdd92e51
+# ╟─70ff62fc-73b3-4020-bf18-6da05b5498b3
+# ╠═39be2637-45e9-4790-98c1-5815c20428e2
+# ╠═42cf47b7-6bab-4d93-8db4-5c69e11d88fc
+# ╟─d5ab6b70-0e50-47fc-a385-f77fea33955a
+# ╟─03bcd530-a71a-4b1c-a84e-cc0f9d54571e
+# ╟─44a50c57-fe46-4ed6-ac59-04cb0e1e3387
+# ╟─6d45fad3-e405-47d2-8bf8-b8898f7a108a
+# ╟─d654c8f0-3b41-4388-840b-acb46263a832
+# ╟─b4a22da7-888b-4842-aa87-5020c7c0e958
+# ╟─2cc54f8b-2c27-4a99-b54d-d0bdeb3e4696
+# ╠═6133d3f4-34cb-463f-bddc-9dce93b642a3
+# ╠═f2018932-3171-41fc-a5bb-34d7cecf23c1
+# ╠═13044570-a39c-4dc6-81ec-ddf14bd3a3e3
+# ╠═7eacc8aa-924d-4801-9b59-3486871dcf74
+# ╠═5c7117e9-9fe4-4a5b-bc75-50428ea76e38
+# ╟─35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
+# ╟─358d1b83-52aa-4704-9347-44b06324d2c0
+# ╠═b7db97a8-131f-42a4-9a5d-32a97d442944
+# ╠═37613c1a-e4fb-45a4-ab2d-c331a7346378
+# ╠═1c05f96c-85a3-4832-b374-b9f23ca432eb
+# ╟─415c838f-034b-4250-ae34-f1163ea9276e
+# ╠═ed71cc0c-bea0-49ab-a676-eb4cf0fc68ac
+# ╠═579fbb8e-fd3f-4bc2-9143-3c93db35fe67
+# ╠═7de4397f-f32c-446b-82c0-35a1f8dffda4
+# ╟─8124b17c-f071-4903-8af1-976e555649f2
+# ╠═9e827af5-06a6-4283-9633-596b68a3b25d
+# ╠═76d7f0f3-ef01-453d-85ac-a21a6bba1d08
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
