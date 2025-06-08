@@ -115,6 +115,9 @@ using Nemo
 using PlutoExtras
   ╠═╡ =#
 
+# ╔═╡ 883b94f3-9a44-491e-8dbd-53d7ea6af0c2
+
+
 # ╔═╡ 6eaea602-9f51-47fb-8bd9-9768f49f4aa3
 ρ_b_(0.0, 0.0)
 
@@ -4581,6 +4584,7 @@ version = "3.6.0+0"
 # ╠═e01e0c08-459e-4636-8fef-b0f6790ee964
 # ╠═a943d92d-2672-4f52-9b9e-bfa51f042bcf
 # ╠═93d5f510-e03b-4ced-9ae7-ef1837b2fb34
+# ╠═883b94f3-9a44-491e-8dbd-53d7ea6af0c2
 # ╠═badf578f-6cc7-48c2-8693-370856d659dd
 # ╠═6eaea602-9f51-47fb-8bd9-9768f49f4aa3
 # ╠═ba2f13d7-0cb8-4556-933c-bb7b5d86db96

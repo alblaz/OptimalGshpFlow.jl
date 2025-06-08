@@ -7,14 +7,14 @@ using InteractiveUtils
 # ╔═╡ 32204332-17e4-4a4c-980e-ddc75d244f51
 using ModelingToolkit, NonlinearSolve
 
-# ╔═╡ 46143377-5b05-4648-89f0-1b1dc43ae51f
-using PlutoTest
-
 # ╔═╡ d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
 using PlutoDevMacros
 
 # ╔═╡ b550df61-460e-4d63-8509-17e697033c87
 using SpecialFunctions
+
+# ╔═╡ e8d48aab-e227-48cc-8ad8-3cfb57a3e165
+using PlutoTest
 
 # ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
 @fromparent begin
@@ -22,8 +22,26 @@ using SpecialFunctions
 	using ..Properties
 end
 
-# ╔═╡ 16a55253-ec0f-457e-aab5-618a12f6c251
-Utils.ρ_b_(0.0, 0.0)
+# ╔═╡ 9fe54e9b-0879-4668-b6ee-5002dc6e5878
+using Interpolations
+
+# ╔═╡ 107be9d7-6d21-4251-af2d-85c7f82f2652
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Plots
+  ╠═╡ =#
+
+# ╔═╡ 46143377-5b05-4648-89f0-1b1dc43ae51f
+# ╠═╡ disabled = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
+
+# ╔═╡ 9a7db941-b8b8-4b81-918b-d86509b589a3
+# ╠═╡ disabled = true
+#=╠═╡
+@named ethanol = Properties.DynamicIncompressibleProps(χ = 0.2, fluid = "MEA")
+  ╠═╡ =#
 
 # ╔═╡ aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╠═╡ skip_as_script = true
@@ -118,35 +136,14 @@ md"""
 """
 
 # ╔═╡ c9c6d38d-0094-46ec-8445-8ae71e2cde62
-"""
-Calculate the loss coefficient for pipe bends using the Idelchik correlation.
-θ: bend angle in degrees
-R: bend radius
-D: pipe diameter
-Re: Reynolds number
-"""
+# ╠═╡ disabled = true
+#=╠═╡
 function k_bend_idelchik(θ, R, D, Re)
     # Radius ratio
     R_D = R/D
     
-    # Base coefficient for 90° bends
-    if R_D < 1.0
-        A = 1.0
-    elseif R_D <= 1.5
-        A = 0.9
-    elseif R_D <= 2.0
-        A = 0.8
-    elseif R_D <= 4.0
-        A = 0.7
-    elseif R_D <= 6.0
-        A = 0.6
-    elseif R_D <= 8.0
-        A = 0.55
-    elseif R_D <= 10.0
-        A = 0.5
-    else
-        A = 0.4
-    end
+    # Base coefficient using interpolation
+    A = bend_base_coefficient(R_D)
     
     # Reynolds number correction
     B = 1.0
@@ -162,22 +159,49 @@ function k_bend_idelchik(θ, R, D, Re)
     
     return k
 end
+  ╠═╡ =#
+
+# ╔═╡ 9c3615e1-789b-41b8-b1ce-ac49893b32c2
+begin
+	"""
+	Helper function that calculates the base coefficient A for bend loss using interpolation.
+	R_D: Radius to diameter ratio
+	"""
+	function bend_base_coefficient(R_D)
+	    # Create knot points directly from the original conditional logic
+	    R_D_knots = [0.0, 1.0, 1.5, 2.0, 4.0, 6.0, 8.0, 10.0, Inf]
+	    A_values = [1.0, 1.0, 0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.4]
+	    
+	    # Create interpolation object with flat extrapolation
+	    A_interp = Interpolations.LinearInterpolation(R_D_knots, A_values, extrapolation_bc=Interpolations.Flat())
+	    
+	    # Get base coefficient using interpolation
+	    return A_interp(R_D)
+	end
+	
+	# Register the helper function for symbolic computation
+	@register_symbolic bend_base_coefficient(R_D)
+end
 
 # ╔═╡ 05b2abef-8893-4c7a-9ece-60dda7f78f25
+#=╠═╡
 """
 Calculate the loss coefficient for a U-bend (180°) based on bend radius and pipe diameter.
 """
 function k_ubend(R, D, Re)
     return k_bend_idelchik(180.0, R, D, Re)
 end
+  ╠═╡ =#
 
 # ╔═╡ 2437813d-aa72-4b9a-9816-6ad6430f10c5
+#=╠═╡
 """
 Calculate the loss coefficient for a 90° bend based on bend radius and pipe diameter.
 """
 function k_90bend(R, D, Re)
     return k_bend_idelchik(90.0, R, D, Re)
 end
+  ╠═╡ =#
 
 # ╔═╡ fe4deb09-0ad9-4266-aa08-a52bc79d2f34
 """
@@ -343,6 +367,10 @@ function head_loss_annular(ṁ, Do, Di, L, ρ, μ, ε; Re_low=2300, Re_high=4000
     return f * (L/Dh) * (v^2 / (2*g))
 end
 
+# ╔═╡ d64c53cb-b4a4-4811-8f80-42be4c0bbb48
+assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
+
+
 # ╔═╡ 70ff62fc-73b3-4020-bf18-6da05b5498b3
 md"""
 # MTK Components for Straight Tubes
@@ -351,6 +379,7 @@ md"""
 # ╔═╡ 39be2637-45e9-4790-98c1-5815c20428e2
 """
 Create a nonlinear system for a straight pipe section using the Gnielinski correlation.
+This implementation leverages the existing friction_factor_gnielinski function.
 """
 function StraightTubeGnielinski(; name::Symbol, 
                                  L = 1.0,        # Length [m]
@@ -380,11 +409,9 @@ function StraightTubeGnielinski(; name::Symbol,
         ε_D = 0.0015    # Relative roughness
         Δp = 1000.0     # Pressure drop [Pa]
         H = 0.1         # Head loss [m]
-        f_lam = 0.064   # Laminar friction factor
-        f_turb = 0.04   # Turbulent friction factor
-        trans_factor = 0.0 # Transition factor
         A = 0.0001      # Flow area [m²]
     end
+
 
     eqs = [
         # Mass continuity
@@ -400,17 +427,8 @@ function StraightTubeGnielinski(; name::Symbol,
         # Relative roughness
         ε_D ~ ε / Di,
         
-        # Laminar friction factor
-        f_lam ~ 64.0 / Re,
-        
-        # Turbulent friction factor using Gnielinski
-        f_turb ~ (1.0 / (-2.0 * log10(ε_D / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2,
-        
-        # Smooth transition between laminar and turbulent regimes
-        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
-        
-        # Combined friction factor
-        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        # Use the existing friction factor function via callback
+        f ~ friction_factor_gnielinski(Re, ε_D; Re_low=Re_low, Re_high=Re_high),
         
         # Pressure drop calculation
         Δp ~ f * (L/Di) * 0.5 * ρ * v^2,
@@ -425,6 +443,7 @@ end
 # ╔═╡ 42cf47b7-6bab-4d93-8db4-5c69e11d88fc
 """
 Create a nonlinear system for a straight pipe section using the Swamee-Jain approximation.
+This implementation leverages the existing friction_factor_swamee_jain function.
 """
 function StraightTubeSwameeJain(; name::Symbol, 
                                  L = 1.0,        # Length [m]
@@ -454,11 +473,9 @@ function StraightTubeSwameeJain(; name::Symbol,
         ε_D = 0.0015    # Relative roughness
         Δp = 1000.0     # Pressure drop [Pa]
         H = 0.1         # Head loss [m]
-        f_lam = 0.064   # Laminar friction factor
-        f_turb = 0.04   # Turbulent friction factor
-        trans_factor = 0.0 # Transition factor
         A = 0.0001      # Flow area [m²]
     end
+
 
     eqs = [
         # Mass continuity
@@ -474,17 +491,8 @@ function StraightTubeSwameeJain(; name::Symbol,
         # Relative roughness
         ε_D ~ ε / Di,
         
-        # Laminar friction factor
-        f_lam ~ 64.0 / Re,
-        
-        # Turbulent friction factor using Swamee-Jain
-        f_turb ~ 0.25 / (log10(ε_D/3.7 + 5.74/(Re^0.9)))^2,
-        
-        # Smooth transition between laminar and turbulent regimes
-        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
-        
-        # Combined friction factor
-        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        # Use the existing friction factor function via callback
+        f ~ friction_factor_swamee_jain(Re, ε_D; Re_low=Re_low, Re_high=Re_high),
         
         # Pressure drop calculation
         Δp ~ f * (L/Di) * 0.5 * ρ * v^2,
@@ -496,15 +504,78 @@ function StraightTubeSwameeJain(; name::Symbol,
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
+# ╔═╡ d6c2510d-cfbb-42e0-aefa-62289832c789
+# Test function for StraightTubeGnielinski model
+function test_straight_tube_gnielinski()
+    # Create the model
+    @named straight_pipe = StraightTubeGnielinski(L=10.0, Di=0.02, ε=1.5e-6)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([straight_pipe], 
+                                      equations = [straight_pipe.ρ ~ 1000.0, 
+                                                   straight_pipe.μ ~ 0.001,
+                                                   straight_pipe.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results (expected values are approximate)
+    pressure_drop = sol[straight_pipe.Δp]
+    reynolds = sol[straight_pipe.Re]
+    friction = sol[straight_pipe.f]
+    display(pressure_drop)
+    display(reynolds)
+    display(friction)
+    # Return true if pressure drop is within expected range for water in a pipe
+    # Note: You can replace with exact expected values when known
+    return (pressure_drop > 0) && (reynolds > 0) && (friction > 0)
+end
+
+
+# ╔═╡ 8160473b-7a6f-475a-afc8-c61f50290f44
+@test test_straight_tube_gnielinski()
+
+# ╔═╡ 9beb3f23-8110-4867-9b19-b9ddeeb711b0
+
+# Test function for StraightTubeSwameeJain model
+function test_straight_tube_swamee_jain()
+    # Create the model
+    @named straight_pipe = StraightTubeSwameeJain(L=10.0, Di=0.02, ε=1.5e-6)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([straight_pipe], 
+                                      equations = [straight_pipe.ρ ~ 1000.0, 
+                                                   straight_pipe.μ ~ 0.001,
+                                                   straight_pipe.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[straight_pipe.Δp]
+    reynolds = sol[straight_pipe.Re]
+    friction = sol[straight_pipe.f]
+    
+    display(pressure_drop)
+    display(reynolds)
+    display(friction)
+    return (pressure_drop > 0) && (reynolds > 0) && (friction > 0)
+end
+
+
+# ╔═╡ 3320cb17-a8ac-4f9e-ace1-29f8a4ba7906
+@test test_straight_tube_swamee_jain()
+
 # ╔═╡ d5ab6b70-0e50-47fc-a385-f77fea33955a
 md"""
 # MTK Components for Bends
 """
 
 # ╔═╡ 03bcd530-a71a-4b1c-a84e-cc0f9d54571e
-"""
-Create a nonlinear system for a pipe bend with a specified angle.
-"""
 function PipeBend(; name::Symbol, 
                    θ = 90.0,       # Bend angle [degrees]
                    R = 0.05,       # Bend radius [m]
@@ -526,13 +597,12 @@ function PipeBend(; name::Symbol,
         v = 1.0         # Velocity [m/s]
         Re = 1000.0     # Reynolds number
         k = 0.5         # Loss coefficient
-        R_D = 5.0       # Radius to diameter ratio
-        L_eq = 1.0      # Equivalent length [m]
         Δp = 100.0      # Pressure drop [Pa]
         H = 0.01        # Head loss [m]
         A = 0.0001      # Flow area [m²]
-        A_coeff = 0.7   # Base coefficient for angle
-        B_coeff = 1.0   # Reynolds number correction
+        R_D = 5.0       # Radius to diameter ratio
+        A_coeff = 0.7   # Base coefficient
+        B_coeff = 1.0   # Reynolds correction
         C_coeff = 0.1   # Angle correction
     end
 
@@ -547,30 +617,20 @@ function PipeBend(; name::Symbol,
         # Reynolds number
         Re ~ ρ * v * Di / μ,
         
-        # Radius to diameter ratio
-        R_D ~ R / Di,
-        
-        # Base coefficient for angles (simplified for MTK compatibility)
-        A_coeff ~ ifelse(R_D < 1.0, 1.0, 
-                 ifelse(R_D < 2.0, 0.9 - 0.1*(R_D - 1.0),
-                 ifelse(R_D < 4.0, 0.8 - 0.05*(R_D - 2.0),
-                 ifelse(R_D < 6.0, 0.7 - 0.05*(R_D - 4.0),
-                 ifelse(R_D < 8.0, 0.6 - 0.025*(R_D - 6.0),
-                 ifelse(R_D < 10.0, 0.55 - 0.025*(R_D - 8.0),
-                       0.5 - 0.01*(R_D - 10.0))))))),
-        
-        # Reynolds number correction
-        B_coeff ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
-        
-        # Angle correction
-        C_coeff ~ 0.01 * θ * (0.25 * θ * (0.5 * θ / 90)^0.5),
-        
-        # Loss coefficient
-        k ~ A_coeff * B_coeff * C_coeff,
-        
-        # Equivalent length calculation (for integration with straight pipe sections)
-        L_eq ~ k * Di / 0.025, # Assume f≈0.025 for typical turbulent flow
-        
+	    # Radius to diameter ratio
+	    R_D ~ R / Di,
+	    
+	    # Use the registered function for base coefficient
+	    A_coeff ~ bend_base_coefficient(R_D),
+	    
+	    # Reynolds number correction
+	    B_coeff ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
+	    
+	    # Angle correction
+	    C_coeff ~ 0.01 * θ * (0.25 * θ * (0.5 * θ / 90)^0.5),
+	    
+	    # Loss coefficient
+	    k ~ A_coeff * B_coeff * C_coeff,
         # Pressure drop calculation
         Δp ~ k * 0.5 * ρ * v^2,
         
@@ -581,30 +641,150 @@ function PipeBend(; name::Symbol,
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
-# ╔═╡ 44a50c57-fe46-4ed6-ac59-04cb0e1e3387
+# ╔═╡ e8717713-d36c-4fc5-bf8d-ef411da93670
 """
 Create a nonlinear system for a 90-degree pipe bend.
 """
-function PipeBend90(; name::Symbol, kwargs...)
-    return PipeBend(; name=name, θ=90.0, kwargs...)
+function PipeBend90(; name::Symbol, R = 0.05, Di = 0.01, g = 9.81)
+    return PipeBend(; name=name, θ=90.0, R=R, Di=Di, g=g)
 end
 
-# ╔═╡ 6d45fad3-e405-47d2-8bf8-b8898f7a108a
+# ╔═╡ 0fe6fed4-926b-4d24-968f-fd0820220bfd
+function test_pipe_bend_90()
+    # Create the model
+    @named bend90 = PipeBend(θ=90.0, R=0.04, Di=0.02)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend90], 
+                                      equations = [bend90.ρ ~ 1000.0, 
+                                                   bend90.μ ~ 0.001,
+                                                   bend90.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend90.Δp]
+    k_value = sol[bend90.k]
+    
+    # Print diagnostic info
+    println("90° bend test: k_value = $(k_value), pressure_drop = $(pressure_drop) Pa")
+    
+    # Expected range for k_value for a 90° bend with R/D=2
+    return (pressure_drop > 0) && (k_value > 0.05) && (k_value < 2.0)
+end
+
+# ╔═╡ a386db98-0822-45e7-a75f-33a63fe58481
 """
 Create a nonlinear system for a U-bend (180-degree pipe bend).
 """
-function PipeBendU(; name::Symbol, kwargs...)
-    return PipeBend(; name=name, θ=180.0, kwargs...)
+function PipeBendU(; name::Symbol, R = 0.05, Di = 0.01, g = 9.81)
+    return PipeBend(; name=name, θ=180.0, R=R, Di=Di, g=g)
 end
+
+# ╔═╡ a6c14a45-eeef-452f-b5fa-5e444a5c43fd
+# Test function for PipeBend model
+function test_pipe_bend()
+    # Create the model
+    @named bend = PipeBend(θ=90.0, R=0.05, Di=0.02)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend], 
+                                      equations = [bend.ρ ~ 1000.0, 
+                                                   bend.μ ~ 0.001,
+                                                   bend.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend.Δp]
+    k_value = sol[bend.k]
+    reynolds = sol[bend.Re]
+    
+    # Return true if values are physically reasonable
+    return (pressure_drop > 0) && (k_value > 0) && (reynolds > 0)
+end
+
+# ╔═╡ 4dc9f69a-948b-4dca-9c67-d824b4fb3514
+@test test_pipe_bend()
+
+# ╔═╡ 37446e0e-1b46-4a53-97d8-39c81371d77e
+function test_pipe_bend_u()
+    # Create the model
+    @named bendu = PipeBend(θ=180.0, R=0.04, Di=0.02)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bendu], 
+                                      equations = [bendu.ρ ~ 1000.0, 
+                                                   bendu.μ ~ 0.001,
+                                                   bendu.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bendu.Δp]
+    k_value = sol[bendu.k]
+    
+    # For a 180° bend, the k value should be approximately twice that of a 90° bend
+    return (pressure_drop > 0) && (k_value > 0.2)
+end
+
+# Test comparing different angles
+
+# ╔═╡ 1dc3cbdd-8e28-474e-944b-018c6c004dc7
+@test test_pipe_bend_u()
+
+# ╔═╡ 7e02fca4-3a53-4ae4-a01d-6f7cdaa8ca9f
+function test_pipe_bend_angles()
+    # Create models with different angles
+    @named bend45 = PipeBend(θ=45.0, R=0.04, Di=0.02)
+    @named bend90 = PipeBend(θ=90.0, R=0.04, Di=0.02)
+    @named bend180 = PipeBend(θ=180.0, R=0.04, Di=0.02)
+    
+    # Set up test conditions (same for all)
+    flow_conditions = [
+        bend45.ρ ~ 1000.0, bend45.μ ~ 0.001, bend45.V̇ ~ 0.0005,
+        bend90.ρ ~ 1000.0, bend90.μ ~ 0.001, bend90.V̇ ~ 0.0005,
+        bend180.ρ ~ 1000.0, bend180.μ ~ 0.001, bend180.V̇ ~ 0.0005
+    ]
+    
+    # Assemble system
+    @named constrained_sys = assemble([bend45, bend90, bend180], equations = flow_conditions)
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Extract results
+    k45 = sol[bend45.k]
+    k90 = sol[bend90.k]
+    k180 = sol[bend180.k]
+    
+    # For the same R/D ratio, loss coefficient should increase with angle
+    return (k45 < k90) && (k90 < k180)
+end
+
+# ╔═╡ a34eba54-106d-47af-85bd-8a8a7320003c
+@test test_pipe_bend_angles()
 
 # ╔═╡ d654c8f0-3b41-4388-840b-acb46263a832
 md"""
 # MTK Components for Annular Flow
 """
 
-# ╔═╡ b4a22da7-888b-4842-aa87-5020c7c0e958
+# ╔═╡ ef44e372-38f1-4e50-b474-8088eb6ae1a3
 """
 Create a nonlinear system for flow in a concentric annular channel.
+This implementation leverages the existing friction_factor_annular function.
 """
 function AnnularChannel(; name::Symbol, 
                          L = 1.0,        # Length [m]
@@ -631,35 +811,27 @@ function AnnularChannel(; name::Symbol,
         ρ = 1000.0      # Density [kg/m³]
         μ = 0.001       # Dynamic viscosity [Pa·s]
         v = 1.0         # Velocity [m/s]
-        κ = 0.5         # Diameter ratio (Di/Do)
-        Dh = 0.01       # Hydraulic diameter [m]
-        A = 0.0001      # Flow area [m²]
         Re = 1000.0     # Reynolds number
         f = 0.03        # Friction factor
         ε_Dh = 0.0015   # Relative roughness
         Δp = 1000.0     # Pressure drop [Pa]
         H = 0.1         # Head loss [m]
-        f_lam = 0.064   # Laminar friction factor
-        f_turb = 0.04   # Turbulent friction factor
-        trans_factor = 0.0 # Transition factor
-        lam_factor = 1.0  # Laminar correction for annular flow
+        A = 0.0001      # Flow area [m²]
+        Dh = 0.01       # Hydraulic diameter [m]
+        κ = 0.5         # Diameter ratio Di/Do
     end
 
     eqs = [
-        # Mass continuity
-        ṁ ~ ρ * V̇,
-        
-        # Diameter ratio
+        # Hydraulic diameter and diameter ratio
+        Dh ~ Do - Di,
         κ ~ Di / Do,
         
-        # Hydraulic diameter
-        Dh ~ Do - Di,
-        
-        # Flow area
+        # Flow area and velocity
         A ~ π * (Do^2 - Di^2) / 4,
-        
-        # Velocity calculation
         v ~ V̇ / A,
+        
+        # Mass continuity
+        ṁ ~ ρ * V̇,
         
         # Reynolds number
         Re ~ ρ * v * Dh / μ,
@@ -667,20 +839,8 @@ function AnnularChannel(; name::Symbol,
         # Relative roughness
         ε_Dh ~ ε / Dh,
         
-        # Laminar correction factor for annular flow
-        lam_factor ~ (1 - κ^2) / (1 - κ^2 + (1 + κ^2) * log(κ)),
-        
-        # Laminar friction factor for annular flow
-        f_lam ~ 64.0 / Re * lam_factor,
-        
-        # Turbulent friction factor using Colebrook-White with hydraulic diameter
-        f_turb ~ (1.0 / (-2.0 * log10(ε_Dh / 3.7 + 2.51 / (Re * sqrt(0.25)))))^2,
-        
-        # Smooth transition between laminar and turbulent regimes
-        trans_factor ~ 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2))),
-        
-        # Combined friction factor
-        f ~ (1-trans_factor) * f_lam + trans_factor * f_turb,
+        # Use the existing friction factor function via callback
+        f ~ friction_factor_annular(Re, ε_Dh, κ; Re_low=Re_low, Re_high=Re_high),
         
         # Pressure drop calculation
         Δp ~ f * (L/Dh) * 0.5 * ρ * v^2,
@@ -692,9 +852,32 @@ function AnnularChannel(; name::Symbol,
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
-# ╔═╡ 2cc54f8b-2c27-4a99-b54d-d0bdeb3e4696
+# ╔═╡ be8c1638-1b97-4787-b9f6-9727e85ba21f
+begin
+	"""
+	Helper function that calculates the loss coefficient for an annular 180° bend using interpolation.
+	R_D: Ratio of bend radius to hydraulic diameter
+	"""
+	function annular_bend_coefficient(R_D)
+	    # Create knot points from the original conditional logic
+	    R_D_knots = [0.0, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, Inf]
+	    K_values = [1.75, 1.75, 1.10, 0.95, 0.60, 0.45, 0.20, 0.16, 0.10, 0.10]
+	    
+	    # Create interpolation object with flat extrapolation
+	    K_interp = Interpolations.LinearInterpolation(R_D_knots, K_values, extrapolation_bc=Interpolations.Flat())
+	    
+	    # Get coefficient using interpolation
+	    return K_interp(R_D)
+	end
+	
+	# Register the helper function for symbolic computation
+	@register_symbolic annular_bend_coefficient(R_D)
+end
+
+# ╔═╡ 15d54952-e218-4c14-b950-288b26cfc9fe
 """
 Create a nonlinear system for a 180° bend in an annular channel (coaxial BHE).
+Uses interpolation for improved symbolic compatibility.
 """
 function AnnularBend180(; name::Symbol, 
                          Do = 0.02,      # Outer diameter [m]
@@ -713,55 +896,46 @@ function AnnularBend180(; name::Symbol,
         ρ = 1000.0      # Density [kg/m³]
         μ = 0.001       # Dynamic viscosity [Pa·s]
         v = 1.0         # Velocity [m/s]
-        Dh = 0.01       # Hydraulic diameter [m]
-        A = 0.0001      # Flow area [m²]
         Re = 1000.0     # Reynolds number
         k = 0.5         # Loss coefficient
-        R = 0.01        # Estimated centerline radius [m]
-        R_D = 2.0       # Radius to hydraulic diameter ratio
         Δp = 100.0      # Pressure drop [Pa]
         H = 0.01        # Head loss [m]
-        K_base = 0.95   # Base loss coefficient from R/D ratio
-        K_Re = 1.0      # Reynolds number correction factor
+        A = 0.0001      # Flow area [m²]
+        Dh = 0.01       # Hydraulic diameter [m]
+        R = 0.005       # Estimated bend radius [m]
+        R_D = 0.5       # Ratio of bend radius to hydraulic diameter
+        K_base = 0.5    # Base loss coefficient from interpolation
+        Re_corr = 1.0   # Reynolds number correction factor
     end
 
     eqs = [
-        # Mass continuity
-        ṁ ~ ρ * V̇,
-        
         # Hydraulic diameter
         Dh ~ Do - Di,
         
-        # Flow area
+        # Flow area and velocity
         A ~ π * (Do^2 - Di^2) / 4,
-        
-        # Velocity calculation
         v ~ V̇ / A,
+        
+        # Mass continuity
+        ṁ ~ ρ * V̇,
         
         # Reynolds number
         Re ~ ρ * v * Dh / μ,
         
-        # Estimate centerline radius (from center of inner pipe to middle of annular gap)
-        R ~ (Do - Di)/4,
+        # Estimate bend radius
+        R ~ Di/2 + (Do - Di)/4,
         
-        # Radius to hydraulic diameter ratio
+        # Calculate R/D ratio
         R_D ~ R / Dh,
         
-        # Base loss coefficient (simplified piecewise function for MTK compatibility)
-        K_base ~ ifelse(R_D <= 1.0, 1.75,
-                 ifelse(R_D <= 1.5, 1.10,
-                 ifelse(R_D <= 2.0, 0.95,
-                 ifelse(R_D <= 3.0, 0.60,
-                 ifelse(R_D <= 4.0, 0.45,
-                 ifelse(R_D <= 6.0, 0.20,
-                 ifelse(R_D <= 8.0, 0.16,
-                       0.10))))))),
+        # Use the registered function for base coefficient
+        K_base ~ annular_bend_coefficient(R_D),
         
         # Reynolds number correction
-        K_Re ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
+        Re_corr ~ ifelse(Re < 2e5, (2e5/Re)^0.2, 1.0),
         
         # Total loss coefficient
-        k ~ K_base * K_Re,
+        k ~ K_base * Re_corr,
         
         # Pressure drop calculation
         Δp ~ k * 0.5 * ρ * v^2,
@@ -773,7 +947,619 @@ function AnnularBend180(; name::Symbol,
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
+# ╔═╡ 9ea17444-965d-4aec-885a-c3b7065dbdea
+#=╠═╡
+function generate_pressure_drop_curve(component_type, component_params; 
+                                     flow_range=(0.0001, 0.002), 
+                                     num_points=20, 
+                                     ρ=1000.0, 
+                                     μ=0.001)
+    # Generate flow rates to test
+    flow_rates = range(flow_range[1], flow_range[2], length=num_points)
+    
+    # Storage for results
+    pressure_drops = Float64[]
+    reynolds = Float64[]
+    
+    # For each flow rate, create and solve a system
+    for V̇ in flow_rates
+        # Create the component for each flow rate
+        @named component = component_type(; component_params...)
+        
+        # Set up the system with all constraints
+        @named constrained_sys = assemble([component], 
+                              equations = [component.ρ ~ ρ, 
+                                          component.μ ~ μ,
+                                          component.V̇ ~ V̇])
+        
+        # Simplify and solve
+        simpl_sys = structural_simplify(constrained_sys)
+        problem = NonlinearProblem(simpl_sys, [])
+        sol = solve(problem)
+        
+        # Store results
+        push!(pressure_drops, sol[component.Δp])
+        push!(reynolds, sol[component.Re])
+    end
+    
+    # Convert flow rates to L/s for better readability
+    flow_rates_L_s = flow_rates .* 1000
+    
+    # Plot results
+    p1 = plot(flow_rates_L_s, pressure_drops, 
+         xlabel="Flow Rate (L/s)", ylabel="Pressure Drop (Pa)",
+         title="Pressure Drop vs Flow Rate", 
+         legend=false, lw=2, marker=:circle, markersize=4)
+    
+    # Create a plot for Reynolds number
+    p2 = plot(flow_rates_L_s, reynolds, 
+         xlabel="Flow Rate (L/s)", ylabel="Reynolds Number",
+         title="Reynolds Number vs Flow Rate", 
+         legend=false, lw=2, marker=:circle, markersize=4)
+    
+    # Return both plots and the raw data
+    return (plots=(p1, p2), data=(flow_rates, pressure_drops, reynolds))
+end
+  ╠═╡ =#
+
+# ╔═╡ bc35b49e-b666-49a5-8a39-102164d1ce63
+#=╠═╡
+# Example usage with AnnularChannel
+channel_results = generate_pressure_drop_curve(
+    AnnularChannel,
+    (L=10.0, Do=0.03, Di=0.02, ε=1.5e-6),
+    flow_range=(0.0001, 0.002),  # 0.1 to 2 L/s
+    num_points=30,
+    ρ=1000.0,  # Water density
+    μ=0.001    # Water viscosity
+)
+  ╠═╡ =#
+
+# ╔═╡ 19969f54-9c4c-4b4c-bacb-54db49381bc9
+#=╠═╡
+channel_results[1][1]
+  ╠═╡ =#
+
+# ╔═╡ 8b331638-8121-4b4e-9818-4ba4529addb1
+#=╠═╡
+channel_results[1][2]
+  ╠═╡ =#
+
+# ╔═╡ f412a924-6ffc-42b5-afda-e9fb4fb5dab2
+function test_annular_channel()
+    # Create the model
+    @named annular = AnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([annular], 
+                                      equations = [annular.ρ ~ 1000.0, 
+                                                   annular.μ ~ 0.001,
+                                                   annular.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[annular.Δp]
+    friction = sol[annular.f]
+    reynolds = sol[annular.Re]
+    
+    return (pressure_drop > 0) && (friction > 0) && (reynolds > 0)
+end
+
+# Test function for AnnularBend180
+
+# ╔═╡ 70940a38-5268-46ba-8cfb-d1c6cbba4890
+@test test_annular_channel()
+
+# ╔═╡ 2ca0fcb3-eab1-40f2-b525-f3a619daf567
+function test_annular_bend_180()
+    # Create the model
+    @named bend180 = AnnularBend180(Do=0.03, Di=0.02)
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend180], 
+                                     equations = [bend180.ρ ~ 1000.0, 
+                                                  bend180.μ ~ 0.001,
+                                                  bend180.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend180.Δp]
+    k_value = sol[bend180.k]
+    
+    return (pressure_drop > 0) && (k_value > 0)
+end
+
+# ╔═╡ be093a4c-8b72-4663-88a8-916441e063f6
+@test test_annular_bend_180()
+
+# ╔═╡ e1931bc6-e7ca-402d-b719-d1b6e670e37f
+function DynamicPropPipeBend(; name::Symbol, 
+                             θ = 90.0,       # Bend angle [degrees]
+                             R = 0.05,       # Bend radius [m]
+                             Di = 0.01,      # Inner diameter [m]
+                             g = 9.81,       # Gravity [m/s²]
+                             fluid = "water",
+                             χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create the standard pipe bend component
+    @named bend = PipeBend(θ=θ, R=R, Di=Di, g=g)
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect components
+    connect_eqs = [
+        bend.ρ ~ props.ρ,
+        bend.μ ~ props.μ
+    ]
+    
+    return assemble([bend, props], equations = connect_eqs, name = name)
+end
+
+# ╔═╡ 76570272-a765-42ed-adec-002bfecbec3e
+function DynamicPropPipeBend90(; name::Symbol,
+                               R = 0.05,       # Bend radius [m] 
+                               Di = 0.01,      # Inner diameter [m]
+                               g = 9.81,       # Gravity [m/s²]
+                               fluid = "water",
+                               χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create using the generic DynamicPropPipeBend with θ=90°
+    return DynamicPropPipeBend(name=name, θ=90.0, R=R, Di=Di, g=g, fluid=fluid, χ=χ)
+end
+
+# ╔═╡ c79eb2cb-8172-4123-b31b-535ef0f8bd95
+function DynamicPropPipeBendU(; name::Symbol,
+                              R = 0.05,       # Bend radius [m] 
+                              Di = 0.01,      # Inner diameter [m]
+                              g = 9.81,       # Gravity [m/s²]
+                              fluid = "water",
+                              χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create using the generic DynamicPropPipeBend with θ=180°
+    return DynamicPropPipeBend(name=name, θ=180.0, R=R, Di=Di, g=g, fluid=fluid, χ=χ)
+end
+
+# ╔═╡ 06c0b7b0-35af-4f78-992a-7bc538fc280c
+function DynamicPropAnnularBend180(; name::Symbol,
+                                   Do = 0.02,      # Outer diameter [m]
+                                   Di = 0.01,      # Inner diameter [m]
+                                   g = 9.81,       # Gravity [m/s²]
+                                   fluid = "water",
+                                   χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create the standard annular bend component
+    @named bend = AnnularBend180(Do=Do, Di=Di, g=g)
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect components
+    connect_eqs = [
+        bend.ρ ~ props.ρ,
+        bend.μ ~ props.μ
+    ]
+    
+    return assemble([bend, props], equations = connect_eqs, name = name)
+end
+
+# ╔═╡ 800c5c52-94ad-4083-98c9-e7ec42cc70ed
+function test_dynamic_prop_pipe_bend()
+    # Create the model
+    @named bend = DynamicPropPipeBend(θ=90.0, R=0.05, Di=0.02, fluid="water")
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend], 
+                                      equations = [bend.props.T ~ 293.15,  # 20°C
+                                                   bend.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend.bend.Δp]
+    reynolds = sol[bend.bend.Re]
+    k_value = sol[bend.bend.k]
+    density = sol[bend.props.ρ]
+    viscosity = sol[bend.props.μ]
+    
+    # Display results
+    println("Dynamic Pipe Bend Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    println("  Reynolds Number: $(reynolds)")
+    println("  Loss Coefficient k: $(k_value)")
+    println("  Fluid Density: $(density) kg/m³")
+    println("  Fluid Viscosity: $(viscosity) Pa·s")
+    
+    # Check that results are physically meaningful
+    return (pressure_drop > 0) && (reynolds > 0) && (k_value > 0) && 
+           (density > 900) && (viscosity > 0.0001)
+end
+
+# Test function for DynamicPropPipeBend90 model
+
+# ╔═╡ f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
+function test_dynamic_prop_pipe_bend_90()
+    # Create the model
+    @named bend90 = DynamicPropPipeBend90(R=0.05, Di=0.02, fluid="water")
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend90], 
+                                      equations = [bend90.props.T ~ 293.15,  # 20°C
+                                                   bend90.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend90.bend.Δp]
+    
+    # Display results
+    println("Dynamic 90° Pipe Bend Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    
+    # Check that result is physically meaningful
+    return pressure_drop > 0
+end
+
+# Test function for DynamicPropPipeBendU model
+
+# ╔═╡ 32c32c40-756b-4eae-a123-68e77920c112
+function test_dynamic_prop_pipe_bend_u()
+    # Create the model
+    @named bendu = DynamicPropPipeBendU(R=0.05, Di=0.02, fluid="water")
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bendu], 
+                                      equations = [bendu.props.T ~ 293.15,  # 20°C
+                                                   bendu.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bendu.bend.Δp]
+    
+    # Display results
+    println("Dynamic U-bend Pipe Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    
+    # Check that result is physically meaningful
+    return pressure_drop > 0
+end
+
+# Test function for DynamicPropAnnularBend180 model
+
+# ╔═╡ 5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
+function test_dynamic_prop_annular_bend_180()
+    # Create the model
+    @named bend180 = DynamicPropAnnularBend180(Do=0.03, Di=0.02, fluid="water")
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([bend180], 
+                                      equations = [bend180.props.T ~ 293.15,  # 20°C
+                                                   bend180.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[bend180.bend.Δp]
+    reynolds = sol[bend180.bend.Re]
+    k_value = sol[bend180.bend.k]
+    density = sol[bend180.props.ρ]
+    viscosity = sol[bend180.props.μ]
+    
+    # Display results
+    println("Dynamic 180° Annular Bend Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    println("  Reynolds Number: $(reynolds)")
+    println("  Loss Coefficient k: $(k_value)")
+    println("  Fluid Density: $(density) kg/m³")
+    println("  Fluid Viscosity: $(viscosity) Pa·s")
+    
+    # Check that results are physically meaningful
+    return (pressure_drop > 0) && (reynolds > 0) && (k_value > 0) && 
+           (density > 900) && (viscosity > 0.0001)
+end
+
+# Run the tests with PlutoTest
+
+# ╔═╡ db1950c3-3a9e-440d-87d9-141c4d07a8a4
+@test test_dynamic_prop_pipe_bend()
+
+# ╔═╡ d742e609-3a44-4a61-960b-c2c50f47ba9d
+@test test_dynamic_prop_pipe_bend_90()
+
+# ╔═╡ 21be2680-3a26-4222-91f0-4dfe01a628ca
+@test test_dynamic_prop_pipe_bend_u()
+
+# ╔═╡ 18962ef4-5570-4b40-b31d-7fd211025965
+@test test_dynamic_prop_annular_bend_180()
+
+# ╔═╡ c16bf678-742e-4953-b3b6-d298bedfa9e9
+md"""
+# Composing the whole
+"""
+
+# ╔═╡ d47638a6-a00a-498a-a568-b31eb4a221ca
+
+
+# ╔═╡ fe6c00b8-fc3f-426f-920c-7deaae99dce8
+md"""
+# Dynamic properties verion
+"""
+
+# ╔═╡ 5883f14b-95cc-43d7-870d-bfa0426efbf5
+function DynamicPropAnnularChannel(; name::Symbol, 
+                                    L = 1.0,        # Length [m]
+                                    Do = 0.02,      # Outer diameter [m]
+                                    Di = 0.01,      # Inner diameter [m]
+                                    ε = 1.5e-6,     # Roughness [m]
+                                    g = 9.81,       # Gravity [m/s²]
+                                    Re_low = 2300,  # Lower transition Reynolds number
+                                    Re_high = 4000, # Upper transition Reynolds number
+                                    fluid = "water",
+                                    χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create the standard annular channel component
+    @named channel = AnnularChannel(L=L, Do=Do, Di=Di, ε=ε, g=g, 
+                                  Re_low=Re_low, Re_high=Re_high)
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Additional equations to connect components
+    connect_eqs = [
+        # Connect fluid properties to hydraulic component
+        channel.ρ ~ props.ρ,
+        channel.μ ~ props.μ,
+		#props.T ~ 303.15,
+		#channel.V̇ ~ 0.0005
+        
+        # Other potential connections could be added here
+    ]
+    
+    return assemble([channel, props], equations = connect_eqs, name = name)
+end
+
+# ╔═╡ 003dad93-d071-4f6c-9ea9-7ee455a255fe
+function DynamicPropStraightTube(; name::Symbol, 
+                                 L = 1.0,        # Length [m]
+                                 Di = 0.01,      # Inner diameter [m]
+                                 ε = 1.5e-6,     # Roughness [m]
+                                 g = 9.81,       # Gravity [m/s²]
+                                 Re_low = 2300,  # Lower transition Reynolds number
+                                 Re_high = 4000, # Upper transition Reynolds number
+                                 fluid = "water",
+                                 χ = 0.0)        # Concentration (for mixtures)
+    
+    # Create the standard straight tube component with Gnielinski correlation
+    @named tube = StraightTubeGnielinski(L=L, Di=Di, ε=ε, g=g, 
+                                       Re_low=Re_low, Re_high=Re_high)
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect components
+    connect_eqs = [
+        tube.ρ ~ props.ρ,
+        tube.μ ~ props.μ,
+    ]
+    
+    return assemble([tube, props], equations = connect_eqs, name = name)
+end
+
+# ╔═╡ 095c8a61-9332-44d7-b0e9-7b0eb83761b0
+"""
+Create a complete U-pipe borehole heat exchanger model with dynamic fluid properties.
+Version with parameters that trickle down to components for easy remaking.
+"""
+function BHE_Upipe_Hydraulic_Complete(; name::Symbol,
+                    depth = 100.0,     # Borehole depth [m]
+                    Di = 0.032,        # Inner diameter of the pipes [m]
+                    ε = 1.5e-6,        # Pipe roughness [m]
+                    U_radius = 0.064,  # U-bend radius [m]
+                    fluid = "water",   # Fluid type
+                    χ = 0.0)           # Concentration (for mixtures)
+    
+    # Create the components using the named parameter symbols
+    @named leg1 = DynamicPropStraightTube(
+        L = depth,      # Use named parameter symbol
+        Di = Di,        # Use named parameter symbol
+        ε = ε,          # Use named parameter symbol
+        fluid = fluid,    # String, not a parameter
+        χ = χ          # Use named parameter symbol
+    )
+    
+    @named ubend = DynamicPropPipeBendU(
+        R = U_radius,   # Use named parameter symbol
+        Di = Di,        # Use named parameter symbol
+        fluid = fluid,    # String, not a parameter
+        χ = χ          # Use named parameter symbol
+    )
+    
+    @named leg2 = DynamicPropStraightTube(
+        L = depth,      # Use named parameter symbol
+        Di = Di,        # Use named parameter symbol
+        ε = ε,          # Use named parameter symbol
+        fluid = fluid,    # String, not a parameter
+        χ = χ           # Use named parameter symbol
+    )
+    
+    # Create system-level variables
+    sys_vars = @variables begin
+        Δp               # Total pressure drop [Pa]
+        H_total          # Total head loss [m]
+        T_leg1 = 293.15  # Temperature in leg1 [K]
+        T_bend = 283.15  # Temperature in the bend [K]
+        T_leg2 = 288.15  # Temperature in leg2 [K]
+        ṁ = 0.5          # Mass flow rate [kg/s]
+    end
+    
+    # Define equations connecting components and system variables
+    eqs = [
+        # Total pressure and head
+        Δp ~ leg1.tube.Δp + ubend.bend.Δp + leg2.tube.Δp,
+        H_total ~ leg1.tube.H + ubend.bend.H + leg2.tube.H,
+        
+        # Connect temperatures to components
+        leg1.props.T ~ T_leg1,
+        ubend.props.T ~ T_bend,
+        leg2.props.T ~ T_leg2,
+        
+        # Connect flow rate to all components
+        leg1.tube.ṁ ~ ṁ,
+        ubend.bend.ṁ ~ ṁ,
+        leg2.tube.ṁ ~ ṁ
+    ]
+
+    sys_params = @parameters begin
+        depth = depth          # Borehole depth [m]
+        Di = Di                # Inner diameter [m]
+        ε = ε                  # Roughness [m]
+        U_radius = U_radius    # U-bend radius [m]
+        χ = χ                  # Concentration
+        χ2 = 2χ                  # Concentration
+    end
+
+	
+    return compose(NonlinearSystem(eqs, sys_vars, sys_params, name=name), [leg1, ubend, leg2])
+end
+
+# ╔═╡ ef533dd6-fc5d-420b-b061-37681426e895
+function test_upipe_complete()
+    # Create the model
+    @named bhe = BHE_Upipe_Hydraulic_Complete()
+    
+    # We can run with default values or override them
+    # For example:
+    @named constrained_sys = assemble([bhe], 
+                                      equations = [
+                                          bhe.T_leg1 ~ 303.15,  # Override to 30°C
+                                          bhe.T_bend ~ 303.15,  # Override to 30°C
+                                          bhe.T_leg2 ~ 303.15,  # Override to 30°C
+                                          bhe.ṁ ~ 1.0         # Override to 1 L/s
+                                      ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+end
+
+# ╔═╡ 913491fc-6568-47bc-9880-fd54b647cc39
+test_upipe_complete()
+
+# ╔═╡ 4f9b3f95-0ac4-45b4-a5db-7571045f69ac
+# Test function for DynamicPropAnnularChannel model
+function test_dynamic_prop_annular_channel()
+    # Create the model
+    @named annular = DynamicPropAnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6, fluid="water")
+    
+    # Set up test conditions - note that we set temperature directly
+    @named constrained_sys = assemble([annular], 
+                                      equations = [annular.props.T ~ 293.15,  # 20°C
+                                                   annular.channel.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[annular.channel.Δp]
+    reynolds = sol[annular.channel.Re]
+    friction = sol[annular.channel.f]
+    density = sol[annular.props.ρ]
+    viscosity = sol[annular.props.μ]
+    
+    # Display results
+    println("Dynamic Annular Channel Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    println("  Reynolds Number: $(reynolds)")
+    println("  Friction Factor: $(friction)")
+    println("  Fluid Density: $(density) kg/m³")
+    println("  Fluid Viscosity: $(viscosity) Pa·s")
+    
+    # Check that results are physically meaningful
+    return (pressure_drop > 0) && (reynolds > 0) && (friction > 0) && 
+           (density > 900) && (viscosity > 0.0001)
+end
+
+
+
+# ╔═╡ b3b22def-aacb-4f4b-be4b-83ea2e26f986
+@test test_dynamic_prop_annular_channel()
+
+# ╔═╡ c160cc41-cc8d-4b69-9e76-b5a4aed8388c
+# Test function for DynamicPropStraightTube model
+function test_dynamic_prop_straight_tube()
+    # Create the model
+    @named tube = DynamicPropStraightTube(L=10.0, Di=0.02, ε=1.5e-6, fluid="water")
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([tube], 
+                                      equations = [tube.props.T ~ 293.15,  # 20°C
+                                                   tube.tube.V̇ ~ 0.0005]) # 0.5 L/s
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    pressure_drop = sol[tube.tube.Δp]
+    reynolds = sol[tube.tube.Re]
+    friction = sol[tube.tube.f]
+    density = sol[tube.props.ρ]
+    viscosity = sol[tube.props.μ]
+    
+    # Display results
+    println("Dynamic Straight Tube Test Results:")
+    println("  Pressure Drop: $(pressure_drop) Pa")
+    println("  Reynolds Number: $(reynolds)")
+    println("  Friction Factor: $(friction)")
+    println("  Fluid Density: $(density) kg/m³")
+    println("  Fluid Viscosity: $(viscosity) Pa·s")
+    
+    # Check that results are physically meaningful
+    return (pressure_drop > 0) && (reynolds > 0) && (friction > 0) && 
+           (density > 900) && (viscosity > 0.0001)
+end
+
+
+
+# ╔═╡ 5cae4ac8-cd9a-4273-845e-3ea0c111d4df
+@test test_dynamic_prop_straight_tube()
+
+# ╔═╡ 98c19d69-9118-4326-84d4-d9a575c4aac1
+@test test_dynamic_prop_straight_tube()
+
+
+# ╔═╡ 621f4f32-510e-4173-89d3-e5c9d9919d46
+
+@test test_dynamic_prop_annular_channel()
+
 # ╔═╡ 6133d3f4-34cb-463f-bddc-9dce93b642a3
+# ╠═╡ disabled = true
+#=╠═╡
 """
 Create a complete U-pipe borehole heat exchanger model.
 The model includes:
@@ -854,17 +1640,11 @@ function BHE_Upipe_Hydraulic(; name::Symbol,
     bhe_system = compose(NonlinearSystem(eqs, vars, pars, name=name), components)
     return bhe_system
 end
-
-# ╔═╡ f2018932-3171-41fc-a5bb-34d7cecf23c1
-@named bhc1 = BHE_Upipe_Hydraulic()
-
-# ╔═╡ 13044570-a39c-4dc6-81ec-ddf14bd3a3e3
-bhc1.Di
-
-# ╔═╡ 7eacc8aa-924d-4801-9b59-3486871dcf74
-bhc1.uppipe.Di
+  ╠═╡ =#
 
 # ╔═╡ 5c7117e9-9fe4-4a5b-bc75-50428ea76e38
+# ╠═╡ disabled = true
+#=╠═╡
 """
 Create a complete coaxial borehole heat exchanger model.
 The model includes:
@@ -954,6 +1734,7 @@ function BHE_Coaxial_Hydraulic(; name::Symbol,
     
     return complete_system
 end
+  ╠═╡ =#
 
 # ╔═╡ 35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
 """
@@ -1048,168 +1829,252 @@ function create_Coaxial_BHE(; name,
     return complete_system
 end
 
-# ╔═╡ b7db97a8-131f-42a4-9a5d-32a97d442944
-@named bhe = BHE_Coaxial_Hydraulic()
-
-# ╔═╡ 37613c1a-e4fb-45a4-ab2d-c331a7346378
-bhe.inner_pipe.v
-
-# ╔═╡ 1c05f96c-85a3-4832-b374-b9f23ca432eb
-@named c2 = create_Coaxial_BHE()
-
 # ╔═╡ 415c838f-034b-4250-ae34-f1163ea9276e
 md"""
 # Utility Functions
 """
 
-# ╔═╡ ed71cc0c-bea0-49ab-a676-eb4cf0fc68ac
-"""
-Assemble multiple hydraulic components into a series connection.
-"""
-function assemble_series(systems::Vector{<:NonlinearSystem}; name::Symbol)
-    # Create equations to link the systems in series
-    equations = []
-    
-    # Link consecutive components - flow and fluid properties must be the same
-    for i in 1:length(systems)-1
-        push!(equations, systems[i].V̇ ~ systems[i+1].V̇)
-        push!(equations, systems[i].ṁ ~ systems[i+1].ṁ)
-        push!(equations, systems[i].ρ ~ systems[i+1].ρ)
-        push!(equations, systems[i].μ ~ systems[i+1].μ)
-    end
-    
-    # Total pressure drop and head loss is the sum of all components
-    vars = @variables begin
-        Δp_total = 0.0   # Total pressure drop [Pa]
-        H_total = 0.0    # Total head loss [m]
-    end
-    
-    # Add equations for total pressure drop and head loss
-    push!(equations, Δp_total ~ sum(system.Δp for system in systems))
-    push!(equations, H_total ~ sum(system.H for system in systems))
-    
-    # Create the combined system
-    return compose(NonlinearSystem(equations, vars, [], name=name), systems)
-end
-
-# ╔═╡ 579fbb8e-fd3f-4bc2-9143-3c93db35fe67
-"""
-Create a full pipeline with a series of components.
-"""
-function create_pipeline(components::Vector{<:NonlinearSystem}; 
-                         name::Symbol, 
-                         flow_rate=nothing, 
-                         pressure_drop=nothing)
-    # Assemble the pipeline in series
-    @named pipeline = assemble_series(components)
-    
-    # Add constraints based on specified inputs
-    constraints = []
-    
-    if !isnothing(flow_rate)
-        # Fix the flow rate if provided
-        push!(constraints, components[1].V̇ ~ flow_rate)
-    end
-    
-    if !isnothing(pressure_drop)
-        # Fix the pressure drop if provided
-        push!(constraints, pipeline.Δp_total ~ pressure_drop)
-    end
-    
-    # Create the final constrained system
-    final_system = compose(NonlinearSystem(constraints, [], [], name=name), [pipeline])
-    
-    return structural_simplify(final_system)
-end
-
-# ╔═╡ 7de4397f-f32c-446b-82c0-35a1f8dffda4
-# ╠═╡ disabled = true
-#=╠═╡
-"""
-Create a basic fluid properties component.
-"""
-function StaticFluidProps(; name::Symbol,
-                           ρ₀ = 1000.0,  # Default density [kg/m³]
-                           μ₀ = 0.001)   # Default viscosity [Pa·s]
-    pars = @parameters begin
-        ρ₀ = ρ₀
-        μ₀ = μ₀
-    end
-    vars = @variables begin
-        ρ
-        μ
-    end
-    eqs  = [
-      ρ ~ ρ₀,
-      μ ~ μ₀
-    ]
-    return NonlinearSystem(eqs, vars, pars, name=name)
-end
-  ╠═╡ =#
-
 # ╔═╡ 8124b17c-f071-4903-8af1-976e555649f2
 md"""
-# Example Usage
+# Pump modeling
 """
 
-# ╔═╡ 9e827af5-06a6-4283-9633-596b68a3b25d
-#=╠═╡
-"""
-Create an example pipeline with straight sections and bends.
-"""
-function example_pipeline()
-    # Create pipeline components
-    @named inlet_pipe = StraightTubeSwameeJain(L=2.0, Di=0.02, ε=1e-6)
-    @named bend1 = PipeBend90(R=0.06, Di=0.02)
-    @named middle_pipe = StraightTubeSwameeJain(L=1.5, Di=0.02, ε=1e-6)
-    @named bend2 = PipeBendU(R=0.08, Di=0.02)
-    @named outlet_pipe = StraightTubeSwameeJain(L=3.0, Di=0.02, ε=1e-6)
-    @named fluid = StaticFluidProps()
+# ╔═╡ f8b8b7d9-4788-4fb4-bc60-f98e88109647
+function pump_params_from_basics(;
+    H_shutoff,  # Shutoff head (m)
+    Q_max,      # Maximum flow rate (m³/s)
+    Q_BEP,      # Flow rate at best efficiency point (m³/s)
+    η_BEP,      # Efficiency at best efficiency point (decimal)
+    η_motor,    # Motor efficiency (decimal)
+    N = 50.0,   # Rotational speed (rev/s, typically 50Hz)
+    D = 0.1,    # Impeller diameter (m)
+    g = 9.81    # Gravity (m/s²)
+)
+    # Calculate head at BEP using the quadratic curve
+    # H = H_shutoff * (1 - (Q/Q_max)²)
+    H_BEP = H_shutoff * (1 - (Q_BEP/Q_max)^2)
     
-    # Create connection equations
-    eqs = [
-        inlet_pipe.ρ ~ fluid.ρ,
-        inlet_pipe.μ ~ fluid.μ,
-        bend1.ρ ~ fluid.ρ,
-        bend1.μ ~ fluid.μ,
-        middle_pipe.ρ ~ fluid.ρ,
-        middle_pipe.μ ~ fluid.μ,
-        bend2.ρ ~ fluid.ρ,
-        bend2.μ ~ fluid.μ,
-        outlet_pipe.ρ ~ fluid.ρ,
-        outlet_pipe.μ ~ fluid.μ,
-        
-        # Specify flow rate
-        inlet_pipe.V̇ ~ 0.0005  # 0.5 L/s
-    ]
+    # Convert to dimensionless parameters
+    φ_BEP = Q_BEP / (N * D^3)          # Flow coefficient at BEP
+    ψ₀ = H_shutoff * g / (N^2 * D^2)    # Dead-head coefficient
     
-    # Create the complete system
-    components = [inlet_pipe, bend1, middle_pipe, bend2, outlet_pipe]
-    @named pipeline = compose(NonlinearSystem(eqs, [], [], name=:pipeline), 
-                             [components..., fluid])
+    # Calculate K parameter 
+    K = ψ₀ / (Q_max / (N * D^3))^2      # Head curve shape parameter
     
-    # Simplify the system
-    return pipeline
+    return (
+        N = N,
+        D = D,
+        ψ₀ = ψ₀,
+        K = K,
+        φ_BEP = φ_BEP,
+        η_max = η_BEP,
+        η_motor = η_motor
+    )
 end
-  ╠═╡ =#
 
-# ╔═╡ 76d7f0f3-ef01-453d-85ac-a21a6bba1d08
-#=╠═╡
-example_pipeline()
-  ╠═╡ =#
+# ╔═╡ ca88f11d-0f9f-406c-8b73-6e399619d135
+function estimate_pump_params(;
+    H_shutoff = 12,  # Shutoff head (m)
+    Q_max = 13/3600,      # Maximum flow (m³/s)
+    N = 50.0/60.0,  # Rotational speed (rev/s)
+    D = 0.1,    # Impeller diameter (m)
+    g = 9.81    # Gravity (m/s²)
+)
+    # Typical values
+    Q_BEP = 0.8 * Q_max  # BEP typically around 80% of max flow
+    η_BEP = 0.75         # Typical peak efficiency for medium-sized pumps
+    η_motor = 0.9        # Typical motor efficiency
+    
+    return pump_params_from_basics(
+        H_shutoff = H_shutoff,
+        Q_max = Q_max,
+        Q_BEP = Q_BEP,
+        η_BEP = η_BEP,
+        η_motor = η_motor,
+        N = N,
+        D = D,
+        g = g
+    )
+end
+
+# ╔═╡ a5e4545e-5110-49d3-8b4a-700352509bd5
+@named testP = Properties.DynamicRefrigerantProps();
+
+# ╔═╡ 42354632-77f6-43cb-8c48-0a65fe3f24a7
+function Pump(; name::Symbol,
+        N         = 1.0,        # rotational speed [1/s]
+        D         = 0.1,        # impeller diameter [m]
+        g         = 9.81,       # gravity [m/s^2]
+        ψ₀        = 0.5,        # dead‐head coeff
+        K         = 0.3,        # head‐curve shape
+        φ_BEP     = 0.08,       # BEP flow coeff
+        η_max     = 0.85,       # peak hydraulic efficiency
+        η_motor   = 0.9,        # motor efficiency
+        N_max     = 1.2,        # maximum rotational speed [1/s]
+        P_elec_max = 1000.0,    # maximum electrical power [W]
+        H_max     = 20.0,       # maximum head [m]
+        )
+    pars = @parameters begin
+        N         = N        # rotational speed [1/s]
+        D         = D        # impeller diameter [m]
+        g         = g        # gravity [m/s^2]
+        ψ₀        = ψ₀       # dead‐head coeff
+        K         = K        # head‐curve shape
+        φ_BEP     = φ_BEP    # BEP flow coeff
+        η_max     = η_max    # peak hydraulic efficiency
+        η_motor   = η_motor  # motor efficiency
+        N_max     = N_max    # maximum rotational speed
+        P_elec_max = P_elec_max # maximum electrical power
+        H_max     = H_max    # maximum head
+    end
+
+    vars = @variables begin
+        V̇ = 0.1      # volumetric flow [m^3/s]
+        ρ = 1000.0   # density [kg/m^3]
+        ṁ = 1.0      # mass flow [kg/s]
+        cp = 4180    # specific heat [J/(kg·K)]
+        H = 10.0     # head [m]
+        φ = 0.01     # flow coeff
+        ψ = 0.1      # head coeff
+        κ = 0.01     # power coeff
+        η = 0.5      # hydraulic efficiency
+        P_shaft = 100.0  # shaft power [W]
+        P_elec = 100.0   # electrical power [W]
+        
+        # Flags for operational limits
+        exceeding_max_speed = false    # true when N > N_max
+        exceeding_max_power = false    # true when P_elec > P_elec_max
+        exceeding_max_head = false     # true when H > H_max
+    end
+
+    eqs = [
+      # mass continuity
+      ṁ       ~ ρ * V̇,
+
+      # dimensionless groups
+      φ        ~ V̇       / (N * D^3),
+      ψ        ~ g * H    / (N^2 * D^2),
+      
+      P_shaft  ~ κ * ρ * N^3 * D^5,
+
+      # performance curves
+      ψ        ~ ψ₀ - K * φ^2,
+      η        ~ η_max * (1 - ((φ - φ_BEP)/φ_BEP)^2),
+      κ        ~ ψ * φ / η,
+
+      # electrical consumption & heating
+      P_elec   ~ P_shaft / η_motor,
+      
+      # Operational limit flags
+      exceeding_max_speed ~ N > N_max,
+      exceeding_max_power ~ P_elec > P_elec_max,
+      exceeding_max_head ~ H > H_max,
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 8ec23851-7775-4b2a-9ca5-c418ff46f5be
+function BasicPump(;name,
+    H_shutoff = 12,  # Shutoff head (m)
+    Q_max = 13/3600,      # Maximum flow (m³/s)
+    N = 50.0/60.0,  # Default to 50Hz
+    D = 0.1,    # Default impeller diameter [m]
+    g = 9.81,   # Default gravity [m/s²]
+    N_max = 1.2 * N,  # Default maximum speed 20% above nominal
+    P_elec_max = nothing,  # Default max power, will be calculated if not provided
+    H_max = nothing   # Default max head, will be calculated if not provided
+)
+    # Calculate pump parameters based on basic info
+    ppars = estimate_pump_params(
+        H_shutoff = H_shutoff, 
+        Q_max = Q_max,
+        N = N,
+        D = D,
+        g = g
+    )
+    
+    # Calculate default maximum values if not provided
+    if isnothing(P_elec_max)
+        # Estimate max power at BEP
+        H_BEP = H_shutoff * (1 - (ppars.φ_BEP * N * D^3 / Q_max)^2)
+        P_hydraulic_BEP = ppars.φ_BEP * N * D^3 * H_BEP * g * 1000.0  # ρ=1000 kg/m³
+        P_elec_max = P_hydraulic_BEP / (ppars.η_max * ppars.η_motor) * 1.2  # 20% safety margin
+    end
+    
+    if isnothing(H_max)
+        H_max = H_shutoff * 1.1  # Max head is typically slightly above shutoff head
+    end
+    
+    # Create pump with calculated parameters
+    p = Pump(; name=name,
+        N         = ppars.N,         
+        D         = ppars.D,        
+        g         = g,       
+        ψ₀        = ppars.ψ₀,        
+        K         = ppars.K,        
+        φ_BEP     = ppars.φ_BEP,   
+        η_max     = ppars.η_max,    
+        η_motor   = ppars.η_motor,
+        N_max     = N_max,
+        P_elec_max = P_elec_max,
+        H_max     = H_max
+    )
+    return p
+end
+
+# ╔═╡ 85b6f908-2434-4231-8b8a-d4084557674c
+estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
+
+# ╔═╡ 1eb7505d-f420-4ee9-a967-29d34da7a283
+@named magna3_approx = BasicPump(H_shutoff=12, Q_max=13/3600,
+    N_max = 50,
+    P_elec_max = 185,
+    H_max = 12
+)
+
+# ╔═╡ 690c1fda-a594-4902-8139-6f50d8219a96
+@named props = Properties.DynamicIncompressibleProps()
+
+# ╔═╡ 30a5b043-64ef-4f93-8de3-1699b89d597f
+link_eqs = [
+    magna3_approx.ρ  ~ props.ρ,
+    magna3_approx.cp ~ props.cp,
+	magna3_approx.H ~ 5.0,
+	props.T ~ 290.90,
+  ]
+
+# ╔═╡ 4f8bf79c-ff09-46a9-8678-03a8fa3b7f96
+@named new_sys = assemble([magna3_approx, props], equations = link_eqs);
+
+# ╔═╡ 9614f380-5f85-4e52-9e18-13c820f77829
+system   = structural_simplify(new_sys)
+
+# ╔═╡ 8e807b2b-b1b5-40dc-98a8-0ff56194ea94
+prob = NonlinearProblem(system, [])
+
+# ╔═╡ 09fb9270-1fa9-4e4e-94f7-02e8ae05c918
+sol = solve(prob)
+
+# ╔═╡ b0293c08-24b5-44fb-8407-cf9f78a64e70
+@test sol[magna3_approx.V̇] ≈ 0.002758031668260459
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
+Interpolations = "~0.15.1"
 ModelingToolkit = "~9.78.0"
 NonlinearSolve = "~4.8.0"
+Plots = "~1.40.13"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
 SpecialFunctions = "~2.5.1"
@@ -1221,7 +2086,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "73dde5c43c3a2e989ef6ae7178c10c42ca88e859"
+project_hash = "817bfe1fd032f94ad1e65bf89f47f0f23c2491a3"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1336,6 +2201,12 @@ weakdeps = ["SparseArrays"]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
 
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "01b8ccb13d68535d73d2b0c23e39bd23155fb712"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.1.0"
+
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
@@ -1344,6 +2215,11 @@ version = "1.11.0"
 git-tree-sha1 = "6aaafea90a56dc1fc8cbc15e3cf26d6bc81eb0a3"
 uuid = "e2ed5e7c-b2de-5872-ae92-c73ca462fb04"
 version = "0.1.10"
+
+[[deps.BitFlags]]
+git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
+uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
+version = "0.1.9"
 
 [[deps.BitTwiddlingConvenienceFunctions]]
 deps = ["Static"]
@@ -1375,11 +2251,23 @@ weakdeps = ["ForwardDiff"]
     [deps.BracketingNonlinearSolve.extensions]
     BracketingNonlinearSolveForwardDiffExt = "ForwardDiff"
 
+[[deps.Bzip2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
+uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
+version = "1.0.9+0"
+
 [[deps.CPUSummary]]
 deps = ["CpuId", "IfElse", "PrecompileTools", "Static"]
 git-tree-sha1 = "5a97e67919535d6841172016c9530fd69494e5ec"
 uuid = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
 version = "0.2.6"
+
+[[deps.Cairo_jll]]
+deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
+git-tree-sha1 = "fde3bf89aead2e723284a8ff9cdf5b551ed700e8"
+uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
+version = "1.18.5+0"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -1402,6 +2290,44 @@ deps = ["InteractiveUtils", "UUIDs"]
 git-tree-sha1 = "062c5e1a5bf6ada13db96a4ae4749a4c2234f521"
 uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
 version = "1.3.9"
+
+[[deps.CodecZlib]]
+deps = ["TranscodingStreams", "Zlib_jll"]
+git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
+uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
+version = "0.7.8"
+
+[[deps.ColorSchemes]]
+deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
+git-tree-sha1 = "403f2d8e209681fcbd9468a8514efff3ea08452e"
+uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+version = "3.29.0"
+
+[[deps.ColorTypes]]
+deps = ["FixedPointNumbers", "Random"]
+git-tree-sha1 = "67e11ee83a43eb71ddc950302c53bf33f0690dfe"
+uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+version = "0.12.1"
+weakdeps = ["StyledStrings"]
+
+    [deps.ColorTypes.extensions]
+    StyledStringsExt = "StyledStrings"
+
+[[deps.ColorVectorSpace]]
+deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
+git-tree-sha1 = "8b3b6f87ce8f65a2b4f857528fd8d70086cd72b1"
+uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
+version = "0.11.0"
+weakdeps = ["SpecialFunctions"]
+
+    [deps.ColorVectorSpace.extensions]
+    SpecialFunctionsExt = "SpecialFunctions"
+
+[[deps.Colors]]
+deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
+git-tree-sha1 = "37ea44092930b1811e666c3bc38065d7d87fcc74"
+uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
+version = "0.13.1"
 
 [[deps.Combinatorics]]
 git-tree-sha1 = "8010b6bb3388abe68d95743dcbea77650bb2eddf"
@@ -1464,6 +2390,12 @@ git-tree-sha1 = "f749037478283d372048690eb3b5f92a79432b34"
 uuid = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 version = "0.2.3"
 
+[[deps.ConcurrentUtilities]]
+deps = ["Serialization", "Sockets"]
+git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
+uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
+version = "2.5.0"
+
 [[deps.ConstructionBase]]
 git-tree-sha1 = "76219f1ed5771adbb096743bff43fb5fdd4c1157"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
@@ -1474,6 +2406,11 @@ weakdeps = ["IntervalSets", "LinearAlgebra", "StaticArrays"]
     ConstructionBaseIntervalSetsExt = "IntervalSets"
     ConstructionBaseLinearAlgebraExt = "LinearAlgebra"
     ConstructionBaseStaticArraysExt = "StaticArrays"
+
+[[deps.Contour]]
+git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
+uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
+version = "0.6.3"
 
 [[deps.CpuId]]
 deps = ["Markdown"]
@@ -1506,6 +2443,18 @@ version = "1.0.0"
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
+
+[[deps.Dbus_jll]]
+deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "473e9afc9cf30814eb67ffa5f2db7df82c3ad9fd"
+uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
+version = "1.16.2+0"
+
+[[deps.DelimitedFiles]]
+deps = ["Mmap"]
+git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
+uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+version = "1.9.1"
 
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
@@ -1717,6 +2666,24 @@ weakdeps = ["Adapt"]
     [deps.EnzymeCore.extensions]
     AdaptExt = "Adapt"
 
+[[deps.EpollShim_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a4be429317c42cfae6a7fc03c31bad1970c310d"
+uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
+version = "0.0.20230411+1"
+
+[[deps.ExceptionUnwrapping]]
+deps = ["Test"]
+git-tree-sha1 = "d36f682e590a83d63d1c7dbd287573764682d12a"
+uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
+version = "0.1.11"
+
+[[deps.Expat_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "d55dffd9ae73ff72f1c0482454dcf2ec6c6c4a63"
+uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
+version = "2.6.5+0"
+
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
@@ -1726,6 +2693,18 @@ version = "0.1.10"
 git-tree-sha1 = "c13f0b150373771b0fdc1713c97860f8df12e6c2"
 uuid = "55351af7-c7e9-48d6-89ff-24e801d99491"
 version = "0.10.14"
+
+[[deps.FFMPEG]]
+deps = ["FFMPEG_jll"]
+git-tree-sha1 = "53ebe7511fa11d33bec688a9178fac4e49eeee00"
+uuid = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
+version = "0.4.2"
+
+[[deps.FFMPEG_jll]]
+deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
+git-tree-sha1 = "466d45dc38e15794ec7d5d63ec03d776a9aff36e"
+uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
+version = "4.4.4+1"
 
 [[deps.FastBroadcast]]
 deps = ["ArrayInterface", "LinearAlgebra", "Polyester", "Static", "StaticArrayInterface", "StrideArraysCore"]
@@ -1798,6 +2777,18 @@ version = "2.27.0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[[deps.FixedPointNumbers]]
+deps = ["Statistics"]
+git-tree-sha1 = "05882d6995ae5c12bb5f36dd2ed3f61c98cbb172"
+uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
+version = "0.8.5"
+
+[[deps.Fontconfig_jll]]
+deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Zlib_jll"]
+git-tree-sha1 = "301b5d5d731a0654825f1f2e906990f7141a106b"
+uuid = "a3f928ae-7b40-5064-980b-68af3947d34b"
+version = "2.16.0+0"
+
 [[deps.Format]]
 git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
 uuid = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
@@ -1812,6 +2803,18 @@ weakdeps = ["StaticArrays"]
 
     [deps.ForwardDiff.extensions]
     ForwardDiffStaticArraysExt = "StaticArrays"
+
+[[deps.FreeType2_jll]]
+deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "2c5512e11c791d1baed2049c5652441b28fc6a31"
+uuid = "d7e528f0-a631-5988-bf34-fe36492bcfd7"
+version = "2.13.4+0"
+
+[[deps.FriBidi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7a214fdac5ed5f59a22c2d9a885a16da1c74bbc7"
+uuid = "559328eb-81f9-559d-9380-de523a88c83c"
+version = "1.0.17+0"
 
 [[deps.FunctionWrappers]]
 git-tree-sha1 = "d62485945ce5ae9c0c48f124a84998d755bae00e"
@@ -1835,22 +2838,75 @@ deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 version = "1.11.0"
 
+[[deps.GLFW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll", "libdecor_jll", "xkbcommon_jll"]
+git-tree-sha1 = "fcb0584ff34e25155876418979d4c8971243bb89"
+uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
+version = "3.4.0+2"
+
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
 git-tree-sha1 = "83cf05ab16a73219e5f6bd1bdfa9848fa24ac627"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
 
+[[deps.GR]]
+deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Preferences", "Printf", "Qt6Wayland_jll", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "p7zip_jll"]
+git-tree-sha1 = "4424dca1462cc3f19a0e6f07b809ad948ac1d62b"
+uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+version = "0.73.16"
+
+[[deps.GR_jll]]
+deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "FreeType2_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Qt6Base_jll", "Zlib_jll", "libpng_jll"]
+git-tree-sha1 = "d7ecfaca1ad1886de4f9053b5b8aef34f36ede7f"
+uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
+version = "0.73.16+0"
+
+[[deps.Gettext_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
+git-tree-sha1 = "9b02998aba7bf074d14de89f9d37ca24a1a0b046"
+uuid = "78b55507-aeef-58d4-861c-77aaff3498b1"
+version = "0.21.0+0"
+
+[[deps.Glib_jll]]
+deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
+git-tree-sha1 = "fee60557e4f19d0fe5cd169211fdda80e494f4e8"
+uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
+version = "2.84.0+0"
+
 [[deps.Glob]]
 git-tree-sha1 = "97285bbd5230dd766e9ef6749b80fc617126d496"
 uuid = "c27321d9-0574-5035-807b-f59d2c89b15c"
 version = "1.3.1"
+
+[[deps.Graphite2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a6dbda1fd736d60cc477d99f2e7a042acfa46e8"
+uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
+version = "1.3.15+0"
 
 [[deps.Graphs]]
 deps = ["ArnoldiMethod", "Compat", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
 git-tree-sha1 = "3169fd3440a02f35e549728b0890904cfd4ae58a"
 uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
 version = "1.12.1"
+
+[[deps.Grisu]]
+git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
+uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
+version = "1.0.2"
+
+[[deps.HTTP]]
+deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
+git-tree-sha1 = "f93655dc73d7a0b4a368e3c0bce296ae035ad76e"
+uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+version = "1.10.16"
+
+[[deps.HarfBuzz_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
+git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
+uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
+version = "8.5.1+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
@@ -1890,6 +2946,16 @@ deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 version = "1.11.0"
 
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "88a101217d7cb38a7b481ccd50d21876e1d1b0e0"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.15.1"
+weakdeps = ["Unitful"]
+
+    [deps.Interpolations.extensions]
+    InterpolationsUnitfulExt = "Unitful"
+
 [[deps.IntervalSets]]
 git-tree-sha1 = "5fbb102dcb8b1a858111ae81d56682376130517d"
 uuid = "8197267c-284f-5f27-9208-e0e47529a953"
@@ -1921,17 +2987,35 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
+[[deps.JLFzf]]
+deps = ["REPL", "Random", "fzf_jll"]
+git-tree-sha1 = "82f7acdc599b65e0f8ccd270ffa1467c21cb647b"
+uuid = "1019f520-868f-41f5-a6de-eb00f4b6a39c"
+version = "0.1.11"
+
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
 git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.0"
 
+[[deps.JSON]]
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+version = "0.21.4"
+
 [[deps.Jieko]]
 deps = ["ExproniconLite"]
 git-tree-sha1 = "2f05ed29618da60c06a87e9c033982d4f71d0b6c"
 uuid = "ae98c720-c025-4a4a-838c-29b094483192"
 version = "0.2.1"
+
+[[deps.JpegTurbo_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
+uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
+version = "3.1.1+0"
 
 [[deps.JuliaFormatter]]
 deps = ["CommonMark", "Glob", "JuliaSyntax", "PrecompileTools", "TOML"]
@@ -1962,6 +3046,30 @@ deps = ["LinearAlgebra", "Printf", "SparseArrays"]
 git-tree-sha1 = "b94257a1a8737099ca40bc7271a8b374033473ed"
 uuid = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
 version = "0.10.1"
+
+[[deps.LAME_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "170b660facf5df5de098d866564877e119141cbd"
+uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
+version = "3.100.2+0"
+
+[[deps.LERC_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "aaafe88dccbd957a8d82f7d05be9b69172e0cee3"
+uuid = "88015f11-f218-50d7-93a8-a6af411a945d"
+version = "4.0.1+0"
+
+[[deps.LLVMOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "eb62a3deb62fc6d8822c0c4bef73e4412419c5d8"
+uuid = "1d63c593-3942-5779-bab2-d838dc0a180e"
+version = "18.1.8+0"
+
+[[deps.LZO_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1c602b1127f4751facb671441ca72715cc95938a"
+uuid = "dd4b983a-f0e5-5f8d-a1b7-129d4a5fb1ac"
+version = "2.10.3+0"
 
 [[deps.LaTeXStrings]]
 git-tree-sha1 = "dda21b8cbd6a6c40d9d02a73230f9d70fed6918c"
@@ -2041,6 +3149,42 @@ version = "1.11.0+1"
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
+
+[[deps.Libffi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "c8da7e6a91781c41a863611c7e966098d783c57a"
+uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
+version = "3.4.7+0"
+
+[[deps.Libglvnd_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll"]
+git-tree-sha1 = "d36c21b9e7c172a44a10484125024495e2625ac0"
+uuid = "7e76a0d4-f3c7-5321-8279-8d96eeed0f29"
+version = "1.7.1+1"
+
+[[deps.Libiconv_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "be484f5c92fad0bd8acfef35fe017900b0b73809"
+uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
+version = "1.18.0+0"
+
+[[deps.Libmount_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a31572773ac1b745e0343fe5e2c8ddda7a37e997"
+uuid = "4b2f31a3-9ecc-558c-b454-b3730dcb73e9"
+version = "2.41.0+0"
+
+[[deps.Libtiff_jll]]
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "LERC_jll", "Libdl", "XZ_jll", "Zlib_jll", "Zstd_jll"]
+git-tree-sha1 = "4ab7581296671007fc33f07a721631b8855f4b1d"
+uuid = "89763e89-9b03-5906-acba-b20f662cd828"
+version = "4.7.1+0"
+
+[[deps.Libuuid_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "321ccef73a96ba828cd51f2ab5b9f917fa73945a"
+uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
+version = "2.41.0+0"
 
 [[deps.LineSearch]]
 deps = ["ADTypes", "CommonSolve", "ConcreteStructs", "FastClosures", "LinearAlgebra", "MaybeInplace", "SciMLBase", "SciMLJacobianOperators", "StaticArraysCore"]
@@ -2125,6 +3269,12 @@ version = "0.3.29"
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 version = "1.11.0"
 
+[[deps.LoggingExtras]]
+deps = ["Dates", "Logging"]
+git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
+uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
+version = "1.1.0"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
 git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
@@ -2161,10 +3311,21 @@ weakdeps = ["SparseArrays"]
     [deps.MaybeInplace.extensions]
     MaybeInplaceSparseArraysExt = "SparseArrays"
 
+[[deps.MbedTLS]]
+deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "NetworkOptions", "Random", "Sockets"]
+git-tree-sha1 = "c067a280ddc25f196b5e7df3877c6b226d390aaf"
+uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
+version = "1.1.9"
+
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
+
+[[deps.Measures]]
+git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
+uuid = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
+version = "0.3.2"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -2332,6 +3493,12 @@ weakdeps = ["Adapt"]
     [deps.OffsetArrays.extensions]
     OffsetArraysAdaptExt = "Adapt"
 
+[[deps.Ogg_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
+uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
+version = "1.3.5+1"
+
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
@@ -2341,6 +3508,18 @@ version = "0.3.27+1"
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.5+0"
+
+[[deps.OpenSSL]]
+deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
+git-tree-sha1 = "f1a7e086c677df53e064e0fdd2c9d0b0833e3f6e"
+uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
+version = "1.5.0"
+
+[[deps.OpenSSL_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "9216a80ff3682833ac4b733caa8c00390620ba5d"
+uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
+version = "3.5.0+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
@@ -2360,10 +3539,21 @@ version = "1.12.0"
     [deps.Optim.weakdeps]
     MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
+[[deps.Opus_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6703a85cb3781bd5909d48730a67205f3f31a575"
+uuid = "91d4177d-7536-5919-b921-800302f37372"
+version = "1.3.3+0"
+
 [[deps.OrderedCollections]]
 git-tree-sha1 = "cc4054e898b852042d7b503313f7ad03de99c3dd"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.8.0"
+
+[[deps.PCRE2_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
+version = "10.42.0+1"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -2371,22 +3561,70 @@ git-tree-sha1 = "0e1340b5d98971513bddaa6bbed470670cebbbfe"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
 version = "0.11.34"
 
+[[deps.Pango_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "275a9a6d85dc86c24d03d1837a0010226a96f540"
+uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
+version = "1.56.3+0"
+
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
 uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 version = "0.12.3"
 
+[[deps.Parsers]]
+deps = ["Dates", "PrecompileTools", "UUIDs"]
+git-tree-sha1 = "7d2f8f21da5db6a806faf7b9b292296da42b2810"
+uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+version = "2.8.3"
+
+[[deps.Pixman_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
+git-tree-sha1 = "db76b1ecd5e9715f3d043cec13b2ec93ce015d53"
+uuid = "30392449-352a-5448-841d-b1acce4e97dc"
+version = "0.44.2+0"
+
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.11.0"
+weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
     REPLExt = "REPL"
 
-    [deps.Pkg.weakdeps]
-    REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+[[deps.PlotThemes]]
+deps = ["PlotUtils", "Statistics"]
+git-tree-sha1 = "41031ef3a1be6f5bbbf3e8073f210556daeae5ca"
+uuid = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
+version = "3.3.0"
+
+[[deps.PlotUtils]]
+deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random", "Reexport", "StableRNGs", "Statistics"]
+git-tree-sha1 = "3ca9a356cd2e113c420f2c13bea19f8d3fb1cb18"
+uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
+version = "1.4.3"
+
+[[deps.Plots]]
+deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "PrecompileTools", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "TOML", "UUIDs", "UnicodeFun", "UnitfulLatexify", "Unzip"]
+git-tree-sha1 = "809ba625a00c605f8d00cd2a9ae19ce34fc24d68"
+uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+version = "1.40.13"
+
+    [deps.Plots.extensions]
+    FileIOExt = "FileIO"
+    GeometryBasicsExt = "GeometryBasics"
+    IJuliaExt = "IJulia"
+    ImageInTerminalExt = "ImageInTerminal"
+    UnitfulExt = "Unitful"
+
+    [deps.Plots.weakdeps]
+    FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+    GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+    IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
+    ImageInTerminal = "d8c32880-2388-543b-8c61-d9f865259254"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.PlutoDevMacros]]
 deps = ["JuliaInterpreter", "Logging", "MacroTools", "Pkg", "TOML"]
@@ -2458,6 +3696,30 @@ git-tree-sha1 = "1d36ef11a9aaf1e8b74dacc6a731dd1de8fd493d"
 uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
 version = "1.3.0"
 
+[[deps.Qt6Base_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Vulkan_Loader_jll", "Xorg_libSM_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_cursor_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "libinput_jll", "xkbcommon_jll"]
+git-tree-sha1 = "eb38d376097f47316fe089fc62cb7c6d85383a52"
+uuid = "c0090381-4147-56d7-9ebc-da0b1113ec56"
+version = "6.8.2+1"
+
+[[deps.Qt6Declarative_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6ShaderTools_jll"]
+git-tree-sha1 = "da7adf145cce0d44e892626e647f9dcbe9cb3e10"
+uuid = "629bc702-f1f5-5709-abd5-49b8460ea067"
+version = "6.8.2+1"
+
+[[deps.Qt6ShaderTools_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll"]
+git-tree-sha1 = "9eca9fc3fe515d619ce004c83c31ffd3f85c7ccf"
+uuid = "ce943373-25bb-56aa-8eca-768745ed7b5a"
+version = "6.8.2+1"
+
+[[deps.Qt6Wayland_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6Declarative_jll"]
+git-tree-sha1 = "2766344a35a1a5ec1147305c4b343055d7c22c90"
+uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
+version = "6.8.2+0"
+
 [[deps.QuadGK]]
 deps = ["DataStructures", "LinearAlgebra"]
 git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
@@ -2469,6 +3731,11 @@ version = "2.11.2"
 
     [deps.QuadGK.weakdeps]
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.REPL]]
+deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
+uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+version = "1.11.0"
 
 [[deps.Random]]
 deps = ["SHA"]
@@ -2487,11 +3754,27 @@ git-tree-sha1 = "c6ec94d2aaba1ab2ff983052cf6a606ca5985902"
 uuid = "e6cf234a-135c-5ec9-84dd-332b85af5143"
 version = "1.6.0"
 
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.5"
+weakdeps = ["FixedPointNumbers"]
+
+    [deps.Ratios.extensions]
+    RatiosFixedPointNumbersExt = "FixedPointNumbers"
+
 [[deps.RecipesBase]]
 deps = ["PrecompileTools"]
 git-tree-sha1 = "5c3d09cc4f31f5fc6af001c250bf1278733100ff"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 version = "1.3.4"
+
+[[deps.RecipesPipeline]]
+deps = ["Dates", "NaNMath", "PlotUtils", "PrecompileTools", "RecipesBase"]
+git-tree-sha1 = "45cf9fd0ca5839d06ef333c8201714e888486342"
+uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
+version = "0.6.12"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
@@ -2525,6 +3808,12 @@ version = "3.33.0"
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
+
+[[deps.RelocatableFolders]]
+deps = ["SHA", "Scratch"]
+git-tree-sha1 = "ffdaf70d81cf6ff22c2b6e733c900c3321cab864"
+uuid = "05181044-ff0b-4ac5-8273-598c1e38db00"
+version = "1.0.1"
 
 [[deps.Requires]]
 deps = ["UUIDs"]
@@ -2621,6 +3910,12 @@ git-tree-sha1 = "566c4ed301ccb2a44cbd5a27da5f885e0ed1d5df"
 uuid = "53ae85a6-f571-4167-b2af-e1d143709226"
 version = "1.7.0"
 
+[[deps.Scratch]]
+deps = ["Dates"]
+git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
+uuid = "6c6a2e73-6563-6170-7368-637461726353"
+version = "1.2.1"
+
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 version = "1.11.0"
@@ -2635,6 +3930,17 @@ version = "1.1.2"
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 version = "1.11.0"
+
+[[deps.Showoff]]
+deps = ["Dates", "Grisu"]
+git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
+uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
+version = "1.0.3"
+
+[[deps.SimpleBufferStream]]
+git-tree-sha1 = "f305871d2f381d21527c770d4788c06c097c9bc1"
+uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
+version = "1.2.0"
 
 [[deps.SimpleNonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "Setfield", "StaticArraysCore"]
@@ -2698,6 +4004,12 @@ weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
     SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
+
+[[deps.StableRNGs]]
+deps = ["Random"]
+git-tree-sha1 = "95af145932c2ed859b63329952ce8d633719f091"
+uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
+version = "1.0.3"
 
 [[deps.Static]]
 deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools"]
@@ -2776,6 +4088,10 @@ deps = ["PrecompileTools"]
 git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
 uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
 version = "0.4.1"
+
+[[deps.StyledStrings]]
+uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+version = "1.11.0"
 
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
@@ -2861,6 +4177,12 @@ git-tree-sha1 = "d155450e6dff2a8bc2fcb81dcb194bd98b0aeb46"
 uuid = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 version = "0.1.2"
 
+[[deps.TensorCore]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "1feb45f88d133a655e001435632f019a9a1bcdb6"
+uuid = "62fd8b95-f654-4bbd-a8a5-9c27f68ccd50"
+version = "0.1.1"
+
 [[deps.TermInterface]]
 git-tree-sha1 = "d673e0aca9e46a2f63720201f55cc7b3e7169b16"
 uuid = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
@@ -2894,6 +4216,11 @@ version = "0.5.28"
     [deps.TimerOutputs.weakdeps]
     FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 
+[[deps.TranscodingStreams]]
+git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.11.3"
+
 [[deps.Tricks]]
 git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
@@ -2924,6 +4251,12 @@ version = "1.0.2"
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
 
+[[deps.UnicodeFun]]
+deps = ["REPL"]
+git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
+uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
+version = "0.4.1"
+
 [[deps.Unitful]]
 deps = ["Dates", "LinearAlgebra", "Random"]
 git-tree-sha1 = "c0667a8e676c53d390a09dc6870b3d8d6650e2bf"
@@ -2935,26 +4268,289 @@ weakdeps = ["ConstructionBase", "InverseFunctions"]
     ConstructionBaseUnitfulExt = "ConstructionBase"
     InverseFunctionsUnitfulExt = "InverseFunctions"
 
+[[deps.UnitfulLatexify]]
+deps = ["LaTeXStrings", "Latexify", "Unitful"]
+git-tree-sha1 = "975c354fcd5f7e1ddcc1f1a23e6e091d99e99bc8"
+uuid = "45397f5d-5981-4c77-b2b3-fc36d6e9b728"
+version = "1.6.4"
+
 [[deps.Unityper]]
 deps = ["ConstructionBase"]
 git-tree-sha1 = "25008b734a03736c41e2a7dc314ecb95bd6bbdb0"
 uuid = "a7c27f48-0311-42f6-a7f8-2c11e75eb415"
 version = "0.1.6"
 
+[[deps.Unzip]]
+git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
+uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
+version = "0.2.0"
+
+[[deps.Vulkan_Loader_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Xorg_libX11_jll", "Xorg_libXrandr_jll", "xkbcommon_jll"]
+git-tree-sha1 = "2f0486047a07670caad3a81a075d2e518acc5c59"
+uuid = "a44049a8-05dd-5a78-86c9-5fde0876e88c"
+version = "1.3.243+0"
+
+[[deps.Wayland_jll]]
+deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "XML2_jll"]
+git-tree-sha1 = "49be0be57db8f863a902d59c0083d73281ecae8e"
+uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
+version = "1.23.1+0"
+
+[[deps.Wayland_protocols_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "5db3e9d307d32baba7067b13fc7b5aa6edd4a19a"
+uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
+version = "1.36.0+0"
+
 [[deps.WeakValueDicts]]
 git-tree-sha1 = "98528c2610a5479f091d470967a25becfd83edd0"
 uuid = "897b6980-f191-5a31-bcb0-bf3c4585e0c1"
 version = "0.1.0"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "1.0.0"
+
+[[deps.XML2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
+git-tree-sha1 = "b8b243e47228b4a3877f1dd6aee0c5d56db7fcf4"
+uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
+version = "2.13.6+1"
+
+[[deps.XZ_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "fee71455b0aaa3440dfdd54a9a36ccef829be7d4"
+uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
+version = "5.8.1+0"
+
+[[deps.Xorg_libICE_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a3ea76ee3f4facd7a64684f9af25310825ee3668"
+uuid = "f67eecfb-183a-506d-b269-f58e52b52d7c"
+version = "1.1.2+0"
+
+[[deps.Xorg_libSM_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libICE_jll"]
+git-tree-sha1 = "9c7ad99c629a44f81e7799eb05ec2746abb5d588"
+uuid = "c834827a-8449-5923-a945-d239c165b7dd"
+version = "1.2.6+0"
+
+[[deps.Xorg_libX11_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
+git-tree-sha1 = "b5899b25d17bf1889d25906fb9deed5da0c15b3b"
+uuid = "4f6342f7-b3d2-589e-9d20-edeb45f2b2bc"
+version = "1.8.12+0"
+
+[[deps.Xorg_libXau_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "aa1261ebbac3ccc8d16558ae6799524c450ed16b"
+uuid = "0c0b7dd1-d40b-584c-a123-a41640f87eec"
+version = "1.0.13+0"
+
+[[deps.Xorg_libXcursor_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXfixes_jll", "Xorg_libXrender_jll"]
+git-tree-sha1 = "6c74ca84bbabc18c4547014765d194ff0b4dc9da"
+uuid = "935fb764-8cf2-53bf-bb30-45bb1f8bf724"
+version = "1.2.4+0"
+
+[[deps.Xorg_libXdmcp_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "52858d64353db33a56e13c341d7bf44cd0d7b309"
+uuid = "a3789734-cfe1-5b06-b2d0-1dd0d9d62d05"
+version = "1.1.6+0"
+
+[[deps.Xorg_libXext_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "a4c0ee07ad36bf8bbce1c3bb52d21fb1e0b987fb"
+uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
+version = "1.3.7+0"
+
+[[deps.Xorg_libXfixes_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "9caba99d38404b285db8801d5c45ef4f4f425a6d"
+uuid = "d091e8ba-531a-589c-9de9-94069b037ed8"
+version = "6.0.1+0"
+
+[[deps.Xorg_libXi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXfixes_jll"]
+git-tree-sha1 = "a376af5c7ae60d29825164db40787f15c80c7c54"
+uuid = "a51aa0fd-4e3c-5386-b890-e753decda492"
+version = "1.8.3+0"
+
+[[deps.Xorg_libXinerama_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll"]
+git-tree-sha1 = "a5bc75478d323358a90dc36766f3c99ba7feb024"
+uuid = "d1454406-59df-5ea1-beac-c340f2130bc3"
+version = "1.1.6+0"
+
+[[deps.Xorg_libXrandr_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXrender_jll"]
+git-tree-sha1 = "aff463c82a773cb86061bce8d53a0d976854923e"
+uuid = "ec84b674-ba8e-5d96-8ba1-2a689ba10484"
+version = "1.5.5+0"
+
+[[deps.Xorg_libXrender_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
+uuid = "ea2f1a96-1ddc-540d-b46f-429655e07cfa"
+version = "0.9.12+0"
+
+[[deps.Xorg_libxcb_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_jll"]
+git-tree-sha1 = "bfcaf7ec088eaba362093393fe11aa141fa15422"
+uuid = "c7cfdc94-dc32-55de-ac96-5a1b8d977c5b"
+version = "1.17.1+0"
+
+[[deps.Xorg_libxkbfile_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "e3150c7400c41e207012b41659591f083f3ef795"
+uuid = "cc61e674-0454-545c-8b26-ed2c68acab7a"
+version = "1.1.3+0"
+
+[[deps.Xorg_xcb_util_cursor_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_jll", "Xorg_xcb_util_renderutil_jll"]
+git-tree-sha1 = "04341cb870f29dcd5e39055f895c39d016e18ccd"
+uuid = "e920d4aa-a673-5f3a-b3d7-f755a4d47c43"
+version = "0.1.4+0"
+
+[[deps.Xorg_xcb_util_image_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "0fab0a40349ba1cba2c1da699243396ff8e94b97"
+uuid = "12413925-8142-5f55-bb0e-6d7ca50bb09b"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libxcb_jll"]
+git-tree-sha1 = "e7fd7b2881fa2eaa72717420894d3938177862d1"
+uuid = "2def613f-5ad1-5310-b15b-b15d46f528f5"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_keysyms_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "d1151e2c45a544f32441a567d1690e701ec89b00"
+uuid = "975044d2-76e6-5fbe-bf08-97ce7c6574c7"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_renderutil_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "dfd7a8f38d4613b6a575253b3174dd991ca6183e"
+uuid = "0d47668e-0667-5a69-a72c-f761630bfb7e"
+version = "0.3.9+1"
+
+[[deps.Xorg_xcb_util_wm_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "e78d10aab01a4a154142c5006ed44fd9e8e31b67"
+uuid = "c22f9ab0-d5fe-5066-847c-f4bb1cd4e361"
+version = "0.4.1+1"
+
+[[deps.Xorg_xkbcomp_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxkbfile_jll"]
+git-tree-sha1 = "801a858fc9fb90c11ffddee1801bb06a738bda9b"
+uuid = "35661453-b289-5fab-8a00-3d9160c6a3a4"
+version = "1.4.7+0"
+
+[[deps.Xorg_xkeyboard_config_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xkbcomp_jll"]
+git-tree-sha1 = "00af7ebdc563c9217ecc67776d1bbf037dbcebf4"
+uuid = "33bec58e-1273-512f-9401-5d533626f822"
+version = "2.44.0+0"
+
+[[deps.Xorg_xtrans_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a63799ff68005991f9d9491b6e95bd3478d783cb"
+uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
+version = "1.6.0+0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 version = "1.2.13+1"
 
+[[deps.Zstd_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "446b23e73536f84e8037f5dce465e92275f6a308"
+uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
+version = "1.5.7+1"
+
+[[deps.eudev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "gperf_jll"]
+git-tree-sha1 = "431b678a28ebb559d224c0b6b6d01afce87c51ba"
+uuid = "35ca27e7-8b34-5b7f-bca9-bdc33f59eb06"
+version = "3.2.9+0"
+
+[[deps.fzf_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "b6a34e0e0960190ac2a4363a1bd003504772d631"
+uuid = "214eeab7-80f7-51ab-84ad-2988db7cef09"
+version = "0.61.1+0"
+
+[[deps.gperf_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "3cad2cf2c8d80f1d17320652b3ea7778b30f473f"
+uuid = "1a1c6b14-54f6-533d-8383-74cd7377aa70"
+version = "3.3.0+0"
+
+[[deps.libaom_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "522c1df09d05a71785765d19c9524661234738e9"
+uuid = "a4ae2306-e953-59d6-aa16-d00cac43593b"
+version = "3.11.0+0"
+
+[[deps.libass_jll]]
+deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "e17c115d55c5fbb7e52ebedb427a0dca79d4484e"
+uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
+version = "0.15.2+0"
+
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
 version = "5.11.0+0"
+
+[[deps.libdecor_jll]]
+deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
+git-tree-sha1 = "9bf7903af251d2050b467f76bdbe57ce541f7f4f"
+uuid = "1183f4f0-6f2a-5f1a-908b-139f9cdfea6f"
+version = "0.2.2+0"
+
+[[deps.libevdev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "141fe65dc3efabb0b1d5ba74e91f6ad26f84cc22"
+uuid = "2db6ffa8-e38f-5e21-84af-90c45d0032cc"
+version = "1.11.0+0"
+
+[[deps.libfdk_aac_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a22cf860a7d27e4f3498a0fe0811a7957badb38"
+uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
+version = "2.0.3+0"
+
+[[deps.libinput_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "eudev_jll", "libevdev_jll", "mtdev_jll"]
+git-tree-sha1 = "ad50e5b90f222cfe78aa3d5183a20a12de1322ce"
+uuid = "36db933b-70db-51c0-b978-0f229ee0e533"
+version = "1.18.0+0"
+
+[[deps.libpng_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "002748401f7b520273e2b506f61cab95d4701ccf"
+uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
+version = "1.6.48+0"
+
+[[deps.libvorbis_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Ogg_jll", "Pkg"]
+git-tree-sha1 = "490376214c4721cdaca654041f635213c6165cb3"
+uuid = "f27f6e37-5d2b-51aa-960f-b287f2bc3b7a"
+version = "1.3.7+2"
+
+[[deps.mtdev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "814e154bdb7be91d78b6802843f76b6ece642f11"
+uuid = "009596ad-96f7-51b1-9f1b-5ce2d5e8a71e"
+version = "1.1.6+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2971,6 +4567,24 @@ version = "2022.0.0+0"
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
+
+[[deps.x264_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "4fea590b89e6ec504593146bf8b988b2c00922b2"
+uuid = "1270edf5-f2f9-52d2-97e9-ab00b5d0237a"
+version = "2021.5.5+0"
+
+[[deps.x265_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "ee567a171cce03570d77ad3a43e90218e38937a9"
+uuid = "dfaa095f-4041-5dcd-9319-2fabd8486b76"
+version = "3.5.0+0"
+
+[[deps.xkbcommon_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
+git-tree-sha1 = "c950ae0a3577aec97bfccf3381f66666bc416729"
+uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
+version = "1.8.1+0"
 """
 
 # ╔═╡ Cell order:
@@ -2978,15 +4592,18 @@ version = "17.4.0+2"
 # ╠═46143377-5b05-4648-89f0-1b1dc43ae51f
 # ╠═d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
 # ╠═b550df61-460e-4d63-8509-17e697033c87
+# ╠═e8d48aab-e227-48cc-8ad8-3cfb57a3e165
 # ╠═6f95a236-229a-4f68-be72-a8085f3aa025
-# ╠═16a55253-ec0f-457e-aab5-618a12f6c251
+# ╠═9a7db941-b8b8-4b81-918b-d86509b589a3
 # ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╟─ff1be30a-fb09-4ecd-884f-3fe44f43cd92
 # ╟─3ca7a788-85b9-466c-89e0-fabd1cf5d0db
 # ╟─f1ed8017-c3f6-4fdd-8352-d571b577aded
 # ╟─7830ef5f-a6b6-43e5-bcc8-cea0b38f830a
 # ╟─8a0ea5b2-6d00-40b2-a0b1-b988450ba3d9
-# ╟─c9c6d38d-0094-46ec-8445-8ae71e2cde62
+# ╠═c9c6d38d-0094-46ec-8445-8ae71e2cde62
+# ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
+# ╠═9c3615e1-789b-41b8-b1ce-ac49893b32c2
 # ╟─05b2abef-8893-4c7a-9ece-60dda7f78f25
 # ╟─2437813d-aa72-4b9a-9816-6ad6430f10c5
 # ╟─fe4deb09-0ad9-4266-aa08-a52bc79d2f34
@@ -2997,32 +4614,83 @@ version = "17.4.0+2"
 # ╟─dd8cddd6-5b34-4161-882a-c2708e01e3a6
 # ╟─a5da0c1c-5451-4228-9201-2baf274d6efb
 # ╟─884fae8d-2455-4aab-8780-8837bdd92e51
+# ╠═d64c53cb-b4a4-4811-8f80-42be4c0bbb48
 # ╟─70ff62fc-73b3-4020-bf18-6da05b5498b3
-# ╠═39be2637-45e9-4790-98c1-5815c20428e2
-# ╠═42cf47b7-6bab-4d93-8db4-5c69e11d88fc
+# ╟─39be2637-45e9-4790-98c1-5815c20428e2
+# ╟─42cf47b7-6bab-4d93-8db4-5c69e11d88fc
+# ╟─d6c2510d-cfbb-42e0-aefa-62289832c789
+# ╠═8160473b-7a6f-475a-afc8-c61f50290f44
+# ╠═9beb3f23-8110-4867-9b19-b9ddeeb711b0
+# ╠═3320cb17-a8ac-4f9e-ace1-29f8a4ba7906
 # ╟─d5ab6b70-0e50-47fc-a385-f77fea33955a
-# ╟─03bcd530-a71a-4b1c-a84e-cc0f9d54571e
-# ╟─44a50c57-fe46-4ed6-ac59-04cb0e1e3387
-# ╟─6d45fad3-e405-47d2-8bf8-b8898f7a108a
+# ╠═03bcd530-a71a-4b1c-a84e-cc0f9d54571e
+# ╠═e8717713-d36c-4fc5-bf8d-ef411da93670
+# ╠═0fe6fed4-926b-4d24-968f-fd0820220bfd
+# ╠═a386db98-0822-45e7-a75f-33a63fe58481
+# ╟─a6c14a45-eeef-452f-b5fa-5e444a5c43fd
+# ╠═4dc9f69a-948b-4dca-9c67-d824b4fb3514
+# ╟─37446e0e-1b46-4a53-97d8-39c81371d77e
+# ╠═1dc3cbdd-8e28-474e-944b-018c6c004dc7
+# ╟─7e02fca4-3a53-4ae4-a01d-6f7cdaa8ca9f
+# ╠═a34eba54-106d-47af-85bd-8a8a7320003c
 # ╟─d654c8f0-3b41-4388-840b-acb46263a832
-# ╟─b4a22da7-888b-4842-aa87-5020c7c0e958
-# ╟─2cc54f8b-2c27-4a99-b54d-d0bdeb3e4696
+# ╠═ef44e372-38f1-4e50-b474-8088eb6ae1a3
+# ╠═be8c1638-1b97-4787-b9f6-9727e85ba21f
+# ╠═107be9d7-6d21-4251-af2d-85c7f82f2652
+# ╠═15d54952-e218-4c14-b950-288b26cfc9fe
+# ╠═9ea17444-965d-4aec-885a-c3b7065dbdea
+# ╠═bc35b49e-b666-49a5-8a39-102164d1ce63
+# ╠═19969f54-9c4c-4b4c-bacb-54db49381bc9
+# ╠═8b331638-8121-4b4e-9818-4ba4529addb1
+# ╟─f412a924-6ffc-42b5-afda-e9fb4fb5dab2
+# ╠═70940a38-5268-46ba-8cfb-d1c6cbba4890
+# ╟─2ca0fcb3-eab1-40f2-b525-f3a619daf567
+# ╠═be093a4c-8b72-4663-88a8-916441e063f6
+# ╠═e1931bc6-e7ca-402d-b719-d1b6e670e37f
+# ╠═76570272-a765-42ed-adec-002bfecbec3e
+# ╠═c79eb2cb-8172-4123-b31b-535ef0f8bd95
+# ╠═06c0b7b0-35af-4f78-992a-7bc538fc280c
+# ╠═800c5c52-94ad-4083-98c9-e7ec42cc70ed
+# ╠═f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
+# ╠═32c32c40-756b-4eae-a123-68e77920c112
+# ╠═5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
+# ╠═5cae4ac8-cd9a-4273-845e-3ea0c111d4df
+# ╠═b3b22def-aacb-4f4b-be4b-83ea2e26f986
+# ╠═db1950c3-3a9e-440d-87d9-141c4d07a8a4
+# ╠═d742e609-3a44-4a61-960b-c2c50f47ba9d
+# ╠═21be2680-3a26-4222-91f0-4dfe01a628ca
+# ╠═18962ef4-5570-4b40-b31d-7fd211025965
+# ╟─c16bf678-742e-4953-b3b6-d298bedfa9e9
+# ╠═095c8a61-9332-44d7-b0e9-7b0eb83761b0
+# ╠═d47638a6-a00a-498a-a568-b31eb4a221ca
+# ╠═ef533dd6-fc5d-420b-b061-37681426e895
+# ╠═913491fc-6568-47bc-9880-fd54b647cc39
+# ╟─fe6c00b8-fc3f-426f-920c-7deaae99dce8
+# ╠═5883f14b-95cc-43d7-870d-bfa0426efbf5
+# ╠═003dad93-d071-4f6c-9ea9-7ee455a255fe
+# ╟─4f9b3f95-0ac4-45b4-a5db-7571045f69ac
+# ╟─c160cc41-cc8d-4b69-9e76-b5a4aed8388c
+# ╠═98c19d69-9118-4326-84d4-d9a575c4aac1
+# ╠═621f4f32-510e-4173-89d3-e5c9d9919d46
 # ╠═6133d3f4-34cb-463f-bddc-9dce93b642a3
-# ╠═f2018932-3171-41fc-a5bb-34d7cecf23c1
-# ╠═13044570-a39c-4dc6-81ec-ddf14bd3a3e3
-# ╠═7eacc8aa-924d-4801-9b59-3486871dcf74
 # ╠═5c7117e9-9fe4-4a5b-bc75-50428ea76e38
 # ╟─35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
-# ╟─358d1b83-52aa-4704-9347-44b06324d2c0
-# ╠═b7db97a8-131f-42a4-9a5d-32a97d442944
-# ╠═37613c1a-e4fb-45a4-ab2d-c331a7346378
-# ╠═1c05f96c-85a3-4832-b374-b9f23ca432eb
+# ╠═358d1b83-52aa-4704-9347-44b06324d2c0
 # ╟─415c838f-034b-4250-ae34-f1163ea9276e
-# ╠═ed71cc0c-bea0-49ab-a676-eb4cf0fc68ac
-# ╠═579fbb8e-fd3f-4bc2-9143-3c93db35fe67
-# ╠═7de4397f-f32c-446b-82c0-35a1f8dffda4
 # ╟─8124b17c-f071-4903-8af1-976e555649f2
-# ╠═9e827af5-06a6-4283-9633-596b68a3b25d
-# ╠═76d7f0f3-ef01-453d-85ac-a21a6bba1d08
+# ╠═f8b8b7d9-4788-4fb4-bc60-f98e88109647
+# ╠═ca88f11d-0f9f-406c-8b73-6e399619d135
+# ╠═8ec23851-7775-4b2a-9ca5-c418ff46f5be
+# ╠═a5e4545e-5110-49d3-8b4a-700352509bd5
+# ╠═42354632-77f6-43cb-8c48-0a65fe3f24a7
+# ╠═85b6f908-2434-4231-8b8a-d4084557674c
+# ╠═1eb7505d-f420-4ee9-a967-29d34da7a283
+# ╠═690c1fda-a594-4902-8139-6f50d8219a96
+# ╠═30a5b043-64ef-4f93-8de3-1699b89d597f
+# ╠═4f8bf79c-ff09-46a9-8678-03a8fa3b7f96
+# ╠═9614f380-5f85-4e52-9e18-13c820f77829
+# ╠═8e807b2b-b1b5-40dc-98a8-0ff56194ea94
+# ╠═09fb9270-1fa9-4e4e-94f7-02e8ae05c918
+# ╠═b0293c08-24b5-44fb-8407-cf9f78a64e70
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
