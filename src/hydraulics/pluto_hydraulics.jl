@@ -16,14 +16,14 @@ using SpecialFunctions
 # ╔═╡ e8d48aab-e227-48cc-8ad8-3cfb57a3e165
 using PlutoTest
 
+# ╔═╡ 9fe54e9b-0879-4668-b6ee-5002dc6e5878
+using Interpolations
+
 # ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
 @fromparent begin
 	using ..Utils
 	using ..Properties
 end
-
-# ╔═╡ 9fe54e9b-0879-4668-b6ee-5002dc6e5878
-using Interpolations
 
 # ╔═╡ 107be9d7-6d21-4251-af2d-85c7f82f2652
 # ╠═╡ skip_as_script = true
@@ -135,32 +135,6 @@ md"""
 # Correlations for bends
 """
 
-# ╔═╡ c9c6d38d-0094-46ec-8445-8ae71e2cde62
-# ╠═╡ disabled = true
-#=╠═╡
-function k_bend_idelchik(θ, R, D, Re)
-    # Radius ratio
-    R_D = R/D
-    
-    # Base coefficient using interpolation
-    A = bend_base_coefficient(R_D)
-    
-    # Reynolds number correction
-    B = 1.0
-    if Re < 2e5
-        B *= (2e5/Re)^0.2
-    end
-    
-    # Angle correction
-    C = 0.01 * θ * (0.25 * θ * (0.5 * θ / 90)^0.5)
-    
-    # Total coefficient
-    k = A * B * C
-    
-    return k
-end
-  ╠═╡ =#
-
 # ╔═╡ 9c3615e1-789b-41b8-b1ce-ac49893b32c2
 begin
 	"""
@@ -182,26 +156,6 @@ begin
 	# Register the helper function for symbolic computation
 	@register_symbolic bend_base_coefficient(R_D)
 end
-
-# ╔═╡ 05b2abef-8893-4c7a-9ece-60dda7f78f25
-#=╠═╡
-"""
-Calculate the loss coefficient for a U-bend (180°) based on bend radius and pipe diameter.
-"""
-function k_ubend(R, D, Re)
-    return k_bend_idelchik(180.0, R, D, Re)
-end
-  ╠═╡ =#
-
-# ╔═╡ 2437813d-aa72-4b9a-9816-6ad6430f10c5
-#=╠═╡
-"""
-Calculate the loss coefficient for a 90° bend based on bend radius and pipe diameter.
-"""
-function k_90bend(R, D, Re)
-    return k_bend_idelchik(90.0, R, D, Re)
-end
-  ╠═╡ =#
 
 # ╔═╡ fe4deb09-0ad9-4266-aa08-a52bc79d2f34
 """
@@ -390,13 +344,14 @@ function StraightTubeGnielinski(; name::Symbol,
                                  Re_high = 4000) # Upper transition Reynolds number
     
     pars = @parameters begin
-        L = L           # Length [m]
+        L = L          # Length [m]
         Di = Di         # Inner diameter [m]
         ε = ε           # Roughness [m]
         g = g           # Gravity [m/s²]
         Re_low = Re_low # Lower transition Reynolds number
         Re_high = Re_high # Upper transition Reynolds number
     end
+
 
     vars = @variables begin
         V̇ = 0.0001      # Volumetric flow [m³/s]
@@ -535,7 +490,7 @@ end
 
 
 # ╔═╡ 8160473b-7a6f-475a-afc8-c61f50290f44
-@test test_straight_tube_gnielinski()
+test_straight_tube_gnielinski()
 
 # ╔═╡ 9beb3f23-8110-4867-9b19-b9ddeeb711b0
 
@@ -1012,7 +967,7 @@ channel_results = generate_pressure_drop_curve(
     num_points=30,
     ρ=1000.0,  # Water density
     μ=0.001    # Water viscosity
-)
+);
   ╠═╡ =#
 
 # ╔═╡ 19969f54-9c4c-4b4c-bacb-54db49381bc9
@@ -1088,7 +1043,14 @@ function DynamicPropPipeBend(; name::Symbol,
                              g = 9.81,       # Gravity [m/s²]
                              fluid = "water",
                              χ = 0.0)        # Concentration (for mixtures)
-    
+    pars = @parameters begin
+		θ = θ
+		R = R
+		Di = Di
+		g = g
+		#fluid = fluid
+		χ = χ
+	end
     # Create the standard pipe bend component
     @named bend = PipeBend(θ=θ, R=R, Di=Di, g=g)
     
@@ -1100,8 +1062,8 @@ function DynamicPropPipeBend(; name::Symbol,
         bend.ρ ~ props.ρ,
         bend.μ ~ props.μ
     ]
-    
-    return assemble([bend, props], equations = connect_eqs, name = name)
+    system = NonlinearSystem(connect_eqs, [], pars, name = name)
+	return compose(system, [bend; props], name = name)
 end
 
 # ╔═╡ 76570272-a765-42ed-adec-002bfecbec3e
@@ -1135,7 +1097,13 @@ function DynamicPropAnnularBend180(; name::Symbol,
                                    g = 9.81,       # Gravity [m/s²]
                                    fluid = "water",
                                    χ = 0.0)        # Concentration (for mixtures)
-    
+     pars = @parameters begin
+		Do = Do
+		Di = Di
+		g = g
+		#fluid = fluid
+		χ = χ
+	end
     # Create the standard annular bend component
     @named bend = AnnularBend180(Do=Do, Di=Di, g=g)
     
@@ -1148,7 +1116,8 @@ function DynamicPropAnnularBend180(; name::Symbol,
         bend.μ ~ props.μ
     ]
     
-    return assemble([bend, props], equations = connect_eqs, name = name)
+    system = NonlinearSystem(connect_eqs, [], pars, name = name)
+	return compose(system, [bend; props], name = name)
 end
 
 # ╔═╡ 800c5c52-94ad-4083-98c9-e7ec42cc70ed
@@ -1293,14 +1262,6 @@ end
 # ╔═╡ 18962ef4-5570-4b40-b31d-7fd211025965
 @test test_dynamic_prop_annular_bend_180()
 
-# ╔═╡ c16bf678-742e-4953-b3b6-d298bedfa9e9
-md"""
-# Composing the whole
-"""
-
-# ╔═╡ d47638a6-a00a-498a-a568-b31eb4a221ca
-
-
 # ╔═╡ fe6c00b8-fc3f-426f-920c-7deaae99dce8
 md"""
 # Dynamic properties verion
@@ -1317,7 +1278,17 @@ function DynamicPropAnnularChannel(; name::Symbol,
                                     Re_high = 4000, # Upper transition Reynolds number
                                     fluid = "water",
                                     χ = 0.0)        # Concentration (for mixtures)
-    
+	pars = @parameters begin
+		L = L
+		Do = Do
+		Di = Di
+		ε = ε
+		g = g
+		Re_low = Re_low
+		Re_high = Re_high
+		χ = χ
+	end
+	
     # Create the standard annular channel component
     @named channel = AnnularChannel(L=L, Do=Do, Di=Di, ε=ε, g=g, 
                                   Re_low=Re_low, Re_high=Re_high)
@@ -1330,142 +1301,12 @@ function DynamicPropAnnularChannel(; name::Symbol,
         # Connect fluid properties to hydraulic component
         channel.ρ ~ props.ρ,
         channel.μ ~ props.μ,
-		#props.T ~ 303.15,
-		#channel.V̇ ~ 0.0005
-        
-        # Other potential connections could be added here
     ]
     
-    return assemble([channel, props], equations = connect_eqs, name = name)
+    
+	system = NonlinearSystem(connect_eqs, [], pars, name = name)
+	return compose(system, [channel; props], name = name)
 end
-
-# ╔═╡ 003dad93-d071-4f6c-9ea9-7ee455a255fe
-function DynamicPropStraightTube(; name::Symbol, 
-                                 L = 1.0,        # Length [m]
-                                 Di = 0.01,      # Inner diameter [m]
-                                 ε = 1.5e-6,     # Roughness [m]
-                                 g = 9.81,       # Gravity [m/s²]
-                                 Re_low = 2300,  # Lower transition Reynolds number
-                                 Re_high = 4000, # Upper transition Reynolds number
-                                 fluid = "water",
-                                 χ = 0.0)        # Concentration (for mixtures)
-    
-    # Create the standard straight tube component with Gnielinski correlation
-    @named tube = StraightTubeGnielinski(L=L, Di=Di, ε=ε, g=g, 
-                                       Re_low=Re_low, Re_high=Re_high)
-    
-    # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
-    
-    # Connect components
-    connect_eqs = [
-        tube.ρ ~ props.ρ,
-        tube.μ ~ props.μ,
-    ]
-    
-    return assemble([tube, props], equations = connect_eqs, name = name)
-end
-
-# ╔═╡ 095c8a61-9332-44d7-b0e9-7b0eb83761b0
-"""
-Create a complete U-pipe borehole heat exchanger model with dynamic fluid properties.
-Version with parameters that trickle down to components for easy remaking.
-"""
-function BHE_Upipe_Hydraulic_Complete(; name::Symbol,
-                    depth = 100.0,     # Borehole depth [m]
-                    Di = 0.032,        # Inner diameter of the pipes [m]
-                    ε = 1.5e-6,        # Pipe roughness [m]
-                    U_radius = 0.064,  # U-bend radius [m]
-                    fluid = "water",   # Fluid type
-                    χ = 0.0)           # Concentration (for mixtures)
-    
-    # Create the components using the named parameter symbols
-    @named leg1 = DynamicPropStraightTube(
-        L = depth,      # Use named parameter symbol
-        Di = Di,        # Use named parameter symbol
-        ε = ε,          # Use named parameter symbol
-        fluid = fluid,    # String, not a parameter
-        χ = χ          # Use named parameter symbol
-    )
-    
-    @named ubend = DynamicPropPipeBendU(
-        R = U_radius,   # Use named parameter symbol
-        Di = Di,        # Use named parameter symbol
-        fluid = fluid,    # String, not a parameter
-        χ = χ          # Use named parameter symbol
-    )
-    
-    @named leg2 = DynamicPropStraightTube(
-        L = depth,      # Use named parameter symbol
-        Di = Di,        # Use named parameter symbol
-        ε = ε,          # Use named parameter symbol
-        fluid = fluid,    # String, not a parameter
-        χ = χ           # Use named parameter symbol
-    )
-    
-    # Create system-level variables
-    sys_vars = @variables begin
-        Δp               # Total pressure drop [Pa]
-        H_total          # Total head loss [m]
-        T_leg1 = 293.15  # Temperature in leg1 [K]
-        T_bend = 283.15  # Temperature in the bend [K]
-        T_leg2 = 288.15  # Temperature in leg2 [K]
-        ṁ = 0.5          # Mass flow rate [kg/s]
-    end
-    
-    # Define equations connecting components and system variables
-    eqs = [
-        # Total pressure and head
-        Δp ~ leg1.tube.Δp + ubend.bend.Δp + leg2.tube.Δp,
-        H_total ~ leg1.tube.H + ubend.bend.H + leg2.tube.H,
-        
-        # Connect temperatures to components
-        leg1.props.T ~ T_leg1,
-        ubend.props.T ~ T_bend,
-        leg2.props.T ~ T_leg2,
-        
-        # Connect flow rate to all components
-        leg1.tube.ṁ ~ ṁ,
-        ubend.bend.ṁ ~ ṁ,
-        leg2.tube.ṁ ~ ṁ
-    ]
-
-    sys_params = @parameters begin
-        depth = depth          # Borehole depth [m]
-        Di = Di                # Inner diameter [m]
-        ε = ε                  # Roughness [m]
-        U_radius = U_radius    # U-bend radius [m]
-        χ = χ                  # Concentration
-        χ2 = 2χ                  # Concentration
-    end
-
-	
-    return compose(NonlinearSystem(eqs, sys_vars, sys_params, name=name), [leg1, ubend, leg2])
-end
-
-# ╔═╡ ef533dd6-fc5d-420b-b061-37681426e895
-function test_upipe_complete()
-    # Create the model
-    @named bhe = BHE_Upipe_Hydraulic_Complete()
-    
-    # We can run with default values or override them
-    # For example:
-    @named constrained_sys = assemble([bhe], 
-                                      equations = [
-                                          bhe.T_leg1 ~ 303.15,  # Override to 30°C
-                                          bhe.T_bend ~ 303.15,  # Override to 30°C
-                                          bhe.T_leg2 ~ 303.15,  # Override to 30°C
-                                          bhe.ṁ ~ 1.0         # Override to 1 L/s
-                                      ])
-    
-    # Simplify and solve
-    simpl_sys = structural_simplify(constrained_sys)
-    problem = NonlinearProblem(simpl_sys, [])
-    sol = solve(problem)
-end
-
-# ╔═╡ 913491fc-6568-47bc-9880-fd54b647cc39
-test_upipe_complete()
 
 # ╔═╡ 4f9b3f95-0ac4-45b4-a5db-7571045f69ac
 # Test function for DynamicPropAnnularChannel model
@@ -1508,6 +1349,45 @@ end
 # ╔═╡ b3b22def-aacb-4f4b-be4b-83ea2e26f986
 @test test_dynamic_prop_annular_channel()
 
+# ╔═╡ 003dad93-d071-4f6c-9ea9-7ee455a255fe
+function DynamicPropStraightTube(; name::Symbol, 
+                                 L = 1.0,        # Length [m]
+                                 Di = 0.01,      # Inner diameter [m]
+                                 ε = 1.5e-6,     # Roughness [m]
+                                 g = 9.81,       # Gravity [m/s²]
+                                 Re_low = 2300,  # Lower transition Reynolds number
+                                 Re_high = 4000, # Upper transition Reynolds number
+                                 fluid = "water",
+                                 χ = 0.0)        # Concentration (for mixtures)
+
+     pars = @parameters begin
+		L = L
+		Di = Di
+		 ε = ε
+		g = g
+		 Re_low = Re_low
+		 Re_high = Re_high
+		#fluid = fluid
+		χ = χ
+	end
+    # Create the standard straight tube component with Gnielinski correlation
+    @named tube = StraightTubeGnielinski(L=L, Di=Di, ε=ε, g=g, 
+                                       Re_low=Re_low, Re_high=Re_high)
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect components
+    connect_eqs = [
+        tube.ρ ~ props.ρ,
+        tube.μ ~ props.μ,
+    ]
+    
+	system = NonlinearSystem(connect_eqs, [], pars, name = name)
+	return compose(system, [tube; props], name = name)
+	
+end
+
 # ╔═╡ c160cc41-cc8d-4b69-9e76-b5a4aed8388c
 # Test function for DynamicPropStraightTube model
 function test_dynamic_prop_straight_tube()
@@ -1546,288 +1426,453 @@ end
 
 
 
-# ╔═╡ 5cae4ac8-cd9a-4273-845e-3ea0c111d4df
-@test test_dynamic_prop_straight_tube()
-
 # ╔═╡ 98c19d69-9118-4326-84d4-d9a575c4aac1
 @test test_dynamic_prop_straight_tube()
 
 
-# ╔═╡ 621f4f32-510e-4173-89d3-e5c9d9919d46
-
-@test test_dynamic_prop_annular_channel()
-
-# ╔═╡ 6133d3f4-34cb-463f-bddc-9dce93b642a3
-# ╠═╡ disabled = true
-#=╠═╡
+# ╔═╡ c16bf678-742e-4953-b3b6-d298bedfa9e9
+md"""
+# Composing the whole
 """
-Create a complete U-pipe borehole heat exchanger model.
-The model includes:
-- Downward pipe flow
-- U-bend at the bottom
-- Upward pipe flow
 
-Returns a ModelingToolkit system representing the entire BHE pressure drop.
+# ╔═╡ 14690559-f3a2-4d72-a188-53d859c74602
 """
-function BHE_Upipe_Hydraulic(; name::Symbol,
+Create a complete U-pipe borehole heat exchanger model with dynamic fluid properties.
+Implements parameter inheritance for easy remaking.
+"""
+function BHE_Upipe_Hydraulic_Complete(; name::Symbol,
                     depth = 100.0,     # Borehole depth [m]
-                    Di_ = 0.032,        # Inner diameter of the pipes [m]
+                    Di = 0.032,        # Inner diameter of the pipes [m]
                     ε = 1.5e-6,        # Pipe roughness [m]
                     U_radius = 0.064,  # U-bend radius [m]
-                    spacing = 0.075,   # Spacing between pipes (center to center) [m]
                     Re_low = 2300,     # Lower transition Reynolds number
                     Re_high = 4000,    # Upper transition Reynolds number
-                    g = 9.81)          # Gravity [m/s²]
+                    g = 9.81,          # Gravity [m/s²]
+                    fluid = "water",   # Fluid type
+                    χ = 0.0)           # Concentration (for mixtures)
+
+    # Define the BHE-level parameters
     pars = @parameters begin
-		depth = depth
-		Di = Di_
-	end
-    # Create the individual components
-    @named downpipe = StraightTubeSwameeJain(
+        depth = depth          # Borehole depth [m]
+        Di = Di                # Inner diameter [m]
+        ε = ε                  # Roughness [m]
+        U_radius = U_radius    # U-bend radius [m]
+        Re_low = Re_low        # Lower transition Reynolds number
+        Re_high = Re_high      # Upper transition Reynolds number
+        g = g                  # Gravity [m/s²]
+        χ = χ                  # Concentration
+    end
+    
+    # Create the components using the parameter symbols
+    @named leg1 = DynamicPropStraightTube(
         L = depth,
         Di = Di,
         ε = ε,
         Re_low = Re_low,
         Re_high = Re_high,
-        g = g
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named ubend = PipeBendU(
+    @named ubend = DynamicPropPipeBendU(
         R = U_radius,
         Di = Di,
-        g = g
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named uppipe = StraightTubeSwameeJain(
+    @named leg2 = DynamicPropStraightTube(
         L = depth,
         Di = Di,
         ε = ε,
         Re_low = Re_low,
         Re_high = Re_high,
-        g = g
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named fluid = Properties.DynamicIncompressibleProps(fluid="mea", χ = 0.0)
+    # Create system-level variables
+    @variables begin
+        Δp               # Total pressure drop [Pa]
+        H_total          # Total head loss [m]
+        T_leg1 = 293.15  # Temperature in leg1 [K]
+        T_bend = 283.15  # Temperature in the bend [K]
+        T_leg2 = 288.15  # Temperature in leg2 [K]
+        ṁ = 0.5          # Mass flow rate [kg/s]
+    end
     
-    # Create connection equations
-    components_eqs = [
-        # Connect the fluid properties to all components
-        downpipe.ρ ~ fluid.ρ,
-        downpipe.μ ~ fluid.μ,
-        ubend.ρ ~ fluid.ρ,
-        ubend.μ ~ fluid.μ,
-        uppipe.ρ ~ fluid.ρ,
-        uppipe.μ ~ fluid.μ,
+    # Define equations connecting components and system variables
+    eqs = [
+        # Total pressure and head
+        Δp ~ leg1.tube.Δp + ubend.bend.Δp + leg2.tube.Δp,
+        H_total ~ leg1.tube.H + ubend.bend.H + leg2.tube.H,
         
-        # Connect the flow between components
-        downpipe.ṁ ~ ubend.ṁ,
-        ubend.ṁ ~ uppipe.ṁ
+        # Connect temperatures to components
+        leg1.props.T ~ T_leg1,
+        ubend.props.T ~ T_bend,
+        leg2.props.T ~ T_leg2,
+        
+        # Connect flow rate to all components
+        leg1.tube.ṁ ~ ṁ,
+        ubend.bend.ṁ ~ ṁ,
+        leg2.tube.ṁ ~ ṁ
     ]
-
-
-    # Add total pressure drop and head variables
-    vars = @variables Δp_total H_total
-    sys_eqs = [
-        Δp_total ~ downpipe.Δp + ubend.Δp + uppipe.Δp,
-        H_total ~ downpipe.H + ubend.H + uppipe.H
-    ]
-
-	eqs = [components_eqs; sys_eqs]
-	
-    # Create the complete system
-    components = [downpipe, ubend, uppipe, fluid]
-	
-    bhe_system = compose(NonlinearSystem(eqs, vars, pars, name=name), components)
-    return bhe_system
+    
+    # Create the parent system
+    parent_system = NonlinearSystem(eqs, [Δp, H_total, T_leg1, T_bend, T_leg2, ṁ], pars, name=name)
+    
+    # Compose the complete system
+    return compose(parent_system, [leg1, ubend, leg2])
 end
-  ╠═╡ =#
 
-# ╔═╡ 5c7117e9-9fe4-4a5b-bc75-50428ea76e38
-# ╠═╡ disabled = true
-#=╠═╡
+# ╔═╡ 6bded15a-1717-4737-b277-2319211cb367
 """
-Create a complete coaxial borehole heat exchanger model.
-The model includes:
-- Inner pipe (usually the supply)
-- 180° annular bend at the bottom
-- Annular channel (usually the return)
+Test function for the BHE_Upipe_Hydraulic_Complete model
+"""
+function test_upipe_complete()
+    # Create the model
+    @named bhe = BHE_Upipe_Hydraulic_Complete()
+    
+    # We can run with default values or override them
+    @named constrained_sys = assemble([bhe], 
+                                      equations = [
+                                          bhe.T_leg1 ~ 303.15,  # Override to 30°C
+                                          bhe.T_bend ~ 303.15,  # Override to 30°C
+                                          bhe.T_leg2 ~ 303.15,  # Override to 30°C
+                                          bhe.ṁ ~ 1.0         # Override to 1 kg/s
+                                      ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    total_pressure_drop = sol[bhe.Δp]
+    leg1_pressure = sol[bhe.leg1.tube.Δp]
+    ubend_pressure = sol[bhe.ubend.bend.Δp]
+    leg2_pressure = sol[bhe.leg2.tube.Δp]
+    
+    # Calculate other relevant values for verification
+    reynolds_leg1 = sol[bhe.leg1.tube.Re]
+    reynolds_leg2 = sol[bhe.leg2.tube.Re]
+    friction_leg1 = sol[bhe.leg1.tube.f]
+    friction_leg2 = sol[bhe.leg2.tube.f]
+    
+    # Display results
+    println("BHE U-pipe Hydraulic Complete Test Results:")
+    println("  Flow rate: $(sol[bhe.ṁ]) kg/s")
+    println("  Total Pressure Drop: $(total_pressure_drop) Pa")
+    println("  Leg 1 Pressure Drop: $(leg1_pressure) Pa (T = $(sol[bhe.T_leg1]) K)")
+    println("  U-bend Pressure Drop: $(ubend_pressure) Pa (T = $(sol[bhe.T_bend]) K)")
+    println("  Leg 2 Pressure Drop: $(leg2_pressure) Pa (T = $(sol[bhe.T_leg2]) K)")
+    println("  Reynolds Numbers: Leg1 = $(reynolds_leg1), Leg2 = $(reynolds_leg2)")
+    println("  Friction Factors: Leg1 = $(friction_leg1), Leg2 = $(friction_leg2)")
+    
+    # Verify pressure balance
+    pressure_sum_ok = isapprox(total_pressure_drop, leg1_pressure + ubend_pressure + leg2_pressure, rtol=1e-6)
+    if !pressure_sum_ok
+        println("WARNING: Pressure balance check failed!")
+        println("  Total pressure: $(total_pressure_drop)")
+        println("  Sum of components: $(leg1_pressure + ubend_pressure + leg2_pressure)")
+    end
+    
+    # Return true if all checks pass
+    return (total_pressure_drop > 0) && 
+           (leg1_pressure > 0) && 
+           (ubend_pressure > 0) && 
+           (leg2_pressure > 0) &&
+           pressure_sum_ok
+end
 
-Returns a ModelingToolkit system representing the entire coaxial BHE pressure drop.
+# ╔═╡ 18bcbb99-f0e7-46f0-a5f7-423f3347a5c7
+@test test_upipe_complete()
+
+# ╔═╡ 36ff2f99-61cb-4532-a7ee-14e20295d164
 """
-function BHE_Coaxial_Hydraulic(; name::Symbol,
+Test function that demonstrates parameter inheritance with remake
+"""
+function test_upipe_complete_parametric()
+    # Create the base model
+    @named bhe_base = BHE_Upipe_Hydraulic_Complete(depth = 100.0, Di = 0.032)
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = assemble([bhe_base], 
+                                    equations = [
+                                        bhe_base.T_leg1 ~ 303.15, 
+                                        bhe_base.T_bend ~ 303.15, 
+                                        bhe_base.T_leg2 ~ 303.15,
+                                        bhe_base.ṁ ~ 1.0
+                                    ])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+    # Create variations using remake to test parameter inheritance
+    depths = [50.0, 100.0, 150.0, 200.0]
+    results = []
+    
+    for d in depths
+        # Create a modified problem with updated depth parameter using remake
+        # Here we correctly use the remake function on the problem, not the model
+        problem = remake(base_problem, p = [bhe_base.depth => d])
+        
+        # Solve the modified problem
+        sol = solve(problem)
+        
+        # Store results
+        push!(results, (
+            depth = d,
+            pressure_drop = sol[bhe_base.Δp],
+            leg1_pressure = sol[bhe_base.leg1.tube.Δp],
+            ubend_pressure = sol[bhe_base.ubend.bend.Δp],
+            leg2_pressure = sol[bhe_base.leg2.tube.Δp]
+        ))
+        
+        println("Depth: $(d) m | Pressure drop: $(sol[bhe_base.Δp]) Pa")
+    end
+    
+    # Verify that pressure drop increases with depth
+    depths_consistent = all(results[i].pressure_drop < results[i+1].pressure_drop 
+                          for i in 1:length(results)-1)
+                          
+    if depths_consistent
+        println("✅ Test passed: Pressure drop increases with depth as expected")
+    else
+        println("❌ Test failed: Pressure drop does not consistently increase with depth")
+    end
+    
+    return depths_consistent
+end
+
+# ╔═╡ 5b49809d-aa65-429d-bb28-f70f0c89fced
+@test test_upipe_complete_parametric()
+
+# ╔═╡ 671b94ce-76eb-4d58-bca2-480a23c9e244
+"""
+Create a complete coaxial borehole heat exchanger model with dynamic fluid properties.
+Implements parameter inheritance for easy remaking.
+"""
+function BHE_Coaxial_Hydraulic_Complete(; name::Symbol,
                       depth = 100.0,     # Borehole depth [m]
                       Di_inner = 0.032,  # Inner diameter of the inner pipe [m]
                       Do_inner = 0.040,  # Outer diameter of the inner pipe [m]
                       Di_outer = 0.060,  # Inner diameter of the outer pipe [m]
                       ε_inner = 1.5e-6,  # Inner pipe roughness [m]
                       ε_outer = 1.5e-6,  # Outer pipe roughness [m]
-                      flow_direction = :center_in, # :center_in or :annulus_in
                       Re_low = 2300,     # Lower transition Reynolds number
                       Re_high = 4000,    # Upper transition Reynolds number
-                      g = 9.81)          # Gravity [m/s²]
+                      g = 9.81,          # Gravity [m/s²]
+                      fluid = "water",   # Fluid type
+                      χ = 0.0)           # Concentration (for mixtures)
+                      
+    # Define the BHE-level parameters
+    pars = @parameters begin
+        depth = depth          # Borehole depth [m]
+        Di_inner = Di_inner    # Inner diameter of inner pipe [m]
+        Do_inner = Do_inner    # Outer diameter of inner pipe [m]
+        Di_outer = Di_outer    # Inner diameter of outer pipe [m]
+        ε_inner = ε_inner      # Inner pipe roughness [m]
+        ε_outer = ε_outer      # Outer pipe roughness [m]
+        Re_low = Re_low        # Lower transition Reynolds number
+        Re_high = Re_high      # Upper transition Reynolds number
+        g = g                  # Gravity [m/s²]
+        χ = χ                  # Concentration
+    end
     
-    # Create the individual components
-    @named inner_pipe = StraightTubeSwameeJain(
+    # Create the components using the parameter symbols
+    @named inner_pipe = DynamicPropStraightTube(
         L = depth,
         Di = Di_inner,
         ε = ε_inner,
         Re_low = Re_low,
         Re_high = Re_high,
-        g = g
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named annular_bend = AnnularBend180(
-        Di = Do_inner,
+    @named annular_bend = DynamicPropAnnularBend180(
         Do = Di_outer,
-        g = g
+        Di = Do_inner,
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named annular_channel = AnnularChannel(
+    @named annular_channel = DynamicPropAnnularChannel(
         L = depth,
-        Di = Do_inner,
         Do = Di_outer,
+        Di = Do_inner,
         ε = ε_outer,
         Re_low = Re_low,
         Re_high = Re_high,
-        g = g
+        g = g,
+        fluid = fluid,
+        χ = χ
     )
     
-    @named fluid = Properties.DynamicIncompressibleProps(fluid="mea", χ = 0.0)
+    # Create system-level variables
+    @variables begin
+        Δp               # Total pressure drop [Pa]
+        H_total          # Total head loss [m]
+        T_inner = 293.15 # Temperature in inner pipe [K]
+        T_bend = 283.15  # Temperature in the bend [K]
+        T_annular = 288.15 # Temperature in annular channel [K]
+        ṁ = 0.5          # Mass flow rate [kg/s]
+    end
     
-    # Create connection equations
+    # Define equations connecting components and system variables
     eqs = [
-        # Connect the fluid properties to all components
-        inner_pipe.ρ ~ fluid.ρ,
-        inner_pipe.μ ~ fluid.μ,
-        annular_bend.ρ ~ fluid.ρ,
-        annular_bend.μ ~ fluid.μ,
-        annular_channel.ρ ~ fluid.ρ,
-        annular_channel.μ ~ fluid.μ,
+        # Total pressure and head (center-in configuration by default)
+        Δp ~ inner_pipe.tube.Δp + annular_bend.bend.Δp + annular_channel.channel.Δp,
+        H_total ~ inner_pipe.tube.H + annular_bend.bend.H + annular_channel.channel.H,
         
-        # Connect the flow between components
-        inner_pipe.ṁ ~ annular_bend.ṁ,
-        annular_bend.ṁ ~ annular_channel.ṁ
+        # Connect temperatures to components
+        inner_pipe.props.T ~ T_inner,
+        annular_bend.props.T ~ T_bend,
+        annular_channel.props.T ~ T_annular,
+        
+        # Connect flow rate to all components
+        inner_pipe.tube.ṁ ~ ṁ,
+        annular_bend.bend.ṁ ~ ṁ,
+        annular_channel.channel.ṁ ~ ṁ
     ]
     
-    # Create the complete system
-    components = [inner_pipe, annular_bend, annular_channel, fluid]
-    bhe_system = compose(NonlinearSystem(eqs, [], [], name=name), components)
-	return bhe_system
+    # Create the parent system
+    parent_system = NonlinearSystem(eqs, [Δp, H_total, T_inner, T_bend, T_annular, ṁ], pars, name=name)
     
-    # Add total pressure drop and head variables
-    @variables Δp_total H_total
-    
-    # If flow direction is from annulus to center, reverse the components order
-    if flow_direction == :annulus_in
-        total_eqs = [
-            Δp_total ~ annular_channel.Δp + annular_bend.Δp + inner_pipe.Δp,
-            H_total ~ annular_channel.H + annular_bend.H + inner_pipe.H
-        ]
-    else # Default: center_in
-        total_eqs = [
-            Δp_total ~ inner_pipe.Δp + annular_bend.Δp + annular_channel.Δp,
-            H_total ~ inner_pipe.H + annular_bend.H + annular_channel.H
-        ]
-    end
-    
-    @named complete_system = compose(NonlinearSystem(total_eqs, [Δp_total, H_total], [], name=name), [bhe_system])
-    
-    return complete_system
-end
-  ╠═╡ =#
-
-# ╔═╡ 35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
-"""
-Create a single U-pipe borehole heat exchanger model with custom fluid properties.
-This is a convenience function that allows setting the flow rate and fluid properties.
-"""
-function create_Upipe_BHE(; name::Symbol,
-                          depth = 100.0,     # Borehole depth [m]
-                          Di = 0.032,        # Inner diameter of the pipes [m]
-                          ε = 1.5e-6,        # Pipe roughness [m]
-                          U_radius = 0.064,  # U-bend radius [m]
-                          spacing = 0.075,   # Spacing between pipes (center to center) [m]
-                          flow_rate = 0.0005, # Volumetric flow rate [m³/s]
-                          ρ = 1000.0,        # Fluid density [kg/m³]
-                          μ = 0.001,         # Fluid dynamic viscosity [Pa·s]
-                          Re_low = 2300,     # Lower transition Reynolds number
-                          Re_high = 4000)    # Upper transition Reynolds number
-    
-    # Create BHE system
-    @named bhe = BHE_Upipe_Hydraulic(
-        depth = depth,
-        Di = Di,
-        ε = ε,
-        U_radius = U_radius,
-        spacing = spacing,
-        Re_low = Re_low,
-        Re_high = Re_high
-    )
-    
-    # Create constraints
-    constraints = [
-        bhe.downpipe.V̇ ~ flow_rate,
-        bhe.fluid.ρ₀ ~ ρ,
-        bhe.fluid.μ₀ ~ μ
-    ]
-    
-    # Create the constrained system
-    @named complete_system = compose(NonlinearSystem(constraints, [], [], name=name), [bhe])
-    
-    return complete_system
+    # Compose the complete system
+    return compose(parent_system, [inner_pipe, annular_bend, annular_channel])
 end
 
-# ╔═╡ 358d1b83-52aa-4704-9347-44b06324d2c0
+# ╔═╡ 89004c6f-cc14-4e2a-a348-f4b278eec71d
 """
-Create a coaxial borehole heat exchanger model with custom fluid properties.
-This is a convenience function that allows setting the flow rate and fluid properties.
+Test function for the BHE_Coaxial_Hydraulic_Complete model
 """
-function create_Coaxial_BHE(; name,
-                            depth = 100.0,     # Borehole depth [m]
-                            Di_inner = 0.032,  # Inner diameter of the inner pipe [m]
-                            Do_inner = 0.040,  # Outer diameter of the inner pipe [m]
-                            Di_outer = 0.060,  # Inner diameter of the outer pipe [m]
-                            ε_inner = 1.5e-6,  # Inner pipe roughness [m]
-                            ε_outer = 1.5e-6,  # Outer pipe roughness [m]
-                            flow_direction = :center_in, # :center_in or :annulus_in
-                            flow_rate = 0.0005, # Volumetric flow rate [m³/s]
-                            ρ = 1000.0,        # Fluid density [kg/m³]
-                            μ = 0.001,         # Fluid dynamic viscosity [Pa·s]
-                            Re_low = 2300,     # Lower transition Reynolds number
-                            Re_high = 4000)    # Upper transition Reynolds number
+function test_coaxial_complete()
+    # Create the model
+    @named bhe = BHE_Coaxial_Hydraulic_Complete()
     
-    # Create BHE system
-    @named bhe = BHE_Coaxial_Hydraulic(
-        depth = depth,
-        Di_inner = Di_inner,
-        Do_inner = Do_inner,
-        Di_outer = Di_outer,
-        ε_inner = ε_inner,
-        ε_outer = ε_outer,
-        flow_direction = flow_direction,
-        Re_low = Re_low,
-        Re_high = Re_high
-    )
+    # We can run with default values or override them
+    @named constrained_sys = assemble([bhe], 
+                                      equations = [
+                                          bhe.T_inner ~ 303.15,   # Override to 30°C
+                                          bhe.T_bend ~ 303.15,    # Override to 30°C
+                                          bhe.T_annular ~ 303.15, # Override to 30°C
+                                          bhe.ṁ ~ 1.0           # Override to 1 kg/s
+                                      ])
     
-    # Create constraints based on flow direction
-    if flow_direction == :annulus_in
-        flow_constraints = [bhe.annular_channel.V̇ ~ flow_rate]
-    else # Default: center_in
-        flow_constraints = [bhe.inner_pipe.V̇ ~ flow_rate]
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    total_pressure_drop = sol[bhe.Δp]
+    inner_pressure = sol[bhe.inner_pipe.tube.Δp]
+    bend_pressure = sol[bhe.annular_bend.bend.Δp]
+    annular_pressure = sol[bhe.annular_channel.channel.Δp]
+    
+    # Calculate other relevant values for verification
+    reynolds_inner = sol[bhe.inner_pipe.tube.Re]
+    reynolds_annular = sol[bhe.annular_channel.channel.Re]
+    friction_inner = sol[bhe.inner_pipe.tube.f]
+    
+    # Display results
+    println("BHE Coaxial Hydraulic Complete Test Results:")
+    println("  Flow rate: $(sol[bhe.ṁ]) kg/s")
+    println("  Total Pressure Drop: $(total_pressure_drop) Pa")
+    println("  Inner Pipe Pressure Drop: $(inner_pressure) Pa (T = $(sol[bhe.T_inner]) K)")
+    println("  Annular Bend Pressure Drop: $(bend_pressure) Pa (T = $(sol[bhe.T_bend]) K)")
+    println("  Annular Channel Pressure Drop: $(annular_pressure) Pa (T = $(sol[bhe.T_annular]) K)")
+    println("  Reynolds Numbers: Inner = $(reynolds_inner), Annular = $(reynolds_annular)")
+    println("  Friction Factor (Inner): $(friction_inner)")
+    
+    # Verify pressure balance
+    pressure_sum_ok = isapprox(total_pressure_drop, inner_pressure + bend_pressure + annular_pressure, rtol=1e-6)
+    if !pressure_sum_ok
+        println("WARNING: Pressure balance check failed!")
+        println("  Total pressure: $(total_pressure_drop)")
+        println("  Sum of components: $(inner_pressure + bend_pressure + annular_pressure)")
     end
     
-    # Add fluid property constraints
-    constraints = [
-        flow_constraints...,
-        bhe.fluid.ρ₀ ~ ρ,
-        bhe.fluid.μ₀ ~ μ
-    ]
-    
-    # Create the constrained system
-    @named complete_system = compose(NonlinearSystem(constraints, [], [], name=name), [bhe])
-    
-    return complete_system
+    # Return true if all checks pass
+    return (total_pressure_drop > 0) && 
+           (inner_pressure > 0) && 
+           (bend_pressure > 0) && 
+           (annular_pressure > 0) &&
+           pressure_sum_ok
 end
+
+# ╔═╡ 9ef8cba9-e590-4190-b4b9-6c00fe71ca2a
+"""
+Test function that demonstrates parameter inheritance with remake for coaxial BHE
+"""
+function test_coaxial_complete_parametric()
+    # Create the base model
+    @named bhe_base = BHE_Coaxial_Hydraulic_Complete(depth = 100.0, Di_inner = 0.032)
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = assemble([bhe_base], 
+                                    equations = [
+                                        bhe_base.T_inner ~ 303.15, 
+                                        bhe_base.T_bend ~ 303.15, 
+                                        bhe_base.T_annular ~ 303.15,
+                                        bhe_base.ṁ ~ 1.0
+                                    ])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+    # Create variations using remake to test parameter inheritance
+    depths = [50.0, 100.0, 150.0, 200.0]
+    results = []
+    
+    for d in depths
+        # Create a modified problem with updated depth parameter using remake
+        problem = remake(base_problem, p = [bhe_base.depth => d])
+        
+        # Solve the modified problem
+        sol = solve(problem)
+        
+        # Store results
+        push!(results, (
+            depth = d,
+            pressure_drop = sol[bhe_base.Δp],
+            inner_pressure = sol[bhe_base.inner_pipe.tube.Δp],
+            bend_pressure = sol[bhe_base.annular_bend.bend.Δp],
+            annular_pressure = sol[bhe_base.annular_channel.channel.Δp]
+        ))
+        
+        println("Depth: $(d) m | Pressure drop: $(sol[bhe_base.Δp]) Pa")
+    end
+    
+    # Verify that pressure drop increases with depth
+    depths_consistent = all(results[i].pressure_drop < results[i+1].pressure_drop 
+                          for i in 1:length(results)-1)
+                          
+    if depths_consistent
+        println("✅ Test passed: Pressure drop increases with depth as expected")
+    else
+        println("❌ Test failed: Pressure drop does not consistently increase with depth")
+    end
+    
+    return depths_consistent
+end
+
+# Run the tests
+
+# ╔═╡ 879502ff-f142-47eb-a17e-f6c252fa592a
+@test test_coaxial_complete()
+
+# ╔═╡ 2333034e-6a59-4323-8398-6680ea7311cb
+@test test_coaxial_complete_parametric()
 
 # ╔═╡ 415c838f-034b-4250-ae34-f1163ea9276e
 md"""
@@ -2023,41 +2068,389 @@ function BasicPump(;name,
     return p
 end
 
-# ╔═╡ 85b6f908-2434-4231-8b8a-d4084557674c
-estimate_pump_params(H_shutoff = 12, Q_max = 13/3600)
+# ╔═╡ 4f21cf92-9f70-46e5-9f2e-1ccecbf2d0a6
+"""
+Create a pump model with dynamic fluid properties.
+Implements parameter inheritance for easy remaking.
+"""
+function DynamicPropPump(; name::Symbol,
+        N = 1.0,            # rotational speed [1/s]
+        D = 0.1,            # impeller diameter [m]
+        g = 9.81,           # gravity [m/s^2]
+        ψ₀ = 0.5,           # dead‐head coeff
+        K = 0.3,            # head‐curve shape
+        φ_BEP = 0.08,       # BEP flow coeff
+        η_max = 0.85,       # peak hydraulic efficiency
+        η_motor = 0.9,      # motor efficiency
+        N_max = 1.2,        # maximum rotational speed [1/s]
+        P_elec_max = 1000.0, # maximum electrical power [W]
+        H_max = 20.0,       # maximum head [m]
+        fluid = "water",    # Fluid type
+        χ = 0.0)            # Concentration (for mixtures)
+    
+    # Define the pump-level parameters for inheritance
+    pars = @parameters begin
+        N = N
+        D = D
+        g = g
+        ψ₀ = ψ₀
+        K = K
+        φ_BEP = φ_BEP
+        η_max = η_max
+        η_motor = η_motor
+        N_max = N_max
+        P_elec_max = P_elec_max
+        H_max = H_max
+        χ = χ
+    end
+    
+    # Create the pump component
+    @named pump = Pump(
+        N = N,
+        D = D,
+        g = g,
+        ψ₀ = ψ₀,
+        K = K,
+        φ_BEP = φ_BEP,
+        η_max = η_max,
+        η_motor = η_motor,
+        N_max = N_max,
+        P_elec_max = P_elec_max,
+        H_max = H_max
+    )
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect properties to the pump
+    connect_eqs = [
+        # Connect fluid properties to pump
+        pump.ρ ~ props.ρ,
+        pump.cp ~ props.cp  # Optional: for thermal calculations if needed
+    ]
+    
+    # Create the parent system with connected components
+    system = NonlinearSystem(connect_eqs, [], pars, name=name)
+    return compose(system, [pump, props], name=name)
+end
 
-# ╔═╡ 1eb7505d-f420-4ee9-a967-29d34da7a283
-@named magna3_approx = BasicPump(H_shutoff=12, Q_max=13/3600,
-    N_max = 50,
-    P_elec_max = 185,
-    H_max = 12
-)
+# ╔═╡ e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
+"""
+Create a pump with dynamic fluid properties based on common pump specifications.
+Parameters are estimated from basic pump characteristics and inherited to subcomponents.
+"""
+function DynamicPropBasicPump(; name::Symbol,
+    H_shutoff = 12,          # Shutoff head [m]
+    Q_max = 13/3600,         # Maximum flow [m³/s]
+    N = 50.0/60.0,           # Default to 50Hz
+    D = 0.1,                 # Default impeller diameter [m]
+    g = 9.81,                # Default gravity [m/s²]
+    N_max = 1.2 * N,         # Default maximum speed 20% above nominal
+    P_elec_max = nothing,    # Default max power, will be calculated if not provided
+    H_max = nothing,         # Default max head, will be calculated if not provided
+    fluid = "water",         # Fluid type
+    χ = 0.0)                 # Concentration (for mixtures)
+    
+    # Calculate pump parameters based on basic info
+    ppars = estimate_pump_params(
+        H_shutoff = H_shutoff, 
+        Q_max = Q_max,
+        N = N,
+        D = D,
+        g = g
+    )
+    
+    # Calculate default maximum values if not provided
+    if isnothing(P_elec_max)
+        # Estimate max power at BEP
+        H_BEP = H_shutoff * (1 - (ppars.φ_BEP * N * D^3 / Q_max)^2)
+        P_hydraulic_BEP = ppars.φ_BEP * N * D^3 * H_BEP * g * 1000.0  # ρ=1000 kg/m³
+        P_elec_max = P_hydraulic_BEP / (ppars.η_max * ppars.η_motor) * 1.2  # 20% safety margin
+    end
+    
+    if isnothing(H_max)
+        H_max = H_shutoff * 1.1  # Max head is typically slightly above shutoff head
+    end
+    
+    # Create pump with calculated parameters and fluid properties
+    return DynamicPropPump(
+        name = name,
+        N = ppars.N,         
+        D = ppars.D,        
+        g = g,       
+        ψ₀ = ppars.ψ₀,        
+        K = ppars.K,        
+        φ_BEP = ppars.φ_BEP,   
+        η_max = ppars.η_max,    
+        η_motor = ppars.η_motor,
+        N_max = N_max,
+        P_elec_max = P_elec_max,
+        H_max = H_max,
+        fluid = fluid,
+        χ = χ
+    )
+end
 
-# ╔═╡ 690c1fda-a594-4902-8139-6f50d8219a96
-@named props = Properties.DynamicIncompressibleProps()
+# ╔═╡ 165e8538-776f-4c46-86c2-d43f3bb302e2
+"""
+Test function for the DynamicPropPump model
+"""
+function test_dynamic_prop_pump()
+    # Create the model
+    @named pump = DynamicPropPump(
+        N = 50.0/60.0,      # 50 Hz
+        D = 0.1,            # 10 cm impeller
+        ψ₀ = 0.5,
+        K = 0.3,
+        φ_BEP = 0.08,
+        η_max = 0.85,
+        fluid = "water"
+    )
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([pump], 
+                                     equations = [
+                                         pump.props.T ~ 293.15,  # 20°C
+                                         pump.pump.V̇ ~ 0.001     # 1 L/s
+                                     ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    head = sol[pump.pump.H]
+    power = sol[pump.pump.P_elec]
+    efficiency = sol[pump.pump.η]
+    density = sol[pump.props.ρ]
+    
+    # Display results
+    println("Dynamic Pump Test Results:")
+    println("  Head: $(head) m")
+    println("  Electrical Power: $(power) W")
+    println("  Hydraulic Efficiency: $(efficiency)")
+    println("  Fluid Density: $(density) kg/m³")
+    
+    # Verify results are reasonable
+    return (head > 0) && (power > 0) && (efficiency > 0) && (density > 900)
+end
 
-# ╔═╡ 30a5b043-64ef-4f93-8de3-1699b89d597f
-link_eqs = [
-    magna3_approx.ρ  ~ props.ρ,
-    magna3_approx.cp ~ props.cp,
-	magna3_approx.H ~ 5.0,
-	props.T ~ 290.90,
-  ]
+# ╔═╡ 0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
+"""
+Test function that demonstrates parameter inheritance with remake
+"""
+function test_pump_parametric()
+    # Create the base model with a standard pump
+    @named pump_base = DynamicPropBasicPump(
+        H_shutoff = 12,
+        Q_max = 13/3600,
+        fluid = "water"
+    )
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = assemble([pump_base], 
+                                     equations = [
+                                         pump_base.props.T ~ 293.15,  # 20°C
+                                         pump_base.pump.V̇ ~ 0.001     # 1 L/s
+                                     ])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+    # Create variations with different speeds to test parameter inheritance
+    speeds = [40.0/60.0, 45.0/60.0, 50.0/60.0, 55.0/60.0]  # Different pump speeds in Hz
+    results = []
+    
+    for n in speeds
+        # Create a modified problem with updated speed parameter using remake
+        problem = remake(base_problem, p = [pump_base.N => n])
+        
+        # Solve the modified problem
+        sol = solve(problem)
+        
+        # Store results
+        push!(results, (
+            speed = n * 60,  # Convert to Hz for display
+            head = sol[pump_base.pump.H],
+            power = sol[pump_base.pump.P_elec],
+            flow = sol[pump_base.pump.V̇]
+        ))
+        
+        println("Speed: $(n*60) Hz | Head: $(sol[pump_base.pump.H]) m | Power: $(sol[pump_base.pump.P_elec]) W")
+    end
+    
+    # Verify that head increases with speed (following affinity laws)
+    speeds_consistent = all(results[i].head < results[i+1].head 
+                           for i in 1:length(results)-1)
+                           
+    if speeds_consistent
+        println("✅ Test passed: Head increases with speed as expected (affinity laws)")
+    else
+        println("❌ Test failed: Head does not consistently increase with speed")
+    end
+    
+    return speeds_consistent
+end
 
-# ╔═╡ 4f8bf79c-ff09-46a9-8678-03a8fa3b7f96
-@named new_sys = assemble([magna3_approx, props], equations = link_eqs);
+# ╔═╡ 75a9b1e0-6b75-4442-8a32-f0e692d1989b
+test_pump_parametric()
 
-# ╔═╡ 9614f380-5f85-4e52-9e18-13c820f77829
-system   = structural_simplify(new_sys)
+# ╔═╡ cecce7db-5dc5-4c47-a666-af62bfe707a2
+md"""
+# Assembling all
 
-# ╔═╡ 8e807b2b-b1b5-40dc-98a8-0ff56194ea94
-prob = NonlinearProblem(system, [])
 
-# ╔═╡ 09fb9270-1fa9-4e4e-94f7-02e8ae05c918
-sol = solve(prob)
+"""
 
-# ╔═╡ b0293c08-24b5-44fb-8407-cf9f78a64e70
-@test sol[magna3_approx.V̇] ≈ 0.002758031668260459
+# ╔═╡ 771bc84e-cb07-4be7-a129-5772749dc845
+"""
+Create a complete geothermal loop with a pump and BHE.
+Implements parameter inheritance for easy remaking.
+"""
+function GeothermalLoop(; name::Symbol,
+                         bhe_type = :upipe,      # :upipe or :coaxial
+                         depth = 100.0,          # Borehole depth [m]
+                         Di = 0.032,             # Inner diameter [m]
+                         H_shutoff = 12,         # Pump shutoff head [m]
+                         Q_max = 13/3600,        # Maximum pump flow [m³/s]
+                         fluid = "mea",        # Fluid type
+                         χ = 0.0)                # Concentration (for mixtures)
+    
+    # Define the loop-level parameters
+    pars = @parameters begin
+        depth = depth
+        Di = Di
+        χ = χ
+    end
+    
+    # Create the pump
+    @named pump = DynamicPropBasicPump(
+        H_shutoff = H_shutoff,
+        Q_max = Q_max,
+        fluid = fluid,
+        χ = χ
+    )
+    
+    # Create the BHE depending on the type
+    if bhe_type == :upipe
+        @named bhe = BHE_Upipe_Hydraulic_Complete(
+            depth = depth,
+            Di = Di,
+            fluid = fluid,
+            χ = χ
+        )
+    elseif bhe_type == :coaxial
+        @named bhe = BHE_Coaxial_Hydraulic_Complete(
+            depth = depth,
+            Di_inner = Di,
+            fluid = fluid,
+            χ = χ
+        )
+    else
+        error("Unsupported BHE type: $bhe_type. Use :upipe or :coaxial.")
+    end
+    
+    # Create system-level variables
+    @variables begin
+        T_supply = 293.15   # Supply temperature [K]
+        T_return = 288.15   # Return temperature [K]
+        ṁ = 0.5             # Mass flow rate [kg/s]
+    end
+    
+    # Create connection equations
+    if bhe_type == :upipe
+        temp_eqs = [
+            # Connect temperatures
+            bhe.T_leg1 ~ T_supply,
+            bhe.T_bend ~ (T_supply + T_return)/2,
+            bhe.T_leg2 ~ T_return
+        ]
+    else # coaxial
+        temp_eqs = [
+            # Connect temperatures
+            bhe.T_inner ~ T_supply,
+            bhe.T_bend ~ (T_supply + T_return)/2,
+            bhe.T_annular ~ T_return
+        ]
+    end
+    
+    flow_eqs = [
+		
+		pump.props.T ~ (T_supply + T_return)/2,
+        # Connect flow rates
+        pump.pump.ṁ ~ ṁ,
+        bhe.ṁ ~ ṁ,
+        
+        # System balance equation: pump head equals BHE head loss
+        pump.pump.H ~ bhe.H_total
+    ]
+    
+    eqs = [temp_eqs; flow_eqs]
+    
+    # Create the parent system
+    sys_vars = [T_supply, T_return, ṁ]
+    parent_system = NonlinearSystem(eqs, sys_vars, pars, name=name)
+    
+    # Compose the complete system
+    return compose(parent_system, [pump, bhe])
+end
+
+# ╔═╡ d9f417b2-184e-4f5e-9c3a-9649a6cb4235
+"""
+Test function for the complete GeothermalLoop model
+"""
+function test_geothermal_loop()
+    # Create the model
+    @named loop = GeothermalLoop(
+        bhe_type = :upipe,
+        depth = 100.0,
+        Di = 0.032,
+        H_shutoff = 12,
+        Q_max = 13/3600,
+        fluid = "water"
+    )
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([loop], 
+                                     equations = [
+                                         loop.T_supply ~ 303.15,  # 30°C
+                                         loop.T_return ~ 298.15   # 25°C
+                                     ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    mass_flow = sol[loop.ṁ]
+    pump_head = sol[loop.pump.pump.H]
+    bhe_head_loss = sol[loop.bhe.H_total]
+    pump_power = sol[loop.pump.pump.P_elec]
+    
+    # Display results
+    println("Geothermal Loop Test Results:")
+    println("  Mass Flow Rate: $(mass_flow) kg/s")
+    println("  Volume Flow Rate: $(mass_flow/1000) m³/s ($(mass_flow/1000*3600*1000) L/h)")
+    println("  Pump Head: $(pump_head) m")
+    println("  BHE Head Loss: $(bhe_head_loss) m")
+    println("  Pump Power: $(pump_power) W")
+    
+    # Verify results
+    head_balance_ok = isapprox(pump_head, bhe_head_loss, rtol=1e-6)
+    if !head_balance_ok
+        println("WARNING: Hydraulic balance check failed!")
+        println("  Pump head: $(pump_head)")
+        println("  BHE head loss: $(bhe_head_loss)")
+    end
+    
+    return (mass_flow > 0) && (pump_head > 0) && (pump_power > 0) && head_balance_ok
+end
+
+# ╔═╡ f03a950a-78bc-4483-8d25-c926a2a79724
+@test test_geothermal_loop()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -4593,6 +4986,7 @@ version = "1.8.1+0"
 # ╠═d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
 # ╠═b550df61-460e-4d63-8509-17e697033c87
 # ╠═e8d48aab-e227-48cc-8ad8-3cfb57a3e165
+# ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
 # ╠═6f95a236-229a-4f68-be72-a8085f3aa025
 # ╠═9a7db941-b8b8-4b81-918b-d86509b589a3
 # ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
@@ -4601,11 +4995,7 @@ version = "1.8.1+0"
 # ╟─f1ed8017-c3f6-4fdd-8352-d571b577aded
 # ╟─7830ef5f-a6b6-43e5-bcc8-cea0b38f830a
 # ╟─8a0ea5b2-6d00-40b2-a0b1-b988450ba3d9
-# ╠═c9c6d38d-0094-46ec-8445-8ae71e2cde62
-# ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
 # ╠═9c3615e1-789b-41b8-b1ce-ac49893b32c2
-# ╟─05b2abef-8893-4c7a-9ece-60dda7f78f25
-# ╟─2437813d-aa72-4b9a-9816-6ad6430f10c5
 # ╟─fe4deb09-0ad9-4266-aa08-a52bc79d2f34
 # ╟─1f72eb23-8bd0-4671-89d6-67b68d1c9e4c
 # ╟─2f9ffd26-092a-4f0e-a7b9-3f7b0d2ceb5b
@@ -4616,7 +5006,7 @@ version = "1.8.1+0"
 # ╟─884fae8d-2455-4aab-8780-8837bdd92e51
 # ╠═d64c53cb-b4a4-4811-8f80-42be4c0bbb48
 # ╟─70ff62fc-73b3-4020-bf18-6da05b5498b3
-# ╟─39be2637-45e9-4790-98c1-5815c20428e2
+# ╠═39be2637-45e9-4790-98c1-5815c20428e2
 # ╟─42cf47b7-6bab-4d93-8db4-5c69e11d88fc
 # ╟─d6c2510d-cfbb-42e0-aefa-62289832c789
 # ╠═8160473b-7a6f-475a-afc8-c61f50290f44
@@ -4634,12 +5024,12 @@ version = "1.8.1+0"
 # ╟─7e02fca4-3a53-4ae4-a01d-6f7cdaa8ca9f
 # ╠═a34eba54-106d-47af-85bd-8a8a7320003c
 # ╟─d654c8f0-3b41-4388-840b-acb46263a832
-# ╠═ef44e372-38f1-4e50-b474-8088eb6ae1a3
+# ╟─ef44e372-38f1-4e50-b474-8088eb6ae1a3
 # ╠═be8c1638-1b97-4787-b9f6-9727e85ba21f
 # ╠═107be9d7-6d21-4251-af2d-85c7f82f2652
 # ╠═15d54952-e218-4c14-b950-288b26cfc9fe
-# ╠═9ea17444-965d-4aec-885a-c3b7065dbdea
-# ╠═bc35b49e-b666-49a5-8a39-102164d1ce63
+# ╟─9ea17444-965d-4aec-885a-c3b7065dbdea
+# ╟─bc35b49e-b666-49a5-8a39-102164d1ce63
 # ╠═19969f54-9c4c-4b4c-bacb-54db49381bc9
 # ╠═8b331638-8121-4b4e-9818-4ba4529addb1
 # ╟─f412a924-6ffc-42b5-afda-e9fb4fb5dab2
@@ -4650,32 +5040,32 @@ version = "1.8.1+0"
 # ╠═76570272-a765-42ed-adec-002bfecbec3e
 # ╠═c79eb2cb-8172-4123-b31b-535ef0f8bd95
 # ╠═06c0b7b0-35af-4f78-992a-7bc538fc280c
-# ╠═800c5c52-94ad-4083-98c9-e7ec42cc70ed
-# ╠═f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
-# ╠═32c32c40-756b-4eae-a123-68e77920c112
-# ╠═5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
-# ╠═5cae4ac8-cd9a-4273-845e-3ea0c111d4df
-# ╠═b3b22def-aacb-4f4b-be4b-83ea2e26f986
+# ╟─800c5c52-94ad-4083-98c9-e7ec42cc70ed
+# ╟─f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
+# ╟─32c32c40-756b-4eae-a123-68e77920c112
+# ╟─5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
 # ╠═db1950c3-3a9e-440d-87d9-141c4d07a8a4
 # ╠═d742e609-3a44-4a61-960b-c2c50f47ba9d
 # ╠═21be2680-3a26-4222-91f0-4dfe01a628ca
 # ╠═18962ef4-5570-4b40-b31d-7fd211025965
-# ╟─c16bf678-742e-4953-b3b6-d298bedfa9e9
-# ╠═095c8a61-9332-44d7-b0e9-7b0eb83761b0
-# ╠═d47638a6-a00a-498a-a568-b31eb4a221ca
-# ╠═ef533dd6-fc5d-420b-b061-37681426e895
-# ╠═913491fc-6568-47bc-9880-fd54b647cc39
 # ╟─fe6c00b8-fc3f-426f-920c-7deaae99dce8
 # ╠═5883f14b-95cc-43d7-870d-bfa0426efbf5
-# ╠═003dad93-d071-4f6c-9ea9-7ee455a255fe
 # ╟─4f9b3f95-0ac4-45b4-a5db-7571045f69ac
+# ╠═b3b22def-aacb-4f4b-be4b-83ea2e26f986
+# ╠═003dad93-d071-4f6c-9ea9-7ee455a255fe
 # ╟─c160cc41-cc8d-4b69-9e76-b5a4aed8388c
 # ╠═98c19d69-9118-4326-84d4-d9a575c4aac1
-# ╠═621f4f32-510e-4173-89d3-e5c9d9919d46
-# ╠═6133d3f4-34cb-463f-bddc-9dce93b642a3
-# ╠═5c7117e9-9fe4-4a5b-bc75-50428ea76e38
-# ╟─35d8fc1a-c4d2-4a91-a8e7-63f2c034bf51
-# ╠═358d1b83-52aa-4704-9347-44b06324d2c0
+# ╟─c16bf678-742e-4953-b3b6-d298bedfa9e9
+# ╠═14690559-f3a2-4d72-a188-53d859c74602
+# ╠═6bded15a-1717-4737-b277-2319211cb367
+# ╠═18bcbb99-f0e7-46f0-a5f7-423f3347a5c7
+# ╠═36ff2f99-61cb-4532-a7ee-14e20295d164
+# ╠═5b49809d-aa65-429d-bb28-f70f0c89fced
+# ╠═671b94ce-76eb-4d58-bca2-480a23c9e244
+# ╠═89004c6f-cc14-4e2a-a348-f4b278eec71d
+# ╠═9ef8cba9-e590-4190-b4b9-6c00fe71ca2a
+# ╠═879502ff-f142-47eb-a17e-f6c252fa592a
+# ╠═2333034e-6a59-4323-8398-6680ea7311cb
 # ╟─415c838f-034b-4250-ae34-f1163ea9276e
 # ╟─8124b17c-f071-4903-8af1-976e555649f2
 # ╠═f8b8b7d9-4788-4fb4-bc60-f98e88109647
@@ -4683,14 +5073,14 @@ version = "1.8.1+0"
 # ╠═8ec23851-7775-4b2a-9ca5-c418ff46f5be
 # ╠═a5e4545e-5110-49d3-8b4a-700352509bd5
 # ╠═42354632-77f6-43cb-8c48-0a65fe3f24a7
-# ╠═85b6f908-2434-4231-8b8a-d4084557674c
-# ╠═1eb7505d-f420-4ee9-a967-29d34da7a283
-# ╠═690c1fda-a594-4902-8139-6f50d8219a96
-# ╠═30a5b043-64ef-4f93-8de3-1699b89d597f
-# ╠═4f8bf79c-ff09-46a9-8678-03a8fa3b7f96
-# ╠═9614f380-5f85-4e52-9e18-13c820f77829
-# ╠═8e807b2b-b1b5-40dc-98a8-0ff56194ea94
-# ╠═09fb9270-1fa9-4e4e-94f7-02e8ae05c918
-# ╠═b0293c08-24b5-44fb-8407-cf9f78a64e70
+# ╠═4f21cf92-9f70-46e5-9f2e-1ccecbf2d0a6
+# ╠═e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
+# ╠═165e8538-776f-4c46-86c2-d43f3bb302e2
+# ╠═0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
+# ╠═75a9b1e0-6b75-4442-8a32-f0e692d1989b
+# ╠═cecce7db-5dc5-4c47-a666-af62bfe707a2
+# ╠═771bc84e-cb07-4be7-a129-5772749dc845
+# ╠═d9f417b2-184e-4f5e-9c3a-9649a6cb4235
+# ╠═f03a950a-78bc-4483-8d25-c926a2a79724
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
