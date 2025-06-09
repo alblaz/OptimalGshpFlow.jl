@@ -73,7 +73,7 @@ get_rp(bh::SingleUPipeBorehole{T}) where {T <: Real} = bh.rpi
 get_default_hp(bh::SingleUPipeBorehole{T}) where {T <: Real} = bh.hp
 get_n_segments(bh::SingleUPipeBorehole) = bh.n_segments
 
-
+# based on Hellström (1991), section 8.6.1 eq. 8.86
 function uniform_Tb_coeffs(borehole::SingleUPipeBorehole, λ, mass_flow, Tref, fluid_properties::SecondaryFluid)
     @unpack λg, λp, rb, rpi, rpo, dpw, H, R_cache, A, method, exp_cache = borehole
 
@@ -96,25 +96,25 @@ function uniform_Tb_coeffs(borehole::SingleUPipeBorehole, λ, mass_flow, Tref, f
         r2 = (x1 - x2)^2 + (y1 - y2)^2
         d12 = sqrt( (1 - r2_1 / rb^2) * (1 - r2_2 / rb^2) + r2 / rb^2 )
 
-        R11 =  1/(2*π*λg) * (log(rb/rpo) - k * log(1 - r2_1 / rb^2) ) + Rp
-        R12 = -1/(2*π*λg) * (log(sqrt(r2) / rb ) + k * log(d12))
+        R11 =  1/(2*π*λg) * (log(rb/rpo) - k * log(1 - r2_1 / rb^2) ) + Rp #eq. 8.28
+        R12 = -1/(2*π*λg) * (log(sqrt(r2) / rb ) + k * log(d12)) #eq. 8.28
         R22 =  1/(2*π*λg) * (log(rb/rpo) - k * log(1 - r2_2 / rb^2) ) + Rp 
 
         R_cache = @SMatrix [R11 R12; R12 R22]
     end
     R11 = R_cache[1, 1] + Rhp
-    R12 = R_cache[1, 2]
+    R12 = R_cache[1, 2] 
     R22 = R_cache[2, 2] + Rhp
 
     mfc = mass_flow * fluid_properties.cp(Tref)
     det = (R11*R22 - R12^2)
 
-    β1β2 = (R22 - R12 + R11 - R12) / (det * mfc)
+    β1β2 = (R22 - R12 + R11 - R12) / (det * mfc) # 8.80
     β12 = R12 / (det * mfc)
 
-    γ = sqrt(β1β2^2 / 4 + β1β2 * β12)
+    γ = sqrt(β1β2^2 / 4 + β1β2 * β12) #8.80
 
-    L = β1β2/(2γ) * tanh(γ * H)
+    L = β1β2/(2γ) * tanh(γ * H) #8.86
 
     k_i = (1-L)/(1+L)
     # return k_i, -1., 1 - k_i#, R11, R22, R12
