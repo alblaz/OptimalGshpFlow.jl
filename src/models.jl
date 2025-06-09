@@ -102,7 +102,7 @@ function evaporator_model!(du, u, p::EvaporatorParameters)
     # These are Cs_e, Ue, Cs_sup, Cref_sup, Cr,  U_sup,
 
     # two-phase
-    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)
+    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)
     xs = sigmoid_R_to_01(u[6])
     Qe = u[2]
     Tsm_e = (u[7] + u[8])/2
@@ -126,14 +126,14 @@ function evaporator_model!(du, u, p::EvaporatorParameters)
 
     # Heat balance equations (two-phase)
     du[1] = Cs_e * (u[8] - u[7]) - u[2]  # heat balance secondary fluid
-    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
-    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
+    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
+    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
     du[4] =  1 - exp(-Ue * A * sigmoid_R_to_01(u[6]) / Cmin_e)  -  sigmoid_R_to_01(u[4])
 
     # heat balance equations (superheater)
     du[5] = Cs_sup* (Ts_h - u[8]) - u[3]  # heat balance secondary fluid
     du[6] = Cref_sup * ΔTsup - u[3]
-    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (Ts_h - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
+    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (Ts_h - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
     du[8] = (1 - exp((-Usup*A*(1- sigmoid_R_to_01(u[6]))/Cmin_sup*(1-Cr))))/(1 - Cr *(exp(-Usup*A*(1- sigmoid_R_to_01(u[6]) )/Cmin_sup*(1-Cr)))) - sigmoid_R_to_01(u[5])  
 
     return nothing
@@ -233,7 +233,7 @@ function evaporator_model(u,p::EvaporatorParameters)
     A = plateheatexchanger.A 
 
     # transform mapped variables
-    pe = sigmoid_R_to_ab(pme, refrigerant.pr_min, refrigerant.pcrit)
+    pe = sigmoid_R_to_ab(pme, refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)
     ϵe = sigmoid_R_to_01(ϵme)
     ϵsup = sigmoid_R_to_01(ϵmsup)
     xs  = sigmoid_R_to_01(xms)
@@ -306,7 +306,7 @@ function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters)
     # These are Cs_e, Ue, Cs_sup, Cref_sup, Cr,  U_sup,
 
     # two-phase
-    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)
+    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)
     xs = sigmoid_R_to_01(u[6])
     Qe = u[2]
     Tsm_e = (u[7] + u[8])/2
@@ -330,21 +330,21 @@ function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters)
 
     # Heat balance equations (two-phase)
     du[1] = Cs_e * (u[8] - u[7]) - u[2]  # heat balance secondary fluid
-    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
-    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
+    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
+    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
     du[4] =  1 - exp(-Ue * A * sigmoid_R_to_01(u[6]) / Cmin_e)  -  sigmoid_R_to_01(u[4])
 
     # heat balance equations (superheater)
     du[5] = Cs_sup* (u[9] - u[8]) - u[3]  # heat balance secondary fluid
     du[6] = Cref_sup * ΔTsup - u[3]
-    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (u[9] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
+    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (u[9] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min*refrigerant.pcrit, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
     du[8] = (1 - exp((-Usup*A*(1- sigmoid_R_to_01(u[6]))/Cmin_sup*(1-Cr))))/(1 - Cr *(exp(-Usup*A*(1- sigmoid_R_to_01(u[6]) )/Cmin_sup*(1-Cr)))) - sigmoid_R_to_01(u[5])  #1/(1 + exp(-u[5])) # sigmoid_R_to_01(u[5])
 
     # borehole model 
     # kin = uniform_Tb_coeffs(bh, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[2] + u[9])/2, secondaryflui)
-    # du[9] = kin*u[2] - 1*u[9] + (1-kin)* Tb
+    # du[9] = kin*u[7] - 1*u[9] + (1-kin)* Tb
 
-    du[9] = uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9]/2), secondaryfluid)*u[7] - u[9] + (1-uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9]/2), secondaryfluid))*Tb
+    du[9] = uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9])/2, secondaryfluid)*u[7] - u[9] + (1-uniform_Tb_coeffs(borehole, λground, secondaryfluid.ρ(Tsm_e )*Vs, (u[7] + u[9])/2, secondaryfluid))*Tb
 
     return nothing
 end

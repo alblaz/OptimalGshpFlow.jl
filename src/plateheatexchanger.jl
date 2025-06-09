@@ -19,6 +19,8 @@ struct PlateHeatExchanger{T <: Number}
    ϕ::T
    b::T
    β::T
+   D_port::T
+   N_pass::Int
 end
 
 """
@@ -27,10 +29,11 @@ Constructor
 
 PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
 """
-function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30.)
-    np =  round(Int, A/(L*W)/ϕ) + 2        # number of total plates, i.e. including the two "blind" plates on the side
+function PlateHeatExchanger(A,L,W; b=0.002, ϕ=1.189, β = 30., Dport=0.05,N_pass=1)
+    L_eff=L-Dport # effective heat transfer area (no heat transfer over the length having the ports)
+    np =  round(Int, A/(L*W*ϕ)/2)+1 + 2  # number of total plates, i.e. including the two "blind" plates on the side, number of plates should always be odd
     H = (np-1)/2 * b                     # total height of the secondary fluid channels 
-    return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β)
+    return PlateHeatExchanger(A,L,W,H,np,ϕ,b,β,Dport,N_pass)
 end
 
 """
@@ -46,11 +49,12 @@ compute the convective heat transfer coefficient for a liquid flowing in a plate
 """
 function h_platehex_wanniarachchi(V, platehex::PlateHeatExchanger, fluidproperties)    
     
-    A, L, W, H, np, ϕ, b, β = getfield.(Ref(platehex), fieldnames(PlateHeatExchanger))    
+    @unpack A, L, W, H, np, ϕ, b, β =platehex
+    # A, L, W, H, np, ϕ, b, β = getfield.(Ref(platehex), fieldnames(PlateHeatExchanger))    
     ρ, μ, λ, cp = fluidproperties
 
     us = V/(H*W)                  # speed of the secondary fluid 
-    dh = 2*b                       # hydraulic diameter 
+    dh = 2*b/ϕ                       # hydraulic diameter, NB! check the definition, this is not the "real" hydraulic diameter
 
     Redh = ρ * us * dh / μ           # Reynolds
 

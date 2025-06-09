@@ -36,10 +36,11 @@ end
 """
     `f_Martin(Re)`
 
-compute the Darcy friction factor fD given the Reynolds number and cheveron angle `β` based on Martin (1996)
+compute the Darcy friction factor fD given the Reynolds number and chevron angle `ϕ` based on Martin (1996)
 """
-function f_Martin(Re,β)
-    β=β*pi/180
+function f_Martin(Re,ϕ)
+    
+    ϕ=ϕ*pi/180
     if Re < 2000
         f₀=64/Re
         f₁=597/Re+3.85
@@ -47,10 +48,9 @@ function f_Martin(Re,β)
         f₀=(1.8*log10(Re)-1.5)^(-2) # check log or log10
         f₁=39/Re^0.289
     end
-    # A=1/cos(β)*(0.18*sin(β)*(1+2*cos(β))+f₀)
-    # fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
-    # fD = 1/(cos(β)/(√(A))+(1-cos(β))/√(3.8*f₁))^2 # Martin 1996
-    fD= (cos(β)/(0.18*tan(β) + 0.36 *sin(β) + f₀/cos(β))  + (1-cos(β))/√(3.8*f₁))^-2
+    A=cos(ϕ)/(sqrt(0.18*tan(ϕ)+0.36*sin(ϕ)+f₀/cos(ϕ)))
+    B=(1-cos(ϕ))/sqrt(3.8*f₁)
+    fD = 1/(A+B)^2 # Martin 1996
     return fD
 end
 
@@ -63,22 +63,22 @@ Compute the pressure drop for a plate heat exchanger.
 `platehex::PlateHeatExchanger` is the plate heat exchanger object containing parameters such as number of plates, plate width, chevron angle, and plate length,
 `fluidproperties` is an object of type `SecondaryFluid` that provides fluid properties like density and viscosity.
 """
-function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.04,N_pass=1)    
+function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T)    
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
-    @unpack np,b,ϕ,β,L = platehex
-    Nc=(np-1)/2 #number of channels
+    @unpack np,b,ϕ,β,L,W,D_port,N_pass = platehex
+    Nc=(np-1)/2/N_pass #number of parallel channels
     Dₕ=2*b/ϕ # hydraulic diameter 4*A/P
 
-    v = V/(L*b*Nc) # velocity per channel
+    v = V/(W*b*Nc) # velocity per channel, check if to be corrected for corrugation factor (see eq.92 in Jocke's thesis)
     Re = ρ*v*Dₕ/μ #Reynolds number per channel
-    fD = f_Martin(Re,β)
+    fD = f_Martin(Re,90. -β) # uysing reverse chevron angle
 
     # v_port = V/(π*D_port^2/4)
     # Δp_port=+ 1.5*ρ*v_port^2/2*N_pass
     # NB! port pressure drop accounted for in Martin
-    
-    Δp = fD * L/Dₕ * v^2 * ρ/2 
+    # @show fD
+    Δp = fD * L/Dₕ * v^2 * ρ/2 * N_pass
     return Δp
 end
 
@@ -106,5 +106,12 @@ end
 function pumping_power(η, H, V, D, fluidproperties, T)
     Δp = pressure_drop(H,V,D,fluidproperties,T)
     P = Δp * V / η
+    return P
+end
+
+
+function pumping_power(η, H, V, D, fluidproperties, T, platehex,minor_losses=0.15)
+    Δp = pressure_drop(H,V,D,fluidproperties,T)+pressure_drop_evap(V, platehex, fluidproperties,T)
+    P = Δp *(1+minor_losses)* V / η
     return P
 end

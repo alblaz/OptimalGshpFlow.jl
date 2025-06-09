@@ -9,7 +9,7 @@
 """
 function nusselt_circularpipe(Re, Pr; mode = "heating")
     if Re < 2300
-        Nu = 3.657
+        Nu = 3.657 # consider the entry length (now underestimated Nu)
     elseif (Re >= 2300) && (Re < 10000)        
         f =  (1.58*log(Re) - 3.28)^(-2)
         Nu = (0.5*f*(Re - 1000.) * Pr)/(1 + 12.7*sqrt(0.5*f) * (Pr^(2/3) - 1))
