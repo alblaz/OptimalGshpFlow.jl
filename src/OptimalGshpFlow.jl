@@ -7,10 +7,6 @@ Utils.initialize_refrigerant_properties()
 # Include and export the Properties module
 include("properties/Properties.jl")
 include("hydraulics/Hydraulics.jl")
-#export Properties
-
-# Include other modules as needed
-#include("hydraulics/hydraulics.jl")
-#include("thermodynamic_cycle/Thermodynamic_cycle.jl")
+include("thermal/Thermal.jl")
 
 end # module OptimalGshpFlow

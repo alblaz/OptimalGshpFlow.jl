@@ -25,7 +25,7 @@ using PlutoTest
 # ╔═╡ badf578f-6cc7-48c2-8693-370856d659dd
 @fromparent begin
 	using ..Utils
-	#using ..Properties
+	using ..Properties
 end
 
 # ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
@@ -103,9 +103,6 @@ begin
 end
   ╠═╡ =#
 
-# ╔═╡ 1c61fab6-f56b-460b-870f-8e3a83337312
-using ModelingToolkit, NonlinearSolve
-
 # ╔═╡ fa00c042-0b93-4635-ac75-4513e61671ec
 using Nemo
 
@@ -114,12 +111,6 @@ using Nemo
 #=╠═╡
 using PlutoExtras
   ╠═╡ =#
-
-# ╔═╡ 883b94f3-9a44-491e-8dbd-53d7ea6af0c2
-
-
-# ╔═╡ 6eaea602-9f51-47fb-8bd9-9768f49f4aa3
-ρ_b_(0.0, 0.0)
 
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 #=╠═╡
@@ -204,6 +195,9 @@ function htc(ρ, ṁ, dh, μ, β, b, np)
 	Nu  = (Nul^3 + Nut^3)^(1/3) * Pr^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
 	htc = Nu*λ/dh
 end
+
+# ╔═╡ 8c65aea8-e77d-41cc-981f-42894089e553
+
 
 # ╔═╡ d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 begin
@@ -1382,6 +1376,12 @@ md" # Imports"
 #=╠═╡
 using LinearAlgebra
   ╠═╡ =#
+
+# ╔═╡ 1c61fab6-f56b-460b-870f-8e3a83337312
+using ModelingToolkit, NonlinearSolve
+
+# ╔═╡ e0a8dace-aa48-4ed7-958e-0d2595746609
+using NonlinearSolve
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -4584,14 +4584,14 @@ version = "3.6.0+0"
 # ╠═e01e0c08-459e-4636-8fef-b0f6790ee964
 # ╠═a943d92d-2672-4f52-9b9e-bfa51f042bcf
 # ╠═93d5f510-e03b-4ced-9ae7-ef1837b2fb34
-# ╠═883b94f3-9a44-491e-8dbd-53d7ea6af0c2
+# ╠═e0a8dace-aa48-4ed7-958e-0d2595746609
 # ╠═badf578f-6cc7-48c2-8693-370856d659dd
-# ╠═6eaea602-9f51-47fb-8bd9-9768f49f4aa3
-# ╠═ba2f13d7-0cb8-4556-933c-bb7b5d86db96
+# ╟─ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 # ╠═9538bfde-6ac2-4557-aaba-6b5e55f5b774
 # ╟─c89c0195-7f93-4a49-993a-7efa861db428
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
 # ╠═5e2946e4-436b-4232-93f6-5549b0a1377d
+# ╠═8c65aea8-e77d-41cc-981f-42894089e553
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
 # ╠═989f50ba-1014-42ba-a454-b91bbe076f6b

@@ -14,10 +14,19 @@ using PlutoDevMacros
 using SpecialFunctions
 
 # ╔═╡ e8d48aab-e227-48cc-8ad8-3cfb57a3e165
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoTest
+  ╠═╡ =#
 
 # ╔═╡ 9fe54e9b-0879-4668-b6ee-5002dc6e5878
 using Interpolations
+
+# ╔═╡ 429b8af2-89da-4865-b484-aa9266ad5732
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using DataFrames
+  ╠═╡ =#
 
 # ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
 @fromparent begin
@@ -29,12 +38,6 @@ end
 # ╠═╡ skip_as_script = true
 #=╠═╡
 using Plots
-  ╠═╡ =#
-
-# ╔═╡ 46143377-5b05-4648-89f0-1b1dc43ae51f
-# ╠═╡ disabled = true
-#=╠═╡
-using PlutoTest
   ╠═╡ =#
 
 # ╔═╡ 9a7db941-b8b8-4b81-918b-d86509b589a3
@@ -523,7 +526,9 @@ end
 
 
 # ╔═╡ 3320cb17-a8ac-4f9e-ace1-29f8a4ba7906
+#=╠═╡
 @test test_straight_tube_swamee_jain()
+  ╠═╡ =#
 
 # ╔═╡ d5ab6b70-0e50-47fc-a385-f77fea33955a
 md"""
@@ -666,7 +671,9 @@ function test_pipe_bend()
 end
 
 # ╔═╡ 4dc9f69a-948b-4dca-9c67-d824b4fb3514
+#=╠═╡
 @test test_pipe_bend()
+  ╠═╡ =#
 
 # ╔═╡ 37446e0e-1b46-4a53-97d8-39c81371d77e
 function test_pipe_bend_u()
@@ -695,7 +702,9 @@ end
 # Test comparing different angles
 
 # ╔═╡ 1dc3cbdd-8e28-474e-944b-018c6c004dc7
+#=╠═╡
 @test test_pipe_bend_u()
+  ╠═╡ =#
 
 # ╔═╡ 7e02fca4-3a53-4ae4-a01d-6f7cdaa8ca9f
 function test_pipe_bend_angles()
@@ -729,7 +738,9 @@ function test_pipe_bend_angles()
 end
 
 # ╔═╡ a34eba54-106d-47af-85bd-8a8a7320003c
+#=╠═╡
 @test test_pipe_bend_angles()
+  ╠═╡ =#
 
 # ╔═╡ d654c8f0-3b41-4388-840b-acb46263a832
 md"""
@@ -1007,7 +1018,9 @@ end
 # Test function for AnnularBend180
 
 # ╔═╡ 70940a38-5268-46ba-8cfb-d1c6cbba4890
+#=╠═╡
 @test test_annular_channel()
+  ╠═╡ =#
 
 # ╔═╡ 2ca0fcb3-eab1-40f2-b525-f3a619daf567
 function test_annular_bend_180()
@@ -1033,7 +1046,9 @@ function test_annular_bend_180()
 end
 
 # ╔═╡ be093a4c-8b72-4663-88a8-916441e063f6
+#=╠═╡
 @test test_annular_bend_180()
+  ╠═╡ =#
 
 # ╔═╡ e1931bc6-e7ca-402d-b719-d1b6e670e37f
 function DynamicPropPipeBend(; name::Symbol, 
@@ -1251,16 +1266,24 @@ end
 # Run the tests with PlutoTest
 
 # ╔═╡ db1950c3-3a9e-440d-87d9-141c4d07a8a4
+#=╠═╡
 @test test_dynamic_prop_pipe_bend()
+  ╠═╡ =#
 
 # ╔═╡ d742e609-3a44-4a61-960b-c2c50f47ba9d
+#=╠═╡
 @test test_dynamic_prop_pipe_bend_90()
+  ╠═╡ =#
 
 # ╔═╡ 21be2680-3a26-4222-91f0-4dfe01a628ca
+#=╠═╡
 @test test_dynamic_prop_pipe_bend_u()
+  ╠═╡ =#
 
 # ╔═╡ 18962ef4-5570-4b40-b31d-7fd211025965
+#=╠═╡
 @test test_dynamic_prop_annular_bend_180()
+  ╠═╡ =#
 
 # ╔═╡ fe6c00b8-fc3f-426f-920c-7deaae99dce8
 md"""
@@ -1347,7 +1370,9 @@ end
 
 
 # ╔═╡ b3b22def-aacb-4f4b-be4b-83ea2e26f986
+#=╠═╡
 @test test_dynamic_prop_annular_channel()
+  ╠═╡ =#
 
 # ╔═╡ 003dad93-d071-4f6c-9ea9-7ee455a255fe
 function DynamicPropStraightTube(; name::Symbol, 
@@ -1427,8 +1452,10 @@ end
 
 
 # ╔═╡ 98c19d69-9118-4326-84d4-d9a575c4aac1
+#=╠═╡
 @test test_dynamic_prop_straight_tube()
 
+  ╠═╡ =#
 
 # ╔═╡ c16bf678-742e-4953-b3b6-d298bedfa9e9
 md"""
@@ -1589,7 +1616,9 @@ function test_upipe_complete()
 end
 
 # ╔═╡ 18bcbb99-f0e7-46f0-a5f7-423f3347a5c7
+#=╠═╡
 @test test_upipe_complete()
+  ╠═╡ =#
 
 # ╔═╡ 36ff2f99-61cb-4532-a7ee-14e20295d164
 """
@@ -1650,7 +1679,9 @@ function test_upipe_complete_parametric()
 end
 
 # ╔═╡ 5b49809d-aa65-429d-bb28-f70f0c89fced
+#=╠═╡
 @test test_upipe_complete_parametric()
+  ╠═╡ =#
 
 # ╔═╡ 671b94ce-76eb-4d58-bca2-480a23c9e244
 """
@@ -1869,10 +1900,14 @@ end
 # Run the tests
 
 # ╔═╡ 879502ff-f142-47eb-a17e-f6c252fa592a
+#=╠═╡
 @test test_coaxial_complete()
+  ╠═╡ =#
 
 # ╔═╡ 2333034e-6a59-4323-8398-6680ea7311cb
+#=╠═╡
 @test test_coaxial_complete_parametric()
+  ╠═╡ =#
 
 # ╔═╡ 415c838f-034b-4250-ae34-f1163ea9276e
 md"""
@@ -2450,11 +2485,482 @@ function test_geothermal_loop()
 end
 
 # ╔═╡ f03a950a-78bc-4483-8d25-c926a2a79724
+#=╠═╡
 @test test_geothermal_loop()
+  ╠═╡ =#
+
+# ╔═╡ e9fecb1f-357f-47c0-a90d-f7b8a677b55e
+#=╠═╡
+"""
+Analyze the impact of pump speed on power consumption for a geothermal loop.
+Returns a DataFrame with pump speeds, mass flow rates, and power consumption.
+"""
+function analyze_pump_speed_vs_consumption(;
+    speeds = range(5.0/60.0, 60.0/60.0, length=10),  # Pump speeds in rev/s (0.5-1.0 Hz)
+    bhe_type = :upipe,      # BHE type (:upipe or :coaxial)
+    depth = 100.0,          # Borehole depth [m]
+    Di = 0.032,             # Inner diameter [m]
+    H_shutoff = 12.0,       # Pump shutoff head [m]
+    Q_max = 13/3600,        # Maximum pump flow [m³/s]
+    fluid = "water",        # Fluid type
+    χ = 0.0,                # Concentration
+    T_supply = 303.15,      # Supply temperature [K] (30°C)
+    T_return = 298.15       # Return temperature [K] (25°C)
+)
+    # Create the base model
+    @named loop = GeothermalLoop(
+        bhe_type = bhe_type,
+        depth = depth,
+        Di = Di,
+        H_shutoff = H_shutoff,
+        Q_max = Q_max,
+        fluid = fluid,
+        χ = χ
+    )
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = assemble([loop], 
+                                     equations = [
+                                         loop.T_supply ~ T_supply,
+                                         loop.T_return ~ T_return
+                                     ])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+    # Storage for results
+    results = []
+    
+    for speed in speeds
+        # Create a modified problem with updated pump speed parameter
+        problem = remake(base_problem, p = [loop.pump.N => speed])
+        
+        # Solve the modified problem
+        sol = solve(problem)
+        
+        # Extract key results
+        push!(results, (
+            speed_hz = speed * 60,               # Convert to Hz for readability
+            flow_rate_kg_per_s = sol[loop.ṁ],    # Mass flow rate [kg/s]
+            flow_rate_L_h = sol[loop.ṁ]/1000 * 3600 * 1000,  # Volume flow [L/h]
+            head_m = sol[loop.pump.pump.H],      # Pump head [m]
+            power_W = sol[loop.pump.pump.P_elec],  # Electrical power [W]
+            efficiency = sol[loop.pump.pump.η]    # Hydraulic efficiency
+        ))
+        
+        # Display progress
+        println("Speed: $(speed*60) Hz | Flow: $(round(sol[loop.ṁ]/1000*3600*1000, digits=1)) L/h | Power: $(round(sol[loop.pump.pump.P_elec], digits=1)) W")
+    end
+    
+    # Convert to DataFrame for easier analysis
+    df = DataFrame(results)
+    
+    return df
+end
+  ╠═╡ =#
+
+# ╔═╡ 5a3b2bdc-b1be-491b-8339-b597338a58b3
+#=╠═╡
+"""
+Plot the results from analyze_pump_speed_vs_consumption
+"""
+function plot_pump_speed_analysis(df)
+    
+    # Create figure with two y-axes
+    p1 = plot(df.speed_hz, df.power_W, 
+        xlabel="Pump Speed (Hz)", 
+        ylabel="Power Consumption (W)",
+        label="Power", 
+        linewidth=2, 
+        marker=:circle,
+        legend=:topleft,
+        title="Pump Speed vs Power & Flow")
+    
+    # Add flow rate on secondary y-axis
+    plot!(twinx(), df.speed_hz, df.flow_rate_L_h, 
+        ylabel="Flow Rate (L/h)",
+        linewidth=2, 
+        marker=:square,
+        color=:red,
+        label="Flow Rate")
+    
+    # Plot efficiency vs speed
+    p2 = plot(df.speed_hz, df.efficiency, 
+        xlabel="Pump Speed (Hz)", 
+        ylabel="Hydraulic Efficiency",
+        label="Efficiency", 
+        linewidth=2, 
+        marker=:circle,
+        legend=:bottomright,
+        title="Pump Speed vs Efficiency")
+    
+    # Plot power vs flow rate
+    p3 = plot(df.flow_rate_L_h, df.power_W, 
+        xlabel="Flow Rate (L/h)", 
+        ylabel="Power Consumption (W)",
+        label="Power vs Flow", 
+        linewidth=2, 
+        marker=:circle,
+        legend=:topleft,
+        title="Flow Rate vs Power Consumption")
+    
+    # Combine all plots
+    combined = plot(p1, p2, p3, layout=(3,1), size=(800, 900))
+    
+    return combined
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 1adad638-3111-446e-9bbd-085bde79a763
+#=╠═╡
+results = analyze_pump_speed_vs_consumption()
+  ╠═╡ =#
+
+# ╔═╡ 2009d02d-d2c0-44ea-96f2-b0bc4889fef1
+#=╠═╡
+plot_pump_speed_analysis(results)
+  ╠═╡ =#
+
+# ╔═╡ f5c942cf-5bbf-4455-954e-7db1bdcaba1b
+# ╠═╡ disabled = true
+#=╠═╡
+"""
+Utility function for plate heat exchanger friction factor with smooth transition.
+Uses error function for smooth transition between laminar and turbulent regimes.
+"""
+function phx_friction_factor_smooth(Re, β, Re_low=2300, Re_high=4000)
+    # Laminar flow regime
+    f_lam = 16.0 / Re
+    
+    # Turbulent flow regime based on chevron angle
+    C = 0.6 * sin(β) + 0.3  # Coefficient depends on chevron angle
+    m = 0.2 * sin(β) + 0.1  # Exponent depends on chevron angle
+    f_turb = C * Re^(-m)
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+  ╠═╡ =#
+
+# ╔═╡ c45e2af7-7bf9-49d9-be63-c89094c1e540
+"""
+Utility function for plate heat exchanger friction factor with smooth transition.
+Uses error function for smooth transition between laminar and turbulent regimes.
+β is the chevron angle measured from horizontal (0° = straight channels, 90° = maximum corrugation)
+"""
+function phx_friction_factor_smooth(Re, β, Re_low=2300, Re_high=4000)
+    # Laminar flow regime
+    f_lam = 16.0 / Re
+    
+    # Calculate turbulent friction factor using Martin's correlation
+    # For turbulent regime with β as angle from horizontal
+    f_0 = 0.38 * Re^(-0.14)              # Friction factor for β=0° (parallel plates)
+    f_90 = 39 * Re^(-0.289)              # Friction factor for β=90° (orthogonal corrugation)
+    
+    # Interpolate based on chevron angle
+    f_turb = f_0 * cos(β) + f_90 * sin(β)
+    
+    # Smooth transition between laminar and turbulent regimes
+    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
+    
+    # Combined friction factor
+    f = (1-transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+# ╔═╡ cb0f35b9-ebc0-4232-a427-3ebfa85aacfd
+@register_symbolic phx_friction_factor_smooth(Re, β, Re_low, Re_high)
+
+# ╔═╡ 551f3049-7ba7-4e79-8d9d-02f6fa835912
+"""
+Create a static plate heat exchanger model.
+"""
+function PlateHeatExchanger(; name::Symbol,
+                         L = 0.3,        # Plate length [m]
+                         W = 0.2,        # Plate width [m]
+                         b = 2e-3,       # Channel gap / pressing depth [m]
+                         np = 20,        # Number of plates
+                         ϕ = 1.118,      # Surface enlargement factor
+                         β = 30*π/180,   # Chevron angle [radians]
+                         K_ports = 1.5,  # Port pressure loss coefficient
+                         g = 9.81,       # Gravity [m/s²]
+                         Re_low = 2300,  # Lower transition Reynolds number
+                         Re_high = 4000) # Upper transition Reynolds number
+    
+    pars = @parameters begin
+        L = L               # Plate length [m]
+        W = W               # Plate width [m]
+        b = b               # Channel gap [m]
+        np = np             # Number of plates
+        ϕ = ϕ               # Surface enlargement factor
+        β = β               # Chevron angle [radians]
+        K_ports = K_ports   # Port pressure loss coefficient
+        g = g               # Gravity [m/s²]
+        Re_low = Re_low     # Lower transition Reynolds number
+        Re_high = Re_high   # Upper transition Reynolds number
+    end
+
+    vars = @variables begin
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Re = 1000.0     # Reynolds number
+        f = 0.03        # Friction factor
+        Δp = 1000.0     # Pressure drop [Pa]
+        H = 0.1         # Head loss [m]
+        dh = 0.01       # Hydraulic diameter [m]
+        S = 0.0001      # Flow area [m²]
+        Δp_core = 800.0 # Core pressure drop [Pa]
+        Δp_ports = 200.0 # Port pressure drop [Pa]
+    end
+
+    eqs = [
+        # Mass continuity
+        ṁ ~ ρ * V̇,
+        
+        # Hydraulic diameter
+        dh ~ 2 * b / ϕ,
+        
+        # Flow area
+        S ~ b * W * np / 2,
+        
+        # Flow velocity
+        v ~ V̇ / S,
+        
+        # Reynolds number
+        Re ~ ρ * v * dh / μ,
+        
+        # Friction factor with smooth transition between laminar and turbulent
+        f ~ phx_friction_factor_smooth(Re, β, Re_low, Re_high),
+        
+        # Core pressure drop (channel flow)
+        Δp_core ~ 4 * f * (L / dh) * (ρ * v^2 / 2),
+        
+        # Port pressure drop (entrance and exit)
+        Δp_ports ~ K_ports * (ρ * v^2 / 2),
+        
+        # Total pressure drop
+        Δp ~ Δp_core + Δp_ports,
+        
+        # Head loss calculation
+        H ~ Δp / (ρ * g)
+    ]
+
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 9ba05444-6ea6-460d-a674-3fef94c553f8
+"""
+Create a plate heat exchanger model with dynamic fluid properties.
+Uses the same smooth transition approach for turbulence as other components.
+"""
+function DynamicPropPlateHeatExchanger(; name::Symbol,
+                         L = 0.3,        # Plate length [m]
+                         W = 0.2,        # Plate width [m]
+                         b = 2e-3,       # Channel gap / pressing depth [m]
+                         np = 20,        # Number of plates
+                         ϕ = 1.118,      # Surface enlargement factor
+                         β = 30*π/180,   # Chevron angle [radians]
+                         K_ports = 1.5,  # Port pressure loss coefficient
+                         g = 9.81,       # Gravity [m/s²]
+                         Re_low = 2300,  # Lower transition Reynolds number
+                         Re_high = 4000, # Upper transition Reynolds number
+                         fluid = "water",
+                         χ = 0.0)        # Concentration (for mixtures)
+                      
+    # Define the PHX-level parameters for inheritance
+    pars = @parameters begin
+        L = L
+        W = W
+        b = b
+        np = np
+        ϕ = ϕ
+        β = β
+        K_ports = K_ports
+        g = g
+        Re_low = Re_low
+        Re_high = Re_high
+        χ = χ
+    end
+    
+    # Create the standard PHX component
+    @named phx = PlateHeatExchanger(
+        L = L,
+        W = W,
+        b = b,
+        np = np,
+        ϕ = ϕ,
+        β = β,
+        K_ports = K_ports,
+        g = g,
+        Re_low = Re_low,
+        Re_high = Re_high
+    )
+    
+    # Create the fluid property component
+    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    
+    # Connect components
+    connect_eqs = [
+        # Connect fluid properties to hydraulic component
+        phx.ρ ~ props.ρ,
+        phx.μ ~ props.μ
+    ]
+    
+    # Create the parent system with connected components
+    system = NonlinearSystem(connect_eqs, [], pars, name=name)
+    return compose(system, [phx, props], name=name)
+end
+
+# ╔═╡ c705bcad-1203-48e7-a6b4-ab0e8d476c8c
+"""
+Test function for the DynamicPropPlateHeatExchanger model
+"""
+function test_phx_heat_exchanger()
+    # Create the model
+    @named phx = DynamicPropPlateHeatExchanger(
+        L = 0.3,
+        W = 0.2,
+        b = 2e-3,
+        np = 20,
+        ϕ = 1.118,
+        β = 30*π/180,
+        fluid = "water"
+    )
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([phx], 
+                                      equations = [
+                                          phx.props.T ~ 293.15,  # 20°C
+                                          phx.phx.V̇ ~ 0.001     # 1 L/s
+                                      ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = solve(problem)
+    
+    # Check results
+    total_pressure_drop = sol[phx.phx.Δp]
+    core_pressure = sol[phx.phx.Δp_core]
+    port_pressure = sol[phx.phx.Δp_ports]
+    reynolds = sol[phx.phx.Re]
+    friction = sol[phx.phx.f]
+    velocity = sol[phx.phx.v]
+    density = sol[phx.props.ρ]
+    viscosity = sol[phx.props.μ]
+    
+    # Display results
+    println("Plate Heat Exchanger Test Results:")
+    println("  Flow rate: $(sol[phx.phx.V̇] * 1000) L/s")
+    println("  Total Pressure Drop: $(total_pressure_drop) Pa")
+    println("  Core Pressure Drop: $(core_pressure) Pa")
+    println("  Port Pressure Drop: $(port_pressure) Pa")
+    println("  Reynolds Number: $(reynolds)")
+    println("  Friction Factor: $(friction)")
+    println("  Flow Velocity: $(velocity) m/s")
+    println("  Fluid Density: $(density) kg/m³")
+    println("  Fluid Viscosity: $(viscosity) Pa·s")
+    
+    # Verify pressure balance
+    pressure_sum_ok = isapprox(total_pressure_drop, core_pressure + port_pressure, rtol=1e-6)
+    if !pressure_sum_ok
+        println("WARNING: Pressure balance check failed!")
+        println("  Total pressure: $(total_pressure_drop)")
+        println("  Sum of components: $(core_pressure + port_pressure)")
+    end
+    
+    # Return true if all checks pass
+    return (total_pressure_drop > 0) && 
+           (reynolds > 0) && 
+           (friction > 0) &&
+           pressure_sum_ok
+end
+
+# ╔═╡ c37b7907-bced-4c1a-90d3-eb3366a2197c
+#=╠═╡
+@test test_phx_heat_exchanger()
+  ╠═╡ =#
+
+# ╔═╡ e57b762f-fc7d-4aa5-8941-6798a01ae8e1
+"""
+Test function that demonstrates parameter inheritance with remake for PHX
+"""
+function test_phx_parametric()
+    # Create the base model
+    @named phx_base = DynamicPropPlateHeatExchanger(
+        L = 0.3,
+        W = 0.2, 
+        b = 2e-3,
+        np = 20,
+        fluid = "water"
+    )
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = assemble([phx_base], 
+                                    equations = [
+                                        phx_base.props.T ~ 293.15,  # 20°C
+                                        phx_base.phx.V̇ ~ 0.01     # 1 L/s
+                                    ])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+    # Create variations using remake to test parameter inheritance
+    chevron_angles = collect(10:10:90) .* (π/180)  # Different chevron angles in radians
+    results = []
+    
+    for β in chevron_angles
+        # Create a modified problem with updated chevron angle parameter using remake
+        problem = remake(base_problem, p = [phx_base.β => β])
+        
+        # Solve the modified problem
+        sol = solve(problem)
+        
+        # Store results
+        push!(results, (
+            angle_deg = β * 180/π,
+            pressure_drop = sol[phx_base.phx.Δp],
+            core_pressure = sol[phx_base.phx.Δp_core],
+            port_pressure = sol[phx_base.phx.Δp_ports],
+            reynolds = sol[phx_base.phx.Re],
+            friction = sol[phx_base.phx.f]
+        ))
+        
+        println("Chevron Angle: $(β * 180/π)° | Pressure drop: $(sol[phx_base.phx.Δp]) Pa | Friction Factor: $(sol[phx_base.phx.f])")
+    end
+    
+    # Verify that pressure drop increases with chevron angle (higher turbulence)
+    angles_consistent = all(results[i].pressure_drop < results[i+1].pressure_drop 
+                          for i in 1:length(results)-1)
+                          
+    if angles_consistent
+        println("✅ Test passed: Pressure drop increases with chevron angle as expected")
+    else
+        println("❌ Test failed: Pressure drop does not consistently increase with chevron angle")
+    end
+    
+    return angles_consistent
+end
+
+# ╔═╡ 30b031a4-98b6-4a11-a4ed-a74983078a7f
+test_phx_parametric()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
@@ -2464,6 +2970,7 @@ PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
+DataFrames = "~1.7.0"
 Interpolations = "~0.15.1"
 ModelingToolkit = "~9.78.0"
 NonlinearSolve = "~4.8.0"
@@ -2479,7 +2986,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "817bfe1fd032f94ad1e65bf89f47f0f23c2491a3"
+project_hash = "8841fe9e514515e85c14659169ea44983070c43a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -2820,6 +3327,12 @@ version = "4.1.1"
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.16.0"
+
+[[deps.DataFrames]]
+deps = ["Compat", "DataAPI", "DataStructures", "Future", "InlineStrings", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrecompileTools", "PrettyTables", "Printf", "Random", "Reexport", "SentinelArrays", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
+git-tree-sha1 = "fb61b4812c49343d7ef0b533ba982c46021938a6"
+uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+version = "1.7.0"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -3323,6 +3836,19 @@ git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
 
+[[deps.InlineStrings]]
+git-tree-sha1 = "6a9fde685a7ac1eb3495f8e812c5a7c3711c2d5e"
+uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
+version = "1.4.3"
+
+    [deps.InlineStrings.extensions]
+    ArrowTypesExt = "ArrowTypes"
+    ParsersExt = "Parsers"
+
+    [deps.InlineStrings.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
+    Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+
 [[deps.IntegerMathUtils]]
 git-tree-sha1 = "b8ffb903da9f7b8cf695a8bead8e01814aa24b30"
 uuid = "18e54dd8-cb9d-406c-a71d-865a43cbb235"
@@ -3369,6 +3895,11 @@ weakdeps = ["Dates", "Test"]
     [deps.InverseFunctions.extensions]
     InverseFunctionsDatesExt = "Dates"
     InverseFunctionsTestExt = "Test"
+
+[[deps.InvertedIndices]]
+git-tree-sha1 = "6da3c4316095de0f5ee2ebd875df8721e7e0bdbe"
+uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
+version = "1.3.1"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
@@ -4049,6 +4580,12 @@ git-tree-sha1 = "645bed98cd47f72f67316fd42fc47dee771aefcd"
 uuid = "1d0040c9-8b98-4ee7-8388-3f51789ca0ad"
 version = "0.2.2"
 
+[[deps.PooledArrays]]
+deps = ["DataAPI", "Future"]
+git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
+uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
+version = "1.4.3"
+
 [[deps.PositiveFactorizations]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
@@ -4308,6 +4845,12 @@ deps = ["Dates"]
 git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.2.1"
+
+[[deps.SentinelArrays]]
+deps = ["Dates", "Random"]
+git-tree-sha1 = "712fb0231ee6f9120e005ccd56297abbc053e7e0"
+uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
+version = "1.4.8"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -4982,11 +5525,11 @@ version = "1.8.1+0"
 
 # ╔═╡ Cell order:
 # ╠═32204332-17e4-4a4c-980e-ddc75d244f51
-# ╠═46143377-5b05-4648-89f0-1b1dc43ae51f
 # ╠═d471a9d8-5a4d-49e4-9bfd-39bbdbfb2741
 # ╠═b550df61-460e-4d63-8509-17e697033c87
 # ╠═e8d48aab-e227-48cc-8ad8-3cfb57a3e165
 # ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
+# ╠═429b8af2-89da-4865-b484-aa9266ad5732
 # ╠═6f95a236-229a-4f68-be72-a8085f3aa025
 # ╠═9a7db941-b8b8-4b81-918b-d86509b589a3
 # ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
@@ -5050,7 +5593,7 @@ version = "1.8.1+0"
 # ╠═18962ef4-5570-4b40-b31d-7fd211025965
 # ╟─fe6c00b8-fc3f-426f-920c-7deaae99dce8
 # ╠═5883f14b-95cc-43d7-870d-bfa0426efbf5
-# ╟─4f9b3f95-0ac4-45b4-a5db-7571045f69ac
+# ╠═4f9b3f95-0ac4-45b4-a5db-7571045f69ac
 # ╠═b3b22def-aacb-4f4b-be4b-83ea2e26f986
 # ╠═003dad93-d071-4f6c-9ea9-7ee455a255fe
 # ╟─c160cc41-cc8d-4b69-9e76-b5a4aed8388c
@@ -5082,5 +5625,18 @@ version = "1.8.1+0"
 # ╠═771bc84e-cb07-4be7-a129-5772749dc845
 # ╠═d9f417b2-184e-4f5e-9c3a-9649a6cb4235
 # ╠═f03a950a-78bc-4483-8d25-c926a2a79724
+# ╠═e9fecb1f-357f-47c0-a90d-f7b8a677b55e
+# ╠═5a3b2bdc-b1be-491b-8339-b597338a58b3
+# ╠═1adad638-3111-446e-9bbd-085bde79a763
+# ╠═2009d02d-d2c0-44ea-96f2-b0bc4889fef1
+# ╠═f5c942cf-5bbf-4455-954e-7db1bdcaba1b
+# ╠═c45e2af7-7bf9-49d9-be63-c89094c1e540
+# ╠═551f3049-7ba7-4e79-8d9d-02f6fa835912
+# ╠═9ba05444-6ea6-460d-a674-3fef94c553f8
+# ╠═c705bcad-1203-48e7-a6b4-ab0e8d476c8c
+# ╠═c37b7907-bced-4c1a-90d3-eb3366a2197c
+# ╠═e57b762f-fc7d-4aa5-8941-6798a01ae8e1
+# ╠═30b031a4-98b6-4a11-a4ed-a74983078a7f
+# ╠═cb0f35b9-ebc0-4232-a427-3ebfa85aacfd
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

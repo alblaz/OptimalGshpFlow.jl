@@ -1,0 +1,5336 @@
+### A Pluto.jl notebook ###
+# v0.20.8
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ 2f0fd7c9-b47c-45ee-8a92-e7cf468c5ae0
+using PlutoDevMacros
+
+# ╔═╡ da77d4ce-898e-4dac-a193-ec03eb088c2d
+using ModelingToolkit
+
+# ╔═╡ 17af46d6-c740-489f-84d7-cd70da1045e7
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Printf
+  ╠═╡ =#
+
+# ╔═╡ 681b6b67-2f78-4085-9abb-5c2d4abdb117
+using NonlinearSolve
+
+# ╔═╡ f05d0696-202e-4158-bf2a-a47c33493f71
+@fromparent begin
+	using ..Utils
+	using ..Properties
+end
+
+# ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+using MonteCarloMeasurements
+
+# ╔═╡ da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
+using Distributions
+
+# ╔═╡ 18df1038-aa05-43e8-b88b-6d13586cf503
+using LinearAlgebra
+
+# ╔═╡ 5b8db305-4447-4943-b0fa-61051b86d112
+using PlutoTest
+
+# ╔═╡ 1e019ddb-1873-4cea-a765-83b6f7316b34
+using SteadyStateDiffEq
+
+# ╔═╡ 94eef45c-9d7d-4f74-aa18-b95bf11e2196
+using NLsolve
+
+# ╔═╡ 7fc1869e-4ccb-4ffc-97a5-31589089fd75
+using Sundials
+
+# ╔═╡ deb8cae6-ab88-41a8-b7c7-6bcad63a68ef
+using MINPACK
+
+# ╔═╡ 154297c3-6988-4815-b6da-e512562e7502
+using SIAMFANLEquations
+
+# ╔═╡ cfb6b78c-7e52-45c4-85ad-d738c181590a
+using NLSolvers
+
+# ╔═╡ fa7d3054-a1d8-4c19-867a-2acb21feed8e
+using PETSc
+
+# ╔═╡ 9a1c9032-fd54-401e-9c34-8f4004724674
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using PlutoUI
+  ╠═╡ =#
+
+# ╔═╡ 9577e62f-795a-4d33-9667-fca61b12ee75
+using Unitful
+
+# ╔═╡ ef3dfacb-befa-470a-a0eb-dfba087e963f
+using Markdown
+
+# ╔═╡ 05128731-497f-44ab-9786-10fca398f149
+using InteractiveUtils
+
+# ╔═╡ eca62203-4f5b-48b7-8a9f-7e515ae99842
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Logging
+  ╠═╡ =#
+
+# ╔═╡ e0c96a01-908c-409d-81c5-2d6475ad7f14
+# ╠═╡ skip_as_script = true
+#=╠═╡
+begin
+    using WGLMakie
+    set_theme!(theme_dark())
+end
+  ╠═╡ =#
+
+# ╔═╡ d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
+using Nemo
+
+# ╔═╡ 47ac09a5-9907-4283-8ea9-6f8c584a989a
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using PlutoExtras
+  ╠═╡ =#
+
+# ╔═╡ 572701dd-5f06-41ea-b920-bc6a5c01be72
+# ╠═╡ disabled = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
+
+# ╔═╡ 121f3c96-8e06-4e26-99f2-46f12ea83d8d
+function UBorehole(;name)
+	ps = @parameters begin
+	end
+	sts = @variables begin
+	end
+	begin
+		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
+		
+	end
+
+    eqs = [
+	]
+
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
+
+# ╔═╡ 858f94fa-aa22-442c-96ee-52209d62d9cd
+@named ubhe = UBorehole()
+
+# ╔═╡ da0560a5-fde0-4997-a8ae-34a294a403b8
+begin
+	
+	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
+	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
+	
+	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
+
+	cp_1 = cp_b_(T_p_1, χ)
+	μ_1 = μ_b_(T_p_1, χ)
+	λp_1 = λ_b_(T_p_1, χ)
+	ρ_1 = ρ_b_(T_p_1, χ)
+	
+	V̇_1 = ṁ_1 / ρ_1
+	S_1 = π*D_1^2/4
+	v_1 = V̇_1 / S_1
+
+	Re_1 = ρ_1*v_1*D_1/μ_1
+	Pr_1 = cp_1*μ_1/λp_1
+
+	Nu_lam_1 = 3.66
+	f_1 = 0.3164*Re_1^(-1//4)
+	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
+	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
+
+	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
+
+	h_1 = Nu_1 * λp_1/D_1
+
+	#---
+
+	cp_2 = cp_b_(T_p_2, χ)
+	μ_2 = μ_b_(T_p_2, χ)
+	λp_2 = λ_b_(T_p_2, χ)
+	ρ_2 = ρ_b_(T_p_2, χ)
+	
+	V̇_2 = ṁ_2 / ρ_2
+	S_2 = π*D_2^2/4
+	v_2 = V̇_2 / S_2
+
+	Re_2 = ρ_2*v_2*D_2/μ_2
+	Pr_2 = cp_2*μ_2/λp_2
+
+	Nu_lam_2 = 3.66
+	f_2 = 0.3164*Re_1^(-1//4)
+	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
+	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
+
+	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_1*Nu_tur_2
+
+	h_2 = Nu_2 * λp_2/D_2;
+end;
+
+# ╔═╡ e3e8a633-0572-4032-a6ed-3c03ead67180
+md" # U-tube: filled"
+
+# ╔═╡ cd4d60e8-724c-4fe9-8947-061df7072bf4
+
+
+# ╔═╡ f266e88f-ce01-4030-8740-b792a16bb99a
+# Borehole resistance in natural convection
+begin
+	#@variables r_p r_b
+	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
+	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
+	@variables T_w_av T_1_av T_2_av T_b_av
+	@parameters g
+	T_f_1_w = 0.5*T_1_av + .5*T_w_av
+	T_f_2_w = 0.5*T_2_av + .5*T_w_av
+	T_f_b_w = 0.5*T_b_av + .5*T_w_av
+
+	Gr_1 = g*β_b_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
+	Gr_2 = g*β_b_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
+	Gr_b = g*β_b_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
+
+	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
+	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
+	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
+	
+	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
+	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
+	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
+
+	R_1w_cv = 1/(h_1_w*pi*D_1)
+	R_2w_cv = 1/(h_2_w*pi*D_2)
+	R_bw_cv = 1/(h_b_w*pi*D_b);
+end;
+
+# ╔═╡ 4cfd9965-69d0-4409-a15e-bc5a0fec9f11
+md" # U tube: grouted"
+
+# ╔═╡ c5c82402-d105-4346-9eac-bc6064da4c41
+# Borehole resistance in conduction
+begin
+	J = 1
+	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
+	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
+	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
+	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
+	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
+	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
+	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
+	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
+	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
+	A_ = f_data .+ t_sum
+	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
+	M_ = KJ_mat .+ A_
+	
+	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
+	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
+	
+	B_ = V_k'*inv(M_)*V_bk
+	
+	B⁻ = substitute(B_, s => -1)
+	B⁺ = substitute(B_, s => 1)
+
+	R⁺ = R₀⁺ .+ B⁺
+	R⁻ = R₀⁻ .+ B⁻
+
+	R_1b_p_c = R⁺
+	R_2b_p_c = R⁺
+	R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
+	
+	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]);
+end;
+
+# ╔═╡ 48ef9603-6e6c-4d78-a85d-f26436ef3348
+function U_fill_R_s(;name, J::Int=1)
+	ps = @parameters begin
+		λ_ground = 3.5
+		λ_grout = 2.0
+		r_p = 40e-3/2
+		r_b = 115e-3/2
+		α = 0.5 #"centered"
+	end
+	sts = @variables begin
+		RΔ12
+		RΔ1b
+		RΔ2b
+	end
+	begin
+		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
+		
+		V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
+		V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
+		#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
+		t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
+		St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
+		t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
+		f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
+		t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
+		A_ = f_data .+ t_sum
+		KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
+		M_ = KJ_mat .+ A_
+		
+		R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
+		R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
+		
+		B_ = V_k'*inv(M_)*V_bk
+		
+		B⁻ = substitute(B_, s => -1)
+		B⁺ = substitute(B_, s => 1)
+	
+		R⁺ = R₀⁺ .+ B⁺
+		R⁻ = R₀⁻ .+ B⁻
+	
+		R_1b_p_c = R⁺
+		R_2b_p_c = R⁺
+		R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
+		
+		exp_R_1b = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_2b = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_12 = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_12 = substitute(R_12_cd, [χ_p => α*r_b]);
+	end
+
+    eqs = [
+        exp_R_12 ~ RΔ12,
+        exp_R_1b ~ RΔ1b,
+        exp_R_2b ~ RΔ2b,
+	]
+
+	return NonlinearSystem(eqs, sts, ps; name = name);
+end
+
+# ╔═╡ 5ae06bb9-9687-4e25-b3ee-44c11f1eb79f
+# ╠═╡ skip_as_script = true
+#=╠═╡
+@named Upipe = U_fill_R_s(J=3)
+  ╠═╡ =#
+
+# ╔═╡ c04ec6f0-e43f-4947-a545-01d09d46b982
+#=╠═╡
+@named newsys = ModelingToolkit.compose(NonlinearSystem([], [], []; name = :name), [h1, Upipe, h2])
+  ╠═╡ =#
+
+# ╔═╡ d882d2ae-e976-4bc5-b58c-011f22ae0d04
+#=╠═╡
+structural_simplify(newsys)
+  ╠═╡ =#
+
+# ╔═╡ 5f8caf93-d3fe-4343-9b20-bbe5ea706549
+R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
+
+# ╔═╡ ab501cca-a573-4c35-9926-aa42e075c128
+R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
+
+# ╔═╡ caf4b4da-0e15-40e5-983a-dd364e40f235
+begin
+	#@variables D_1 D_2 D_b th_1 th_2
+	Per_1 = pi*(D_1-th_1)
+	Per_2 = pi*(D_2-th_2)
+	Per_w = pi*(D_b)
+	
+	R_1 = 1/(Per_1*h_1)
+	R_2 = 1/(Per_2*h_2)
+	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
+	
+	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
+	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
+
+end;
+
+# ╔═╡ d797d02a-fb17-4967-8b5a-91c0cc817d33
+begin
+	R_12_cv = R_1w_cv + R_2w_cv
+	R_1b_cv = R_1w_cv + R_bw_cv
+	R_2b_cv = R_2w_cv + R_bw_cv;
+	
+	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
+	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
+	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
+	
+	UA_12_cv_tot = 1/R_12_cv_tot
+	UA_1w_cv_tot = 1/R_1w_cv_tot
+	UA_2w_cv_tot = 1/R_2w_cv_tot;
+end;
+
+# ╔═╡ b33b59ad-d750-49c8-a32b-aa5e1c4ef0fa
+begin
+	
+	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
+	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
+	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
+	
+	UA_12_cd_tot = 1/R_12_cd_tot
+	UA_1w_cd_tot = 1/R_1w_cd_tot
+	UA_2w_cd_tot = 1/R_2w_cd_tot;
+	
+end;
+
+# ╔═╡ 29594d9b-b007-40ac-bdb2-16286abc8d6c
+UA_12_cd_tot |> get_variables
+
+# ╔═╡ df8d848c-bde6-477a-b9ff-09154b3ee375
+md" # Quick analysis: parametric study"
+
+# ╔═╡ 7adc28f8-c020-4ba3-af18-0d8037f78416
+begin
+	@variables th_p, ṁ_bh
+	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh])
+	R_12_simplified |> get_variables
+R1B_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low, expression=Val{false});
+eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low) = @bymap R1B_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low)
+	
+end
+
+# ╔═╡ b177db0b-a08e-4c78-950c-f2723f402b50
+begin
+XX = range(1e-2, 2.0, length = 300)
+	
+	n_p = 1000
+YY = map(x->eval_R1b(
+	115e-3,
+	Particles(n_p, Uniform(0.35, 0.36)),
+	2e-3,
+	Particles(n_p, Uniform(0.5, 0.51)),
+	40e-3,
+	Particles(n_p, Uniform(3.5, 4.5)),
+	Particles(n_p, Uniform(1.8, 2.2)),
+	x,
+	273.15+5,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	273.15+5,
+	5000,
+	2300), XX)
+end
+
+# ╔═╡ 247513bd-9b58-485e-b920-07b532e28f18
+begin
+	m_Y = [median(y.particles) for y in YY]
+	q_05 = [quantile(y.particles, 0.025) for y in YY]
+	q_95 = [quantile(y.particles, 0.975) for y in YY]
+end
+
+# ╔═╡ 37c6fed7-275b-423d-992d-0e5f6e6e2cf1
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+fig_study = Makie.lines(XX, m_Y)
+	band!(XX, q_05, q_95)
+	fig_study
+end
+  ╠═╡ =#
+
+# ╔═╡ 6034ad9e-4787-42e7-9f9a-592d5da1369d
+md" # Temperature profiles"
+
+# ╔═╡ 9ffdac54-ec39-4c4c-b3f9-b58877f52b33
+begin
+	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
+	
+	# We assume that our homogeneous (shifted) solution is:
+	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
+	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
+	#
+	# The boundary conditions we impose are:
+	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
+	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
+	#        T̃₁(L) = T̃₂(L)
+	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
+	
+	# Write the equations:
+	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
+	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
+	
+	# Solve the system for C1 and C2.
+	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
+end
+
+# ╔═╡ 8327ca86-5c71-482a-a605-29de14de9081
+begin
+	#@variables U_12 U_1w U_2w
+	@variables P_1 P_w1 P_2 P_w2
+	
+	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
+
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
+                                        λ_2 => sλ2,
+                                        γ_1 => sγ1,
+                                        γ_2 => sγ2)) for s in sol_C];
+end;
+
+# ╔═╡ 4972527a-d3c2-4f61-96c2-478b2e3d4113
+begin
+	@variables UA_12 UA_1w UA_2w
+	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
+	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+end;
+
+# ╔═╡ 274f3783-65e8-4b2b-9f87-ef181e5cb618
+get_variables(sC_2)
+
+# ╔═╡ 7eeb426b-fa00-46a9-8076-8ef43e87fec2
+get_variables(sλ_1)
+
+# ╔═╡ 689b3394-87ed-477d-be96-4c7475882398
+begin
+	@variables x_bh
+	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
+	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
+	
+	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh)
+	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
+	Tbh_in = T_1_in
+	Tbh_out = substitute(sT_2, x_bh=>0.0);
+	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
+	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
+end;
+
+# ╔═╡ 452e93d4-ee46-4563-8572-362d5dbb64f6
+Tbh_out
+
+# ╔═╡ b1a806ff-ec69-46a7-a006-83dd25654e1e
+sT_2 |> get_variables
+
+# ╔═╡ 9b8d052c-8f75-47fb-a320-275dc7a39bbe
+fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+
+# ╔═╡ 3253b31e-d586-4c6d-9a57-575649f83894
+fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
+
+# ╔═╡ b7234bda-3dfd-4a53-b995-320c8aec4846
+begin
+	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+end;
+
+# ╔═╡ 8e6c599d-7f3a-49fe-b9ca-9a2f2585d41c
+begin
+	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+	
+	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
+
+	@variables D_bh
+	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
+	sT_1_cd = substitute(sT_1_cd, d_simpl);
+	
+end;
+
+# ╔═╡ 5028aee6-1138-408a-ab1d-ebfdf3e604ea
+UA_12_cd_tot |> simplify;
+
+# ╔═╡ eb86c8ed-a2c1-4637-9319-1364165ea18c
+get_variables(sT_1_cd)
+
+# ╔═╡ f104a6e3-4e3b-4cbd-bf2b-55ad3a98b7ce
+get_variables(sT_1_cd)
+
+# ╔═╡ f5186f8a-2789-47d8-890a-82284fb6898f
+simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
+
+# ╔═╡ abb2c4bf-a835-4d9d-a746-29bc317130e4
+T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
+
+# ╔═╡ 0a80bead-8b86-4efe-9272-bdffcdfed727
+eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
+
+# ╔═╡ 9bb82a58-a11b-432b-9a02-4ba1b4b4ac51
+begin
+XBH = range(1e-2, 300.0, length = 300)
+TT = map(x-> eval_T1(
+	273.15,#T_p_1,
+	Particles(n_p, Uniform(0.25, 0.255)),
+	115e-3,
+	2e-3,#th_1,
+	Particles(n_p, Uniform(0.35, 0.45)),
+	2e-3,#th_2,
+	2300,#Re_low,
+	5000,#Re_high,
+	273.15,#T_p_2,
+	20e-3,#r_p,
+	3.5,#λ_ground,
+	2.0,#λ_grout,
+	1.0,#ṁ_b,
+	x,#x_bh,
+	273.15+5,#T_1_in,
+	273.15+10,#T_wall,
+	300.0,#L_bh
+	0.3,#α
+), XBH)
+end
+
+# ╔═╡ 5b6a8aa4-b752-4175-a2da-f7a222e03c93
+#=╠═╡
+begin
+	m_T = [median(y.particles) for y in TT]
+	q_05_T = [quantile(y.particles, 0.025) for y in TT]
+	q_95_T = [quantile(y.particles, 0.975) for y in TT]
+fig_study_T = Makie.lines(XBH, m_T)
+	band!(XBH, q_05_T, q_95_T)
+	fig_study_T
+end
+  ╠═╡ =#
+
+# ╔═╡ 571a62a6-2bee-43c0-939f-e96346108c67
+assemble(systems::Vector{NonlinearSystem}; equations=[], name) = ModelingToolkit.compose(NonlinearSystem(equations, [], [], name=name), systems)
+
+
+# ╔═╡ 1b76f1ee-7c28-441d-9586-7fd37c6dbee6
+md"""
+# Test
+"""
+
+# ╔═╡ fe000077-8514-4ac7-8dc9-52a87ad28b2c
+"""
+UTubeParameters calculates the key parameters needed for the analytical solution of U-tube 
+temperature profiles. It solves for eigenvalues, eigenvector ratios, and integration constants.
+"""
+function BoreholeTemperatureParameters(; name::Symbol)
+    ps = @parameters begin
+    end
+    
+    sts = @variables begin
+        L_bh = 100.0  # Borehole length [m]
+        T_wall = 283.15  # Borehole wall temperature [K]
+        T_f_in = 293.15  # Inlet fluid temperature [K]
+        ṁ_f = 0.5     # Fluid mass flow rate [kg/s]
+        cp_f = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        R_1b = 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_2b = 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_12 = 0.3    # Thermal resistance between pipes [K·m/W]
+		
+        λ_1 = -0.00614         # First eigenvalue for the temperature solution
+        λ_2 = 0.00614         # Second eigenvalue for the temperature solution
+        γ_1 = 0.12701          # First eigenvector component ratio
+        γ_2 = 7.87298         # Second eigenvector component ratio
+        C_1 = 9.64186          # First integration constant
+        C_2 = 0.3581364          # Second integration constant
+    end
+
+    
+    # Use Symbolics to derive the equations
+    begin
+        # Calculate P terms
+        P_1 = 1/(ṁ_f*cp_f*R_12)
+        P_w1 = 1/(ṁ_f*cp_f*R_1b)
+        P_2 = 1/(ṁ_f*cp_f*R_12)
+        P_w2 = 1/(ṁ_f*cp_f*R_2b)
+        
+        # Calculate eigenvalues
+        # The coefficient matrix for the homogeneous system
+        A_11 = -(P_1 + P_w1)
+        A_12 = P_1
+        A_21 = -P_2
+        A_22 = P_2 + P_w2
+        
+        # Characteristic equation coefficients for det(A - λI) = 0
+        a = 1.0  # coefficient of λ²
+        b = -(A_11 + A_22)  # coefficient of λ
+        c = A_11*A_22 - A_12*A_21  # constant term
+        
+        # Calculate roots of the quadratic equation: a*λ² + b*λ + c = 0
+        # Using the quadratic formula: λ = (-b ± sqrt(b² - 4ac))/(2a)
+        discriminant = b^2 - 4*a*c
+        
+        # We know that for this physical system, both eigenvalues should be negative
+        # λ_1 is the less negative (closer to zero)
+        λ_1_eq = λ_1 ~ (-b - sqrt(discriminant))/(2*a)
+        λ_2_eq = λ_2 ~ (-b + sqrt(discriminant))/(2*a)
+        
+        # Calculate eigenvector component ratios
+        # For each eigenvalue λ, the eigenvector components satisfy:
+        # (A_11 - λ)*v₁ + A_12*v₂ = 0
+        # Solve for v₂/v₁ = γ
+        γ_1_eq = γ_1 ~ (λ_1 - A_11)/A_12
+        γ_2_eq = γ_2 ~ (λ_2 - A_11)/A_12
+        
+        # Set up boundary conditions
+        # C_1 + C_2 = T_f_in - T_wall
+        # C_1*exp(λ_1*L_bh) + C_2*exp(λ_2*L_bh) = C_1*γ_1*exp(λ_1*L_bh) + C_2*γ_2*exp(λ_2*L_bh)
+        # Which simplifies to:
+        # C_1*(1-γ_1)*exp(λ_1*L_bh) + C_2*(1-γ_2)*exp(λ_2*L_bh) = 0
+        
+        # Solve the system for C_1 and C_2
+        # From the second condition:
+        # C_2 = -C_1*(1-γ_1)*exp(λ_1*L_bh)/((1-γ_2)*exp(λ_2*L_bh))
+        # Substitute into the first condition:
+        # C_1 - C_1*(1-γ_1)*exp(λ_1*L_bh)/((1-γ_2)*exp(λ_2*L_bh)) = T_f_in - T_wall
+        
+        # Solve for C_1 and C_2
+        factor1 = (1-γ_1)*exp(λ_1*L_bh)
+        factor2 = (1-γ_2)*exp(λ_2*L_bh)
+        
+        C_1_eq = C_1 ~ (T_f_in - T_wall) * factor2 / (factor2 - factor1)
+        C_2_eq = C_2 ~ (T_f_in - T_wall) * (-factor1) / (factor2 - factor1)
+    end
+    
+    # Combine all equations for the system
+    eqs = [λ_1_eq, λ_2_eq, γ_1_eq, γ_2_eq, C_1_eq, C_2_eq]
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ b8ac6f9a-d15a-4a91-9057-bb98c6b58044
+"""
+Simple test for the UTubeParameters component.
+"""
+function test_utube_parameters_simple()
+    # Create the parameters component
+    @named params = BoreholeTemperatureParameters()
+    
+    # Define a test system with default values
+    @named test_sys = assemble([params], equations=[
+		
+        params.L_bh ~ 100.0  # Borehole length [m]
+        params.T_wall ~ 283.15  # Borehole wall temperature [K]
+        params.T_f_in ~ 293.15  # Inlet fluid temperature [K]
+        params.ṁ_f ~ 0.5     # Fluid mass flow rate [kg/s]
+        params.cp_f ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        params.R_1b ~ 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        params.R_2b ~ 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        params.R_12 ~ 0.3    # Thermal resistance between pipes [K·m/W]
+	])
+    simpl_sys = structural_simplify(test_sys)
+    
+    # Solve the system
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    λ_1 = sol[params.λ_1]
+    λ_2 = sol[params.λ_2]
+    γ_1 = sol[params.γ_1]
+    γ_2 = sol[params.γ_2]
+    C_1 = sol[params.C_1]
+    C_2 = sol[params.C_2]
+    
+    # Print the results
+    println("UTubeParameters Results:")
+    println("---------------------------")
+    println("Eigenvalues:")
+    println("  λ₁ = $(λ_1)")
+    println("  λ₂ = $(λ_2)")
+    println("Eigenvector ratios:")
+    println("  γ₁ = $(γ_1)")
+    println("  γ₂ = $(γ_2)")
+    println("Integration constants:")
+    println("  C₁ = $(C_1)")
+    println("  C₂ = $(C_2)")
+
+	return C_1 > 0 &&C_2> 0 &&γ_1 > 0 &&γ_2 > 0
+end
+
+# ╔═╡ fae38d18-0c77-4b4e-9c30-9976a17c3a2b
+test_utube_parameters_simple()
+
+# ╔═╡ 3a9ef928-cb59-45dd-87db-71d57c38e15a
+"""
+UTubeTemperature calculates the temperature at a specific position in a U-tube borehole heat exchanger.
+This component uses pre-calculated parameters from UTubeParameters.
+"""
+function BoreholeTemperature(; name::Symbol)
+    ps = @parameters begin
+    end
+    
+    sts = @variables begin
+        x = 0.0       # Position along the borehole [m]
+        T_wall = 283.15  # Borehole wall temperature [K]
+        λ_1 = 0.0     # First eigenvalue (from UTubeParameters)
+        λ_2 = 0.0     # Second eigenvalue (from UTubeParameters)
+        γ_1 = 0.0     # First eigenvector ratio (from UTubeParameters)
+        γ_2 = 0.0     # Second eigenvector ratio (from UTubeParameters)
+        C_1 = 0.0     # First integration constant (from UTubeParameters)
+        C_2 = 0.0     # Second integration constant (from UTubeParameters)
+        T_1 = 300.0   # Temperature in downward pipe at position x [K]
+        T_2 = 300.0   # Temperature in upward pipe at position x [K]
+    end
+    
+    # Simple direct equations using the parameters
+    eqs = [
+        # Temperature profiles at position x using the analytical solution
+        T_1 ~ T_wall + C_1*exp(λ_1*x) + C_2*exp(λ_2*x),
+        T_2 ~ T_wall + C_1*γ_1*exp(λ_1*x) + C_2*γ_2*exp(λ_2*x)
+    ]
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ 6f1888cb-63ba-4cef-8151-bd7d09e5bc63
+"""
+UTubeBorehole combines the UTubeParameters and UTubeTemperature components to model
+the temperature profile of a U-tube borehole heat exchanger.
+
+This component connects the parameter calculation with temperature profiles at the top
+of the borehole to calculate inlet/outlet temperatures and total heat transfer.
+"""
+function BoreholeThermal(; name::Symbol)
+    # Define top-level parameters (depth and wall temperature)
+    ps = @parameters begin
+        depth = 100.0      # Borehole length [m]
+        T_wall = 283.15    # Borehole wall temperature [K]
+    end
+    
+    # System variables that will be inputs/outputs at the top level
+    sts = @variables begin
+        T_inlet = 293.15   # Inlet fluid temperature [K]
+        T_outlet = 283.15  # Outlet fluid temperature [K]
+        ṁ = 0.5            # Fluid mass flow rate [kg/s]
+        cp = 4200.0        # Fluid specific heat capacity [J/(kg·K)]
+        R_1b = 0.1         # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_2b = 0.1         # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_12 = 0.3         # Thermal resistance between pipes [K·m/W]
+    end
+    
+    # Create component instances
+    @named params = BoreholeTemperatureParameters()
+    @named temp_top = BoreholeTemperature()    # For inlet/outlet temperatures
+    
+    # Connect components with each other
+    eqs = [
+        # Connect parameters to the parameter calculation component
+        params.L_bh ~ depth,
+        params.T_wall ~ T_wall,
+        params.T_f_in ~ T_inlet,
+        params.ṁ_f ~ ṁ,
+        params.cp_f ~ cp,
+        params.R_1b ~ R_1b,
+        params.R_2b ~ R_2b,
+        params.R_12 ~ R_12,
+        
+        # Connect top temperature component (at x = 0)
+        temp_top.x ~ 0.0,
+        temp_top.T_wall ~ T_wall,
+        temp_top.λ_1 ~ params.λ_1,
+        temp_top.λ_2 ~ params.λ_2,
+        temp_top.γ_1 ~ params.γ_1,
+        temp_top.γ_2 ~ params.γ_2,
+        temp_top.C_1 ~ params.C_1,
+        temp_top.C_2 ~ params.C_2,
+        
+        # Connect top-level outputs
+        T_outlet ~ temp_top.T_2,
+    ]
+    
+    # Create the parent system with connected components
+    sys = NonlinearSystem(eqs, sts, ps, name=name)
+    return ModelingToolkit.compose(sys, [params, temp_top], name=name)
+end
+
+# ╔═╡ 58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
+function test_utube_borehole()
+    # Create the borehole model
+    @named bh = BoreholeThermal()
+    
+    # Define a test system with input parameters
+    @named test_sys = assemble([bh], equations=[
+        # Set all necessary inputs directly on the top-level component
+        bh.T_inlet ~ 293.15,    # 20°C inlet temperature
+        bh.ṁ ~ 0.5,             # 0.5 kg/s flow rate
+        bh.cp ~ 4200.0,         # Water specific heat
+        bh.R_1b ~ 0.1,          # Thermal resistances
+        bh.R_2b ~ 0.1,
+        bh.R_12 ~ 0.3
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])  # Add the empty array as initial guess
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract key results
+    T_outlet = sol[bh.T_outlet]
+    T_inlet = sol[bh.T_inlet]
+    heat_transfer = sol[bh.ṁ] * sol[bh.cp] * (T_inlet - T_outlet)
+    
+    # Print the results
+    println("UTubeBorehole Results:")
+    println("---------------------------")
+    println("Inlet temperature: $(T_inlet) K ($(T_inlet - 273.15)°C)")
+    println("Outlet temperature: $(T_outlet) K ($(T_outlet - 273.15)°C)")
+    println("Temperature difference: $(T_inlet - T_outlet) K")
+    println("Heat transfer rate: $(heat_transfer) W")
+    
+    return sol.retcode  == ModelingToolkit.ReturnCode.Success
+end
+
+# ╔═╡ 4fe2de48-d332-48a7-8bad-0193769b5955
+@test test_utube_borehole()
+
+# ╔═╡ 8232ef24-b67c-45ea-afe6-086178027a11
+md"""
+# Resistances modeling
+"""
+
+# ╔═╡ 089ef48a-b35c-490f-9b77-898a4dea195b
+# Utility functions for resistance calculations
+"""
+Calculate Nusselt number for natural convection on a cylinder.
+Uses the Churchill-Chu correlation for natural convection.
+
+Parameters:
+- Gr: Grashof number
+- Pr: Prandtl number
+
+Returns:
+- Nusselt number for natural convection
+"""
+function nusselt_natural_convection(Gr, Pr)
+    return 0.6 + 0.387 * (Gr * Pr)^(1/6) * (1 + (0.559 / Pr)^(9/16))^(-8/27)
+end
+
+# ╔═╡ 59ba8bc5-9ca7-4ab5-964c-9c7a8c8141ca
+"""
+Calculate thermal resistance of a cylindrical pipe wall.
+
+Parameters:
+- D_o: Outer diameter of pipe [m]
+- D_i: Inner diameter of pipe [m]
+- λ: Thermal conductivity of pipe material [W/(m·K)]
+
+Returns:
+- Thermal resistance [K·m/W]
+"""
+function pipe_wall_resistance(D_o, D_i, λ)
+    return log(D_o / D_i) / (2 * π * λ)
+end
+
+# ╔═╡ e7812966-cff7-4169-b255-20bfb4c1d2f2
+"""
+Calculate thermal resistance due to convection on a cylindrical surface.
+
+Parameters:
+- D: Diameter of cylinder [m]
+- h: Heat transfer coefficient [W/(m²·K)]
+
+Returns:
+- Thermal resistance [K·m/W]
+"""
+function convection_resistance(D, h)
+    return 1 / (h * π * D)
+end
+
+# ╔═╡ d81fa98e-bdff-40a8-97e4-fc21eef8e635
+"""
+Calculate Grashof number for natural convection.
+
+Parameters:
+- g: Gravitational acceleration [m/s²]
+- β: Thermal expansion coefficient [1/K]
+- ΔT: Temperature difference [K]
+- D: Characteristic dimension [m]
+- ν: Kinematic viscosity [m²/s]
+
+Returns:
+- Grashof number
+"""
+function grashof(g, β, ΔT, D, ν)
+    return g * β * ΔT * D^3 / ν^2
+end
+
+# ╔═╡ d3931d58-e02a-42b5-80f5-06963f2c1ad9
+"""
+Calculate Prandtl number.
+
+Parameters:
+- cp: Specific heat capacity [J/(kg·K)]
+- μ: Dynamic viscosity [Pa·s]
+- λ: Thermal conductivity [W/(m·K)]
+
+Returns:
+- Prandtl number
+"""
+function prandtl(cp, μ, λ)
+    return cp * μ / λ
+end
+
+# ╔═╡ cdc17c0b-341f-4b7e-bcdc-57fc800bf9d8
+"""
+Calculate friction factor using a smooth transition between laminar and turbulent regimes.
+Valid for all Reynolds numbers with a physically smooth transition around the critical zone.
+
+Parameters:
+- Re: Reynolds number
+- ε_D: Relative roughness (defaults to 0.0 for smooth pipes)
+- Re_lam: Lower Reynolds number for transition (default: 2300)
+- Re_turb: Upper Reynolds number for transition (default: 4000)
+
+Returns:
+- Friction factor
+"""
+function friction_factor_smooth(Re, ε_D=0.0; Re_lam=2300, Re_turb=4000)
+    # Laminar flow friction factor
+    f_lam = 64.0 / max(Re, 1.0)
+    
+    # Turbulent flow using Colebrook-White equation (or simplified version for smooth pipes)
+    if ε_D < 1e-6  # Smooth pipe
+        f_turb = (0.79 * log(Re) - 1.64)^(-2)
+    else
+        # Swamee-Jain equation (explicit approximation of Colebrook-White)
+        f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/Re^0.9))^2
+    end
+    
+    # Smooth transition using error function
+    # This ensures a continuous and differentiable transition
+    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
+    
+    # Combined friction factor with smooth transition
+    f = (1 - transition_factor) * f_lam + transition_factor * f_turb
+    
+    return f
+end
+
+
+# ╔═╡ dae309a7-8bc3-461f-b2a1-92b916b9bf15
+"""
+Calculate Nusselt number for pipe flow with smooth transition between regimes.
+Combines laminar (Nu=4.36 for constant heat flux) and Gnielinski correlation for turbulent flow.
+
+Parameters:
+- Re: Reynolds number
+- Pr: Prandtl number
+- f: Friction factor (optional, calculated if not provided)
+- Re_lam: Lower Reynolds number for transition (default: 2300)
+- Re_turb: Upper Reynolds number for transition (default: 4000)
+
+Returns:
+- Nusselt number
+"""
+function nusselt_pipe_flow(Re, Pr, f=nothing; Re_lam=2300, Re_turb=4000)
+    # Laminar flow with constant heat flux
+    Nu_lam = 4.36
+    
+    # Calculate friction factor if not provided
+    if isnothing(f)
+        f = friction_factor_smooth(Re, 0.0, Re_lam=Re_lam, Re_turb=Re_turb)
+    end
+    
+    # Gnielinski correlation for turbulent flow
+    Nu_turb = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
+    
+    # Smooth transition using the same approach as for friction factor
+    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
+    
+    # Combined Nusselt number with smooth transition
+    Nu = (1 - transition_factor) * Nu_lam + transition_factor * Nu_turb
+    
+    return Nu
+end
+
+# Heat transfer coefficient helper functions
+
+# ╔═╡ 69ced9d5-9053-4aaa-b485-ef32d3b66e07
+"""
+Calculate heat transfer coefficient for forced convection in tubes.
+
+Parameters:
+- ṁ: Mass flow rate [kg/s]
+- D: Inner diameter of tube [m]
+- ρ: Fluid density [kg/m³]
+- μ: Dynamic viscosity [Pa·s]
+- cp: Specific heat capacity [J/(kg·K)]
+- λ: Thermal conductivity [W/(m·K)]
+
+Returns:
+- Heat transfer coefficient [W/(m²·K)]
+"""
+function htc_forced_convection_tube(ṁ, D, ρ, μ, cp, λ)
+    # Cross-sectional area
+    A = π * (D/2)^2
+    
+    # Flow velocity
+    v = ṁ / (ρ * A)
+    
+    # Reynolds number
+    Re = ρ * v * D / μ
+    
+    # Prandtl number
+    Pr = prandtl(cp, μ, λ)
+    
+    # Friction factor with smooth transition
+    f = friction_factor_smooth(Re)
+    
+    # Nusselt number with smooth transition
+    Nu = nusselt_pipe_flow(Re, Pr, f)
+    
+    # Heat transfer coefficient
+    return Nu * λ / D
+end
+
+# ╔═╡ 6ef88a89-1365-49b4-a284-491290703e93
+"""
+Calculate heat transfer coefficient for natural convection on a cylinder.
+
+Parameters:
+- g: Gravitational acceleration [m/s²]
+- β: Thermal expansion coefficient [1/K]
+- ΔT: Temperature difference [K]
+- D: Diameter of cylinder [m]
+- ρ: Fluid density [kg/m³]
+- μ: Dynamic viscosity [Pa·s]
+- cp: Specific heat capacity [J/(kg·K)]
+- λ: Thermal conductivity [W/(m·K)]
+
+Returns:
+- Heat transfer coefficient [W/(m²·K)]
+"""
+function htc_natural_convection_cylinder(g, β, ΔT, D, ρ, μ, cp, λ)
+    # Kinematic viscosity
+    ν = μ / ρ
+    
+    # Grashof number
+    Gr = grashof(g, β, ΔT, D, ν)
+    
+    # Prandtl number
+    Pr = prandtl(cp, μ, λ)
+    
+    # Nusselt number
+    Nu = nusselt_natural_convection(Gr, Pr)
+    
+    # Heat transfer coefficient
+    return Nu * λ / D
+end
+
+# ╔═╡ 15c8fb5a-27e4-4a1d-8242-fd5237e39532
+"""
+Calculate heat transfer coefficient for forced convection in annular space.
+
+Parameters:
+- ṁ: Mass flow rate [kg/s]
+- D_i: Inner diameter of annular space [m]
+- D_o: Outer diameter of annular space [m]
+- ρ: Fluid density [kg/m³]
+- μ: Dynamic viscosity [Pa·s]
+- cp: Specific heat capacity [J/(kg·K)]
+- λ: Thermal conductivity [W/(m·K)]
+
+Returns:
+- Heat transfer coefficient for inner surface [W/(m²·K)]
+- Heat transfer coefficient for outer surface [W/(m²·K)]
+"""
+function htc_forced_convection_annular(ṁ, D_i, D_o, ρ, μ, cp, λ)
+    # Hydraulic diameter
+    D_h = D_o - D_i
+    
+    # Cross-sectional area
+    A = π * (D_o^2 - D_i^2) / 4
+    
+    # Flow velocity
+    v = ṁ / (ρ * A)
+    
+    # Reynolds number based on hydraulic diameter
+    Re = ρ * v * D_h / μ
+    
+    # Prandtl number
+    Pr = prandtl(cp, μ, λ)
+    
+    # Friction factor with smooth transition
+    f = friction_factor_smooth(Re)
+    
+    # Nusselt numbers for inner and outer surfaces
+    Nu = nusselt_pipe_flow(Re, Pr, f)
+    
+    # Heat transfer coefficients
+    h_i = Nu * λ / D_h
+    h_o = Nu * λ / D_h
+    
+    return h_i, h_o
+end
+
+
+# ╔═╡ 1e7d455f-3644-4555-ac4d-aae8c2ad2bc2
+"""
+UTubeResistancesGrouted calculates thermal resistances for a grouted U-tube borehole.
+This component uses simplified multipole approximations for thermal resistances.
+"""
+function UTubeResistances(; name::Symbol)
+    ps = @parameters begin
+        λ_pipe = 0.4       # Thermal conductivity of pipe material [W/(m·K)]
+		
+        # Geometry
+        D_p_o = 0.032      # Outer diameter of U-tube pipes [m]
+        D_p_i = 0.026      # Inner diameter of U-tube pipes [m]
+        D_b = 0.11         # Borehole diameter [m]
+		
+        χ = 0.0            # Glycol mass fraction
+    end
+    
+    sts = @variables begin
+        
+        # Flow parameters
+        ṁ = 0.5            # Mass flow rate [kg/s]
+        T_f = 288.15       # Average fluid temperature [K]
+        # Heat transfer coefficients
+        h_1 = 1000.0       # Convective heat transfer coefficient [W/(m²·K)]
+        h_2 = 1000.0       # Convective heat transfer coefficient [W/(m²·K)]
+        
+        # Resistance components
+        R_p1 = 0.0       # Convective resistance in pipes [K·m/W]
+        R_p2 = 0.0       # Pipe wall conductive resistance [K·m/W]
+        
+        # Annular resistances (after the walls), either grout conduction or natural convection chained
+        Ra_12 = 0.3
+        Ra_1b = 0.1
+        Ra_2b = 0.1
+        
+		# Total resistances
+        R_12 = 0.3         # Thermal resistance between pipes [K·m/W]
+        R_1b = 0.1         # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_2b = 0.1         # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+    end
+    
+    eqs = [
+        # Total resistances
+        R_1b ~ R_conv_1 + R_p1 + Ra_1b + R_p2 + R_conv_2,
+		.....
+    ]
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ d51fc769-215e-4055-810e-1c5eef8cd178
+"""
+SimpleThermalResistances calculates the thermal resistances for a borehole heat exchanger.
+This component calculates pipe and convection resistances but takes annular space resistances
+(R12, R1b, R2b) as input variables, allowing for different implementations of the grouted or
+water-filled space calculations.
+"""
+function SimpleThermalResistances(; name::Symbol)
+    ps = @parameters begin
+        λ_pipe = 0.4      # Thermal conductivity of pipe material (PE) [W/(m·K)]
+        Re_lam = 2300.0   # Lower Reynolds number for laminar-turbulent transition
+        Re_turb = 4000.0  # Upper Reynolds number for turbulent transition
+    end
+    
+    sts = @variables begin
+        # Pipe dimensions
+        D_1 = 0.034      # Inner diameter of downward pipe [m]
+        D_2 = 0.034      # Inner diameter of upward pipe [m]
+        th_1 = 0.003     # Wall thickness of downward pipe [m]
+        th_2 = 0.003     # Wall thickness of upward pipe [m]
+        
+        # Flow conditions
+        ṁ_1 = 0.5        # Mass flow rate in downward pipe [kg/s]
+        ṁ_2 = 0.5        # Mass flow rate in upward pipe [kg/s]
+        T_1 = 293.15     # Average temperature in downward pipe [K]
+        T_2 = 285.15     # Average temperature in upward pipe [K]
+        
+        # Fluid properties
+        χ = 0.25         # Glycol mass fraction
+        
+        # Annular space resistances (input from outside)
+        R_12 = 0.3       # Thermal resistance between pipes [K·m/W]
+        R_1b = 0.1       # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_2b = 0.1       # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        
+        # Calculated resistances
+        R_conv_1 = 0.0   # Convective resistance in downward pipe [K·m/W]
+        R_conv_2 = 0.0   # Convective resistance in upward pipe [K·m/W]
+        R_pipe_1 = 0.0   # Conductive resistance through downward pipe wall [K·m/W]
+        R_pipe_2 = 0.0   # Conductive resistance through upward pipe wall [K·m/W]
+        
+        # Total resistances including pipe and convection effects
+        R_12_tot = 0.0   # Total thermal resistance between pipes [K·m/W]
+        R_1b_tot = 0.0   # Total thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_2b_tot = 0.0   # Total thermal resistance from pipe 2 to borehole wall [K·m/W]
+        
+        # Heat transfer coefficients
+        h_1 = 0.0        # Convective heat transfer coefficient in downward pipe [W/(m²·K)]
+        h_2 = 0.0        # Convective heat transfer coefficient in upward pipe [W/(m²·K)]
+    end
+
+    # Calculate fluid properties for pipe 1
+    eqs = [
+        # Fluid properties using external functions
+        # For pipe 1 (downward flow)
+        cp_1 = cp_b_(T_1, χ),
+        μ_1 = μ_b_(T_1, χ),
+        λp_1 = λ_b_(T_1, χ),
+        ρ_1 = ρ_b_(T_1, χ),
+        
+        # Flow calculations for pipe 1
+        V̇_1 = ṁ_1 / ρ_1,
+        S_1 = π * D_1^2 / 4,
+        v_1 = V̇_1 / S_1,
+        
+        # Dimensionless numbers for pipe 1
+        Re_1 = ρ_1 * v_1 * D_1 / μ_1,
+        Pr_1 = cp_1 * μ_1 / λp_1,
+        
+        # Heat transfer calculations for pipe 1
+        # Laminar and turbulent Nusselt numbers
+        Nu_lam_1 = 3.66,
+        f_1 = 0.3164 * Re_1^(-1/4),
+        Nu_tur_1 = (f_1/8 * (Re_1-1000) * Pr_1) / (1 + 12.7 * sqrt(f_1/8) * (Pr_1^(2/3) - 1)),
+        
+        # Smooth transition between laminar and turbulent flow
+        turb_index_1 = 0.5 * (1 + tanh((2 * log10(Re_1 / Re_lam)) / log10(Re_turb / Re_lam))),
+        Nu_1 = (1 - turb_index_1) * Nu_lam_1 + turb_index_1 * Nu_tur_1,
+        
+        # Heat transfer coefficient and resistances for pipe 1
+        h_1 = Nu_1 * λp_1 / D_1,
+        R_conv_1 = 1 / (π * D_1 * h_1),
+        R_pipe_1 = log((D_1 + 2*th_1) / D_1) / (2 * π * λ_pipe),
+        
+        # Similar calculations for pipe 2 (upward flow)
+        # Fluid properties for pipe 2
+        cp_2 = cp_b_(T_2, χ),
+        μ_2 = μ_b_(T_2, χ),
+        λp_2 = λ_b_(T_2, χ),
+        ρ_2 = ρ_b_(T_2, χ),
+        
+        # Flow calculations for pipe 2
+        V̇_2 = ṁ_2 / ρ_2,
+        S_2 = π * D_2^2 / 4,
+        v_2 = V̇_2 / S_2,
+        
+        # Dimensionless numbers for pipe 2
+        Re_2 = ρ_2 * v_2 * D_2 / μ_2,
+        Pr_2 = cp_2 * μ_2 / λp_2,
+        
+        # Heat transfer calculations for pipe 2
+        Nu_lam_2 = 3.66,
+        f_2 = 0.3164 * Re_2^(-1/4),
+        Nu_tur_2 = (f_2/8 * (Re_2-1000) * Pr_2) / (1 + 12.7 * sqrt(f_2/8) * (Pr_2^(2/3) - 1)),
+        
+        # Smooth transition between laminar and turbulent flow
+        turb_index_2 = 0.5 * (1 + tanh((2 * log10(Re_2 / Re_lam)) / log10(Re_turb / Re_lam))),
+        Nu_2 = (1 - turb_index_2) * Nu_lam_2 + turb_index_2 * Nu_tur_2,
+        
+        # Heat transfer coefficient and resistances for pipe 2
+        h_2 = Nu_2 * λp_2 / D_2,
+        R_conv_2 = 1 / (π * D_2 * h_2),
+        R_pipe_2 = log((D_2 + 2*th_2) / D_2) / (2 * π * λ_pipe),
+        
+        # Total thermal resistances including pipe and convection effects
+        R_12_tot ~ R_conv_1 + R_pipe_1 + R_12 + R_pipe_2 + R_conv_2,
+        R_1b_tot ~ R_conv_1 + R_pipe_1 + R_1b,
+        R_2b_tot ~ R_conv_2 + R_pipe_2 + R_2b
+    ]
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ e3b14470-4921-4952-ade9-a1ba266e5484
+"""
+ThermalResistancesUTube calculates the thermal resistances in a U-tube borehole heat exchanger.
+
+This component implements a delta circuit model for U-tube configuration with either:
+- Grouted borehole: Uses multipole method for thermal interactions
+- Water-filled borehole: Uses a chain of resistances
+
+The model includes:
+- Pipe wall resistances
+- Inner channel resistances (convection)
+- Annular space resistance (grouted or water-filled)
+- Delta circuit for thermal interaction between pipes
+"""
+function ThermalResistancesUTubeGrouted(; name::Symbol)
+    @assert mode in [:grouted, :water_filled] "Mode must be either :grouted or :water_filled"
+    
+    ps = @parameters begin
+        # Pipe dimensions
+        D_p_i = 0.026   # Inner diameter of pipes [m]
+        D_p_o = 0.032   # Outer diameter of pipes [m]
+        D_b = 0.11      # Diameter of borehole [m]
+        
+        # Shank spacing parameters
+        s = 0.04        # Center-to-center distance between pipes [m]
+        
+        # Material properties
+        λ_p = 0.4       # Thermal conductivity of pipe material (PE) [W/(m·K)]
+        λ_g = 2.0       # Thermal conductivity of grout [W/(m·K)]
+        λ_soil = 3.0    # Thermal conductivity of soil [W/(m·K)]
+        λ_w = 0.6       # Thermal conductivity of water (for water-filled mode) [W/(m·K)]
+        
+        # Natural convection parameters (for water-filled mode)
+        g = 9.81        # Gravitational acceleration [m/s²]
+    end
+    
+    sts = @variables begin
+        # Temperatures
+        T_1 = 293.15    # Average temperature in downward pipe [K]
+        T_2 = 283.15    # Average temperature in upward pipe [K]
+        T_b = 278.15    # Average borehole wall temperature [K]
+        T_g = 280.15    # Average grout/water temperature [K] (for water-filled mode)
+        
+        # Heat transfer coefficients
+        h_1 = 1000.0    # Heat transfer coefficient inside downward pipe [W/(m²·K)]
+        h_2 = 1000.0    # Heat transfer coefficient inside upward pipe [W/(m²·K)]
+        h_ext = 50.0    # External natural convection coefficient (for water-filled mode) [W/(m²·K)]
+        
+        # Fluid properties (for water-filled mode)
+        μ_w = 0.001     # Dynamic viscosity of water [Pa·s]
+        ρ_w = 1000.0    # Density of water [kg/m³]
+        cp_w = 4200.0   # Specific heat capacity of water [J/(kg·K)]
+        β_w = 0.0002    # Thermal expansion coefficient of water [1/K]
+        
+        # Individual thermal resistances
+        R_p1 = 0.01     # Pipe wall resistance for downward pipe [K·m/W]
+        R_p2 = 0.01     # Pipe wall resistance for upward pipe [K·m/W]
+        R_f1 = 0.05     # Fluid convection resistance inside downward pipe [K·m/W]
+        R_f2 = 0.05     # Fluid convection resistance inside upward pipe [K·m/W]
+        R_g = 0.1       # Grout/water resistance [K·m/W]
+        
+        # Delta circuit resistances (equivalent resistances for thermal modeling)
+        R_a = 0.2       # Resistance between downward pipe and borehole wall [K·m/W]
+        R_b = 0.2       # Resistance between upward pipe and borehole wall [K·m/W]
+        R_c = 0.3       # Resistance between pipes [K·m/W]
+        
+        # Output resistances (in conventional notation)
+        R_1b = 0.2      # Thermal resistance between downward pipe and borehole wall [K·m/W]
+        R_2b = 0.2      # Thermal resistance between upward pipe and borehole wall [K·m/W]
+        R_12 = 0.3      # Thermal resistance between pipes [K·m/W]
+    end
+    
+    # Calculate geometric parameters
+    r_p = D_p_o / 2      # Outer radius of pipe
+    r_b = D_b / 2        # Borehole radius
+    
+    # Calculate pipe perimeters
+    Per_pi = π * D_p_i    # Inner perimeter of pipes
+    
+    # Resistance from fluid to pipe wall (convection)
+    R_f1_eq = R_f1 ~ 1 / (h_1 * Per_pi)
+    R_f2_eq = R_f2 ~ 1 / (h_2 * Per_pi)
+    
+    # Resistance across pipe wall (conduction)
+    R_p1_eq = R_p1 ~ log(D_p_o / D_p_i) / (2 * π * λ_p)
+    R_p2_eq = R_p2 ~ log(D_p_o / D_p_i) / (2 * π * λ_p)
+    
+    # Different approaches for grouted vs water-filled boreholes
+    if mode == :grouted
+        # Implement multipole method for grouted borehole
+        # This is a simplified first-order multipole solution
+        
+        # Dimensionless parameters
+        β_ratio = (λ_g - λ_soil) / (λ_g + λ_soil)  # Thermal conductivity ratio
+        σ_1 = s / (2 * r_b)                        # Relative pipe position
+        σ_2 = σ_1                                  # Symmetric position for U-tube
+        
+        # Calculate delta circuit resistances using multipole approach
+        # These are simplified first-order multipole formulas
+        R_a_eq = R_a ~ 1/(2*π*λ_g) * log(r_b/r_p) + 1/(2*π*λ_g) * β_ratio * log(r_b^2/(r_b^2 - σ_1^2*r_b^2))
+        R_b_eq = R_b ~ 1/(2*π*λ_g) * log(r_b/r_p) + 1/(2*π*λ_g) * β_ratio * log(r_b^2/(r_b^2 - σ_2^2*r_b^2))
+        R_c_eq = R_c ~ 1/(2*π*λ_g) * log(s/(2*r_p)) - 1/(2*π*λ_g) * β_ratio * log((r_b^2 - σ_1*σ_2*r_b^2)/(r_b^2 - σ_1^2*r_b^2)^0.5 * (r_b^2 - σ_2^2*r_b^2)^0.5)
+        
+        # Calculate output resistances from delta circuit
+        R_1b_eq = R_1b ~ R_f1 + R_p1 + (R_a * (R_b + R_c)) / (R_a + R_b + R_c)
+        R_2b_eq = R_2b ~ R_f2 + R_p2 + (R_b * (R_a + R_c)) / (R_a + R_b + R_c)
+        R_12_eq = R_12 ~ R_f1 + R_p1 + R_f2 + R_p2 + (R_a * R_b + R_a * R_c + R_b * R_c) / (R_c)
+        
+    else # water_filled mode
+        # Calculate natural convection in water-filled annular space
+        # Grashof number
+        ΔT_avg = abs(((T_1 + T_2) / 2) - T_b)  # Average temperature difference
+        ν_w = μ_w / ρ_w                        # Kinematic viscosity
+        Gr = g * β_w * ΔT_avg * (D_b - D_p_o)^3 / ν_w^2
+        
+        # Prandtl number
+        Pr = cp_w * μ_w / λ_w
+        
+        # Nusselt number for natural convection
+        Nu = 0.6 + 0.387 * (Gr * Pr)^(1/6) * (1 + (0.559 / Pr)^(9/16))^(-8/27)
+        
+        # Effective heat transfer coefficient for natural convection
+        h_nc = Nu * λ_w / (D_b - D_p_o)
+        
+        # Water resistance (convection to borehole wall)
+        R_g_eq = R_g ~ 1 / (h_nc * π * D_b)
+        
+        # External convection resistance from pipe to water
+        R_ext1 = 1 / (h_ext * π * D_p_o)
+        R_ext2 = 1 / (h_ext * π * D_p_o)
+        
+        # Delta circuit resistances for water-filled case
+        # These are direct thermal resistances based on heat transfer paths
+        R_a_eq = R_a ~ R_ext1 + R_g
+        R_b_eq = R_b ~ R_ext2 + R_g
+        
+        # Direct interaction between pipes (accounting for view factor)
+        # Simplified approach using an effective resistance
+        R_c_eq = R_c ~ log(s / (2 * r_p)) / (π * λ_w)
+        
+        # Calculate output resistances from chain of resistances
+        R_1b_eq = R_1b ~ R_f1 + R_p1 + R_ext1 + R_g
+        R_2b_eq = R_2b ~ R_f2 + R_p2 + R_ext2 + R_g
+        R_12_eq = R_12 ~ R_f1 + R_p1 + R_c + R_p2 + R_f2
+    end
+    
+    # System equations
+    eqs = [
+        R_f1_eq,
+        R_f2_eq,
+        R_p1_eq,
+        R_p2_eq,
+        R_a_eq,
+        R_b_eq,
+        R_c_eq,
+        R_1b_eq,
+        R_2b_eq,
+        R_12_eq
+    ]
+    
+    # Add grout/water resistance equation for water-filled mode
+    if mode == :water_filled
+        push!(eqs, R_g_eq)
+    end
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ 7553bf8c-ac9e-44da-8513-eee11c0b33c5
+"""
+AnnularHeatTransferCoefficient calculates convective heat transfer coefficients for flow in annular spaces.
+
+This component can be used to calculate heat transfer coefficients for both laminar
+and turbulent flow regimes in annular spaces using appropriate correlations.
+
+For annular flow, different correlations are used compared to pipe flow due to the 
+different hydraulic characteristics and heat transfer mechanisms.
+"""
+function AnnularHeatTransferCoefficient(; name::Symbol)
+    ps = @parameters begin
+        D_o = 0.04     # Outer diameter of annular space [m]
+        D_i = 0.02     # Inner diameter of annular space [m]
+        roughness = 1.5e-6  # Surface roughness [m]
+    end
+    
+    sts = @variables begin
+        # Flow properties
+        ṁ = 0.5       # Mass flow rate [kg/s]
+        
+        # Fluid properties
+        ρ = 1000.0    # Density [kg/m³]
+        μ = 0.001     # Dynamic viscosity [Pa·s]
+        cp = 4200.0   # Specific heat capacity [J/(kg·K)]
+        λ = 0.6       # Thermal conductivity [W/(m·K)]
+        
+        # Outputs
+        h_o = 1000.0   # Heat transfer coefficient at outer surface [W/(m²·K)]
+        h_i = 1000.0   # Heat transfer coefficient at inner surface [W/(m²·K)]
+        Re = 10000.0  # Reynolds number
+        Pr = 7.0      # Prandtl number
+        Nu_o = 100.0  # Nusselt number at outer surface
+        Nu_i = 100.0  # Nusselt number at inner surface
+        f = 0.03      # Friction factor
+    end
+    
+    # Calculate hydraulic diameter for annular space
+    D_h = D_o - D_i
+    
+    # Calculate area and wetted perimeter
+    A = π * (D_o^2 - D_i^2) / 4
+    P_wet = π * (D_o + D_i)
+    
+    # Flow velocity
+    v = ṁ / (ρ * A)
+    
+    # Reynolds number
+    Re_eq = Re ~ ρ * v * D_h / μ
+    
+    # Prandtl number
+    Pr_eq = Pr ~ cp * μ / λ
+    
+    # Colebrook-White equation for friction factor (implicit)
+    # Using the Haaland approximation for simplicity
+    relative_roughness = roughness / D_h
+    f_eq = f ~ (1 / (-1.8 * log10((relative_roughness/3.7)^1.11 + 6.9/Re)))^2
+    
+    # Transition function using tanh
+    transition = 0.5 * (1 + tanh((Re - 3000) / 500))
+    
+    # Laminar Nusselt number for annular spaces
+    # For fully developed laminar flow in annular ducts with constant heat flux
+    # Based on the diameter ratio (r_i/r_o)
+    diam_ratio = D_i / D_o
+    
+    # Laminar Nusselt numbers for inner and outer surfaces
+    # Using correlations from literature for annular spaces
+    # (Ref: Incropera's "Fundamentals of Heat and Mass Transfer")
+    Nu_i_laminar = 4.0 + 0.14 * diam_ratio^0.2  # Simplified correlation for inner surface
+    Nu_o_laminar = 3.66 + 0.08 * diam_ratio^0.5  # Simplified correlation for outer surface
+    
+    # Turbulent Nusselt number using Gnielinski correlation adapted for annular spaces
+    Nu_turbulent = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * (f/8)^0.5 * (Pr^(2/3) - 1))
+    
+    # Apply modified correlations for inner and outer surfaces in turbulent flow
+    # Account for curvature effects in annular space
+    # Typically, heat transfer is enhanced at the inner wall and reduced at the outer wall
+    Nu_i_turbulent = Nu_turbulent * (1 + 0.14 * diam_ratio^0.5)
+    Nu_o_turbulent = Nu_turbulent * (1 - 0.08 * diam_ratio^0.3)
+    
+    # Combine laminar and turbulent correlations with smooth transition
+    Nu_i_eq = Nu_i ~ Nu_i_laminar * (1 - transition) + Nu_i_turbulent * transition
+    Nu_o_eq = Nu_o ~ Nu_o_laminar * (1 - transition) + Nu_o_turbulent * transition
+    
+    # Heat transfer coefficients
+    h_i_eq = h_i ~ Nu_i * λ / D_h
+    h_o_eq = h_o ~ Nu_o * λ / D_h
+    
+    # System equations
+    eqs = [
+        Re_eq,
+        Pr_eq,
+        f_eq,
+        Nu_i_eq,
+        Nu_o_eq,
+        h_i_eq,
+        h_o_eq
+    ]
+    
+    return NonlinearSystem(eqs, sts, ps; name=name)
+end
+
+# ╔═╡ 76b1d442-88ce-4cd1-876c-33e08ca1799d
+"""
+Test function for AnnularHeatTransferCoefficient component.
+"""
+function test_annular_heat_transfer_coefficient()
+    # Create the component
+    @named htc = AnnularHeatTransferCoefficient()
+    
+    # Define a test system with default values
+    @named test_sys = assemble([htc], equations=[
+        # Dimensions
+        htc.D_o ~ 0.04,      # 40 mm outer diameter
+        htc.D_i ~ 0.02,      # 20 mm inner diameter
+        
+        # Flow properties
+        htc.ṁ ~ 0.5,         # 0.5 kg/s
+        
+        # Fluid properties for water
+        htc.ρ ~ 1000.0,      # kg/m³
+        htc.cp ~ 4200.0,     # J/(kg·K)
+        htc.μ ~ 0.001,       # Pa·s
+        htc.λ ~ 0.6          # W/(m·K)
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    Re = sol[htc.Re]
+    f = sol[htc.f]
+    Nu_i = sol[htc.Nu_i]
+    Nu_o = sol[htc.Nu_o]
+    h_i = sol[htc.h_i]
+    h_o = sol[htc.h_o]
+    
+    # Print the results
+    println("AnnularHeatTransferCoefficient Results:")
+    println("---------------------------")
+    println("Reynolds number: $(Re)")
+    println("Friction factor: $(f)")
+    println("Inner Nusselt number: $(Nu_i)")
+    println("Outer Nusselt number: $(Nu_o)")
+    println("Inner heat transfer coefficient: $(h_i) W/(m²·K)")
+    println("Outer heat transfer coefficient: $(h_o) W/(m²·K)")
+    
+    return sol
+end
+
+# ╔═╡ f759e486-18b9-4c24-a9ee-8c2bdcd932fb
+test_annular_heat_transfer_coefficient()
+
+# ╔═╡ 4ffe3c04-15e2-4140-8f47-639dd479bcd3
+"""
+DynamicAnnularHeatTransferCoefficient integrates fluid property calculations with the annular heat transfer model.
+
+This component calculates heat transfer coefficients in annular spaces while using the Properties module
+to determine fluid properties based on temperature.
+"""
+function DynamicAnnularHeatTransferCoefficient(; name::Symbol, fluid="water", χ=0.0)
+    ps = @parameters begin
+        D_o = 0.04     # Outer diameter of annular space [m]
+        D_i = 0.02     # Inner diameter of annular space [m]
+        roughness = 1.5e-6  # Surface roughness [m]
+        χ = χ          # Concentration (for mixtures)
+    end
+    
+    sts = @variables begin
+        # Flow properties
+        ṁ = 0.5       # Mass flow rate [kg/s]
+        T = 293.15    # Fluid temperature [K]
+        
+        # Outputs
+        h_o = 1000.0  # Heat transfer coefficient at outer surface [W/(m²·K)]
+        h_i = 1000.0  # Heat transfer coefficient at inner surface [W/(m²·K)]
+        Re = 10000.0  # Reynolds number
+        f = 0.03      # Friction factor
+    end
+    
+    # Create individual components
+    @named htc = AnnularHeatTransferCoefficient()
+    @named fluid_props = Properties.DynamicIncompressibleProps(fluid=fluid)
+    
+    # Connect the systems with equations
+    eqs = [
+        # Connect dimensions
+        htc.D_o ~ D_o,
+        htc.D_i ~ D_i,
+        htc.roughness ~ roughness,
+        
+        # Connect flow properties
+        htc.ṁ ~ ṁ,
+        
+        # Connect fluid properties to temperature
+        fluid_props.T ~ T,
+        fluid_props.χ ~ χ,
+        
+        # Connect fluid properties to HTC component
+        htc.ρ ~ fluid_props.ρ,
+        htc.μ ~ fluid_props.μ,
+        htc.cp ~ fluid_props.cp,
+        htc.λ ~ fluid_props.λ,
+        
+        # Connect outputs
+        h_o ~ htc.h_o,
+        h_i ~ htc.h_i,
+        Re ~ htc.Re,
+        f ~ htc.f
+    ]
+    
+    # Create and return the composed system
+    sys = NonlinearSystem(eqs, sts, ps, name=name)
+    return ModelingToolkit.compose(sys, [htc, fluid_props], name=name)
+end
+
+# ╔═╡ 8850a36f-6ca5-43b2-b81c-d4044f65d6a3
+"""
+Test function for DynamicAnnularHeatTransferCoefficient component.
+"""
+function test_dynamic_annular_heat_transfer_coefficient()
+    # Create the component
+    @named htc = DynamicAnnularHeatTransferCoefficient()
+    
+    # Define a test system with default values
+    @named test_sys = assemble([htc], equations=[
+        # Dimensions
+        htc.D_o ~ 0.04,      # 40 mm outer diameter
+        htc.D_i ~ 0.02,      # 20 mm inner diameter
+        
+        # Flow properties
+        htc.ṁ ~ 0.5,         # 0.5 kg/s
+        htc.T ~ 293.15       # 20°C
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    Re = sol[htc.Re]
+    f = sol[htc.f]
+    h_i = sol[htc.h_i]
+    h_o = sol[htc.h_o]
+    
+    # Print the results
+    println("DynamicAnnularHeatTransferCoefficient Results:")
+    println("---------------------------")
+    println("Reynolds number: $(Re)")
+    println("Friction factor: $(f)")
+    println("Inner heat transfer coefficient: $(h_i) W/(m²·K)")
+    println("Outer heat transfer coefficient: $(h_o) W/(m²·K)")
+    
+    return sol
+end
+
+# ╔═╡ faeca4b4-1489-4288-b61b-05f07bb6af68
+test_dynamic_annular_heat_transfer_coefficient()
+
+# ╔═╡ c2820c10-5b74-438f-a315-b20d8941f487
+"""
+Test function for ThermalResistancesUTube component with grouted borehole.
+"""
+function test_thermal_resistances_utube_grouted()
+    # Create the resistance component for grouted borehole
+    @named bhe = ThermalResistancesUTube(mode=:grouted)
+    
+    # Define a test system with default values
+    @named test_sys = assemble([bhe], equations=[
+        # Heat transfer coefficients
+        bhe.h_1 ~ 1000.0,      # W/(m²·K)
+        bhe.h_2 ~ 1000.0,      # W/(m²·K)
+        
+        # Temperatures
+        bhe.T_1 ~ 293.15,      # 20°C
+        bhe.T_2 ~ 283.15,      # 10°C
+        bhe.T_b ~ 278.15       # 5°C
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    R_1b = sol[bhe.R_1b]
+    R_2b = sol[bhe.R_2b]
+    R_12 = sol[bhe.R_12]
+    
+    # Print the results
+    println("ThermalResistancesUTube (Grouted) Results:")
+    println("---------------------------")
+    println("R_1b = $(R_1b) K·m/W")
+    println("R_2b = $(R_2b) K·m/W")
+    println("R_12 = $(R_12) K·m/W")
+    
+    return sol
+end
+
+# ╔═╡ 7048ecc5-89a7-41d2-8d5b-7ea183f1b67d
+"""
+Test function for ThermalResistancesUTube component with water-filled borehole.
+"""
+function test_thermal_resistances_utube_water_filled()
+    # Create the resistance component for water-filled borehole
+    @named bhe = ThermalResistancesUTube(mode=:water_filled)
+    
+    # Define a test system with default values
+    @named test_sys = assemble([bhe], equations=[
+        # Heat transfer coefficients
+        bhe.h_1 ~ 1000.0,      # W/(m²·K)
+        bhe.h_2 ~ 1000.0,      # W/(m²·K)
+        bhe.h_ext ~ 50.0,      # W/(m²·K)
+        
+        # Temperatures
+        bhe.T_1 ~ 293.15,      # 20°C
+        bhe.T_2 ~ 283.15,      # 10°C
+        bhe.T_b ~ 278.15,      # 5°C
+        bhe.T_g ~ 280.15,      # 7°C
+        
+        # Water properties
+        bhe.μ_w ~ 0.001,       # Pa·s
+        bhe.ρ_w ~ 1000.0,      # kg/m³
+        bhe.cp_w ~ 4200.0,     # J/(kg·K)
+        bhe.β_w ~ 0.0002       # 1/K
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    R_1b = sol[bhe.R_1b]
+    R_2b = sol[bhe.R_2b]
+    R_12 = sol[bhe.R_12]
+    
+    # Print the results
+    println("ThermalResistancesUTube (Water-filled) Results:")
+    println("---------------------------")
+    println("R_1b = $(R_1b) K·m/W")
+    println("R_2b = $(R_2b) K·m/W")
+    println("R_12 = $(R_12) K·m/W")
+    
+    return sol
+end
+
+# ╔═╡ b362d35b-3e25-405b-8ab6-8672ca33e43f
+"""
+ThermalResistancesUTubeWithProps integrates fluid property calculations with the U-tube resistance model.
+
+This component calculates U-tube borehole resistances while using the Properties module
+to determine fluid properties based on temperature and the HeatTransferCoefficient component
+for calculating convective heat transfer coefficients.
+"""
+function ThermalResistancesUTubeWithProps(; name::Symbol, mode::Symbol=:grouted, fluid="water", χ=0.0)
+    @assert mode in [:grouted, :water_filled] "Mode must be either :grouted or :water_filled"
+    
+    ps = @parameters begin
+        # Pipe dimensions
+        D_p_i = 0.026   # Inner diameter of pipes [m]
+        D_p_o = 0.032   # Outer diameter of pipes [m]
+        D_b = 0.11      # Diameter of borehole [m]
+        
+        # Shank spacing parameters
+        s = 0.04        # Center-to-center distance between pipes [m]
+        
+        # Material properties
+        λ_p = 0.4       # Thermal conductivity of pipe material (PE) [W/(m·K)]
+        λ_g = 2.0       # Thermal conductivity of grout [W/(m·K)]
+        λ_soil = 3.0    # Thermal conductivity of soil [W/(m·K)]
+        
+        # Natural convection parameters (for water-filled mode)
+        g = 9.81        # Gravitational acceleration [m/s²]
+        
+        # Fluid specification
+        χ = χ           # Concentration (for mixtures)
+    end
+    
+    sts = @variables begin
+        # Temperatures
+        T_1 = 293.15    # Average temperature in downward pipe [K]
+        T_2 = 283.15    # Average temperature in upward pipe [K]
+        T_b = 278.15    # Average borehole wall temperature [K]
+        T_g = 280.15    # Average grout/water temperature [K] (for water-filled mode)
+        
+        # Flow characteristics
+        ṁ_1 = 0.5       # Mass flow rate in downward pipe [kg/s]
+        ṁ_2 = 0.5       # Mass flow rate in upward pipe [kg/s]
+        
+        # Output resistances
+        R_1b = 0.2      # Thermal resistance between downward pipe and borehole wall [K·m/W]
+        R_2b = 0.2      # Thermal resistance between upward pipe and borehole wall [K·m/W]
+        R_12 = 0.3      # Thermal resistance between pipes [K·m/W]
+    end
+    
+    # Create individual components
+    @named bhe_resistance = ThermalResistancesUTube(mode=mode)
+    @named htc_1 = HeatTransferCoefficient()
+    @named htc_2 = HeatTransferCoefficient()
+    @named fluid_props_1 = Properties.DynamicIncompressibleProps(fluid=fluid)
+    @named fluid_props_2 = Properties.DynamicIncompressibleProps(fluid=fluid)
+    
+    # For water-filled case, create a fluid properties component for the borehole water
+    if mode == :water_filled
+        @named fluid_props_g = Properties.DynamicIncompressibleProps(fluid=fluid)
+    end
+    
+    # Connect the systems with equations
+    eqs = [
+        # Connect pipe dimensions
+        bhe_resistance.D_p_i ~ D_p_i,
+        bhe_resistance.D_p_o ~ D_p_o,
+        bhe_resistance.D_b ~ D_b,
+        bhe_resistance.s ~ s,
+        
+        # Connect material properties
+        bhe_resistance.λ_p ~ λ_p,
+        bhe_resistance.λ_g ~ λ_g,
+        bhe_resistance.λ_soil ~ λ_soil,
+        
+        # Connect flow rates and dimensions to HTC components
+        htc_1.D ~ D_p_i,
+        htc_1.ṁ ~ ṁ_1,
+        htc_2.D ~ D_p_i,
+        htc_2.ṁ ~ ṁ_2,
+        
+        # Connect temperatures to fluid properties
+        fluid_props_1.T ~ T_1,
+        fluid_props_1.χ ~ χ,
+        fluid_props_2.T ~ T_2,
+        fluid_props_2.χ ~ χ,
+        
+        # Connect fluid properties to HTC components
+        htc_1.ρ ~ fluid_props_1.ρ,
+        htc_1.μ ~ fluid_props_1.μ,
+        htc_1.cp ~ fluid_props_1.cp,
+        htc_1.λ ~ fluid_props_1.λ,
+        
+        htc_2.ρ ~ fluid_props_2.ρ,
+        htc_2.μ ~ fluid_props_2.μ,
+        htc_2.cp ~ fluid_props_2.cp,
+        htc_2.λ ~ fluid_props_2.λ,
+        
+        # Connect heat transfer coefficients to resistance model
+        bhe_resistance.h_1 ~ htc_1.h,
+        bhe_resistance.h_2 ~ htc_2.h,
+        
+        # Connect temperatures
+        bhe_resistance.T_1 ~ T_1,
+        bhe_resistance.T_2 ~ T_2,
+        bhe_resistance.T_b ~ T_b,
+        
+        # Connect output resistances
+        R_1b ~ bhe_resistance.R_1b,
+        R_2b ~ bhe_resistance.R_2b,
+        R_12 ~ bhe_resistance.R_12
+    ]
+    
+    # Additional connections for water-filled case
+    if mode == :water_filled
+        push!(eqs,
+            # Connect grout/water temperature
+            bhe_resistance.T_g ~ T_g,
+            
+            # Connect water properties
+            fluid_props_g.T ~ T_g,
+            fluid_props_g.χ ~ χ,
+            
+            # Connect water properties to resistance model
+            bhe_resistance.μ_w ~ fluid_props_g.μ,
+            bhe_resistance.ρ_w ~ fluid_props_g.ρ,
+            bhe_resistance.cp_w ~ fluid_props_g.cp,
+            bhe_resistance.β_w ~ fluid_props_g.β,
+            bhe_resistance.λ_w ~ fluid_props_g.λ
+        )
+        
+        # Create and return the composed system with water properties
+        sys = NonlinearSystem(eqs, sts, ps, name=name)
+        return ModelingToolkit.compose(sys, [bhe_resistance, htc_1, htc_2, fluid_props_1, fluid_props_2, fluid_props_g], name=name)
+    else
+        # Create and return the composed system without water properties
+        sys = NonlinearSystem(eqs, sts, ps, name=name)
+        return ModelingToolkit.compose(sys, [bhe_resistance, htc_1, htc_2, fluid_props_1, fluid_props_2], name=name)
+    end
+end
+
+# ╔═╡ b5173f8d-e218-4e18-88cb-a0ab61592302
+"""
+Test function for ThermalResistancesUTubeWithProps component with grouted borehole.
+"""
+function test_thermal_resistances_utube_with_props_grouted()
+    # Create the component for grouted borehole
+    @named bhe = ThermalResistancesUTubeWithProps(mode=:grouted)
+    
+    # Define a test system with default values
+    @named test_sys = assemble([bhe], equations=[
+        # Temperatures
+        bhe.T_1 ~ 293.15,      # 20°C
+        bhe.T_2 ~ 283.15,      # 10°C
+        bhe.T_b ~ 278.15,      # 5°C
+        
+        # Flow rates
+        bhe.ṁ_1 ~ 0.5,         # 0.5 kg/s
+        bhe.ṁ_2 ~ 0.5          # 0.5 kg/s
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    R_1b = sol[bhe.R_1b]
+    R_2b = sol[bhe.R_2b]
+    R_12 = sol[bhe.R_12]
+    
+    # Print the results
+    println("ThermalResistancesUTubeWithProps (Grouted) Results:")
+    println("---------------------------")
+    println("R_1b = $(R_1b) K·m/W")
+    println("R_2b = $(R_2b) K·m/W")
+    println("R_12 = $(R_12) K·m/W")
+    
+    return sol
+end
+
+# ╔═╡ e2f713de-cf9a-49a1-88bc-404a746b3feb
+"""
+Test function for ThermalResistancesUTubeWithProps component with water-filled borehole.
+"""
+function test_thermal_resistances_utube_with_props_water_filled()
+    # Create the component for water-filled borehole
+    @named bhe = ThermalResistancesUTubeWithProps(mode=:water_filled)
+    
+    # Define a test system with default values
+    @named test_sys = assemble([bhe], equations=[
+        # Temperatures
+        bhe.T_1 ~ 293.15,      # 20°C
+        bhe.T_2 ~ 283.15,      # 10°C
+        bhe.T_b ~ 278.15,      # 5°C
+        bhe.T_g ~ 280.15,      # 7°C
+        
+        # Flow rates
+        bhe.ṁ_1 ~ 0.5,         # 0.5 kg/s
+        bhe.ṁ_2 ~ 0.5          # 0.5 kg/s
+    ])
+    
+    # Simplify and solve the system
+    simpl_sys = structural_simplify(test_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+    
+    # Extract the solution values
+    R_1b = sol[bhe.R_1b]
+    R_2b = sol[bhe.R_2b]
+    R_12 = sol[bhe.R_12]
+    
+    # Print the results
+    println("ThermalResistancesUTubeWithProps (Water-filled) Results:")
+    println("---------------------------")
+    println("R_1b = $(R_1b) K·m/W")
+    println("R_2b = $(R_2b) K·m/W")
+    println("R_12 = $(R_12) K·m/W")
+    
+    return sol
+end
+
+# ╔═╡ 1093c1d5-3263-4a81-9e9d-9677b3003ea4
+md"""
+# Anciliary heating
+"""
+
+# ╔═╡ e884fbb3-e069-484d-87fa-c84535f02403
+md"# Utilities"
+
+# ╔═╡ 62625d10-5988-43dc-9ce0-4ea60f9f6e29
+#=╠═╡
+begin
+	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
+	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
+	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
+	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
+	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
+	end
+
+	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
+		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
+		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
+		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
+	end
+	
+	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
+		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
+		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
+		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
+		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
+	end
+
+	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
+end
+  ╠═╡ =#
+
+# ╔═╡ 686d6091-d607-43df-9d0a-7fbf5c907086
+# Function to compute the largest rectangle in a binary matrix.
+# Returns the best rectangle as (row_min, row_max, col_min, col_max) and its area.
+function largest_valid_submatrix(B)
+    m, n = size(B)
+    height = zeros(Int, n)  # height histogram for each column
+    best_area = 0
+    best_coords = (1, 1, 1, 1)
+
+    for i in 1:m
+        # Update histogram: if B[i,j] is valid then increment, else reset to 0.
+        for j in 1:n
+            height[j] = B[i, j] ? height[j] + 1 : 0
+        end
+        # Compute largest rectangle in histogram for this row.
+        # We'll use a stack; the algorithm is similar to the classic one.
+        stack = Int[]  # will store column indices
+        # Process columns from 1 to n and add a sentinel at the end.
+        for j in 1:(n+1)
+            cur_height = (j <= n) ? height[j] : 0
+            while !isempty(stack) && cur_height < height[stack[end]]
+                h = height[pop!(stack)]
+                # Determine width of the rectangle
+                w = isempty(stack) ? j - 1 : j - stack[end] - 1
+                area = h * w
+                if area > best_area
+                    best_area = area
+                    row_max = i
+                    row_min = i - h + 1
+                    col_min = isempty(stack) ? 1 : stack[end] + 1
+                    col_max = j - 1
+                    best_coords = (row_min, row_max, col_min, col_max)
+                end
+            end
+            push!(stack, j)
+        end
+    end
+    return best_coords, best_area
+end
+
+# ╔═╡ b1eab00d-89c6-4868-bdc9-5537a8cdab3c
+md" # Other"
+
+# ╔═╡ 345b1fa8-ee00-4a6f-8d6d-5cec9fe5151a
+candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(),#
+    CMINPACK(),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+	];
+
+# ╔═╡ 082476a0-a87b-4c16-a8fe-a19290772c07
+md"---"
+
+# ╔═╡ 83e53fd9-15a5-4b11-b918-76fcca073f8e
+md" # Imports"
+
+# ╔═╡ 00000000-0000-0000-0000-000000000001
+PLUTO_PROJECT_TOML_CONTENTS = """
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+MINPACK = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
+Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+NLSolvers = "337daf1e-9722-11e9-073e-8b9effe078ba"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
+PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
+PlutoExtras = "ed5d0301-4775-4676-b788-cf71e66ff8ed"
+PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
+SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
+Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+
+[compat]
+Distributions = "~0.25.120"
+MINPACK = "~1.3.0"
+ModelingToolkit = "~9.78.0"
+MonteCarloMeasurements = "~1.4.6"
+NLSolvers = "~0.5.0"
+NLsolve = "~4.5.1"
+Nemo = "~0.49.4"
+NonlinearSolve = "~4.9.0"
+PETSc = "~0.3.1"
+PlutoDevMacros = "~0.9.0"
+PlutoExtras = "~0.7.15"
+PlutoTest = "~0.2.2"
+PlutoUI = "~0.7.62"
+SIAMFANLEquations = "~1.0.2"
+SteadyStateDiffEq = "~2.5.0"
+Sundials = "~4.28.0"
+Unitful = "~1.22.0"
+WGLMakie = "~0.11.1"
+"""
+
+# ╔═╡ 00000000-0000-0000-0000-000000000002
+PLUTO_MANIFEST_TOML_CONTENTS = """
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.11.5"
+manifest_format = "2.0"
+project_hash = "848154fcfe41dc33bcaee6a9d95c3626699f7c1b"
+
+[[deps.ADTypes]]
+git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
+uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+version = "1.14.0"
+weakdeps = ["ChainRulesCore", "ConstructionBase", "EnzymeCore"]
+
+    [deps.ADTypes.extensions]
+    ADTypesChainRulesCoreExt = "ChainRulesCore"
+    ADTypesConstructionBaseExt = "ConstructionBase"
+    ADTypesEnzymeCoreExt = "EnzymeCore"
+
+[[deps.AbstractAlgebra]]
+deps = ["LinearAlgebra", "MacroTools", "Preferences", "Random", "RandomExtensions", "SparseArrays"]
+git-tree-sha1 = "34d32b62988ea50c169c9d4bef9cb4ce6906d305"
+uuid = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
+version = "0.44.13"
+weakdeps = ["Requires", "Test"]
+
+    [deps.AbstractAlgebra.extensions]
+    TestExt = "Test"
+
+[[deps.AbstractFFTs]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.5.0"
+weakdeps = ["ChainRulesCore", "Test"]
+
+    [deps.AbstractFFTs.extensions]
+    AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+    AbstractFFTsTestExt = "Test"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "6e1d2a35f2f90a4bc7c2ed98079b2ba09c35b83a"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.3.2"
+
+[[deps.AbstractTrees]]
+git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
+uuid = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+version = "0.4.5"
+
+[[deps.Accessors]]
+deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
+git-tree-sha1 = "3b86719127f50670efe356bc11073d84b4ed7a5d"
+uuid = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
+version = "0.1.42"
+
+    [deps.Accessors.extensions]
+    AxisKeysExt = "AxisKeys"
+    IntervalSetsExt = "IntervalSets"
+    LinearAlgebraExt = "LinearAlgebra"
+    StaticArraysExt = "StaticArrays"
+    StructArraysExt = "StructArrays"
+    TestExt = "Test"
+    UnitfulExt = "Unitful"
+
+    [deps.Accessors.weakdeps]
+    AxisKeys = "94b1ba4f-4ee9-5380-92f1-94cde586c3c5"
+    IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
+    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+    StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.Adapt]]
+deps = ["LinearAlgebra", "Requires"]
+git-tree-sha1 = "f7817e2e585aa6d924fd714df1e2a84be7896c60"
+uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+version = "4.3.0"
+weakdeps = ["SparseArrays", "StaticArrays"]
+
+    [deps.Adapt.extensions]
+    AdaptSparseArraysExt = "SparseArrays"
+    AdaptStaticArraysExt = "StaticArrays"
+
+[[deps.AdaptivePredicates]]
+git-tree-sha1 = "7e651ea8d262d2d74ce75fdf47c4d63c07dba7a6"
+uuid = "35492f91-a3bd-45ad-95db-fcad7dcfedb7"
+version = "1.2.0"
+
+[[deps.AliasTables]]
+deps = ["PtrArrays", "Random"]
+git-tree-sha1 = "9876e1e164b144ca45e9e3198d0b689cadfed9ff"
+uuid = "66dad0bd-aa9a-41b7-9441-69ab47430ed8"
+version = "1.1.3"
+
+[[deps.Animations]]
+deps = ["Colors"]
+git-tree-sha1 = "e092fa223bf66a3c41f9c022bd074d916dc303e7"
+uuid = "27a7e980-b3e6-11e9-2bcd-0b925532e340"
+version = "0.4.2"
+
+[[deps.ArgTools]]
+uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
+version = "1.1.2"
+
+[[deps.ArnoldiMethod]]
+deps = ["LinearAlgebra", "Random", "StaticArrays"]
+git-tree-sha1 = "d57bd3762d308bded22c3b82d033bff85f6195c6"
+uuid = "ec485272-7323-5ecc-a04f-4719b315124d"
+version = "0.4.0"
+
+[[deps.ArrayInterface]]
+deps = ["Adapt", "LinearAlgebra"]
+git-tree-sha1 = "9606d7832795cbef89e06a550475be300364a8aa"
+uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+version = "7.19.0"
+
+    [deps.ArrayInterface.extensions]
+    ArrayInterfaceBandedMatricesExt = "BandedMatrices"
+    ArrayInterfaceBlockBandedMatricesExt = "BlockBandedMatrices"
+    ArrayInterfaceCUDAExt = "CUDA"
+    ArrayInterfaceCUDSSExt = "CUDSS"
+    ArrayInterfaceChainRulesCoreExt = "ChainRulesCore"
+    ArrayInterfaceChainRulesExt = "ChainRules"
+    ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
+    ArrayInterfaceReverseDiffExt = "ReverseDiff"
+    ArrayInterfaceSparseArraysExt = "SparseArrays"
+    ArrayInterfaceStaticArraysCoreExt = "StaticArraysCore"
+    ArrayInterfaceTrackerExt = "Tracker"
+
+    [deps.ArrayInterface.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
+    ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
+[[deps.ArrayLayouts]]
+deps = ["FillArrays", "LinearAlgebra"]
+git-tree-sha1 = "4e25216b8fea1908a0ce0f5d87368587899f75be"
+uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
+version = "1.11.1"
+weakdeps = ["SparseArrays"]
+
+    [deps.ArrayLayouts.extensions]
+    ArrayLayoutsSparseArraysExt = "SparseArrays"
+
+[[deps.Artifacts]]
+uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+version = "1.11.0"
+
+[[deps.Automa]]
+deps = ["PrecompileTools", "SIMD", "TranscodingStreams"]
+git-tree-sha1 = "a8f503e8e1a5f583fbef15a8440c8c7e32185df2"
+uuid = "67c07d97-cdcb-5c2c-af73-a7f9c32a568b"
+version = "1.1.0"
+
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "01b8ccb13d68535d73d2b0c23e39bd23155fb712"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.1.0"
+
+[[deps.AxisArrays]]
+deps = ["Dates", "IntervalSets", "IterTools", "RangeArrays"]
+git-tree-sha1 = "16351be62963a67ac4083f748fdb3cca58bfd52f"
+uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
+version = "0.4.7"
+
+[[deps.BandedMatrices]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "PrecompileTools"]
+git-tree-sha1 = "e35c672b239c5105f597963c33e740eeb46cf0ab"
+uuid = "aae01518-5342-5314-be14-df237901396f"
+version = "1.9.4"
+
+    [deps.BandedMatrices.extensions]
+    BandedMatricesSparseArraysExt = "SparseArrays"
+    CliqueTreesExt = "CliqueTrees"
+
+    [deps.BandedMatrices.weakdeps]
+    CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[[deps.Base64]]
+uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+version = "1.11.0"
+
+[[deps.Bijections]]
+git-tree-sha1 = "6aaafea90a56dc1fc8cbc15e3cf26d6bc81eb0a3"
+uuid = "e2ed5e7c-b2de-5872-ae92-c73ca462fb04"
+version = "0.1.10"
+
+[[deps.BitFlags]]
+git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
+uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
+version = "0.1.9"
+
+[[deps.BitTwiddlingConvenienceFunctions]]
+deps = ["Static"]
+git-tree-sha1 = "f21cfd4950cb9f0587d5067e69405ad2acd27b87"
+uuid = "62783981-4cbd-42fc-bca8-16325de8dc4b"
+version = "0.1.6"
+
+[[deps.BlockArrays]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
+git-tree-sha1 = "a8c0f363186263d75e97a41878d10dd842797561"
+uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+version = "1.6.3"
+weakdeps = ["Adapt", "BandedMatrices"]
+
+    [deps.BlockArrays.extensions]
+    BlockArraysAdaptExt = "Adapt"
+    BlockArraysBandedMatricesExt = "BandedMatrices"
+
+[[deps.Bonito]]
+deps = ["Base64", "CodecZlib", "Colors", "Dates", "Deno_jll", "HTTP", "Hyperscript", "LinearAlgebra", "Markdown", "MsgPack", "Observables", "RelocatableFolders", "SHA", "Sockets", "Tables", "ThreadPools", "URIs", "UUIDs", "WidgetsBase"]
+git-tree-sha1 = "534820940e4359c09adc615f8bd06ca90d508ba6"
+uuid = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
+version = "4.0.1"
+
+[[deps.BracketingNonlinearSolve]]
+deps = ["CommonSolve", "ConcreteStructs", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase"]
+git-tree-sha1 = "637ebe439ba587828fd997b7810d8171eed2ea1b"
+uuid = "70df07ce-3d50-431d-a3e7-ca6ddb60ac1e"
+version = "1.2.0"
+weakdeps = ["ForwardDiff"]
+
+    [deps.BracketingNonlinearSolve.extensions]
+    BracketingNonlinearSolveForwardDiffExt = "ForwardDiff"
+
+[[deps.Bzip2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
+uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
+version = "1.0.9+0"
+
+[[deps.CEnum]]
+git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
+uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
+version = "0.5.0"
+
+[[deps.CPUSummary]]
+deps = ["CpuId", "IfElse", "PrecompileTools", "Static"]
+git-tree-sha1 = "5a97e67919535d6841172016c9530fd69494e5ec"
+uuid = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
+version = "0.2.6"
+
+[[deps.CRC32c]]
+uuid = "8bf52ea8-c179-5cab-976a-9e18b702a9bc"
+version = "1.11.0"
+
+[[deps.CRlibm]]
+deps = ["CRlibm_jll"]
+git-tree-sha1 = "66188d9d103b92b6cd705214242e27f5737a1e5e"
+uuid = "96374032-68de-5a5b-8d9e-752f78720389"
+version = "1.0.2"
+
+[[deps.CRlibm_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "e329286945d0cfc04456972ea732551869af1cfc"
+uuid = "4e9b3aee-d8a1-5a3d-ad8b-7d824db253f0"
+version = "1.0.1+0"
+
+[[deps.Cairo_jll]]
+deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
+git-tree-sha1 = "2ac646d71d0d24b44f3f8c84da8c9f4d70fb67df"
+uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
+version = "1.18.4+0"
+
+[[deps.ChainRulesCore]]
+deps = ["Compat", "LinearAlgebra"]
+git-tree-sha1 = "1713c74e00545bfe14605d2a2be1712de8fbcb58"
+uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+version = "1.25.1"
+weakdeps = ["SparseArrays"]
+
+    [deps.ChainRulesCore.extensions]
+    ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.CloseOpenIntervals]]
+deps = ["Static", "StaticArrayInterface"]
+git-tree-sha1 = "05ba0d07cd4fd8b7a39541e31a7b0254704ea581"
+uuid = "fb6a15b2-703c-40df-9091-08a04967cfa9"
+version = "0.1.13"
+
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "062c5e1a5bf6ada13db96a4ae4749a4c2234f521"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.3.9"
+
+[[deps.CodecZlib]]
+deps = ["TranscodingStreams", "Zlib_jll"]
+git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
+uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
+version = "0.7.8"
+
+[[deps.ColorBrewer]]
+deps = ["Colors", "JSON"]
+git-tree-sha1 = "e771a63cc8b539eca78c85b0cabd9233d6c8f06f"
+uuid = "a2cac450-b92f-5266-8821-25eda20663c8"
+version = "0.4.1"
+
+[[deps.ColorSchemes]]
+deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
+git-tree-sha1 = "403f2d8e209681fcbd9468a8514efff3ea08452e"
+uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+version = "3.29.0"
+
+[[deps.ColorTypes]]
+deps = ["FixedPointNumbers", "Random"]
+git-tree-sha1 = "b10d0b65641d57b8b4d5e234446582de5047050d"
+uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+version = "0.11.5"
+
+[[deps.ColorVectorSpace]]
+deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
+git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
+uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
+version = "0.10.0"
+weakdeps = ["SpecialFunctions"]
+
+    [deps.ColorVectorSpace.extensions]
+    SpecialFunctionsExt = "SpecialFunctions"
+
+[[deps.Colors]]
+deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
+git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
+uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
+version = "0.13.0"
+
+[[deps.Combinatorics]]
+git-tree-sha1 = "8010b6bb3388abe68d95743dcbea77650bb2eddf"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "1.0.3"
+
+[[deps.CommonMark]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "351d6f4eaf273b753001b2de4dffb8279b100769"
+uuid = "a80b9123-70ca-4bc0-993e-6e3bcb318db6"
+version = "0.9.1"
+
+[[deps.CommonSolve]]
+git-tree-sha1 = "0eee5eb66b1cf62cd6ad1b460238e60e4b09400c"
+uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
+version = "0.2.4"
+
+[[deps.CommonSubexpressions]]
+deps = ["MacroTools"]
+git-tree-sha1 = "cda2cfaebb4be89c9084adaca7dd7333369715c5"
+uuid = "bbf7d656-a473-5ed7-a52c-81e309532950"
+version = "0.3.1"
+
+[[deps.CommonWorldInvalidations]]
+git-tree-sha1 = "ae52d1c52048455e85a387fbee9be553ec2b68d0"
+uuid = "f70d9fcc-98c5-4d4a-abd7-e4cdeebd8ca8"
+version = "1.0.0"
+
+[[deps.Compat]]
+deps = ["TOML", "UUIDs"]
+git-tree-sha1 = "8ae8d32e09f0dcf42a36b90d4e17f5dd2e4c4215"
+uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
+version = "4.16.0"
+weakdeps = ["Dates", "LinearAlgebra"]
+
+    [deps.Compat.extensions]
+    CompatLinearAlgebraExt = "LinearAlgebra"
+
+[[deps.CompilerSupportLibraries_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+version = "1.1.1+0"
+
+[[deps.CompositeTypes]]
+git-tree-sha1 = "bce26c3dab336582805503bed209faab1c279768"
+uuid = "b152e2b5-7a66-4b01-a709-34e65c35f657"
+version = "0.1.4"
+
+[[deps.CompositionsBase]]
+git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
+uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
+version = "0.1.2"
+weakdeps = ["InverseFunctions"]
+
+    [deps.CompositionsBase.extensions]
+    CompositionsBaseInverseFunctionsExt = "InverseFunctions"
+
+[[deps.ConcreteStructs]]
+git-tree-sha1 = "f749037478283d372048690eb3b5f92a79432b34"
+uuid = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
+version = "0.2.3"
+
+[[deps.ConcurrentUtilities]]
+deps = ["Serialization", "Sockets"]
+git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
+uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
+version = "2.5.0"
+
+[[deps.ConstructionBase]]
+git-tree-sha1 = "76219f1ed5771adbb096743bff43fb5fdd4c1157"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.5.8"
+weakdeps = ["IntervalSets", "LinearAlgebra", "StaticArrays"]
+
+    [deps.ConstructionBase.extensions]
+    ConstructionBaseIntervalSetsExt = "IntervalSets"
+    ConstructionBaseLinearAlgebraExt = "LinearAlgebra"
+    ConstructionBaseStaticArraysExt = "StaticArrays"
+
+[[deps.Contour]]
+git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
+uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
+version = "0.6.3"
+
+[[deps.CpuId]]
+deps = ["Markdown"]
+git-tree-sha1 = "fcbb72b032692610bfbdb15018ac16a36cf2e406"
+uuid = "adafc99b-e345-5852-983c-f28acb93d879"
+version = "0.3.1"
+
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
+
+[[deps.DataAPI]]
+git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
+uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
+version = "1.16.0"
+
+[[deps.DataStructures]]
+deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
+git-tree-sha1 = "4e1fe97fdaed23e9dc21d4d664bea76b65fc50a0"
+uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+version = "0.18.22"
+
+[[deps.DataValueInterfaces]]
+git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
+uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
+version = "1.0.0"
+
+[[deps.Dates]]
+deps = ["Printf"]
+uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+version = "1.11.0"
+
+[[deps.DelaunayTriangulation]]
+deps = ["AdaptivePredicates", "EnumX", "ExactPredicates", "Random"]
+git-tree-sha1 = "5620ff4ee0084a6ab7097a27ba0c19290200b037"
+uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
+version = "1.6.4"
+
+[[deps.Deno_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "cd6756e833c377e0ce9cd63fb97689a255f12323"
+uuid = "04572ae6-984a-583e-9378-9577a1c2574d"
+version = "1.33.4+0"
+
+[[deps.DiffEqBase]]
+deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
+git-tree-sha1 = "575a4b945c26f654625c9bc58a1ed10a4eddd267"
+uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
+version = "6.173.0"
+
+    [deps.DiffEqBase.extensions]
+    DiffEqBaseCUDAExt = "CUDA"
+    DiffEqBaseChainRulesCoreExt = "ChainRulesCore"
+    DiffEqBaseDistributionsExt = "Distributions"
+    DiffEqBaseEnzymeExt = ["ChainRulesCore", "Enzyme"]
+    DiffEqBaseForwardDiffExt = ["ForwardDiff"]
+    DiffEqBaseGTPSAExt = "GTPSA"
+    DiffEqBaseGeneralizedGeneratedExt = "GeneralizedGenerated"
+    DiffEqBaseMPIExt = "MPI"
+    DiffEqBaseMeasurementsExt = "Measurements"
+    DiffEqBaseMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    DiffEqBaseReverseDiffExt = "ReverseDiff"
+    DiffEqBaseSparseArraysExt = "SparseArrays"
+    DiffEqBaseTrackerExt = "Tracker"
+    DiffEqBaseUnitfulExt = "Unitful"
+
+    [deps.DiffEqBase.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    GTPSA = "b27dd330-f138-47c5-815b-40db9dd9b6e8"
+    GeneralizedGenerated = "6b9d7cbe-bcb9-11e9-073f-15a7a543e2eb"
+    MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.DiffEqCallbacks]]
+deps = ["ConcreteStructs", "DataStructures", "DiffEqBase", "DifferentiationInterface", "Functors", "LinearAlgebra", "Markdown", "RecipesBase", "RecursiveArrayTools", "SciMLBase", "StaticArraysCore"]
+git-tree-sha1 = "f98c17df6b2f3ac7d4a7c9b33c161b85c9b496f0"
+uuid = "459566f4-90b8-5000-8ac3-15dfb0a30def"
+version = "4.4.1"
+
+[[deps.DiffEqNoiseProcess]]
+deps = ["DiffEqBase", "Distributions", "GPUArraysCore", "LinearAlgebra", "Markdown", "Optim", "PoissonRandom", "QuadGK", "Random", "Random123", "RandomNumbers", "RecipesBase", "RecursiveArrayTools", "ResettableStacks", "SciMLBase", "StaticArraysCore", "Statistics"]
+git-tree-sha1 = "516d553f5deee7c55b2945b5edf05b6542837887"
+uuid = "77a26b50-5914-5dd7-bc55-306e6241c503"
+version = "5.24.1"
+
+    [deps.DiffEqNoiseProcess.extensions]
+    DiffEqNoiseProcessReverseDiffExt = "ReverseDiff"
+
+    [deps.DiffEqNoiseProcess.weakdeps]
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+
+[[deps.DiffResults]]
+deps = ["StaticArraysCore"]
+git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
+uuid = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+version = "1.1.0"
+
+[[deps.DiffRules]]
+deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
+git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
+uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
+version = "1.15.1"
+
+[[deps.DifferentiationInterface]]
+deps = ["ADTypes", "LinearAlgebra"]
+git-tree-sha1 = "c8d85ecfcbaef899308706bebdd8b00107f3fb43"
+uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+version = "0.6.54"
+
+    [deps.DifferentiationInterface.extensions]
+    DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
+    DifferentiationInterfaceDiffractorExt = "Diffractor"
+    DifferentiationInterfaceEnzymeExt = ["EnzymeCore", "Enzyme"]
+    DifferentiationInterfaceFastDifferentiationExt = "FastDifferentiation"
+    DifferentiationInterfaceFiniteDiffExt = "FiniteDiff"
+    DifferentiationInterfaceFiniteDifferencesExt = "FiniteDifferences"
+    DifferentiationInterfaceForwardDiffExt = ["ForwardDiff", "DiffResults"]
+    DifferentiationInterfaceGPUArraysCoreExt = "GPUArraysCore"
+    DifferentiationInterfaceGTPSAExt = "GTPSA"
+    DifferentiationInterfaceMooncakeExt = "Mooncake"
+    DifferentiationInterfacePolyesterForwardDiffExt = ["PolyesterForwardDiff", "ForwardDiff", "DiffResults"]
+    DifferentiationInterfaceReverseDiffExt = ["ReverseDiff", "DiffResults"]
+    DifferentiationInterfaceSparseArraysExt = "SparseArrays"
+    DifferentiationInterfaceSparseConnectivityTracerExt = "SparseConnectivityTracer"
+    DifferentiationInterfaceSparseMatrixColoringsExt = "SparseMatrixColorings"
+    DifferentiationInterfaceStaticArraysExt = "StaticArrays"
+    DifferentiationInterfaceSymbolicsExt = "Symbolics"
+    DifferentiationInterfaceTrackerExt = "Tracker"
+    DifferentiationInterfaceZygoteExt = ["Zygote", "ForwardDiff"]
+
+    [deps.DifferentiationInterface.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+    Diffractor = "9f5e2b26-1114-432f-b630-d3fe2085c51c"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
+    FastDifferentiation = "eb9bf01b-bf85-4b60-bf87-ee5de06c00be"
+    FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+    FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+    GTPSA = "b27dd330-f138-47c5-815b-40db9dd9b6e8"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+    PolyesterForwardDiff = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
+    SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[[deps.DispatchDoctor]]
+deps = ["MacroTools", "Preferences"]
+git-tree-sha1 = "f311fe66bfe4e38b2f1c8d1081f06920092b57aa"
+uuid = "8d63f2c5-f18a-4cf2-ba9d-b3f60fc568c8"
+version = "0.4.19"
+weakdeps = ["ChainRulesCore", "EnzymeCore"]
+
+    [deps.DispatchDoctor.extensions]
+    DispatchDoctorChainRulesCoreExt = "ChainRulesCore"
+    DispatchDoctorEnzymeCoreExt = "EnzymeCore"
+
+[[deps.Distances]]
+deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
+git-tree-sha1 = "c7e3a542b999843086e2f29dac96a618c105be1d"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.12"
+weakdeps = ["ChainRulesCore", "SparseArrays"]
+
+    [deps.Distances.extensions]
+    DistancesChainRulesCoreExt = "ChainRulesCore"
+    DistancesSparseArraysExt = "SparseArrays"
+
+[[deps.Distributed]]
+deps = ["Random", "Serialization", "Sockets"]
+uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+version = "1.11.0"
+
+[[deps.Distributions]]
+deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
+git-tree-sha1 = "3e6d038b77f22791b8e3472b7c633acea1ecac06"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.120"
+
+    [deps.Distributions.extensions]
+    DistributionsChainRulesCoreExt = "ChainRulesCore"
+    DistributionsDensityInterfaceExt = "DensityInterface"
+    DistributionsTestExt = "Test"
+
+    [deps.Distributions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.DocStringExtensions]]
+git-tree-sha1 = "e7b7e6f178525d17c720ab9c081e4ef04429f860"
+uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+version = "0.9.4"
+
+[[deps.DomainSets]]
+deps = ["CompositeTypes", "IntervalSets", "LinearAlgebra", "Random", "StaticArrays"]
+git-tree-sha1 = "a7e9f13f33652c533d49868a534bfb2050d1365f"
+uuid = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
+version = "0.7.15"
+weakdeps = ["Makie"]
+
+    [deps.DomainSets.extensions]
+    DomainSetsMakieExt = "Makie"
+
+[[deps.Downloads]]
+deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
+uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+version = "1.6.0"
+
+[[deps.DynamicPolynomials]]
+deps = ["Future", "LinearAlgebra", "MultivariatePolynomials", "MutableArithmetics", "Reexport", "Test"]
+git-tree-sha1 = "9a3ae38b460449cc9e7dd0cfb059c76028724627"
+uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
+version = "0.6.1"
+
+[[deps.DynamicQuantities]]
+deps = ["DispatchDoctor", "PrecompileTools", "TestItems", "Tricks"]
+git-tree-sha1 = "44ec2bcde862031866a9f43ee477eaa1ddb0cccc"
+uuid = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
+version = "1.8.0"
+
+    [deps.DynamicQuantities.extensions]
+    DynamicQuantitiesLinearAlgebraExt = "LinearAlgebra"
+    DynamicQuantitiesMeasurementsExt = "Measurements"
+    DynamicQuantitiesScientificTypesExt = "ScientificTypes"
+    DynamicQuantitiesUnitfulExt = "Unitful"
+
+    [deps.DynamicQuantities.weakdeps]
+    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    ScientificTypes = "321657f4-b219-11e9-178b-2701a2544e81"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.EarCut_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "e3290f2d49e661fbd94046d7e3726ffcb2d41053"
+uuid = "5ae413db-bbd1-5e63-b57d-d24a61df00f5"
+version = "2.2.4+0"
+
+[[deps.EnumX]]
+git-tree-sha1 = "bddad79635af6aec424f53ed8aad5d7555dc6f00"
+uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
+version = "1.0.5"
+
+[[deps.EnzymeCore]]
+git-tree-sha1 = "0cdb7af5c39e92d78a0ee8d0a447d32f7593137e"
+uuid = "f151be2c-9106-41f4-ab19-57ee4f262869"
+version = "0.8.8"
+weakdeps = ["Adapt"]
+
+    [deps.EnzymeCore.extensions]
+    AdaptExt = "Adapt"
+
+[[deps.ExactPredicates]]
+deps = ["IntervalArithmetic", "Random", "StaticArrays"]
+git-tree-sha1 = "b3f2ff58735b5f024c392fde763f29b057e4b025"
+uuid = "429591f6-91af-11e9-00e2-59fbe8cec110"
+version = "2.2.8"
+
+[[deps.ExceptionUnwrapping]]
+deps = ["Test"]
+git-tree-sha1 = "d36f682e590a83d63d1c7dbd287573764682d12a"
+uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
+version = "0.1.11"
+
+[[deps.Expat_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "d55dffd9ae73ff72f1c0482454dcf2ec6c6c4a63"
+uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
+version = "2.6.5+0"
+
+[[deps.ExprTools]]
+git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
+uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
+version = "0.1.10"
+
+[[deps.ExproniconLite]]
+git-tree-sha1 = "c13f0b150373771b0fdc1713c97860f8df12e6c2"
+uuid = "55351af7-c7e9-48d6-89ff-24e801d99491"
+version = "0.10.14"
+
+[[deps.Extents]]
+git-tree-sha1 = "063512a13dbe9c40d999c439268539aa552d1ae6"
+uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
+version = "0.1.5"
+
+[[deps.FFMPEG_jll]]
+deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
+git-tree-sha1 = "8cc47f299902e13f90405ddb5bf87e5d474c0d38"
+uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
+version = "6.1.2+0"
+
+[[deps.FFTW]]
+deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
+git-tree-sha1 = "7de7c78d681078f027389e067864a8d53bd7c3c9"
+uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+version = "1.8.1"
+
+[[deps.FFTW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6d6219a004b8cf1e0b4dbe27a2860b8e04eba0be"
+uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
+version = "3.3.11+0"
+
+[[deps.FLINT_jll]]
+deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "OpenBLAS32_jll"]
+git-tree-sha1 = "c08ef035014de2a925098c4df99d44f223476705"
+uuid = "e134572f-a0d5-539d-bddf-3cad8db41a82"
+version = "300.200.201+0"
+
+[[deps.FastBroadcast]]
+deps = ["ArrayInterface", "LinearAlgebra", "Polyester", "Static", "StaticArrayInterface", "StrideArraysCore"]
+git-tree-sha1 = "ab1b34570bcdf272899062e1a56285a53ecaae08"
+uuid = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
+version = "0.3.5"
+
+[[deps.FastClosures]]
+git-tree-sha1 = "acebe244d53ee1b461970f8910c235b259e772ef"
+uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
+version = "0.3.2"
+
+[[deps.FastPower]]
+git-tree-sha1 = "df32f07f373f06260cd6af5371385b5ef85dd762"
+uuid = "a4df4552-cc26-4903-aec0-212e50a0e84b"
+version = "1.1.2"
+
+    [deps.FastPower.extensions]
+    FastPowerEnzymeExt = "Enzyme"
+    FastPowerForwardDiffExt = "ForwardDiff"
+    FastPowerMeasurementsExt = "Measurements"
+    FastPowerMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    FastPowerReverseDiffExt = "ReverseDiff"
+    FastPowerTrackerExt = "Tracker"
+
+    [deps.FastPower.weakdeps]
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
+[[deps.FileIO]]
+deps = ["Pkg", "Requires", "UUIDs"]
+git-tree-sha1 = "b66970a70db13f45b7e57fbda1736e1cf72174ea"
+uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+version = "1.17.0"
+weakdeps = ["HTTP"]
+
+    [deps.FileIO.extensions]
+    HTTPExt = "HTTP"
+
+[[deps.FilePaths]]
+deps = ["FilePathsBase", "MacroTools", "Reexport", "Requires"]
+git-tree-sha1 = "919d9412dbf53a2e6fe74af62a73ceed0bce0629"
+uuid = "8fc22ac5-c921-52a6-82fd-178b2807b824"
+version = "0.8.3"
+
+[[deps.FilePathsBase]]
+deps = ["Compat", "Dates"]
+git-tree-sha1 = "3bab2c5aa25e7840a4b065805c0cdfc01f3068d2"
+uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
+version = "0.9.24"
+weakdeps = ["Mmap", "Test"]
+
+    [deps.FilePathsBase.extensions]
+    FilePathsBaseMmapExt = "Mmap"
+    FilePathsBaseTestExt = "Test"
+
+[[deps.FileWatching]]
+uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
+version = "1.11.0"
+
+[[deps.FillArrays]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "6a70198746448456524cb442b8af316927ff3e1a"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "1.13.0"
+weakdeps = ["PDMats", "SparseArrays", "Statistics"]
+
+    [deps.FillArrays.extensions]
+    FillArraysPDMatsExt = "PDMats"
+    FillArraysSparseArraysExt = "SparseArrays"
+    FillArraysStatisticsExt = "Statistics"
+
+[[deps.FindFirstFunctions]]
+git-tree-sha1 = "670e1d9ceaa4a3161d32fe2d2fb2177f8d78b330"
+uuid = "64ca27bc-2ba2-4a57-88aa-44e436879224"
+version = "1.4.1"
+
+[[deps.FiniteDiff]]
+deps = ["ArrayInterface", "LinearAlgebra", "Setfield"]
+git-tree-sha1 = "f089ab1f834470c525562030c8cfde4025d5e915"
+uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
+version = "2.27.0"
+
+    [deps.FiniteDiff.extensions]
+    FiniteDiffBandedMatricesExt = "BandedMatrices"
+    FiniteDiffBlockBandedMatricesExt = "BlockBandedMatrices"
+    FiniteDiffSparseArraysExt = "SparseArrays"
+    FiniteDiffStaticArraysExt = "StaticArrays"
+
+    [deps.FiniteDiff.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[[deps.FixedPointNumbers]]
+deps = ["Statistics"]
+git-tree-sha1 = "05882d6995ae5c12bb5f36dd2ed3f61c98cbb172"
+uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
+version = "0.8.5"
+
+[[deps.Fontconfig_jll]]
+deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Zlib_jll"]
+git-tree-sha1 = "301b5d5d731a0654825f1f2e906990f7141a106b"
+uuid = "a3f928ae-7b40-5064-980b-68af3947d34b"
+version = "2.16.0+0"
+
+[[deps.Format]]
+git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
+uuid = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
+version = "1.3.7"
+
+[[deps.ForwardDiff]]
+deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "a2df1b776752e3f344e5116c06d75a10436ab853"
+uuid = "f6369f11-7733-5829-9624-2563aa707210"
+version = "0.10.38"
+weakdeps = ["StaticArrays"]
+
+    [deps.ForwardDiff.extensions]
+    ForwardDiffStaticArraysExt = "StaticArrays"
+
+[[deps.FreeType]]
+deps = ["CEnum", "FreeType2_jll"]
+git-tree-sha1 = "907369da0f8e80728ab49c1c7e09327bf0d6d999"
+uuid = "b38be410-82b0-50bf-ab77-7b57e271db43"
+version = "4.1.1"
+
+[[deps.FreeType2_jll]]
+deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "2c5512e11c791d1baed2049c5652441b28fc6a31"
+uuid = "d7e528f0-a631-5988-bf34-fe36492bcfd7"
+version = "2.13.4+0"
+
+[[deps.FreeTypeAbstraction]]
+deps = ["ColorVectorSpace", "Colors", "FreeType", "GeometryBasics"]
+git-tree-sha1 = "d52e255138ac21be31fa633200b65e4e71d26802"
+uuid = "663a7486-cb36-511b-a19d-713bb74d65c9"
+version = "0.10.6"
+
+[[deps.FriBidi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7a214fdac5ed5f59a22c2d9a885a16da1c74bbc7"
+uuid = "559328eb-81f9-559d-9380-de523a88c83c"
+version = "1.0.17+0"
+
+[[deps.FunctionWrappers]]
+git-tree-sha1 = "d62485945ce5ae9c0c48f124a84998d755bae00e"
+uuid = "069b7b12-0de2-55c6-9aab-29f3d0a68a2e"
+version = "1.1.3"
+
+[[deps.FunctionWrappersWrappers]]
+deps = ["FunctionWrappers"]
+git-tree-sha1 = "b104d487b34566608f8b4e1c39fb0b10aa279ff8"
+uuid = "77dc65aa-8811-40c2-897b-53d922fa7daf"
+version = "0.1.3"
+
+[[deps.Functors]]
+deps = ["Compat", "ConstructionBase", "LinearAlgebra", "Random"]
+git-tree-sha1 = "60a0339f28a233601cb74468032b5c302d5067de"
+uuid = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
+version = "0.5.2"
+
+[[deps.Future]]
+deps = ["Random"]
+uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+version = "1.11.0"
+
+[[deps.GMP_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
+version = "6.3.0+0"
+
+[[deps.GPUArraysCore]]
+deps = ["Adapt"]
+git-tree-sha1 = "83cf05ab16a73219e5f6bd1bdfa9848fa24ac627"
+uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
+version = "0.2.0"
+
+[[deps.GenericSchur]]
+deps = ["LinearAlgebra", "Printf"]
+git-tree-sha1 = "f88e0ba1f6b42121a7c1dfe93a9687d8e164c91b"
+uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
+version = "0.5.5"
+
+[[deps.GeoFormatTypes]]
+git-tree-sha1 = "8e233d5167e63d708d41f87597433f59a0f213fe"
+uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
+version = "0.4.4"
+
+[[deps.GeoInterface]]
+deps = ["DataAPI", "Extents", "GeoFormatTypes"]
+git-tree-sha1 = "294e99f19869d0b0cb71aef92f19d03649d028d5"
+uuid = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
+version = "1.4.1"
+
+[[deps.GeometryBasics]]
+deps = ["EarCut_jll", "Extents", "GeoInterface", "IterTools", "LinearAlgebra", "PrecompileTools", "Random", "StaticArrays"]
+git-tree-sha1 = "31dc5dad1ede44c2f417ee7a2320b1966700c512"
+uuid = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+version = "0.5.8"
+
+[[deps.Gettext_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
+git-tree-sha1 = "9b02998aba7bf074d14de89f9d37ca24a1a0b046"
+uuid = "78b55507-aeef-58d4-861c-77aaff3498b1"
+version = "0.21.0+0"
+
+[[deps.Giflib_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6570366d757b50fabae9f4315ad74d2e40c0560a"
+uuid = "59f7168a-df46-5410-90c8-f2779963d0ec"
+version = "5.2.3+0"
+
+[[deps.Glib_jll]]
+deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
+git-tree-sha1 = "b0036b392358c80d2d2124746c2bf3d48d457938"
+uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
+version = "2.82.4+0"
+
+[[deps.Glob]]
+git-tree-sha1 = "97285bbd5230dd766e9ef6749b80fc617126d496"
+uuid = "c27321d9-0574-5035-807b-f59d2c89b15c"
+version = "1.3.1"
+
+[[deps.Graphite2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a6dbda1fd736d60cc477d99f2e7a042acfa46e8"
+uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
+version = "1.3.15+0"
+
+[[deps.Graphs]]
+deps = ["ArnoldiMethod", "Compat", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
+git-tree-sha1 = "3169fd3440a02f35e549728b0890904cfd4ae58a"
+uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
+version = "1.12.1"
+
+[[deps.GridLayoutBase]]
+deps = ["GeometryBasics", "InteractiveUtils", "Observables"]
+git-tree-sha1 = "dc6bed05c15523624909b3953686c5f5ffa10adc"
+uuid = "3955a311-db13-416c-9275-1d80ed98e5e9"
+version = "0.11.1"
+
+[[deps.Grisu]]
+git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
+uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
+version = "1.0.2"
+
+[[deps.HTTP]]
+deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
+git-tree-sha1 = "f93655dc73d7a0b4a368e3c0bce296ae035ad76e"
+uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+version = "1.10.16"
+
+[[deps.HarfBuzz_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
+git-tree-sha1 = "55c53be97790242c29031e5cd45e8ac296dadda3"
+uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
+version = "8.5.0+0"
+
+[[deps.HostCPUFeatures]]
+deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Libdl", "Static"]
+git-tree-sha1 = "8e070b599339d622e9a081d17230d74a5c473293"
+uuid = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
+version = "0.1.17"
+
+[[deps.Hwloc_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "f93a9ce66cd89c9ba7a4695a47fd93b4c6bc59fa"
+uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
+version = "2.12.0+0"
+
+[[deps.HypergeometricFunctions]]
+deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
+git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
+uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
+version = "0.3.28"
+
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "179267cfa5e712760cd43dcae385d7ea90cc25a4"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.5"
+
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "7134810b1afce04bbc1045ca1985fbe81ce17653"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.5"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "b6d6bfdd7ce25b0f9b2f6b3dd56b2673a66c8770"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.5"
+
+[[deps.IfElse]]
+git-tree-sha1 = "debdd00ffef04665ccbb3e150747a77560e8fad1"
+uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+version = "0.1.1"
+
+[[deps.ImageAxes]]
+deps = ["AxisArrays", "ImageBase", "ImageCore", "Reexport", "SimpleTraits"]
+git-tree-sha1 = "e12629406c6c4442539436581041d372d69c55ba"
+uuid = "2803e5a7-5153-5ecf-9a86-9b4c37f5f5ac"
+version = "0.6.12"
+
+[[deps.ImageBase]]
+deps = ["ImageCore", "Reexport"]
+git-tree-sha1 = "eb49b82c172811fd2c86759fa0553a2221feb909"
+uuid = "c817782e-172a-44cc-b673-b171935fbb9e"
+version = "0.1.7"
+
+[[deps.ImageCore]]
+deps = ["ColorVectorSpace", "Colors", "FixedPointNumbers", "MappedArrays", "MosaicViews", "OffsetArrays", "PaddedViews", "PrecompileTools", "Reexport"]
+git-tree-sha1 = "8c193230235bbcee22c8066b0374f63b5683c2d3"
+uuid = "a09fc81d-aa75-5fe9-8630-4744c3626534"
+version = "0.10.5"
+
+[[deps.ImageIO]]
+deps = ["FileIO", "IndirectArrays", "JpegTurbo", "LazyModules", "Netpbm", "OpenEXR", "PNGFiles", "QOI", "Sixel", "TiffImages", "UUIDs", "WebP"]
+git-tree-sha1 = "696144904b76e1ca433b886b4e7edd067d76cbf7"
+uuid = "82e4d734-157c-48bb-816b-45c225c6df19"
+version = "0.6.9"
+
+[[deps.ImageMetadata]]
+deps = ["AxisArrays", "ImageAxes", "ImageBase", "ImageCore"]
+git-tree-sha1 = "2a81c3897be6fbcde0802a0ebe6796d0562f63ec"
+uuid = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
+version = "0.9.10"
+
+[[deps.Imath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "0936ba688c6d201805a83da835b55c61a180db52"
+uuid = "905a6f67-0a94-5f89-b386-d35d92009cd1"
+version = "3.1.11+0"
+
+[[deps.IndirectArrays]]
+git-tree-sha1 = "012e604e1c7458645cb8b436f8fba789a51b257f"
+uuid = "9b13fd28-a010-5f03-acff-a1bbcff69959"
+version = "1.0.0"
+
+[[deps.Inflate]]
+git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
+uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
+version = "0.1.5"
+
+[[deps.IntegerMathUtils]]
+git-tree-sha1 = "b8ffb903da9f7b8cf695a8bead8e01814aa24b30"
+uuid = "18e54dd8-cb9d-406c-a71d-865a43cbb235"
+version = "0.1.2"
+
+[[deps.IntelOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
+git-tree-sha1 = "0f14a5456bdc6b9731a5682f439a672750a09e48"
+uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
+version = "2025.0.4+0"
+
+[[deps.InteractiveUtils]]
+deps = ["Markdown"]
+uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+version = "1.11.0"
+
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "88a101217d7cb38a7b481ccd50d21876e1d1b0e0"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.15.1"
+weakdeps = ["Unitful"]
+
+    [deps.Interpolations.extensions]
+    InterpolationsUnitfulExt = "Unitful"
+
+[[deps.IntervalArithmetic]]
+deps = ["CRlibm", "MacroTools", "OpenBLASConsistentFPCSR_jll", "Random", "RoundingEmulator"]
+git-tree-sha1 = "4e1b4155f04ffa0acf3a0d6e3d651892604666f5"
+uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
+version = "0.22.34"
+weakdeps = ["DiffRules", "ForwardDiff", "IntervalSets", "LinearAlgebra", "RecipesBase", "SparseArrays"]
+
+    [deps.IntervalArithmetic.extensions]
+    IntervalArithmeticDiffRulesExt = "DiffRules"
+    IntervalArithmeticForwardDiffExt = "ForwardDiff"
+    IntervalArithmeticIntervalSetsExt = "IntervalSets"
+    IntervalArithmeticLinearAlgebraExt = "LinearAlgebra"
+    IntervalArithmeticRecipesBaseExt = "RecipesBase"
+    IntervalArithmeticSparseArraysExt = "SparseArrays"
+
+[[deps.IntervalSets]]
+git-tree-sha1 = "5fbb102dcb8b1a858111ae81d56682376130517d"
+uuid = "8197267c-284f-5f27-9208-e0e47529a953"
+version = "0.7.11"
+weakdeps = ["Random", "RecipesBase", "Statistics"]
+
+    [deps.IntervalSets.extensions]
+    IntervalSetsRandomExt = "Random"
+    IntervalSetsRecipesBaseExt = "RecipesBase"
+    IntervalSetsStatisticsExt = "Statistics"
+
+[[deps.InverseFunctions]]
+git-tree-sha1 = "a779299d77cd080bf77b97535acecd73e1c5e5cb"
+uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
+version = "0.1.17"
+weakdeps = ["Dates", "Test"]
+
+    [deps.InverseFunctions.extensions]
+    InverseFunctionsDatesExt = "Dates"
+    InverseFunctionsTestExt = "Test"
+
+[[deps.IrrationalConstants]]
+git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
+uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
+version = "0.2.4"
+
+[[deps.Isoband]]
+deps = ["isoband_jll"]
+git-tree-sha1 = "f9b6d97355599074dc867318950adaa6f9946137"
+uuid = "f1662d9f-8043-43de-a69a-05efc1cc6ff4"
+version = "0.1.1"
+
+[[deps.IterTools]]
+git-tree-sha1 = "42d5f897009e7ff2cf88db414a389e5ed1bdd023"
+uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
+version = "1.10.0"
+
+[[deps.IterativeSolvers]]
+deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
+git-tree-sha1 = "59545b0a2b27208b0650df0a46b8e3019f85055b"
+uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
+version = "0.9.4"
+
+[[deps.IteratorInterfaceExtensions]]
+git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
+uuid = "82899510-4779-5014-852e-03e436cf321d"
+version = "1.0.0"
+
+[[deps.JLLWrappers]]
+deps = ["Artifacts", "Preferences"]
+git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
+uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
+version = "1.7.0"
+
+[[deps.JSON]]
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+version = "0.21.4"
+
+[[deps.Jieko]]
+deps = ["ExproniconLite"]
+git-tree-sha1 = "2f05ed29618da60c06a87e9c033982d4f71d0b6c"
+uuid = "ae98c720-c025-4a4a-838c-29b094483192"
+version = "0.2.1"
+
+[[deps.JpegTurbo]]
+deps = ["CEnum", "FileIO", "ImageCore", "JpegTurbo_jll", "TOML"]
+git-tree-sha1 = "9496de8fb52c224a2e3f9ff403947674517317d9"
+uuid = "b835a17e-a41a-41e7-81f0-2f016b05efe0"
+version = "0.1.6"
+
+[[deps.JpegTurbo_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
+uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
+version = "3.1.1+0"
+
+[[deps.JuliaFormatter]]
+deps = ["CommonMark", "Glob", "JuliaSyntax", "PrecompileTools", "TOML"]
+git-tree-sha1 = "56b382cd34b1a80f63211a0b009461915915bf9e"
+uuid = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+version = "2.1.2"
+
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "c47892541d03e5dc63467f8964c9f2b415dfe718"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.46"
+
+[[deps.JuliaSyntax]]
+git-tree-sha1 = "937da4713526b96ac9a178e2035019d3b78ead4a"
+uuid = "70703baa-626e-46a2-a12c-08ffd08c73b4"
+version = "0.4.10"
+
+[[deps.JumpProcesses]]
+deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
+git-tree-sha1 = "f2bdec5b4580414aee3178c8caa6e46c344c0bbc"
+uuid = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
+version = "9.14.3"
+weakdeps = ["FastBroadcast"]
+
+[[deps.KernelDensity]]
+deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
+git-tree-sha1 = "7d703202e65efa1369de1279c162b915e245eed1"
+uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
+version = "0.6.9"
+
+[[deps.Krylov]]
+deps = ["LinearAlgebra", "Printf", "SparseArrays"]
+git-tree-sha1 = "b94257a1a8737099ca40bc7271a8b374033473ed"
+uuid = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
+version = "0.10.1"
+
+[[deps.LAME_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "170b660facf5df5de098d866564877e119141cbd"
+uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
+version = "3.100.2+0"
+
+[[deps.LERC_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "aaafe88dccbd957a8d82f7d05be9b69172e0cee3"
+uuid = "88015f11-f218-50d7-93a8-a6af411a945d"
+version = "4.0.1+0"
+
+[[deps.LLVMOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "eb62a3deb62fc6d8822c0c4bef73e4412419c5d8"
+uuid = "1d63c593-3942-5779-bab2-d838dc0a180e"
+version = "18.1.8+0"
+
+[[deps.LZO_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1c602b1127f4751facb671441ca72715cc95938a"
+uuid = "dd4b983a-f0e5-5f8d-a1b7-129d4a5fb1ac"
+version = "2.10.3+0"
+
+[[deps.LaTeXStrings]]
+git-tree-sha1 = "dda21b8cbd6a6c40d9d02a73230f9d70fed6918c"
+uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+version = "1.4.0"
+
+[[deps.Latexify]]
+deps = ["Format", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
+git-tree-sha1 = "cd10d2cc78d34c0e2a3a36420ab607b611debfbb"
+uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
+version = "0.16.7"
+
+    [deps.Latexify.extensions]
+    DataFramesExt = "DataFrames"
+    SparseArraysExt = "SparseArrays"
+    SymEngineExt = "SymEngine"
+
+    [deps.Latexify.weakdeps]
+    DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+
+[[deps.LayoutPointers]]
+deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
+git-tree-sha1 = "a9eaadb366f5493a5654e843864c13d8b107548c"
+uuid = "10f19ff3-798f-405d-979b-55457f8fc047"
+version = "0.1.17"
+
+[[deps.LazyArrays]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "SparseArrays"]
+git-tree-sha1 = "866ce84b15e54d758c11946aacd4e5df0e60b7a3"
+uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+version = "2.6.1"
+
+    [deps.LazyArrays.extensions]
+    LazyArraysBandedMatricesExt = "BandedMatrices"
+    LazyArraysBlockArraysExt = "BlockArrays"
+    LazyArraysBlockBandedMatricesExt = "BlockBandedMatrices"
+    LazyArraysStaticArraysExt = "StaticArrays"
+
+    [deps.LazyArrays.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[[deps.LazyArtifacts]]
+deps = ["Artifacts", "Pkg"]
+uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
+version = "1.11.0"
+
+[[deps.LazyModules]]
+git-tree-sha1 = "a560dd966b386ac9ae60bdd3a3d3a326062d3c3e"
+uuid = "8cdb02fc-e678-4876-92c5-9defec4f444e"
+version = "0.3.1"
+
+[[deps.LibCURL]]
+deps = ["LibCURL_jll", "MozillaCACerts_jll"]
+uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
+version = "0.6.4"
+
+[[deps.LibCURL_jll]]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
+uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
+version = "8.6.0+0"
+
+[[deps.LibGit2]]
+deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
+uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
+version = "1.11.0"
+
+[[deps.LibGit2_jll]]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
+uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
+version = "1.7.2+0"
+
+[[deps.LibSSH2_jll]]
+deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
+uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
+version = "1.11.0+1"
+
+[[deps.Libdl]]
+uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+version = "1.11.0"
+
+[[deps.Libffi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "27ecae93dd25ee0909666e6835051dd684cc035e"
+uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
+version = "3.2.2+2"
+
+[[deps.Libglvnd_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll"]
+git-tree-sha1 = "d36c21b9e7c172a44a10484125024495e2625ac0"
+uuid = "7e76a0d4-f3c7-5321-8279-8d96eeed0f29"
+version = "1.7.1+1"
+
+[[deps.Libiconv_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "be484f5c92fad0bd8acfef35fe017900b0b73809"
+uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
+version = "1.18.0+0"
+
+[[deps.Libmount_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a31572773ac1b745e0343fe5e2c8ddda7a37e997"
+uuid = "4b2f31a3-9ecc-558c-b454-b3730dcb73e9"
+version = "2.41.0+0"
+
+[[deps.Libtiff_jll]]
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "LERC_jll", "Libdl", "XZ_jll", "Zlib_jll", "Zstd_jll"]
+git-tree-sha1 = "4ab7581296671007fc33f07a721631b8855f4b1d"
+uuid = "89763e89-9b03-5906-acba-b20f662cd828"
+version = "4.7.1+0"
+
+[[deps.Libuuid_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "321ccef73a96ba828cd51f2ab5b9f917fa73945a"
+uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
+version = "2.41.0+0"
+
+[[deps.LineSearch]]
+deps = ["ADTypes", "CommonSolve", "ConcreteStructs", "FastClosures", "LinearAlgebra", "MaybeInplace", "SciMLBase", "SciMLJacobianOperators", "StaticArraysCore"]
+git-tree-sha1 = "97d502765cc5cf3a722120f50da03c2474efce04"
+uuid = "87fe0de2-c867-4266-b59a-2f0a94fc965b"
+version = "0.1.4"
+weakdeps = ["LineSearches"]
+
+    [deps.LineSearch.extensions]
+    LineSearchLineSearchesExt = "LineSearches"
+
+[[deps.LineSearches]]
+deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
+git-tree-sha1 = "e4c3be53733db1051cc15ecf573b1042b3a712a1"
+uuid = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
+version = "7.3.0"
+
+[[deps.LinearAlgebra]]
+deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
+uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+version = "1.11.0"
+
+[[deps.LinearSolve]]
+deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
+git-tree-sha1 = "c5e80f547e47f00f53c290aa5d4a11034104b94d"
+uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+version = "3.11.0"
+
+    [deps.LinearSolve.extensions]
+    LinearSolveBandedMatricesExt = "BandedMatrices"
+    LinearSolveBlockDiagonalsExt = "BlockDiagonals"
+    LinearSolveCUDAExt = "CUDA"
+    LinearSolveCUDSSExt = "CUDSS"
+    LinearSolveEnzymeExt = "EnzymeCore"
+    LinearSolveFastAlmostBandedMatricesExt = "FastAlmostBandedMatrices"
+    LinearSolveFastLapackInterfaceExt = "FastLapackInterface"
+    LinearSolveHYPREExt = "HYPRE"
+    LinearSolveIterativeSolversExt = "IterativeSolvers"
+    LinearSolveKernelAbstractionsExt = "KernelAbstractions"
+    LinearSolveKrylovKitExt = "KrylovKit"
+    LinearSolveMetalExt = "Metal"
+    LinearSolvePardisoExt = ["Pardiso", "SparseArrays"]
+    LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
+    LinearSolveSparseArraysExt = "SparseArrays"
+    LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
+
+    [deps.LinearSolve.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
+    FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
+    FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
+    HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
+    IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
+    KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+    KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+    Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+    RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
+
+[[deps.LogExpFunctions]]
+deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
+git-tree-sha1 = "13ca9e2586b89836fd20cccf56e57e2b9ae7f38f"
+uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+version = "0.3.29"
+
+    [deps.LogExpFunctions.extensions]
+    LogExpFunctionsChainRulesCoreExt = "ChainRulesCore"
+    LogExpFunctionsChangesOfVariablesExt = "ChangesOfVariables"
+    LogExpFunctionsInverseFunctionsExt = "InverseFunctions"
+
+    [deps.LogExpFunctions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ChangesOfVariables = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
+    InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+
+[[deps.Logging]]
+uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
+version = "1.11.0"
+
+[[deps.LoggingExtras]]
+deps = ["Dates", "Logging"]
+git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
+uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
+version = "1.1.0"
+
+[[deps.MIMEs]]
+git-tree-sha1 = "c64d943587f7187e751162b3b84445bbbd79f691"
+uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
+version = "1.1.0"
+
+[[deps.MINPACK]]
+deps = ["LinearAlgebra", "Printf", "cminpack_jll"]
+git-tree-sha1 = "7833d5fda5c9a7a62b39d37ebd3c7d716fbc0cfc"
+uuid = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
+version = "1.3.0"
+
+[[deps.MKL_jll]]
+deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
+git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
+uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
+version = "2025.0.1+1"
+
+[[deps.MLStyle]]
+git-tree-sha1 = "bc38dff0548128765760c79eb7388a4b37fae2c8"
+uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
+version = "0.4.17"
+
+[[deps.MPFR_jll]]
+deps = ["Artifacts", "GMP_jll", "Libdl"]
+uuid = "3a97d323-0669-5f0c-9066-3539efd106a3"
+version = "4.2.1+0"
+
+[[deps.MPI]]
+deps = ["Distributed", "DocStringExtensions", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "PkgVersion", "PrecompileTools", "Requires", "Serialization", "Sockets"]
+git-tree-sha1 = "892676019c58f34e38743bc989b0eca5bce5edc5"
+uuid = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+version = "0.20.22"
+
+    [deps.MPI.extensions]
+    AMDGPUExt = "AMDGPU"
+    CUDAExt = "CUDA"
+
+    [deps.MPI.weakdeps]
+    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[[deps.MPICH_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
+git-tree-sha1 = "3aa3210044138a1749dbd350a9ba8680869eb503"
+uuid = "7cb0a576-ebde-5e09-9194-50597f1243b4"
+version = "4.3.0+1"
+
+[[deps.MPIPreferences]]
+deps = ["Libdl", "Preferences"]
+git-tree-sha1 = "c105fe467859e7f6e9a852cb15cb4301126fac07"
+uuid = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
+version = "0.1.11"
+
+[[deps.MPItrampoline_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
+git-tree-sha1 = "ff91ca13c7c472cef700f301c8d752bc2aaff1a8"
+uuid = "f1f71cc9-e9ae-5b93-9b94-4fe0e1ad3748"
+version = "5.5.3+0"
+
+[[deps.MacroTools]]
+git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
+uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+version = "0.5.16"
+
+[[deps.Makie]]
+deps = ["Animations", "Base64", "CRC32c", "ColorBrewer", "ColorSchemes", "ColorTypes", "Colors", "Contour", "Dates", "DelaunayTriangulation", "Distributions", "DocStringExtensions", "Downloads", "FFMPEG_jll", "FileIO", "FilePaths", "FixedPointNumbers", "Format", "FreeType", "FreeTypeAbstraction", "GeometryBasics", "GridLayoutBase", "ImageBase", "ImageIO", "InteractiveUtils", "Interpolations", "IntervalSets", "InverseFunctions", "Isoband", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "MacroTools", "MakieCore", "Markdown", "MathTeXEngine", "Observables", "OffsetArrays", "PNGFiles", "Packing", "PlotUtils", "PolygonOps", "PrecompileTools", "Printf", "REPL", "Random", "RelocatableFolders", "Scratch", "ShaderAbstractions", "Showoff", "SignedDistanceFields", "SparseArrays", "Statistics", "StatsBase", "StatsFuns", "StructArrays", "TriplotBase", "UnicodeFun", "Unitful"]
+git-tree-sha1 = "9680336a5b67f9f9f6eaa018f426043a8cd68200"
+uuid = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+version = "0.22.1"
+
+[[deps.MakieCore]]
+deps = ["ColorTypes", "GeometryBasics", "IntervalSets", "Observables"]
+git-tree-sha1 = "c731269d5a2c85ffdc689127a9ba6d73e978a4b1"
+uuid = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
+version = "0.9.0"
+
+[[deps.ManualMemory]]
+git-tree-sha1 = "bcaef4fc7a0cfe2cba636d84cda54b5e4e4ca3cd"
+uuid = "d125e4d3-2237-4719-b19c-fa641b8a4667"
+version = "0.1.8"
+
+[[deps.MappedArrays]]
+git-tree-sha1 = "2dab0221fe2b0f2cb6754eaa743cc266339f527e"
+uuid = "dbb5928d-eab1-5f90-85c2-b9b0edb7c900"
+version = "0.4.2"
+
+[[deps.Markdown]]
+deps = ["Base64"]
+uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
+version = "1.11.0"
+
+[[deps.MathTeXEngine]]
+deps = ["AbstractTrees", "Automa", "DataStructures", "FreeTypeAbstraction", "GeometryBasics", "LaTeXStrings", "REPL", "RelocatableFolders", "UnicodeFun"]
+git-tree-sha1 = "f5a6805fb46c0285991009b526ec6fae43c6dec2"
+uuid = "0a4f8689-d25c-4efe-a92b-7142dfc1aa53"
+version = "0.6.3"
+
+[[deps.MaybeInplace]]
+deps = ["ArrayInterface", "LinearAlgebra", "MacroTools"]
+git-tree-sha1 = "54e2fdc38130c05b42be423e90da3bade29b74bd"
+uuid = "bb5d69b7-63fc-4a16-80bd-7e42200c7bdb"
+version = "0.1.4"
+weakdeps = ["SparseArrays"]
+
+    [deps.MaybeInplace.extensions]
+    MaybeInplaceSparseArraysExt = "SparseArrays"
+
+[[deps.MbedTLS]]
+deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "NetworkOptions", "Random", "Sockets"]
+git-tree-sha1 = "c067a280ddc25f196b5e7df3877c6b226d390aaf"
+uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
+version = "1.1.9"
+
+[[deps.MbedTLS_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
+version = "2.28.6+0"
+
+[[deps.MicrosoftMPI_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "bc95bf4149bf535c09602e3acdf950d9b4376227"
+uuid = "9237b28f-5490-5468-be7b-bb81f5f5e6cf"
+version = "10.1.4+3"
+
+[[deps.Missings]]
+deps = ["DataAPI"]
+git-tree-sha1 = "ec4f7fbeab05d7747bdf98eb74d130a2a2ed298d"
+uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
+version = "1.2.0"
+
+[[deps.Mmap]]
+uuid = "a63ad114-7e13-5084-954f-fe012c677804"
+version = "1.11.0"
+
+[[deps.ModelingToolkit]]
+deps = ["ADTypes", "AbstractTrees", "ArrayInterface", "BlockArrays", "Combinatorics", "CommonSolve", "Compat", "ConstructionBase", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DiffEqNoiseProcess", "DiffRules", "DifferentiationInterface", "Distributed", "Distributions", "DocStringExtensions", "DomainSets", "DynamicQuantities", "EnumX", "ExprTools", "FindFirstFunctions", "ForwardDiff", "FunctionWrappers", "FunctionWrappersWrappers", "Graphs", "InteractiveUtils", "JuliaFormatter", "JumpProcesses", "Latexify", "Libdl", "LinearAlgebra", "MLStyle", "Moshi", "NaNMath", "NonlinearSolve", "OffsetArrays", "OrderedCollections", "PrecompileTools", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SCCNonlinearSolve", "SciMLBase", "SciMLStructures", "Serialization", "Setfield", "SimpleNonlinearSolve", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "SymbolicUtils", "Symbolics", "URIs", "UnPack", "Unitful"]
+git-tree-sha1 = "c0a7d2a91d8cce967744918d811d74f30af8cdd6"
+uuid = "961ee093-0014-501f-94e3-6117800e7a78"
+version = "9.78.0"
+
+    [deps.ModelingToolkit.extensions]
+    MTKBifurcationKitExt = "BifurcationKit"
+    MTKChainRulesCoreExt = "ChainRulesCore"
+    MTKDeepDiffsExt = "DeepDiffs"
+    MTKFMIExt = "FMI"
+    MTKInfiniteOptExt = "InfiniteOpt"
+    MTKLabelledArraysExt = "LabelledArrays"
+
+    [deps.ModelingToolkit.weakdeps]
+    BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DeepDiffs = "ab62b9b5-e342-54a8-a765-a90f495de1a6"
+    FMI = "14a09403-18e3-468f-ad8a-74f8dda2d9ac"
+    InfiniteOpt = "20393b10-9daf-11e9-18c9-8db751c92c57"
+    LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
+
+[[deps.MonteCarloMeasurements]]
+deps = ["Distributions", "GenericSchur", "LinearAlgebra", "MacroTools", "Random", "SLEEFPirates", "StaticArrays", "Statistics", "StatsBase"]
+git-tree-sha1 = "e9f946f013632de7ba4f399bbdc339bbb28cc4ec"
+uuid = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+version = "1.4.6"
+
+    [deps.MonteCarloMeasurements.extensions]
+    ForwardDiffExt = "ForwardDiff"
+    MakieExt = "Makie"
+    MeasurementsExt = "Measurements"
+    RecipesBaseExt = "RecipesBase"
+    UnitfulExt = "Unitful"
+
+    [deps.MonteCarloMeasurements.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.MosaicViews]]
+deps = ["MappedArrays", "OffsetArrays", "PaddedViews", "StackViews"]
+git-tree-sha1 = "7b86a5d4d70a9f5cdf2dacb3cbe6d251d1a61dbe"
+uuid = "e94cdb99-869f-56ef-bcf0-1ae2bcbe0389"
+version = "0.3.4"
+
+[[deps.Moshi]]
+deps = ["ExproniconLite", "Jieko"]
+git-tree-sha1 = "453de0fc2be3d11b9b93ca4d0fddd91196dcf1ed"
+uuid = "2e0e35c7-a2e4-4343-998d-7ef72827ed2d"
+version = "0.3.5"
+
+[[deps.MozillaCACerts_jll]]
+uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
+version = "2023.12.12"
+
+[[deps.MsgPack]]
+deps = ["Serialization"]
+git-tree-sha1 = "f5db02ae992c260e4826fe78c942954b48e1d9c2"
+uuid = "99f44e22-a591-53d1-9472-aa23ef4bd671"
+version = "1.2.1"
+
+[[deps.MuladdMacro]]
+git-tree-sha1 = "cac9cc5499c25554cba55cd3c30543cff5ca4fab"
+uuid = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
+version = "0.2.4"
+
+[[deps.MultivariatePolynomials]]
+deps = ["ChainRulesCore", "DataStructures", "LinearAlgebra", "MutableArithmetics"]
+git-tree-sha1 = "fade91fe9bee7b142d332fc6ab3f0deea29f637b"
+uuid = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
+version = "0.5.9"
+
+[[deps.MutableArithmetics]]
+deps = ["LinearAlgebra", "SparseArrays", "Test"]
+git-tree-sha1 = "491bdcdc943fcbc4c005900d7463c9f216aabf4c"
+uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
+version = "1.6.4"
+
+[[deps.NLSolvers]]
+deps = ["IterativeSolvers", "LinearAlgebra", "PositiveFactorizations", "Printf", "Statistics"]
+git-tree-sha1 = "78a8c11e01b159a546495dae68aa7f787547b75f"
+uuid = "337daf1e-9722-11e9-073e-8b9effe078ba"
+version = "0.5.0"
+
+[[deps.NLSolversBase]]
+deps = ["ADTypes", "DifferentiationInterface", "Distributed", "FiniteDiff", "ForwardDiff"]
+git-tree-sha1 = "b14c7be6046e7d48e9063a0053f95ee0fc954176"
+uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
+version = "7.9.1"
+
+[[deps.NLsolve]]
+deps = ["Distances", "LineSearches", "LinearAlgebra", "NLSolversBase", "Printf", "Reexport"]
+git-tree-sha1 = "019f12e9a1a7880459d0173c182e6a99365d7ac1"
+uuid = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+version = "4.5.1"
+
+[[deps.NaNMath]]
+deps = ["OpenLibm_jll"]
+git-tree-sha1 = "9b8215b1ee9e78a293f99797cd31375471b2bcae"
+uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
+version = "1.1.3"
+
+[[deps.Nemo]]
+deps = ["AbstractAlgebra", "FLINT_jll", "Libdl", "LinearAlgebra", "Random", "RandomExtensions", "SHA", "TOML"]
+git-tree-sha1 = "8ba664064d452bfa973603fa7825d9000a0b3ffe"
+uuid = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+version = "0.49.4"
+
+[[deps.Netpbm]]
+deps = ["FileIO", "ImageCore", "ImageMetadata"]
+git-tree-sha1 = "d92b107dbb887293622df7697a2223f9f8176fcd"
+uuid = "f09324ee-3d7c-5217-9330-fc30815ba969"
+version = "1.1.1"
+
+[[deps.NetworkOptions]]
+uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
+version = "1.2.0"
+
+[[deps.NonlinearSolve]]
+deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "NonlinearSolveBase", "NonlinearSolveFirstOrder", "NonlinearSolveQuasiNewton", "NonlinearSolveSpectralMethods", "PrecompileTools", "Preferences", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SparseArrays", "SparseMatrixColorings", "StaticArraysCore", "SymbolicIndexingInterface"]
+git-tree-sha1 = "aeb6fb02e63b4d4f90337ed90ce54ceb4c0efe77"
+uuid = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+version = "4.9.0"
+
+    [deps.NonlinearSolve.extensions]
+    NonlinearSolveFastLevenbergMarquardtExt = "FastLevenbergMarquardt"
+    NonlinearSolveFixedPointAccelerationExt = "FixedPointAcceleration"
+    NonlinearSolveLeastSquaresOptimExt = "LeastSquaresOptim"
+    NonlinearSolveMINPACKExt = "MINPACK"
+    NonlinearSolveNLSolversExt = "NLSolvers"
+    NonlinearSolveNLsolveExt = ["NLsolve", "LineSearches"]
+    NonlinearSolvePETScExt = ["PETSc", "MPI"]
+    NonlinearSolveSIAMFANLEquationsExt = "SIAMFANLEquations"
+    NonlinearSolveSpeedMappingExt = "SpeedMapping"
+    NonlinearSolveSundialsExt = "Sundials"
+
+    [deps.NonlinearSolve.weakdeps]
+    FastLevenbergMarquardt = "7a0df574-e128-4d35-8cbd-3d84502bf7ce"
+    FixedPointAcceleration = "817d07cb-a79a-5c30-9a31-890123675176"
+    LeastSquaresOptim = "0fc2ff8b-aaa3-5acd-a817-1944a5e08891"
+    LineSearches = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
+    MINPACK = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
+    MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+    NLSolvers = "337daf1e-9722-11e9-073e-8b9effe078ba"
+    NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+    PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
+    SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
+    SpeedMapping = "f1835b91-879b-4a3f-a438-e4baacf14412"
+    Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
+
+[[deps.NonlinearSolveBase]]
+deps = ["ADTypes", "Adapt", "ArrayInterface", "CommonSolve", "Compat", "ConcreteStructs", "DifferentiationInterface", "EnzymeCore", "FastClosures", "LinearAlgebra", "Markdown", "MaybeInplace", "Preferences", "Printf", "RecursiveArrayTools", "SciMLBase", "SciMLJacobianOperators", "SciMLOperators", "StaticArraysCore", "SymbolicIndexingInterface", "TimerOutputs"]
+git-tree-sha1 = "686fd9d0d455171e3530d3540cff94bb01222823"
+uuid = "be0214bd-f91f-a760-ac4e-3421ce2b2da0"
+version = "1.7.0"
+weakdeps = ["BandedMatrices", "DiffEqBase", "ForwardDiff", "LineSearch", "LinearSolve", "SparseArrays", "SparseMatrixColorings"]
+
+    [deps.NonlinearSolveBase.extensions]
+    NonlinearSolveBaseBandedMatricesExt = "BandedMatrices"
+    NonlinearSolveBaseDiffEqBaseExt = "DiffEqBase"
+    NonlinearSolveBaseForwardDiffExt = "ForwardDiff"
+    NonlinearSolveBaseLineSearchExt = "LineSearch"
+    NonlinearSolveBaseLinearSolveExt = "LinearSolve"
+    NonlinearSolveBaseSparseArraysExt = "SparseArrays"
+    NonlinearSolveBaseSparseMatrixColoringsExt = "SparseMatrixColorings"
+
+[[deps.NonlinearSolveFirstOrder]]
+deps = ["ADTypes", "ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLJacobianOperators", "Setfield", "StaticArraysCore"]
+git-tree-sha1 = "9c8cd0a986518ba317af263549b48e34ac8f776d"
+uuid = "5959db7a-ea39-4486-b5fe-2dd0bf03d60d"
+version = "1.5.0"
+
+[[deps.NonlinearSolveQuasiNewton]]
+deps = ["ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLOperators", "StaticArraysCore"]
+git-tree-sha1 = "eafb327f5c2d9f1ac890aa2b9fbe05a1bd7e4dc8"
+uuid = "9a2c21bd-3a47-402d-9113-8faf9a0ee114"
+version = "1.4.0"
+weakdeps = ["ForwardDiff"]
+
+    [deps.NonlinearSolveQuasiNewton.extensions]
+    NonlinearSolveQuasiNewtonForwardDiffExt = "ForwardDiff"
+
+[[deps.NonlinearSolveSpectralMethods]]
+deps = ["CommonSolve", "ConcreteStructs", "DiffEqBase", "LineSearch", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase"]
+git-tree-sha1 = "3398222199e4b9ca0b5840907fb509f28f1a2fdc"
+uuid = "26075421-4e9a-44e1-8bd1-420ed7ad02b2"
+version = "1.2.0"
+weakdeps = ["ForwardDiff"]
+
+    [deps.NonlinearSolveSpectralMethods.extensions]
+    NonlinearSolveSpectralMethodsForwardDiffExt = "ForwardDiff"
+
+[[deps.Observables]]
+git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"
+uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
+version = "0.5.5"
+
+[[deps.OffsetArrays]]
+git-tree-sha1 = "117432e406b5c023f665fa73dc26e79ec3630151"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.17.0"
+weakdeps = ["Adapt"]
+
+    [deps.OffsetArrays.extensions]
+    OffsetArraysAdaptExt = "Adapt"
+
+[[deps.Ogg_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
+uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
+version = "1.3.5+1"
+
+[[deps.OpenBLAS32_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "ece4587683695fe4c5f20e990da0ed7e83c351e7"
+uuid = "656ef2d0-ae68-5445-9ca0-591084a874a2"
+version = "0.3.29+0"
+
+[[deps.OpenBLASConsistentFPCSR_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "567515ca155d0020a45b05175449b499c63e7015"
+uuid = "6cdc7f73-28fd-5e50-80fb-958a8875b1af"
+version = "0.3.29+0"
+
+[[deps.OpenBLAS_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
+uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
+version = "0.3.27+1"
+
+[[deps.OpenEXR]]
+deps = ["Colors", "FileIO", "OpenEXR_jll"]
+git-tree-sha1 = "97db9e07fe2091882c765380ef58ec553074e9c7"
+uuid = "52e1d378-f018-4a11-a4be-720524705ac7"
+version = "0.3.3"
+
+[[deps.OpenEXR_jll]]
+deps = ["Artifacts", "Imath_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "8292dd5c8a38257111ada2174000a33745b06d4e"
+uuid = "18a262bb-aa17-5467-a713-aee519bc75cb"
+version = "3.2.4+0"
+
+[[deps.OpenLibm_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+version = "0.8.5+0"
+
+[[deps.OpenMPI_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
+git-tree-sha1 = "047b66eb62f3cae59ed260ebb9075a32a04350f1"
+uuid = "fe0851c0-eecd-5654-98d4-656369965a5c"
+version = "5.0.7+2"
+
+[[deps.OpenSSL]]
+deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
+git-tree-sha1 = "38cb508d080d21dc1128f7fb04f20387ed4c0af4"
+uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
+version = "1.4.3"
+
+[[deps.OpenSSL_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "9216a80ff3682833ac4b733caa8c00390620ba5d"
+uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
+version = "3.5.0+0"
+
+[[deps.OpenSpecFun_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1346c9208249809840c91b26703912dff463d335"
+uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
+version = "0.5.6+0"
+
+[[deps.Optim]]
+deps = ["Compat", "EnumX", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
+git-tree-sha1 = "31b3b1b8e83ef9f1d50d74f1dd5f19a37a304a1f"
+uuid = "429524aa-4258-5aef-a3af-852621145aeb"
+version = "1.12.0"
+
+    [deps.Optim.extensions]
+    OptimMOIExt = "MathOptInterface"
+
+    [deps.Optim.weakdeps]
+    MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+
+[[deps.Opus_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6703a85cb3781bd5909d48730a67205f3f31a575"
+uuid = "91d4177d-7536-5919-b921-800302f37372"
+version = "1.3.3+0"
+
+[[deps.OrderedCollections]]
+git-tree-sha1 = "cc4054e898b852042d7b503313f7ad03de99c3dd"
+uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
+version = "1.8.0"
+
+[[deps.PCRE2_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
+version = "10.42.0+1"
+
+[[deps.PDMats]]
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "f07c06228a1c670ae4c87d1276b92c7c597fdda0"
+uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
+version = "0.11.35"
+
+[[deps.PETSc]]
+deps = ["Libdl", "LinearAlgebra", "MPI", "MPIPreferences", "PETSc_jll", "Pkg", "SparseArrays"]
+git-tree-sha1 = "0df6fc164a6254fa3311e3717c4155c32cc56a66"
+uuid = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
+version = "0.3.1"
+
+[[deps.PETSc_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS32_jll", "OpenMPI_jll", "SCALAPACK32_jll", "TOML"]
+git-tree-sha1 = "e67be069aea02ce689bd94eb3f7ee011396bf1bd"
+uuid = "8fa3689e-f0b9-5420-9873-adf6ccf46f2d"
+version = "3.22.0+0"
+
+[[deps.PNGFiles]]
+deps = ["Base64", "CEnum", "ImageCore", "IndirectArrays", "OffsetArrays", "libpng_jll"]
+git-tree-sha1 = "cf181f0b1e6a18dfeb0ee8acc4a9d1672499626c"
+uuid = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
+version = "0.4.4"
+
+[[deps.Packing]]
+deps = ["GeometryBasics"]
+git-tree-sha1 = "bc5bf2ea3d5351edf285a06b0016788a121ce92c"
+uuid = "19eb6ba3-879d-56ad-ad62-d5c202156566"
+version = "0.5.1"
+
+[[deps.PaddedViews]]
+deps = ["OffsetArrays"]
+git-tree-sha1 = "0fac6313486baae819364c52b4f483450a9d793f"
+uuid = "5432bcbf-9aad-5242-b902-cca2824c8663"
+version = "0.5.12"
+
+[[deps.Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.3"
+
+[[deps.Parsers]]
+deps = ["Dates", "PrecompileTools", "UUIDs"]
+git-tree-sha1 = "7d2f8f21da5db6a806faf7b9b292296da42b2810"
+uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+version = "2.8.3"
+
+[[deps.Pixman_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
+git-tree-sha1 = "db76b1ecd5e9715f3d043cec13b2ec93ce015d53"
+uuid = "30392449-352a-5448-841d-b1acce4e97dc"
+version = "0.44.2+0"
+
+[[deps.Pkg]]
+deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
+uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+version = "1.11.0"
+weakdeps = ["REPL"]
+
+    [deps.Pkg.extensions]
+    REPLExt = "REPL"
+
+[[deps.PkgVersion]]
+deps = ["Pkg"]
+git-tree-sha1 = "f9501cc0430a26bc3d156ae1b5b0c1b47af4d6da"
+uuid = "eebad327-c553-4316-9ea0-9fa01ccd7688"
+version = "0.3.3"
+
+[[deps.PlotUtils]]
+deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random", "Reexport", "StableRNGs", "Statistics"]
+git-tree-sha1 = "3ca9a356cd2e113c420f2c13bea19f8d3fb1cb18"
+uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
+version = "1.4.3"
+
+[[deps.PlutoDevMacros]]
+deps = ["JuliaInterpreter", "Logging", "MacroTools", "Pkg", "TOML"]
+git-tree-sha1 = "72f65885168722413c7b9a9debc504c7e7df7709"
+uuid = "a0499f29-c39b-4c5c-807c-88074221b949"
+version = "0.9.0"
+
+[[deps.PlutoExtras]]
+deps = ["AbstractPlutoDingetjes", "DocStringExtensions", "HypertextLiteral", "InteractiveUtils", "Markdown", "PlutoUI", "REPL", "Random"]
+git-tree-sha1 = "91d3820f5910572fd9c6077f177ba375e06f7a0e"
+uuid = "ed5d0301-4775-4676-b788-cf71e66ff8ed"
+version = "0.7.15"
+
+[[deps.PlutoTest]]
+deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
+git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
+uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+version = "0.2.2"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "d3de2694b52a01ce61a036f18ea9c0f61c4a9230"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.62"
+
+[[deps.PoissonRandom]]
+deps = ["Random"]
+git-tree-sha1 = "a0f1159c33f846aa77c3f30ebbc69795e5327152"
+uuid = "e409e4f3-bfea-5376-8464-e040bb5c01ab"
+version = "0.4.4"
+
+[[deps.Polyester]]
+deps = ["ArrayInterface", "BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "ManualMemory", "PolyesterWeave", "Static", "StaticArrayInterface", "StrideArraysCore", "ThreadingUtilities"]
+git-tree-sha1 = "6d38fea02d983051776a856b7df75b30cf9a3c1f"
+uuid = "f517fe37-dbe3-4b94-8317-1923a5111588"
+version = "0.7.16"
+
+[[deps.PolyesterWeave]]
+deps = ["BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "Static", "ThreadingUtilities"]
+git-tree-sha1 = "645bed98cd47f72f67316fd42fc47dee771aefcd"
+uuid = "1d0040c9-8b98-4ee7-8388-3f51789ca0ad"
+version = "0.2.2"
+
+[[deps.PolygonOps]]
+git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
+uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
+version = "0.1.2"
+
+[[deps.PositiveFactorizations]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
+uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
+version = "0.2.4"
+
+[[deps.PrecompileTools]]
+deps = ["Preferences"]
+git-tree-sha1 = "5aa36f7049a63a1528fe8f7c3f2113413ffd4e1f"
+uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+version = "1.2.1"
+
+[[deps.Preferences]]
+deps = ["TOML"]
+git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
+uuid = "21216c6a-2e73-6563-6e65-726566657250"
+version = "1.4.3"
+
+[[deps.PrettyTables]]
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "1101cd475833706e4d0e7b122218257178f48f34"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "2.4.0"
+
+[[deps.Primes]]
+deps = ["IntegerMathUtils"]
+git-tree-sha1 = "25cdd1d20cd005b52fc12cb6be3f75faaf59bb9b"
+uuid = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
+version = "0.5.7"
+
+[[deps.Printf]]
+deps = ["Unicode"]
+uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+version = "1.11.0"
+
+[[deps.ProgressMeter]]
+deps = ["Distributed", "Printf"]
+git-tree-sha1 = "13c5103482a8ed1536a54c08d0e742ae3dca2d42"
+uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
+version = "1.10.4"
+
+[[deps.PtrArrays]]
+git-tree-sha1 = "1d36ef11a9aaf1e8b74dacc6a731dd1de8fd493d"
+uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
+version = "1.3.0"
+
+[[deps.QOI]]
+deps = ["ColorTypes", "FileIO", "FixedPointNumbers"]
+git-tree-sha1 = "8b3fc30bc0390abdce15f8822c889f669baed73d"
+uuid = "4b34888f-f399-49d4-9bb3-47ed5cae4e65"
+version = "1.0.1"
+
+[[deps.QuadGK]]
+deps = ["DataStructures", "LinearAlgebra"]
+git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
+uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+version = "2.11.2"
+
+    [deps.QuadGK.extensions]
+    QuadGKEnzymeExt = "Enzyme"
+
+    [deps.QuadGK.weakdeps]
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.REPL]]
+deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
+uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+version = "1.11.0"
+
+[[deps.Random]]
+deps = ["SHA"]
+uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+version = "1.11.0"
+
+[[deps.Random123]]
+deps = ["Random", "RandomNumbers"]
+git-tree-sha1 = "4743b43e5a9c4a2ede372de7061eed81795b12e7"
+uuid = "74087812-796a-5b5d-8853-05524746bad3"
+version = "1.7.0"
+
+[[deps.RandomExtensions]]
+deps = ["Random", "SparseArrays"]
+git-tree-sha1 = "b8a399e95663485820000f26b6a43c794e166a49"
+uuid = "fb686558-2515-59ef-acaa-46db3789a887"
+version = "0.4.4"
+
+[[deps.RandomNumbers]]
+deps = ["Random"]
+git-tree-sha1 = "c6ec94d2aaba1ab2ff983052cf6a606ca5985902"
+uuid = "e6cf234a-135c-5ec9-84dd-332b85af5143"
+version = "1.6.0"
+
+[[deps.RangeArrays]]
+git-tree-sha1 = "b9039e93773ddcfc828f12aadf7115b4b4d225f5"
+uuid = "b3c3ace0-ae52-54e7-9d0b-2c1406fd6b9d"
+version = "0.3.2"
+
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.5"
+weakdeps = ["FixedPointNumbers"]
+
+    [deps.Ratios.extensions]
+    RatiosFixedPointNumbersExt = "FixedPointNumbers"
+
+[[deps.RecipesBase]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "5c3d09cc4f31f5fc6af001c250bf1278733100ff"
+uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+version = "1.3.4"
+
+[[deps.RecursiveArrayTools]]
+deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
+git-tree-sha1 = "2e154f7d7e38db1af0a14ec751aba33360c3bef9"
+uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
+version = "3.33.0"
+
+    [deps.RecursiveArrayTools.extensions]
+    RecursiveArrayToolsFastBroadcastExt = "FastBroadcast"
+    RecursiveArrayToolsForwardDiffExt = "ForwardDiff"
+    RecursiveArrayToolsMeasurementsExt = "Measurements"
+    RecursiveArrayToolsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    RecursiveArrayToolsReverseDiffExt = ["ReverseDiff", "Zygote"]
+    RecursiveArrayToolsSparseArraysExt = ["SparseArrays"]
+    RecursiveArrayToolsStructArraysExt = "StructArrays"
+    RecursiveArrayToolsTrackerExt = "Tracker"
+    RecursiveArrayToolsZygoteExt = "Zygote"
+
+    [deps.RecursiveArrayTools.weakdeps]
+    FastBroadcast = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[[deps.Reexport]]
+git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
+uuid = "189a3867-3050-52da-a836-e630ba90ab69"
+version = "1.2.2"
+
+[[deps.RelocatableFolders]]
+deps = ["SHA", "Scratch"]
+git-tree-sha1 = "ffdaf70d81cf6ff22c2b6e733c900c3321cab864"
+uuid = "05181044-ff0b-4ac5-8273-598c1e38db00"
+version = "1.0.1"
+
+[[deps.Requires]]
+deps = ["UUIDs"]
+git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
+uuid = "ae029012-a4dd-5104-9daa-d747884805df"
+version = "1.3.1"
+
+[[deps.ResettableStacks]]
+deps = ["StaticArrays"]
+git-tree-sha1 = "256eeeec186fa7f26f2801732774ccf277f05db9"
+uuid = "ae5879a3-cd67-5da8-be7f-38c6eb64a37b"
+version = "1.1.1"
+
+[[deps.Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "852bd0f55565a9e973fcfee83a84413270224dc4"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.8.0"
+
+[[deps.Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.5.1+0"
+
+[[deps.RoundingEmulator]]
+git-tree-sha1 = "40b9edad2e5287e05bd413a38f61a8ff55b9557b"
+uuid = "5eaf0fd0-dfba-4ccb-bf02-d820a40db705"
+version = "0.2.1"
+
+[[deps.RuntimeGeneratedFunctions]]
+deps = ["ExprTools", "SHA", "Serialization"]
+git-tree-sha1 = "7cb9d10026d630ce2dd2a1fc6006a3d5041b34c0"
+uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
+version = "0.5.14"
+
+[[deps.SCALAPACK32_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS32_jll", "OpenMPI_jll", "Pkg", "TOML"]
+git-tree-sha1 = "3fd1ffad6374491b54fe50ee9033318f30f39982"
+uuid = "aabda75e-bfe4-5a37-92e3-ffe54af3c273"
+version = "2.2.1+1"
+
+[[deps.SCCNonlinearSolve]]
+deps = ["CommonSolve", "PrecompileTools", "Reexport", "SciMLBase", "SymbolicIndexingInterface"]
+git-tree-sha1 = "5e67b56af8615d1b47720fdc04e34482279c4559"
+uuid = "9dfe8606-65a1-4bb3-9748-cb89d1561431"
+version = "1.2.0"
+
+[[deps.SHA]]
+uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+version = "0.7.0"
+
+[[deps.SIAMFANLEquations]]
+deps = ["AbstractFFTs", "BandedMatrices", "FFTW", "LaTeXStrings", "LinearAlgebra", "Printf", "QuadGK", "SparseArrays", "SuiteSparse", "Test"]
+git-tree-sha1 = "1c7ffc244c458bb52e2b311dd6e0902b2b13fc14"
+uuid = "084e46ad-d928-497d-ad5e-07fa361a48c4"
+version = "1.0.2"
+
+[[deps.SIMD]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "fea870727142270bdf7624ad675901a1ee3b4c87"
+uuid = "fdea26ae-647d-5447-a871-4b548cad5224"
+version = "3.7.1"
+
+[[deps.SIMDTypes]]
+git-tree-sha1 = "330289636fb8107c5f32088d2741e9fd7a061a5c"
+uuid = "94e857df-77ce-4151-89e5-788b33177be4"
+version = "0.1.0"
+
+[[deps.SLEEFPirates]]
+deps = ["IfElse", "Static", "VectorizationBase"]
+git-tree-sha1 = "456f610ca2fbd1c14f5fcf31c6bfadc55e7d66e0"
+uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
+version = "0.6.43"
+
+[[deps.SciMLBase]]
+deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
+git-tree-sha1 = "bf77959adea9efa8929a7846e695d3da8842940e"
+uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+version = "2.89.1"
+
+    [deps.SciMLBase.extensions]
+    SciMLBaseChainRulesCoreExt = "ChainRulesCore"
+    SciMLBaseMLStyleExt = "MLStyle"
+    SciMLBaseMakieExt = "Makie"
+    SciMLBasePartialFunctionsExt = "PartialFunctions"
+    SciMLBasePyCallExt = "PyCall"
+    SciMLBasePythonCallExt = "PythonCall"
+    SciMLBaseRCallExt = "RCall"
+    SciMLBaseZygoteExt = ["Zygote", "ChainRulesCore"]
+
+    [deps.SciMLBase.weakdeps]
+    ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    PartialFunctions = "570af359-4316-4cb7-8c74-252c00c2016b"
+    PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+    PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+    RCall = "6f49c342-dc21-5d91-9882-a32aef131414"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[[deps.SciMLJacobianOperators]]
+deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "ConstructionBase", "DifferentiationInterface", "FastClosures", "LinearAlgebra", "SciMLBase", "SciMLOperators"]
+git-tree-sha1 = "1e2033bdf0792aa2a2f21de8e9378197f13386ec"
+uuid = "19f34311-ddf3-4b8b-af20-060888a46c0e"
+version = "0.1.4"
+
+[[deps.SciMLOperators]]
+deps = ["Accessors", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "MacroTools"]
+git-tree-sha1 = "d82853c515a8d9d42c1ab493a2687a37f1e26c91"
+uuid = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
+version = "0.4.0"
+weakdeps = ["SparseArrays", "StaticArraysCore"]
+
+    [deps.SciMLOperators.extensions]
+    SciMLOperatorsSparseArraysExt = "SparseArrays"
+    SciMLOperatorsStaticArraysCoreExt = "StaticArraysCore"
+
+[[deps.SciMLStructures]]
+deps = ["ArrayInterface"]
+git-tree-sha1 = "566c4ed301ccb2a44cbd5a27da5f885e0ed1d5df"
+uuid = "53ae85a6-f571-4167-b2af-e1d143709226"
+version = "1.7.0"
+
+[[deps.Scratch]]
+deps = ["Dates"]
+git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
+uuid = "6c6a2e73-6563-6170-7368-637461726353"
+version = "1.2.1"
+
+[[deps.Serialization]]
+uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+version = "1.11.0"
+
+[[deps.Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
+git-tree-sha1 = "c5391c6ace3bc430ca630251d02ea9687169ca68"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "1.1.2"
+
+[[deps.ShaderAbstractions]]
+deps = ["ColorTypes", "FixedPointNumbers", "GeometryBasics", "LinearAlgebra", "Observables", "StaticArrays"]
+git-tree-sha1 = "818554664a2e01fc3784becb2eb3a82326a604b6"
+uuid = "65257c39-d410-5151-9873-9b3e5be5013e"
+version = "0.5.0"
+
+[[deps.SharedArrays]]
+deps = ["Distributed", "Mmap", "Random", "Serialization"]
+uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
+version = "1.11.0"
+
+[[deps.Showoff]]
+deps = ["Dates", "Grisu"]
+git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
+uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
+version = "1.0.3"
+
+[[deps.SignedDistanceFields]]
+deps = ["Random", "Statistics", "Test"]
+git-tree-sha1 = "d263a08ec505853a5ff1c1ebde2070419e3f28e9"
+uuid = "73760f76-fbc4-59ce-8f25-708e95d2df96"
+version = "0.4.0"
+
+[[deps.SimpleBufferStream]]
+git-tree-sha1 = "f305871d2f381d21527c770d4788c06c097c9bc1"
+uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
+version = "1.2.0"
+
+[[deps.SimpleNonlinearSolve]]
+deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "Setfield", "StaticArraysCore"]
+git-tree-sha1 = "068c16a16834c1483c299b0e27e901599439570d"
+uuid = "727e6d20-b764-4bd8-a329-72de5adea6c7"
+version = "2.4.0"
+
+    [deps.SimpleNonlinearSolve.extensions]
+    SimpleNonlinearSolveChainRulesCoreExt = "ChainRulesCore"
+    SimpleNonlinearSolveDiffEqBaseExt = "DiffEqBase"
+    SimpleNonlinearSolveReverseDiffExt = "ReverseDiff"
+    SimpleNonlinearSolveTrackerExt = "Tracker"
+
+    [deps.SimpleNonlinearSolve.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
+[[deps.SimpleTraits]]
+deps = ["InteractiveUtils", "MacroTools"]
+git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
+uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
+version = "0.9.4"
+
+[[deps.Sixel]]
+deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL", "libsixel_jll"]
+git-tree-sha1 = "2da10356e31327c7096832eb9cd86307a50b1eb6"
+uuid = "45858cf5-a6b0-47a3-bbea-62219f50df47"
+version = "0.1.3"
+
+[[deps.Sockets]]
+uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
+version = "1.11.0"
+
+[[deps.SortingAlgorithms]]
+deps = ["DataStructures"]
+git-tree-sha1 = "66e0a8e672a0bdfca2c3f5937efb8538b9ddc085"
+uuid = "a2af1166-a08f-5f64-846c-94a0d3cef48c"
+version = "1.2.1"
+
+[[deps.SparseArrays]]
+deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
+uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+version = "1.11.0"
+
+[[deps.SparseMatrixColorings]]
+deps = ["ADTypes", "DocStringExtensions", "LinearAlgebra", "Random", "SparseArrays"]
+git-tree-sha1 = "76e9564f0de0d1d7a46095e758ae13ceba680cfb"
+uuid = "0a514795-09f3-496d-8182-132a7b665d35"
+version = "0.4.19"
+
+    [deps.SparseMatrixColorings.extensions]
+    SparseMatrixColoringsCliqueTreesExt = "CliqueTrees"
+    SparseMatrixColoringsColorsExt = "Colors"
+
+    [deps.SparseMatrixColorings.weakdeps]
+    CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
+    Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+
+[[deps.SpecialFunctions]]
+deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
+git-tree-sha1 = "41852b8679f78c8d8961eeadc8f62cef861a52e3"
+uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
+version = "2.5.1"
+weakdeps = ["ChainRulesCore"]
+
+    [deps.SpecialFunctions.extensions]
+    SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
+
+[[deps.StableRNGs]]
+deps = ["Random"]
+git-tree-sha1 = "95af145932c2ed859b63329952ce8d633719f091"
+uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
+version = "1.0.3"
+
+[[deps.StackViews]]
+deps = ["OffsetArrays"]
+git-tree-sha1 = "46e589465204cd0c08b4bd97385e4fa79a0c770c"
+uuid = "cae243ae-269e-4f55-b966-ac2d0dc13c15"
+version = "0.1.1"
+
+[[deps.Static]]
+deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools"]
+git-tree-sha1 = "f737d444cb0ad07e61b3c1bef8eb91203c321eff"
+uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
+version = "1.2.0"
+
+[[deps.StaticArrayInterface]]
+deps = ["ArrayInterface", "Compat", "IfElse", "LinearAlgebra", "PrecompileTools", "Static"]
+git-tree-sha1 = "96381d50f1ce85f2663584c8e886a6ca97e60554"
+uuid = "0d7ed370-da01-4f52-bd93-41d350b8b718"
+version = "1.8.0"
+weakdeps = ["OffsetArrays", "StaticArrays"]
+
+    [deps.StaticArrayInterface.extensions]
+    StaticArrayInterfaceOffsetArraysExt = "OffsetArrays"
+    StaticArrayInterfaceStaticArraysExt = "StaticArrays"
+
+[[deps.StaticArrays]]
+deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
+git-tree-sha1 = "0feb6b9031bd5c51f9072393eb5ab3efd31bf9e4"
+uuid = "90137ffa-7385-5640-81b9-e52037218182"
+version = "1.9.13"
+weakdeps = ["ChainRulesCore", "Statistics"]
+
+    [deps.StaticArrays.extensions]
+    StaticArraysChainRulesCoreExt = "ChainRulesCore"
+    StaticArraysStatisticsExt = "Statistics"
+
+[[deps.StaticArraysCore]]
+git-tree-sha1 = "192954ef1208c7019899fbf8049e717f92959682"
+uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+version = "1.4.3"
+
+[[deps.Statistics]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "ae3bb1eb3bba077cd276bc5cfc337cc65c3075c0"
+uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+version = "1.11.1"
+weakdeps = ["SparseArrays"]
+
+    [deps.Statistics.extensions]
+    SparseArraysExt = ["SparseArrays"]
+
+[[deps.StatsAPI]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "1ff449ad350c9c4cbc756624d6f8a8c3ef56d3ed"
+uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
+version = "1.7.0"
+
+[[deps.StatsBase]]
+deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "b81c5035922cc89c2d9523afc6c54be512411466"
+uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+version = "0.34.5"
+
+[[deps.StatsFuns]]
+deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "8e45cecc66f3b42633b8ce14d431e8e57a3e242e"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "1.5.0"
+weakdeps = ["ChainRulesCore", "InverseFunctions"]
+
+    [deps.StatsFuns.extensions]
+    StatsFunsChainRulesCoreExt = "ChainRulesCore"
+    StatsFunsInverseFunctionsExt = "InverseFunctions"
+
+[[deps.SteadyStateDiffEq]]
+deps = ["ConcreteStructs", "DiffEqBase", "DiffEqCallbacks", "LinearAlgebra", "NonlinearSolveBase", "Reexport", "SciMLBase"]
+git-tree-sha1 = "66a028f9a2bb44d0f6de0814a2b9840af548143a"
+uuid = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
+version = "2.5.0"
+
+[[deps.StrideArraysCore]]
+deps = ["ArrayInterface", "CloseOpenIntervals", "IfElse", "LayoutPointers", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface", "ThreadingUtilities"]
+git-tree-sha1 = "f35f6ab602df8413a50c4a25ca14de821e8605fb"
+uuid = "7792a7ef-975c-4747-a70f-980b88e8d1da"
+version = "0.5.7"
+
+[[deps.StringManipulation]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.4.1"
+
+[[deps.StructArrays]]
+deps = ["ConstructionBase", "DataAPI", "Tables"]
+git-tree-sha1 = "8ad2e38cbb812e29348719cc63580ec1dfeb9de4"
+uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+version = "0.7.1"
+
+    [deps.StructArrays.extensions]
+    StructArraysAdaptExt = "Adapt"
+    StructArraysGPUArraysCoreExt = ["GPUArraysCore", "KernelAbstractions"]
+    StructArraysLinearAlgebraExt = "LinearAlgebra"
+    StructArraysSparseArraysExt = "SparseArrays"
+    StructArraysStaticArraysExt = "StaticArrays"
+
+    [deps.StructArrays.weakdeps]
+    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+    KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[[deps.StyledStrings]]
+uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+version = "1.11.0"
+
+[[deps.SuiteSparse]]
+deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
+uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+
+[[deps.SuiteSparse_jll]]
+deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
+uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
+version = "7.7.0+0"
+
+[[deps.Sundials]]
+deps = ["CEnum", "DataStructures", "DiffEqBase", "Libdl", "LinearAlgebra", "Logging", "PrecompileTools", "Reexport", "SciMLBase", "SparseArrays", "Sundials_jll"]
+git-tree-sha1 = "7c7a7ee705724b3c80d5451ac49779db36c6f758"
+uuid = "c3572dad-4567-51f8-b174-8c6c989267f4"
+version = "4.28.0"
+
+[[deps.Sundials_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "SuiteSparse_jll", "libblastrampoline_jll"]
+git-tree-sha1 = "91db7ed92c66f81435fe880947171f1212936b14"
+uuid = "fb77eaff-e24c-56d4-86b1-d163f2edb164"
+version = "5.2.3+0"
+
+[[deps.SymbolicIndexingInterface]]
+deps = ["Accessors", "ArrayInterface", "PrettyTables", "RuntimeGeneratedFunctions", "StaticArraysCore"]
+git-tree-sha1 = "b6a641e38efa01355aa721246dd246e10c7dcd4d"
+uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
+version = "0.3.40"
+
+[[deps.SymbolicLimits]]
+deps = ["SymbolicUtils"]
+git-tree-sha1 = "fabf4650afe966a2ba646cabd924c3fd43577fc3"
+uuid = "19f23fe9-fdab-4a78-91af-e7b7767979c3"
+version = "0.2.2"
+
+[[deps.SymbolicUtils]]
+deps = ["AbstractTrees", "ArrayInterface", "Bijections", "ChainRulesCore", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "ExproniconLite", "LinearAlgebra", "MultivariatePolynomials", "NaNMath", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "TimerOutputs", "Unityper", "WeakValueDicts"]
+git-tree-sha1 = "e893939e258de0de23dc233ec6a618a4b53554ff"
+uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
+version = "3.27.0"
+
+    [deps.SymbolicUtils.extensions]
+    SymbolicUtilsLabelledArraysExt = "LabelledArrays"
+    SymbolicUtilsReverseDiffExt = "ReverseDiff"
+
+    [deps.SymbolicUtils.weakdeps]
+    LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+
+[[deps.Symbolics]]
+deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "LaTeXStrings", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "OffsetArrays", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
+git-tree-sha1 = "8a39dd8c60cd38124c49a30ac9c9007634f7b616"
+uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+version = "6.39.0"
+
+    [deps.Symbolics.extensions]
+    SymbolicsForwardDiffExt = "ForwardDiff"
+    SymbolicsGroebnerExt = "Groebner"
+    SymbolicsLuxExt = "Lux"
+    SymbolicsNemoExt = "Nemo"
+    SymbolicsPreallocationToolsExt = ["PreallocationTools", "ForwardDiff"]
+    SymbolicsSymPyExt = "SymPy"
+
+    [deps.Symbolics.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
+    Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
+    Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+    PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
+    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+
+[[deps.TOML]]
+deps = ["Dates"]
+uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+version = "1.0.3"
+
+[[deps.TableTraits]]
+deps = ["IteratorInterfaceExtensions"]
+git-tree-sha1 = "c06b2f539df1c6efa794486abfb6ed2022561a39"
+uuid = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
+version = "1.0.1"
+
+[[deps.Tables]]
+deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
+git-tree-sha1 = "598cd7c1f68d1e205689b1c2fe65a9f85846f297"
+uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+version = "1.12.0"
+
+[[deps.Tar]]
+deps = ["ArgTools", "SHA"]
+uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
+version = "1.10.0"
+
+[[deps.TaskLocalValues]]
+git-tree-sha1 = "d155450e6dff2a8bc2fcb81dcb194bd98b0aeb46"
+uuid = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
+version = "0.1.2"
+
+[[deps.TensorCore]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "1feb45f88d133a655e001435632f019a9a1bcdb6"
+uuid = "62fd8b95-f654-4bbd-a8a5-9c27f68ccd50"
+version = "0.1.1"
+
+[[deps.TermInterface]]
+git-tree-sha1 = "d673e0aca9e46a2f63720201f55cc7b3e7169b16"
+uuid = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
+version = "2.0.0"
+
+[[deps.Test]]
+deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
+uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+version = "1.11.0"
+
+[[deps.TestItems]]
+git-tree-sha1 = "42fd9023fef18b9b78c8343a4e2f3813ffbcefcb"
+uuid = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+version = "1.0.0"
+
+[[deps.ThreadPools]]
+deps = ["Printf", "RecipesBase", "Statistics"]
+git-tree-sha1 = "50cb5f85d5646bc1422aa0238aa5bfca99ca9ae7"
+uuid = "b189fb0b-2eb5-4ed4-bc0c-d34c51242431"
+version = "2.1.1"
+
+[[deps.ThreadingUtilities]]
+deps = ["ManualMemory"]
+git-tree-sha1 = "18ad3613e129312fe67789a71720c3747e598a61"
+uuid = "8290d209-cae3-49c0-8002-c8c24d57dab5"
+version = "0.5.3"
+
+[[deps.TiffImages]]
+deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedPointNumbers", "IndirectArrays", "Inflate", "Mmap", "OffsetArrays", "PkgVersion", "ProgressMeter", "SIMD", "UUIDs"]
+git-tree-sha1 = "f21231b166166bebc73b99cea236071eb047525b"
+uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
+version = "0.11.3"
+
+[[deps.TimerOutputs]]
+deps = ["ExprTools", "Printf"]
+git-tree-sha1 = "f57facfd1be61c42321765d3551b3df50f7e09f6"
+uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+version = "0.5.28"
+
+    [deps.TimerOutputs.extensions]
+    FlameGraphsExt = "FlameGraphs"
+
+    [deps.TimerOutputs.weakdeps]
+    FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
+
+[[deps.TranscodingStreams]]
+git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.11.3"
+
+[[deps.Tricks]]
+git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.10"
+
+[[deps.TriplotBase]]
+git-tree-sha1 = "4d4ed7f294cda19382ff7de4c137d24d16adc89b"
+uuid = "981d1d27-644d-49a2-9326-4793e63143c3"
+version = "0.1.0"
+
+[[deps.TruncatedStacktraces]]
+deps = ["InteractiveUtils", "MacroTools", "Preferences"]
+git-tree-sha1 = "ea3e54c2bdde39062abf5a9758a23735558705e1"
+uuid = "781d530d-4396-4725-bb49-402e4bee1e77"
+version = "1.4.0"
+
+[[deps.URIs]]
+git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
+uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
+version = "1.5.2"
+
+[[deps.UUIDs]]
+deps = ["Random", "SHA"]
+uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+version = "1.11.0"
+
+[[deps.UnPack]]
+git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
+uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+version = "1.0.2"
+
+[[deps.Unicode]]
+uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+version = "1.11.0"
+
+[[deps.UnicodeFun]]
+deps = ["REPL"]
+git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
+uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
+version = "0.4.1"
+
+[[deps.Unitful]]
+deps = ["Dates", "LinearAlgebra", "Random"]
+git-tree-sha1 = "c0667a8e676c53d390a09dc6870b3d8d6650e2bf"
+uuid = "1986cc42-f94f-5a68-af5c-568840ba703d"
+version = "1.22.0"
+weakdeps = ["ConstructionBase", "InverseFunctions"]
+
+    [deps.Unitful.extensions]
+    ConstructionBaseUnitfulExt = "ConstructionBase"
+    InverseFunctionsUnitfulExt = "InverseFunctions"
+
+[[deps.Unityper]]
+deps = ["ConstructionBase"]
+git-tree-sha1 = "25008b734a03736c41e2a7dc314ecb95bd6bbdb0"
+uuid = "a7c27f48-0311-42f6-a7f8-2c11e75eb415"
+version = "0.1.6"
+
+[[deps.VectorizationBase]]
+deps = ["ArrayInterface", "CPUSummary", "HostCPUFeatures", "IfElse", "LayoutPointers", "Libdl", "LinearAlgebra", "SIMDTypes", "Static", "StaticArrayInterface"]
+git-tree-sha1 = "4ab62a49f1d8d9548a1c8d1a75e5f55cf196f64e"
+uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
+version = "0.21.71"
+
+[[deps.WGLMakie]]
+deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
+git-tree-sha1 = "d76bbe29bdac0dc4096e3838c044ed079bb8682b"
+uuid = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+version = "0.11.1"
+
+[[deps.WeakValueDicts]]
+git-tree-sha1 = "98528c2610a5479f091d470967a25becfd83edd0"
+uuid = "897b6980-f191-5a31-bcb0-bf3c4585e0c1"
+version = "0.1.0"
+
+[[deps.WebP]]
+deps = ["CEnum", "ColorTypes", "FileIO", "FixedPointNumbers", "ImageCore", "libwebp_jll"]
+git-tree-sha1 = "aa1ca3c47f119fbdae8770c29820e5e6119b83f2"
+uuid = "e3aaa7dc-3e4b-44e0-be63-ffb868ccd7c1"
+version = "0.1.3"
+
+[[deps.WidgetsBase]]
+deps = ["Observables"]
+git-tree-sha1 = "30a1d631eb06e8c868c559599f915a62d55c2601"
+uuid = "eead4739-05f7-45a1-878c-cee36b57321c"
+version = "0.1.4"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "1.0.0"
+
+[[deps.XML2_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
+git-tree-sha1 = "b8b243e47228b4a3877f1dd6aee0c5d56db7fcf4"
+uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
+version = "2.13.6+1"
+
+[[deps.XZ_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "fee71455b0aaa3440dfdd54a9a36ccef829be7d4"
+uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
+version = "5.8.1+0"
+
+[[deps.Xorg_libX11_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
+git-tree-sha1 = "b5899b25d17bf1889d25906fb9deed5da0c15b3b"
+uuid = "4f6342f7-b3d2-589e-9d20-edeb45f2b2bc"
+version = "1.8.12+0"
+
+[[deps.Xorg_libXau_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "aa1261ebbac3ccc8d16558ae6799524c450ed16b"
+uuid = "0c0b7dd1-d40b-584c-a123-a41640f87eec"
+version = "1.0.13+0"
+
+[[deps.Xorg_libXdmcp_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "52858d64353db33a56e13c341d7bf44cd0d7b309"
+uuid = "a3789734-cfe1-5b06-b2d0-1dd0d9d62d05"
+version = "1.1.6+0"
+
+[[deps.Xorg_libXext_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "a4c0ee07ad36bf8bbce1c3bb52d21fb1e0b987fb"
+uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
+version = "1.3.7+0"
+
+[[deps.Xorg_libXrender_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
+uuid = "ea2f1a96-1ddc-540d-b46f-429655e07cfa"
+version = "0.9.12+0"
+
+[[deps.Xorg_libxcb_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_jll"]
+git-tree-sha1 = "bfcaf7ec088eaba362093393fe11aa141fa15422"
+uuid = "c7cfdc94-dc32-55de-ac96-5a1b8d977c5b"
+version = "1.17.1+0"
+
+[[deps.Xorg_xtrans_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a63799ff68005991f9d9491b6e95bd3478d783cb"
+uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
+version = "1.6.0+0"
+
+[[deps.Zlib_jll]]
+deps = ["Libdl"]
+uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
+version = "1.2.13+1"
+
+[[deps.Zstd_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "446b23e73536f84e8037f5dce465e92275f6a308"
+uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
+version = "1.5.7+1"
+
+[[deps.cminpack_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS32_jll"]
+git-tree-sha1 = "ca8a038b2cabd4fe3dd206de56ac1285131515a0"
+uuid = "b792d7bf-f512-5dba-8a02-6d8084434f1d"
+version = "1.3.12+0"
+
+[[deps.isoband_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "51b5eeb3f98367157a7a12a1fb0aa5328946c03c"
+uuid = "9a68df92-36a6-505f-a73e-abb412b6bfb4"
+version = "0.2.3+0"
+
+[[deps.libaom_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "522c1df09d05a71785765d19c9524661234738e9"
+uuid = "a4ae2306-e953-59d6-aa16-d00cac43593b"
+version = "3.11.0+0"
+
+[[deps.libass_jll]]
+deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "e17c115d55c5fbb7e52ebedb427a0dca79d4484e"
+uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
+version = "0.15.2+0"
+
+[[deps.libblastrampoline_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
+version = "5.11.0+0"
+
+[[deps.libfdk_aac_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a22cf860a7d27e4f3498a0fe0811a7957badb38"
+uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
+version = "2.0.3+0"
+
+[[deps.libpng_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "068dfe202b0a05b8332f1e8e6b4080684b9c7700"
+uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
+version = "1.6.47+0"
+
+[[deps.libsixel_jll]]
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "libpng_jll"]
+git-tree-sha1 = "c1733e347283df07689d71d61e14be986e49e47a"
+uuid = "075b6546-f08a-558a-be8f-8157d0f608a5"
+version = "1.10.5+0"
+
+[[deps.libvorbis_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Ogg_jll", "Pkg"]
+git-tree-sha1 = "490376214c4721cdaca654041f635213c6165cb3"
+uuid = "f27f6e37-5d2b-51aa-960f-b287f2bc3b7a"
+version = "1.3.7+2"
+
+[[deps.libwebp_jll]]
+deps = ["Artifacts", "Giflib_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libglvnd_jll", "Libtiff_jll", "libpng_jll"]
+git-tree-sha1 = "d2408cac540942921e7bd77272c32e58c33d8a77"
+uuid = "c5f90fcd-3b7e-5836-afba-fc50a0988cb2"
+version = "1.5.0+0"
+
+[[deps.nghttp2_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
+version = "1.59.0+0"
+
+[[deps.oneTBB_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
+uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
+version = "2022.0.0+0"
+
+[[deps.p7zip_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+version = "17.4.0+2"
+
+[[deps.x264_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "14cc7083fc6dff3cc44f2bc435ee96d06ed79aa7"
+uuid = "1270edf5-f2f9-52d2-97e9-ab00b5d0237a"
+version = "10164.0.1+0"
+
+[[deps.x265_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "dcc541bb19ed5b0ede95581fb2e41ecf179527d2"
+uuid = "dfaa095f-4041-5dcd-9319-2fabd8486b76"
+version = "3.6.0+0"
+"""
+
+# ╔═╡ Cell order:
+# ╠═2f0fd7c9-b47c-45ee-8a92-e7cf468c5ae0
+# ╠═da77d4ce-898e-4dac-a193-ec03eb088c2d
+# ╠═17af46d6-c740-489f-84d7-cd70da1045e7
+# ╠═681b6b67-2f78-4085-9abb-5c2d4abdb117
+# ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
+# ╠═f05d0696-202e-4158-bf2a-a47c33493f71
+# ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
+# ╠═121f3c96-8e06-4e26-99f2-46f12ea83d8d
+# ╠═858f94fa-aa22-442c-96ee-52209d62d9cd
+# ╠═5ae06bb9-9687-4e25-b3ee-44c11f1eb79f
+# ╠═c04ec6f0-e43f-4947-a545-01d09d46b982
+# ╠═d882d2ae-e976-4bc5-b58c-011f22ae0d04
+# ╠═da0560a5-fde0-4997-a8ae-34a294a403b8
+# ╠═e3e8a633-0572-4032-a6ed-3c03ead67180
+# ╠═cd4d60e8-724c-4fe9-8947-061df7072bf4
+# ╠═f266e88f-ce01-4030-8740-b792a16bb99a
+# ╠═4cfd9965-69d0-4409-a15e-bc5a0fec9f11
+# ╠═c5c82402-d105-4346-9eac-bc6064da4c41
+# ╠═5f8caf93-d3fe-4343-9b20-bbe5ea706549
+# ╠═ab501cca-a573-4c35-9926-aa42e075c128
+# ╠═caf4b4da-0e15-40e5-983a-dd364e40f235
+# ╠═d797d02a-fb17-4967-8b5a-91c0cc817d33
+# ╠═b33b59ad-d750-49c8-a32b-aa5e1c4ef0fa
+# ╠═29594d9b-b007-40ac-bdb2-16286abc8d6c
+# ╠═df8d848c-bde6-477a-b9ff-09154b3ee375
+# ╠═7adc28f8-c020-4ba3-af18-0d8037f78416
+# ╠═b177db0b-a08e-4c78-950c-f2723f402b50
+# ╠═247513bd-9b58-485e-b920-07b532e28f18
+# ╠═37c6fed7-275b-423d-992d-0e5f6e6e2cf1
+# ╠═4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+# ╠═da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
+# ╠═18df1038-aa05-43e8-b88b-6d13586cf503
+# ╠═6034ad9e-4787-42e7-9f9a-592d5da1369d
+# ╠═9ffdac54-ec39-4c4c-b3f9-b58877f52b33
+# ╠═8327ca86-5c71-482a-a605-29de14de9081
+# ╠═4972527a-d3c2-4f61-96c2-478b2e3d4113
+# ╠═274f3783-65e8-4b2b-9f87-ef181e5cb618
+# ╠═7eeb426b-fa00-46a9-8076-8ef43e87fec2
+# ╠═689b3394-87ed-477d-be96-4c7475882398
+# ╠═452e93d4-ee46-4563-8572-362d5dbb64f6
+# ╠═b1a806ff-ec69-46a7-a006-83dd25654e1e
+# ╠═9b8d052c-8f75-47fb-a320-275dc7a39bbe
+# ╠═3253b31e-d586-4c6d-9a57-575649f83894
+# ╠═b7234bda-3dfd-4a53-b995-320c8aec4846
+# ╠═8e6c599d-7f3a-49fe-b9ca-9a2f2585d41c
+# ╠═5028aee6-1138-408a-ab1d-ebfdf3e604ea
+# ╠═eb86c8ed-a2c1-4637-9319-1364165ea18c
+# ╠═f104a6e3-4e3b-4cbd-bf2b-55ad3a98b7ce
+# ╠═f5186f8a-2789-47d8-890a-82284fb6898f
+# ╠═abb2c4bf-a835-4d9d-a746-29bc317130e4
+# ╠═0a80bead-8b86-4efe-9272-bdffcdfed727
+# ╠═9bb82a58-a11b-432b-9a02-4ba1b4b4ac51
+# ╠═5b6a8aa4-b752-4175-a2da-f7a222e03c93
+# ╠═571a62a6-2bee-43c0-939f-e96346108c67
+# ╟─1b76f1ee-7c28-441d-9586-7fd37c6dbee6
+# ╠═fe000077-8514-4ac7-8dc9-52a87ad28b2c
+# ╠═b8ac6f9a-d15a-4a91-9057-bb98c6b58044
+# ╟─fae38d18-0c77-4b4e-9c30-9976a17c3a2b
+# ╠═3a9ef928-cb59-45dd-87db-71d57c38e15a
+# ╠═6f1888cb-63ba-4cef-8151-bd7d09e5bc63
+# ╠═58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
+# ╠═4fe2de48-d332-48a7-8bad-0193769b5955
+# ╠═5b8db305-4447-4943-b0fa-61051b86d112
+# ╟─8232ef24-b67c-45ea-afe6-086178027a11
+# ╠═089ef48a-b35c-490f-9b77-898a4dea195b
+# ╠═59ba8bc5-9ca7-4ab5-964c-9c7a8c8141ca
+# ╠═e7812966-cff7-4169-b255-20bfb4c1d2f2
+# ╠═d81fa98e-bdff-40a8-97e4-fc21eef8e635
+# ╠═d3931d58-e02a-42b5-80f5-06963f2c1ad9
+# ╠═cdc17c0b-341f-4b7e-bcdc-57fc800bf9d8
+# ╠═dae309a7-8bc3-461f-b2a1-92b916b9bf15
+# ╠═69ced9d5-9053-4aaa-b485-ef32d3b66e07
+# ╠═6ef88a89-1365-49b4-a284-491290703e93
+# ╠═15c8fb5a-27e4-4a1d-8242-fd5237e39532
+# ╠═1e7d455f-3644-4555-ac4d-aae8c2ad2bc2
+# ╠═d51fc769-215e-4055-810e-1c5eef8cd178
+# ╠═e3b14470-4921-4952-ade9-a1ba266e5484
+# ╠═7553bf8c-ac9e-44da-8513-eee11c0b33c5
+# ╠═76b1d442-88ce-4cd1-876c-33e08ca1799d
+# ╠═f759e486-18b9-4c24-a9ee-8c2bdcd932fb
+# ╠═4ffe3c04-15e2-4140-8f47-639dd479bcd3
+# ╠═8850a36f-6ca5-43b2-b81c-d4044f65d6a3
+# ╠═faeca4b4-1489-4288-b61b-05f07bb6af68
+# ╠═c2820c10-5b74-438f-a315-b20d8941f487
+# ╠═7048ecc5-89a7-41d2-8d5b-7ea183f1b67d
+# ╠═b362d35b-3e25-405b-8ab6-8672ca33e43f
+# ╠═b5173f8d-e218-4e18-88cb-a0ab61592302
+# ╠═e2f713de-cf9a-49a1-88bc-404a746b3feb
+# ╠═1093c1d5-3263-4a81-9e9d-9677b3003ea4
+# ╠═e884fbb3-e069-484d-87fa-c84535f02403
+# ╠═62625d10-5988-43dc-9ce0-4ea60f9f6e29
+# ╠═686d6091-d607-43df-9d0a-7fbf5c907086
+# ╠═b1eab00d-89c6-4868-bdc9-5537a8cdab3c
+# ╠═345b1fa8-ee00-4a6f-8d6d-5cec9fe5151a
+# ╟─082476a0-a87b-4c16-a8fe-a19290772c07
+# ╠═83e53fd9-15a5-4b11-b918-76fcca073f8e
+# ╠═1e019ddb-1873-4cea-a765-83b6f7316b34
+# ╠═94eef45c-9d7d-4f74-aa18-b95bf11e2196
+# ╠═7fc1869e-4ccb-4ffc-97a5-31589089fd75
+# ╠═deb8cae6-ab88-41a8-b7c7-6bcad63a68ef
+# ╠═154297c3-6988-4815-b6da-e512562e7502
+# ╠═cfb6b78c-7e52-45c4-85ad-d738c181590a
+# ╠═fa7d3054-a1d8-4c19-867a-2acb21feed8e
+# ╠═9a1c9032-fd54-401e-9c34-8f4004724674
+# ╠═9577e62f-795a-4d33-9667-fca61b12ee75
+# ╠═ef3dfacb-befa-470a-a0eb-dfba087e963f
+# ╠═05128731-497f-44ab-9786-10fca398f149
+# ╠═eca62203-4f5b-48b7-8a9f-7e515ae99842
+# ╠═e0c96a01-908c-409d-81c5-2d6475ad7f14
+# ╠═d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
+# ╠═47ac09a5-9907-4283-8ea9-6f8c584a989a
+# ╟─00000000-0000-0000-0000-000000000001
+# ╟─00000000-0000-0000-0000-000000000002
