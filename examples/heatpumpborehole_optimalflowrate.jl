@@ -3,13 +3,15 @@
 ####################
 using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
-sec_fl_name="MEA-25%" # MEA-28% MEG-37%
+sec_fl_name="MEA-20%" # MEA-28% MEG-37%
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::"*sec_fl_name
 Q_evap=10000.
-evaporator = EvaporatorDesign(Q_evap, 273. - 8 ,273+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
+evaporator = EvaporatorDesign(Q_evap, 273.15 - 8 ,273.15+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
-Trange = range(-15. + 273.15, 30 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
+T_f=CoolProp.PropsSI("T_FREEZE", secondaryfluid_name) - 273.15
+
+Trange = range(T_f + 1. + 273.15, 40 + 273.15, length = 40) #temperature range used to build secondary fluid interpolants
 secondaryfluid = SecondaryFluid(Trange, secondaryfluid_name)
 refrigerant = Refrigerant(refrigerant_name)
 
