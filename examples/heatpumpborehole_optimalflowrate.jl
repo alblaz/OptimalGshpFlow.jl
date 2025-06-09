@@ -3,7 +3,7 @@
 ####################
 using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
-sec_fl_name="MEG-37%"
+sec_fl_name="MEA-25%" # MEA-28% MEG-37%
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::"*sec_fl_name
 Q_evap=10000.
@@ -27,7 +27,7 @@ borehole = SingleUPipeBorehole(H = H, D = 4., rpo = dout/2, SDR=17., rb = 0.115/
 
 λground = 3.
 
-Tb = 273.15 + 5    
+Tb = 273.15 + 10   
 ΔTsup = 5
 ηpump = 0.4
 
