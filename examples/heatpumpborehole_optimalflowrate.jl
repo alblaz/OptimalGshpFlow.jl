@@ -29,7 +29,7 @@ borehole = SingleUPipeBorehole(H = H, D = 4., rpo = dout/2, SDR=17., rb = 0.115/
 
 λground = 3.
 
-Tb = 273.15 + 0
+Tb = 273.15 + 10
 ΔTsup = 5
 ηpump = 0.4
 
