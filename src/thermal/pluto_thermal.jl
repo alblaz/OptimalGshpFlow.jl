@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -97,12 +97,6 @@ using Nemo
 using PlutoExtras
   ╠═╡ =#
 
-# ╔═╡ 572701dd-5f06-41ea-b920-bc6a5c01be72
-# ╠═╡ disabled = true
-#=╠═╡
-using PlutoTest
-  ╠═╡ =#
-
 # ╔═╡ 48ef9603-6e6c-4d78-a85d-f26436ef3348
 function U_fill_R_s(;name, J::Int=1)
 	ps = @parameters begin
@@ -113,9 +107,9 @@ function U_fill_R_s(;name, J::Int=1)
 		α = 0.5 #"centered"
 	end
 	sts = @variables begin
-		RΔ12
-		RΔ1b
-		RΔ2b
+		R_t1_t2
+		R_t1_b
+		R_t2_b
 	end
 	begin
 		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
@@ -143,20 +137,20 @@ function U_fill_R_s(;name, J::Int=1)
 		R⁺ = R₀⁺ .+ B⁺
 		R⁻ = R₀⁻ .+ B⁻
 	
-		R_1b_p_c = R⁺
-		R_2b_p_c = R⁺
-		R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
+		R_f1_b_p_c = R⁺
+		R_f2_b_p_c = R⁺
+		R_f1_f2_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
 		
-		exp_R_1b = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_2b = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-		exp_R_12 = substitute(exp_R_12, [χ_p => α*r_b]);
+		exp_R_f1_b = substitute(R_f1_b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_f2_b = substitute(R_f2_b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_f1_f2 = substitute(R_f1_f2_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+		exp_R_f1_f2 = substitute(exp_R_f1_f2, [χ_p => α*r_b]);
 	end
 
     eqs = [
-        exp_R_12 ~ RΔ12,
-        exp_R_1b ~ RΔ1b,
-        exp_R_2b ~ RΔ2b,
+        exp_R_f1_f2 ~ R_t1_t2,
+        exp_R_f1_b ~ R_t1_b,
+        exp_R_f2_b ~ R_t2_b,
 	]
 
 	return NonlinearSystem(eqs, sts, ps; name = name);
@@ -188,455 +182,24 @@ end
 @named Upipe = U_fill_R_s(J=3)
   ╠═╡ =#
 
-# ╔═╡ c04ec6f0-e43f-4947-a545-01d09d46b982
-#=╠═╡
-@named newsys = ModelingToolkit.compose(NonlinearSystem([], [], []; name = :name), [h1, Upipe, h2])
-  ╠═╡ =#
-
-# ╔═╡ d882d2ae-e976-4bc5-b58c-011f22ae0d04
-#=╠═╡
-structural_simplify(newsys)
-  ╠═╡ =#
-
-# ╔═╡ da0560a5-fde0-4997-a8ae-34a294a403b8
-begin
-	
-	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
-	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
-	
-	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
-
-	cp_1 = cp_b_(T_p_1, χ)
-	μ_1 = μ_b_(T_p_1, χ)
-	λp_1 = λ_b_(T_p_1, χ)
-	ρ_1 = ρ_b_(T_p_1, χ)
-	
-	V̇_1 = ṁ_1 / ρ_1
-	S_1 = π*D_1^2/4
-	v_1 = V̇_1 / S_1
-
-	Re_1 = ρ_1*v_1*D_1/μ_1
-	Pr_1 = cp_1*μ_1/λp_1
-
-	Nu_lam_1 = 3.66
-	f_1 = 0.3164*Re_1^(-1//4)
-	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
-	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
-
-	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
-
-	h_1 = Nu_1 * λp_1/D_1
-
-	#---
-
-	cp_2 = cp_b_(T_p_2, χ)
-	μ_2 = μ_b_(T_p_2, χ)
-	λp_2 = λ_b_(T_p_2, χ)
-	ρ_2 = ρ_b_(T_p_2, χ)
-	
-	V̇_2 = ṁ_2 / ρ_2
-	S_2 = π*D_2^2/4
-	v_2 = V̇_2 / S_2
-
-	Re_2 = ρ_2*v_2*D_2/μ_2
-	Pr_2 = cp_2*μ_2/λp_2
-
-	Nu_lam_2 = 3.66
-	f_2 = 0.3164*Re_1^(-1//4)
-	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
-	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
-
-	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_1*Nu_tur_2
-
-	h_2 = Nu_2 * λp_2/D_2;
-end;
-
 # ╔═╡ e3e8a633-0572-4032-a6ed-3c03ead67180
 md" # U-tube: filled"
 
 # ╔═╡ cd4d60e8-724c-4fe9-8947-061df7072bf4
 
 
-# ╔═╡ f266e88f-ce01-4030-8740-b792a16bb99a
-# Borehole resistance in natural convection
-begin
-	#@variables r_p r_b
-	ν(T) = μ_b_(T, 0.0) / ρ_b_(T, 0.0)
-	Pr(T) = cp_b_(T, 0.0) * μ_b_(T, 0.0) / λ_b_(T, 0.0)
-	@variables T_w_av T_1_av T_2_av T_b_av
-	@parameters g
-	T_f_1_w = 0.5*T_1_av + .5*T_w_av
-	T_f_2_w = 0.5*T_2_av + .5*T_w_av
-	T_f_b_w = 0.5*T_b_av + .5*T_w_av
-
-	Gr_1 = g*β_b_(T_f_1_w)*(T_w_av-T_1_av)*D_1^3/ν(T_f_1_w)^2
-	Gr_2 = g*β_b_(T_f_2_w)*(T_w_av-T_2_av)*D_2^3/ν(T_f_2_w)^2
-	Gr_b = g*β_b_(T_f_b_w)*(T_w_av-T_b_av)*D_b^3/ν(T_f_b_w)^2
-
-	Nu_1_cv = 0.6 + 0.387*(Gr_1*Pr(T_f_1_w))^(1//6)*(1+(0.559/Pr(T_f_1_w))^(9/16))^(-8/27)
-	Nu_2_cv = 0.6 + 0.387*(Gr_2*Pr(T_f_2_w))^(1//6)*(1+(0.559/Pr(T_f_2_w))^(9/16))^(-8/27)
-	Nu_b_cv = 0.6 + 0.387*(Gr_b*Pr(T_f_b_w))^(1//6)*(1+(0.559/Pr(T_f_b_w))^(9/16))^(-8/27)
-	
-	h_1_w = Nu_1_cv * λ_b_(T_f_1_w, 0.0)/D_1
-	h_2_w = Nu_2_cv * λ_b_(T_f_2_w, 0.0)/D_2
-	h_b_w = Nu_b_cv * λ_b_(T_f_b_w, 0.0)/D_b
-
-	R_1w_cv = 1/(h_1_w*pi*D_1)
-	R_2w_cv = 1/(h_2_w*pi*D_2)
-	R_bw_cv = 1/(h_b_w*pi*D_b);
-end;
-
 # ╔═╡ 4cfd9965-69d0-4409-a15e-bc5a0fec9f11
 md" # U tube: grouted"
-
-# ╔═╡ c5c82402-d105-4346-9eac-bc6064da4c41
-# Borehole resistance in conduction
-begin
-	J = 1
-	@variables p_0 p_1 p_2 k σ s j i λ_ground λ_grout χ_p χ_b r_p r_b α
-	V_k = [(-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s for k_ in 1:J]
-	V_bk = [((-p_0)^k_*s + σ * p_1^k_ + σ*(-p_2)^k_*s) for k_ in 1:J]
-	#https://research.chalmers.se/publication/505672/file/505672_Fulltext.pdf
-	t_k_j_i = factorial(k+j-1-i)/(factorial(i)*factorial(k-i)*factorial(j-i))*(2*p_0)^1*(p_1^(k+j-1) + (-p_2)^(j+k-1)*s)
-	St_k_j_i = simplify(+([substitute(t_k_j_i, i => n) for n in 1:J]...))
-	t_data = [(i_ <= min(k_, j_) ? substitute(t_k_j_i, [k => k_, j => j_, i => i_]) : 0) for k_ in 1:J, j_ in 1:J, i_ in 0:J]
-	f_data = [substitute(factorial(k + j - 1)/(factorial(k-1)*factorial(j-1))*(-p_0)^(k+j), [k=>k_,j=>j_]) for k_ in 1:J, j_ in 1:J]
-	t_sum = [+(t_data[k, j, :]...) for k in 1:J, j in 1:J]
-	A_ = f_data .+ t_sum
-	KJ_mat = [(k_ == j_ ? k_ : 0) for k_ in 1:J, j_ in 1:J]
-	M_ = KJ_mat .+ A_
-	
-	R₀⁺ = 1/((2pi*λ_ground))*(log(r_b^2/(2*r_p*χ_p))+ σ*log((r_b^4/(r_b^4-χ_p^4))))
-	R₀⁻ = 1/((2pi*λ_ground))*(log(2χ_p/r_p)+ σ*log(((r_b^2 + χ_p^2)/(r_b^2-χ_p^2))))
-	
-	B_ = V_k'*inv(M_)*V_bk
-	
-	B⁻ = substitute(B_, s => -1)
-	B⁺ = substitute(B_, s => 1)
-
-	R⁺ = R₀⁺ .+ B⁺
-	R⁻ = R₀⁻ .+ B⁻
-
-	R_1b_p_c = R⁺
-	R_2b_p_c = R⁺
-	R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
-	
-	R_1b_cd = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_2b_cd = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-	R_12_cd = substitute(R_12_cd, [χ_p => α*r_b]);
-end;
-
-# ╔═╡ 5f8caf93-d3fe-4343-9b20-bbe5ea706549
-R_12_case = substitute(R_12_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1, α => 0.5])
-
-# ╔═╡ ab501cca-a573-4c35-9926-aa42e075c128
-R_1b_case = substitute(R_1b_cd, [r_b => 0.11/2±5e-5, r_p => 0.04/2±1e-3, χ_p => 0.11/3*0.9, λ_ground => 3.5±0.1, λ_grout => 2.5±0.1])
-
-# ╔═╡ caf4b4da-0e15-40e5-983a-dd364e40f235
-begin
-	#@variables D_1 D_2 D_b th_1 th_2
-	Per_1 = pi*(D_1-th_1)
-	Per_2 = pi*(D_2-th_2)
-	Per_w = pi*(D_b)
-	
-	R_1 = 1/(Per_1*h_1)
-	R_2 = 1/(Per_2*h_2)
-	R_w = 1/(Per_w*h_2)#### #w/K/m I guess
-	
-	R_pipe_1 = log(D_1/(D_1+th_1)) / (2π*λ_PE)
-	R_pipe_2 = log(D_2/(D_2+th_2)) / (2π*λ_PE);
-
-end;
-
-# ╔═╡ d797d02a-fb17-4967-8b5a-91c0cc817d33
-begin
-	R_12_cv = R_1w_cv + R_2w_cv
-	R_1b_cv = R_1w_cv + R_bw_cv
-	R_2b_cv = R_2w_cv + R_bw_cv;
-	
-	R_12_cv_tot = R_1 + R_pipe_1 + R_12_cv + R_pipe_1 + R_2
-	R_1w_cv_tot = R_1 + R_pipe_1 + R_1b_cv + R_w
-	R_2w_cv_tot = R_2 + R_pipe_2 + R_2b_cv + R_w
-	
-	UA_12_cv_tot = 1/R_12_cv_tot
-	UA_1w_cv_tot = 1/R_1w_cv_tot
-	UA_2w_cv_tot = 1/R_2w_cv_tot;
-end;
-
-# ╔═╡ b33b59ad-d750-49c8-a32b-aa5e1c4ef0fa
-begin
-	
-	R_12_cd_tot = R_1 + R_pipe_1 + R_12_cd + R_pipe_2 + R_2
-	R_1w_cd_tot = R_1 + R_pipe_1 + R_1b_cd
-	R_2w_cd_tot = R_2 + R_pipe_2 + R_2b_cd
-	
-	UA_12_cd_tot = 1/R_12_cd_tot
-	UA_1w_cd_tot = 1/R_1w_cd_tot
-	UA_2w_cd_tot = 1/R_2w_cd_tot;
-	
-end;
-
-# ╔═╡ 29594d9b-b007-40ac-bdb2-16286abc8d6c
-UA_12_cd_tot |> get_variables
 
 # ╔═╡ df8d848c-bde6-477a-b9ff-09154b3ee375
 md" # Quick analysis: parametric study"
 
-# ╔═╡ 7adc28f8-c020-4ba3-af18-0d8037f78416
-begin
-	@variables th_p, ṁ_bh
-	R_12_simplified = substitute(R_12_cd_tot, [D_1 => r_p*2, D_2 => r_p*2, th_1 => th_p, th_2 => th_p, ṁ_1 => ṁ_bh, ṁ_2 => ṁ_bh])
-	R_12_simplified |> get_variables
-R1B_f = build_function(R_12_simplified, r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low, expression=Val{false});
-eval_R1b(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low) = @bymap R1B_f(r_b, λ_PE, th_p, α, r_p, λ_ground, λ_grout, ṁ_bh, T_p_2, χ, T_p_1, Re_high, Re_low)
-	
-end
-
-# ╔═╡ b177db0b-a08e-4c78-950c-f2723f402b50
-begin
-XX = range(1e-2, 2.0, length = 300)
-	
-	n_p = 1000
-YY = map(x->eval_R1b(
-	115e-3,
-	Particles(n_p, Uniform(0.35, 0.36)),
-	2e-3,
-	Particles(n_p, Uniform(0.5, 0.51)),
-	40e-3,
-	Particles(n_p, Uniform(3.5, 4.5)),
-	Particles(n_p, Uniform(1.8, 2.2)),
-	x,
-	273.15+5,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	273.15+5,
-	5000,
-	2300), XX)
-end
-
-# ╔═╡ 247513bd-9b58-485e-b920-07b532e28f18
-begin
-	m_Y = [median(y.particles) for y in YY]
-	q_05 = [quantile(y.particles, 0.025) for y in YY]
-	q_95 = [quantile(y.particles, 0.975) for y in YY]
-end
-
-# ╔═╡ 37c6fed7-275b-423d-992d-0e5f6e6e2cf1
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-fig_study = Makie.lines(XX, m_Y)
-	band!(XX, q_05, q_95)
-	fig_study
-end
-  ╠═╡ =#
-
 # ╔═╡ 6034ad9e-4787-42e7-9f9a-592d5da1369d
 md" # Temperature profiles"
-
-# ╔═╡ 9ffdac54-ec39-4c4c-b3f9-b58877f52b33
-begin
-	@variables C_1_bh C_2_bh T_1_in T_wall L_bh λ_1 λ_2 γ_1 γ_2
-	
-	# We assume that our homogeneous (shifted) solution is:
-	#   T̃₁(x) = C1*exp(λ1*x) + C2*exp(λ2*x)
-	#   T̃₂(x) = C1*γ1*exp(λ1*x) + C2*γ2*exp(λ2*x)
-	#
-	# The boundary conditions we impose are:
-	# (i) At x=0:   T1(0)=T1_in  →  T̃₁(0)=T1_in - Ts, i.e.,  C1 + C2 = T1_in - Ts.
-	# (ii) At x=L:  Impose T1(L) = T2(L), i.e.,
-	#        T̃₁(L) = T̃₂(L)
-	#        which gives: C1*exp(λ1*L) + C2*exp(λ2*L) = C1*γ1*exp(λ1*L) + C2*γ2*exp(λ2*L).
-	
-	# Write the equations:
-	eq1 = C_1_bh + C_2_bh ~ T_1_in - T_wall
-	eq2 = C_1_bh*(γ_1 - 1)*exp(λ_1*L_bh) + C_2_bh*(γ_2 - 1)*exp(λ_2*L_bh) ~ 0
-	
-	# Solve the system for C1 and C2.
-	sol_C = symbolic_linear_solve([eq1, eq2], [C_1_bh, C_2_bh])
-end
-
-# ╔═╡ 8327ca86-5c71-482a-a605-29de14de9081
-begin
-	#@variables U_12 U_1w U_2w
-	@variables P_1 P_w1 P_2 P_w2
-	
-	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
-                                        λ_2 => sλ2,
-                                        γ_1 => sγ1,
-                                        γ_2 => sγ2)) for s in sol_C];
-end;
-
-# ╔═╡ 4972527a-d3c2-4f61-96c2-478b2e3d4113
-begin
-	@variables UA_12 UA_1w UA_2w
-	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
-	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-end;
-
-# ╔═╡ 274f3783-65e8-4b2b-9f87-ef181e5cb618
-get_variables(sC_2)
-
-# ╔═╡ 7eeb426b-fa00-46a9-8076-8ef43e87fec2
-get_variables(sλ_1)
-
-# ╔═╡ 689b3394-87ed-477d-be96-4c7475882398
-begin
-	@variables x_bh
-	sT̃_1 = sC_1*exp(sλ_1*x_bh) + sC_2*exp(sλ_2*x_bh)
-	sT_1 = sT̃_1 + T_wall # change of variable from homogeneous to non homogeneous
-	
-	sT̃_2 = sC_1*sγ_1*exp(sλ_1*x_bh) + sC_2*sγ_2*exp(sλ_2*x_bh)
-	sT_2 = sT̃_2 + T_wall # change of variable from homogeneous to non homogeneous
-	Tbh_in = T_1_in
-	Tbh_out = substitute(sT_2, x_bh=>0.0);
-	Tbh_1_p = substitute(sT_1, x_bh=>L_bh/2);
-	Tbh_2_p = substitute(sT_2, x_bh=>L_bh/2);
-end;
-
-# ╔═╡ 452e93d4-ee46-4563-8572-362d5dbb64f6
-Tbh_out
-
-# ╔═╡ b1a806ff-ec69-46a7-a006-83dd25654e1e
-sT_2 |> get_variables
-
-# ╔═╡ 9b8d052c-8f75-47fb-a320-275dc7a39bbe
-fT2 = build_function(sT_2, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ 3253b31e-d586-4c6d-9a57-575649f83894
-fT1 = build_function(sT_1, x_bh, T_p_1, T_p_2, χ, UA_12, UA_1w, UA_2w, L_bh, T_1_in, T_wall, ṁ_b, expression=Val{false});
-
-# ╔═╡ b7234bda-3dfd-4a53-b995-320c8aec4846
-begin
-	sC_1_cd = substitute(sC_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sC_2_cd = substitute(sC_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_1_cd = substitute(sλ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sλ_2_cd = substitute(sλ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_1_cd = substitute(sγ_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	sγ_2_cd = substitute(sγ_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-end;
-
-# ╔═╡ 8e6c599d-7f3a-49fe-b9ca-9a2f2585d41c
-begin
-	sT_1_cd = substitute(sT_1, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-	
-	sT_2_cd = substitute(sT_2, Dict(UA_12 => UA_12_cd_tot, UA_1w => UA_1w_cd_tot, UA_2w => UA_2w_cd_tot));
-
-	@variables D_bh
-	d_simpl = Dict(D_1 => D_b, D_2 => D_b, r_b => D_b/2, ṁ_1 => ṁ_b, ṁ_2 => ṁ_b, χ_p => α*D_b, Re_high => 5000, Re_low => 2300)
-	sT_1_cd = substitute(sT_1_cd, d_simpl);
-	
-end;
-
-# ╔═╡ 5028aee6-1138-408a-ab1d-ebfdf3e604ea
-UA_12_cd_tot |> simplify;
-
-# ╔═╡ eb86c8ed-a2c1-4637-9319-1364165ea18c
-get_variables(sT_1_cd)
-
-# ╔═╡ f104a6e3-4e3b-4cbd-bf2b-55ad3a98b7ce
-get_variables(sT_1_cd)
-
-# ╔═╡ f5186f8a-2789-47d8-890a-82284fb6898f
-simple_T_1 = substitute(sT_1_cd, [T_p_1=>295, χ=>0.285, D_b=>115e-3, th_1=>2e-3, λ_PE=>0.5, th_2=>2e-3, Re_low=>2300, Re_high=>5000, T_p_2=>295, r_p=>20e-3, λ_ground=>3.5, λ_grout=>2.0, ṁ_b=>1.0, x_bh=>300, T_1_in=>290, T_wall=> 300, L_bh => 300, α=>0.3])
-
-# ╔═╡ abb2c4bf-a835-4d9d-a746-29bc317130e4
-T_1_cd_f = build_function(sT_1_cd, T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α, expression=Val{false});
-
-# ╔═╡ 0a80bead-8b86-4efe-9272-bdffcdfed727
-eval_T1(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α) = @bymap T_1_cd_f(T_p_1, χ, D_b, th_1, λ_PE, th_2, Re_low, Re_high, T_p_2, r_p, λ_ground, λ_grout, ṁ_b, x_bh, T_1_in, T_wall, L_bh, α)
-
-# ╔═╡ 9bb82a58-a11b-432b-9a02-4ba1b4b4ac51
-begin
-XBH = range(1e-2, 300.0, length = 300)
-TT = map(x-> eval_T1(
-	273.15,#T_p_1,
-	Particles(n_p, Uniform(0.25, 0.255)),
-	115e-3,
-	2e-3,#th_1,
-	Particles(n_p, Uniform(0.35, 0.45)),
-	2e-3,#th_2,
-	2300,#Re_low,
-	5000,#Re_high,
-	273.15,#T_p_2,
-	20e-3,#r_p,
-	3.5,#λ_ground,
-	2.0,#λ_grout,
-	1.0,#ṁ_b,
-	x,#x_bh,
-	273.15+5,#T_1_in,
-	273.15+10,#T_wall,
-	300.0,#L_bh
-	0.3,#α
-), XBH)
-end
-
-# ╔═╡ 5b6a8aa4-b752-4175-a2da-f7a222e03c93
-#=╠═╡
-begin
-	m_T = [median(y.particles) for y in TT]
-	q_05_T = [quantile(y.particles, 0.025) for y in TT]
-	q_95_T = [quantile(y.particles, 0.975) for y in TT]
-fig_study_T = Makie.lines(XBH, m_T)
-	band!(XBH, q_05_T, q_95_T)
-	fig_study_T
-end
-  ╠═╡ =#
 
 # ╔═╡ 571a62a6-2bee-43c0-939f-e96346108c67
 assemble(systems::Vector{NonlinearSystem}; equations=[], name) = ModelingToolkit.compose(NonlinearSystem(equations, [], [], name=name), systems)
 
-
-# ╔═╡ 1b76f1ee-7c28-441d-9586-7fd37c6dbee6
-md"""
-# Test
-"""
 
 # ╔═╡ fe000077-8514-4ac7-8dc9-52a87ad28b2c
 """
@@ -650,12 +213,15 @@ function BoreholeTemperatureParameters(; name::Symbol)
     sts = @variables begin
         L_bh = 100.0  # Borehole length [m]
         T_wall = 283.15  # Borehole wall temperature [K]
-        T_f_in = 293.15  # Inlet fluid temperature [K]
-        ṁ_f = 0.5     # Fluid mass flow rate [kg/s]
-        cp_f = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
-        R_1b = 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        R_2b = 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
-        R_12 = 0.3    # Thermal resistance between pipes [K·m/W]
+        T_1_in = 293.15  # Inlet fluid temperature [K]
+        ṁ = 0.5     # Fluid mass flow rate [kg/s]
+        
+		cp_1 = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        cp_2 = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        
+		R_f1_b = 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_f2_b = 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_f1_f2 = 0.3    # Thermal resistance between pipes [K·m/W]
 		
         λ_1 = -0.00614         # First eigenvalue for the temperature solution
         λ_2 = 0.00614         # Second eigenvalue for the temperature solution
@@ -669,10 +235,10 @@ function BoreholeTemperatureParameters(; name::Symbol)
     # Use Symbolics to derive the equations
     begin
         # Calculate P terms
-        P_1 = 1/(ṁ_f*cp_f*R_12)
-        P_w1 = 1/(ṁ_f*cp_f*R_1b)
-        P_2 = 1/(ṁ_f*cp_f*R_12)
-        P_w2 = 1/(ṁ_f*cp_f*R_2b)
+        P_1 = 1/(ṁ*cp_1*R_f1_f2)
+        P_w1 = 1/(ṁ*cp_1*R_f1_b)
+        P_2 = 1/(ṁ*cp_2*R_f1_f2)
+        P_w2 = 1/(ṁ*cp_2*R_f2_b)
         
         # Calculate eigenvalues
         # The coefficient matrix for the homogeneous system
@@ -718,8 +284,8 @@ function BoreholeTemperatureParameters(; name::Symbol)
         factor1 = (1-γ_1)*exp(λ_1*L_bh)
         factor2 = (1-γ_2)*exp(λ_2*L_bh)
         
-        C_1_eq = C_1 ~ (T_f_in - T_wall) * factor2 / (factor2 - factor1)
-        C_2_eq = C_2 ~ (T_f_in - T_wall) * (-factor1) / (factor2 - factor1)
+        C_1_eq = C_1 ~ (T_1_in - T_wall) * factor2 / (factor2 - factor1)
+        C_2_eq = C_2 ~ (T_1_in - T_wall) * (-factor1) / (factor2 - factor1)
     end
     
     # Combine all equations for the system
@@ -741,12 +307,13 @@ function test_utube_parameters_simple()
 		
         params.L_bh ~ 100.0  # Borehole length [m]
         params.T_wall ~ 283.15  # Borehole wall temperature [K]
-        params.T_f_in ~ 293.15  # Inlet fluid temperature [K]
-        params.ṁ_f ~ 0.5     # Fluid mass flow rate [kg/s]
-        params.cp_f ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
-        params.R_1b ~ 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        params.R_2b ~ 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
-        params.R_12 ~ 0.3    # Thermal resistance between pipes [K·m/W]
+        params.T_1_in ~ 293.15  # Inlet fluid temperature [K]
+        params.ṁ ~ 0.5     # Fluid mass flow rate [kg/s]
+        params.cp_1 ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        params.cp_2 ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+        params.R_f1_b ~ 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        params.R_f2_b ~ 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        params.R_f1_f2 ~ 0.3    # Thermal resistance between pipes [K·m/W]
 	])
     simpl_sys = structural_simplify(test_sys)
     
@@ -779,7 +346,7 @@ function test_utube_parameters_simple()
 end
 
 # ╔═╡ fae38d18-0c77-4b4e-9c30-9976a17c3a2b
-test_utube_parameters_simple()
+@test test_utube_parameters_simple()
 
 # ╔═╡ 3a9ef928-cb59-45dd-87db-71d57c38e15a
 """
@@ -821,22 +388,23 @@ the temperature profile of a U-tube borehole heat exchanger.
 This component connects the parameter calculation with temperature profiles at the top
 of the borehole to calculate inlet/outlet temperatures and total heat transfer.
 """
-function BoreholeThermal(; name::Symbol)
+function BoreholeThermal(; name::Symbol, depth=100.0, T_wall = 300.0)
     # Define top-level parameters (depth and wall temperature)
     ps = @parameters begin
-        depth = 100.0      # Borehole length [m]
-        T_wall = 283.15    # Borehole wall temperature [K]
+        depth = depth      # Borehole length [m]
+        T_wall = T_wall    # Borehole wall temperature [K]
     end
     
     # System variables that will be inputs/outputs at the top level
     sts = @variables begin
-        T_inlet = 293.15   # Inlet fluid temperature [K]
-        T_outlet = 283.15  # Outlet fluid temperature [K]
+        T_1 = 293.15   # Inlet fluid temperature [K]
+        T_2 = 283.15  # Outlet fluid temperature [K]
         ṁ = 0.5            # Fluid mass flow rate [kg/s]
-        cp = 4200.0        # Fluid specific heat capacity [J/(kg·K)]
-        R_1b = 0.1         # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        R_2b = 0.1         # Thermal resistance from pipe 2 to borehole wall [K·m/W]
-        R_12 = 0.3         # Thermal resistance between pipes [K·m/W]
+        cp_1 = 4200.0        # Fluid specific heat capacity [J/(kg·K)]
+        cp_2 = 4200.0        # Fluid specific heat capacity [J/(kg·K)]
+        R_f1_b = 0.1         # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_f2_b = 0.1         # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_f1_f2 = 0.3         # Thermal resistance between pipes [K·m/W]
     end
     
     # Create component instances
@@ -848,12 +416,13 @@ function BoreholeThermal(; name::Symbol)
         # Connect parameters to the parameter calculation component
         params.L_bh ~ depth,
         params.T_wall ~ T_wall,
-        params.T_f_in ~ T_inlet,
-        params.ṁ_f ~ ṁ,
-        params.cp_f ~ cp,
-        params.R_1b ~ R_1b,
-        params.R_2b ~ R_2b,
-        params.R_12 ~ R_12,
+        params.T_1_in ~ T_1,
+        params.ṁ ~ ṁ,
+        params.cp_1 ~ cp_1,
+        params.cp_2 ~ cp_2,
+        params.R_f1_b ~ R_f1_b,
+        params.R_f2_b ~ R_f2_b,
+        params.R_f1_f2 ~ R_f1_f2,
         
         # Connect top temperature component (at x = 0)
         temp_top.x ~ 0.0,
@@ -866,7 +435,7 @@ function BoreholeThermal(; name::Symbol)
         temp_top.C_2 ~ params.C_2,
         
         # Connect top-level outputs
-        T_outlet ~ temp_top.T_2,
+        T_2 ~ temp_top.T_2,
     ]
     
     # Create the parent system with connected components
@@ -882,12 +451,13 @@ function test_utube_borehole()
     # Define a test system with input parameters
     @named test_sys = assemble([bh], equations=[
         # Set all necessary inputs directly on the top-level component
-        bh.T_inlet ~ 293.15,    # 20°C inlet temperature
+        bh.T_1 ~ 293.15,    # 20°C inlet temperature
         bh.ṁ ~ 0.5,             # 0.5 kg/s flow rate
-        bh.cp ~ 4200.0,         # Water specific heat
-        bh.R_1b ~ 0.1,          # Thermal resistances
-        bh.R_2b ~ 0.1,
-        bh.R_12 ~ 0.3
+        bh.cp_1 ~ 4200.0,         # Water specific heat
+        bh.cp_2 ~ 4200.0,         # Water specific heat
+        bh.R_f1_b ~ 0.1,          # Thermal resistances
+        bh.R_f2_b ~ 0.1,
+        bh.R_f1_f2 ~ 0.3
     ])
     
     # Simplify and solve the system
@@ -896,9 +466,9 @@ function test_utube_borehole()
     sol = NonlinearSolve.solve(problem)
     
     # Extract key results
-    T_outlet = sol[bh.T_outlet]
-    T_inlet = sol[bh.T_inlet]
-    heat_transfer = sol[bh.ṁ] * sol[bh.cp] * (T_inlet - T_outlet)
+    T_outlet = sol[bh.T_2]
+    T_inlet = sol[bh.T_1]
+    heat_transfer = sol[bh.ṁ] * sol[bh.cp_1] * (T_inlet - T_outlet)
     
     # Print the results
     println("UTubeBorehole Results:")
@@ -919,8 +489,7 @@ md"""
 # Resistances modeling
 """
 
-# ╔═╡ 089ef48a-b35c-490f-9b77-898a4dea195b
-# Utility functions for resistance calculations
+# ╔═╡ 7226d893-5d58-4997-93c6-a532e76bbd33
 """
 Calculate Nusselt number for natural convection on a cylinder.
 Uses the Churchill-Chu correlation for natural convection.
@@ -936,7 +505,7 @@ function nusselt_natural_convection(Gr, Pr)
     return 0.6 + 0.387 * (Gr * Pr)^(1/6) * (1 + (0.559 / Pr)^(9/16))^(-8/27)
 end
 
-# ╔═╡ 59ba8bc5-9ca7-4ab5-964c-9c7a8c8141ca
+# ╔═╡ 5516c29d-96fd-4614-ad98-6afeb0d7a6c6
 """
 Calculate thermal resistance of a cylindrical pipe wall.
 
@@ -952,7 +521,7 @@ function pipe_wall_resistance(D_o, D_i, λ)
     return log(D_o / D_i) / (2 * π * λ)
 end
 
-# ╔═╡ e7812966-cff7-4169-b255-20bfb4c1d2f2
+# ╔═╡ 6053e72f-a71f-4d66-bdec-825bfc71f3ff
 """
 Calculate thermal resistance due to convection on a cylindrical surface.
 
@@ -967,7 +536,7 @@ function convection_resistance(D, h)
     return 1 / (h * π * D)
 end
 
-# ╔═╡ d81fa98e-bdff-40a8-97e4-fc21eef8e635
+# ╔═╡ ac31a014-260e-427a-a12e-507d08bcf69e
 """
 Calculate Grashof number for natural convection.
 
@@ -985,7 +554,7 @@ function grashof(g, β, ΔT, D, ν)
     return g * β * ΔT * D^3 / ν^2
 end
 
-# ╔═╡ d3931d58-e02a-42b5-80f5-06963f2c1ad9
+# ╔═╡ e5f237e2-9a05-4526-9cee-8cfab38c5b8b
 """
 Calculate Prandtl number.
 
@@ -1001,7 +570,7 @@ function prandtl(cp, μ, λ)
     return cp * μ / λ
 end
 
-# ╔═╡ cdc17c0b-341f-4b7e-bcdc-57fc800bf9d8
+# ╔═╡ dfb5326f-ffdf-485b-a237-01f3c33d378c
 """
 Calculate friction factor using a smooth transition between laminar and turbulent regimes.
 Valid for all Reynolds numbers with a physically smooth transition around the critical zone.
@@ -1019,16 +588,11 @@ function friction_factor_smooth(Re, ε_D=0.0; Re_lam=2300, Re_turb=4000)
     # Laminar flow friction factor
     f_lam = 64.0 / max(Re, 1.0)
     
-    # Turbulent flow using Colebrook-White equation (or simplified version for smooth pipes)
-    if ε_D < 1e-6  # Smooth pipe
-        f_turb = (0.79 * log(Re) - 1.64)^(-2)
-    else
-        # Swamee-Jain equation (explicit approximation of Colebrook-White)
-        f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/Re^0.9))^2
-    end
+    # Turbulent flow (simplified to avoid the conditional check)
+    # Using Swamee-Jain equation which works for both smooth and rough pipes
+    f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/Re^0.9))^2
     
     # Smooth transition using error function
-    # This ensures a continuous and differentiable transition
     transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
     
     # Combined friction factor with smooth transition
@@ -1037,8 +601,7 @@ function friction_factor_smooth(Re, ε_D=0.0; Re_lam=2300, Re_turb=4000)
     return f
 end
 
-
-# ╔═╡ dae309a7-8bc3-461f-b2a1-92b916b9bf15
+# ╔═╡ d75c03e6-6f55-4933-88fc-88428fc22869
 """
 Calculate Nusselt number for pipe flow with smooth transition between regimes.
 Combines laminar (Nu=4.36 for constant heat flux) and Gnielinski correlation for turbulent flow.
@@ -1063,122 +626,10 @@ function nusselt_pipe_flow(Re, Pr, f=nothing; Re_lam=2300, Re_turb=4000)
     end
     
     # Gnielinski correlation for turbulent flow
-    Nu_turb = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
-    
-    # Smooth transition using the same approach as for friction factor
-    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
-    
-    # Combined Nusselt number with smooth transition
-    Nu = (1 - transition_factor) * Nu_lam + transition_factor * Nu_turb
-    
-    return Nu
-end
-
-# Heat transfer coefficient helper functions
-
-# ╔═╡ 6ef88a89-1365-49b4-a284-491290703e93
-"""
-Calculate heat transfer coefficient for natural convection on a cylinder.
-
-Parameters:
-- g: Gravitational acceleration [m/s²]
-- β: Thermal expansion coefficient [1/K]
-- ΔT: Temperature difference [K]
-- D: Diameter of cylinder [m]
-- ρ: Fluid density [kg/m³]
-- μ: Dynamic viscosity [Pa·s]
-- cp: Specific heat capacity [J/(kg·K)]
-- λ: Thermal conductivity [W/(m·K)]
-
-Returns:
-- Heat transfer coefficient [W/(m²·K)]
-"""
-function htc_natural_convection_cylinder(g, β, ΔT, D, ρ, μ, cp, λ)
-    # Kinematic viscosity
-    ν = μ / ρ
-    
-    # Grashof number
-    Gr = grashof(g, β, ΔT, D, ν)
-    
-    # Prandtl number
-    Pr = prandtl(cp, μ, λ)
-    
-    # Nusselt number
-    Nu = nusselt_natural_convection(Gr, Pr)
-    
-    # Heat transfer coefficient
-    return Nu * λ / D
-end
-
-# ╔═╡ 2d39b4ee-299d-4baf-b2d9-92858e91f5d9
-
-
-# ╔═╡ d5937b16-747a-4a9a-9144-0eb0b550f928
-"""
-Calculate friction factor using a smooth transition between laminar and turbulent regimes.
-Valid for all Reynolds numbers with a physically smooth transition around the critical zone.
-
-Parameters:
-- Re: Reynolds number
-- ε_D: Relative roughness (defaults to 0.0 for smooth pipes)
-- Re_lam: Lower Reynolds number for transition (default: 2300)
-- Re_turb: Upper Reynolds number for transition (default: 4000)
-
-Returns:
-- Friction factor
-"""
-function friction_factor_pipe(Re, ε_D=0.0; Re_lam=2300, Re_turb=4000)
-    # Laminar flow friction factor (with safety to avoid division by zero)
-    f_lam = 64.0 / max(Re, 1.0)
-    
-    # Turbulent flow using appropriate correlation based on pipe roughness
-    if ε_D < 1e-6  # Smooth pipe
-        f_turb = (0.79 * log(Re) - 1.64)^(-2)
-    else
-        # Swamee-Jain equation (explicit approximation of Colebrook-White)
-        f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/Re^0.9))^2
-    end
-    
-    # Smooth transition using hyperbolic tangent
-    # This ensures a continuous and differentiable transition
-    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
-    
-    # Combined friction factor with smooth transition
-    f = (1 - transition_factor) * f_lam + transition_factor * f_turb
-    
-    return f
-end
-
-# ╔═╡ 65de1e1c-e06c-444d-983b-50b0e05a397b
-"""
-Calculate Nusselt number for pipe flow with smooth transition between regimes.
-Combines laminar (Nu=4.36 for constant heat flux) and Gnielinski correlation for turbulent flow.
-
-Parameters:
-- Re: Reynolds number
-- Pr: Prandtl number
-- f: Friction factor (optional, calculated if not provided)
-- ε_D: Relative roughness (defaults to 0.0 for smooth pipes)
-- Re_lam: Lower Reynolds number for transition (default: 2300)
-- Re_turb: Upper Reynolds number for transition (default: 4000)
-
-Returns:
-- Nusselt number
-"""
-function nusselt_pipe_flow(Re, Pr, f=nothing, ε_D=0.0; Re_lam=2300, Re_turb=4000)
-    # Calculate friction factor if not provided
-    if f === nothing
-        f = friction_factor_pipe(Re, ε_D; Re_lam=Re_lam, Re_turb=Re_turb)
-    end
-    
-    # Laminar flow (constant heat flux)
-    Nu_lam = 4.36
-    
-    # Turbulent flow (Gnielinski correlation)
-    # Added safety to avoid negative values at low Reynolds numbers
-    Re_gniel = max(Re, 1000.0)  # Ensure Re is at least 1000 for Gnielinski formula
+    # Added safety to ensure valid range
+    Re_gniel = max(Re, 1000.0)
     Nu_turb = ((f/8) * (Re_gniel - 1000) * Pr) / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
-    Nu_turb = max(Nu_turb, 3.66)  # Ensure positive Nusselt number
+    Nu_turb = max(Nu_turb, 3.66)  # Safety to ensure positive value
     
     # Smooth transition using the same approach as for friction factor
     transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
@@ -1189,7 +640,7 @@ function nusselt_pipe_flow(Re, Pr, f=nothing, ε_D=0.0; Re_lam=2300, Re_turb=400
     return Nu
 end
 
-# ╔═╡ 69ced9d5-9053-4aaa-b485-ef32d3b66e07
+# ╔═╡ 529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
 """
 Calculate heat transfer coefficient for forced convection in tubes.
 
@@ -1227,7 +678,41 @@ function htc_forced_convection_tube(ṁ, D, ρ, μ, cp, λ)
     return Nu * λ / D
 end
 
-# ╔═╡ 15c8fb5a-27e4-4a1d-8242-fd5237e39532
+# ╔═╡ 37d8b287-5446-4cfe-bb13-6d24f3f5ace3
+"""
+Calculate heat transfer coefficient for natural convection on a cylinder.
+
+Parameters:
+- g: Gravitational acceleration [m/s²]
+- β: Thermal expansion coefficient [1/K]
+- ΔT: Temperature difference [K]
+- D: Diameter of cylinder [m]
+- ρ: Fluid density [kg/m³]
+- μ: Dynamic viscosity [Pa·s]
+- cp: Specific heat capacity [J/(kg·K)]
+- λ: Thermal conductivity [W/(m·K)]
+
+Returns:
+- Heat transfer coefficient [W/(m²·K)]
+"""
+function htc_natural_convection_cylinder(g, β, ΔT, D, ρ, μ, cp, λ)
+    # Kinematic viscosity
+    ν = μ / ρ
+    
+    # Grashof number
+    Gr = grashof(g, β, ΔT, D, ν)
+    
+    # Prandtl number
+    Pr = prandtl(cp, μ, λ)
+    
+    # Nusselt number
+    Nu = nusselt_natural_convection(Gr, Pr)
+    
+    # Heat transfer coefficient
+    return Nu * λ / D
+end
+
+# ╔═╡ 7f108fec-1aa8-437a-88b4-1933694eb22b
 """
 Calculate heat transfer coefficient for forced convection in annular space.
 
@@ -1273,45 +758,7 @@ function htc_forced_convection_annular(ṁ, D_i, D_o, ρ, μ, cp, λ)
     return h_i, h_o
 end
 
-
-# ╔═╡ e1cf0ab5-3a10-4c67-b393-ff2200cfdb3d
-"""
-Calculate heat transfer coefficient for forced convection in tubes.
-
-Parameters:
-- ṁ: Mass flow rate [kg/s]
-- D: Inner diameter of tube [m]
-- ρ: Fluid density [kg/m³]
-- μ: Dynamic viscosity [Pa·s]
-- cp: Specific heat capacity [J/(kg·K)]
-- λ: Thermal conductivity [W/(m·K)]
-- ε: Pipe roughness [m] (default: 1.5e-6 for PE pipes)
-
-Returns:
-- Heat transfer coefficient [W/(m²·K)]
-"""
-function htc_forced_convection_pipe(ṁ, D, ρ, μ, cp, λ, ε=1.5e-6)
-    # Calculate Reynolds number
-    A = π * (D/2)^2
-    v = ṁ / (ρ * A)
-    Re = ρ * v * D / μ
-    
-    # Calculate Prandtl number
-    Pr = cp * μ / λ
-    
-    # Calculate relative roughness
-    ε_D = ε / D
-    
-    # Calculate Nusselt number
-    Nu = nusselt_pipe_flow(Re, Pr, nothing, ε_D)
-    
-    # Calculate heat transfer coefficient
-    h = Nu * λ / D
-    
-    return h
-end
-
-# ╔═╡ 3dc1ddbc-b78f-4a80-8e28-c9e1329be549
+# ╔═╡ 303c4cac-c9b9-42f7-8fc7-85239423b0e4
 """
 UTubeResistances calculates thermal resistances for a U-tube borehole heat exchanger.
 This component allows for different dimensions for the two tubes and calculates
@@ -1325,9 +772,9 @@ Parameters:
 - χ: Glycol mass fraction
 
 Returns:
-- R_12: Thermal resistance between pipes [K·m/W]
-- R_1b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
-- R_2b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
+- R_f1_f2: Thermal resistance between pipes [K·m/W]
+- R_f1_b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
+- R_f2_b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
 """
 function UTubeResistances(; name::Symbol)
     ps = @parameters begin
@@ -1352,13 +799,18 @@ function UTubeResistances(; name::Symbol)
     sts = @variables begin
         # Flow parameters
         ṁ = 0.5            # Mass flow rate [kg/s]
-        T_f = 288.15       # Average fluid temperature [K]
-        
+		
         # Fluid properties
-        ρ_f = 1000.0       # Fluid density [kg/m³]
-        μ_f = 0.001        # Fluid dynamic viscosity [Pa·s]
-        cp_f = 4200.0      # Fluid specific heat capacity [J/(kg·K)]
-        λ_f = 0.6          # Fluid thermal conductivity [W/(m·K)]
+        ρ_1 = 1000.0       # Fluid density [kg/m³]
+        μ_1 = 0.001        # Fluid dynamic viscosity [Pa·s]
+        cp_1 = 4200.0      # Fluid specific heat capacity [J/(kg·K)]
+        λ_1 = 0.6          # Fluid thermal conductivity [W/(m·K)]
+		
+        # Fluid properties
+        ρ_2 = 1000.0       # Fluid density [kg/m³]
+        μ_2 = 0.001        # Fluid dynamic viscosity [Pa·s]
+        cp_2 = 4200.0      # Fluid specific heat capacity [J/(kg·K)]
+        λ_2 = 0.6          # Fluid thermal conductivity [W/(m·K)]
         
         # Heat transfer coefficients
         h_1 = 1000.0       # Convective heat transfer coefficient for pipe 1 [W/(m²·K)]
@@ -1367,72 +819,47 @@ function UTubeResistances(; name::Symbol)
         # Individual resistance components
         R_conv_1 = 0.0     # Convective resistance inside pipe 1 [K·m/W]
         R_conv_2 = 0.0     # Convective resistance inside pipe 2 [K·m/W]
+		
         R_p1 = 0.0         # Pipe 1 wall conductive resistance [K·m/W]
         R_p2 = 0.0         # Pipe 2 wall conductive resistance [K·m/W]
         
         # Annular resistances (after the walls), either grout conduction or natural convection chained
-        Ra_12 = 0.3        # Annular resistance between pipes [K·m/W]
-        Ra_1b = 0.1        # Annular resistance from pipe 1 to borehole [K·m/W]
-        Ra_2b = 0.1        # Annular resistance from pipe 2 to borehole [K·m/W]
+        R_t1_t2 = 0.3        # Annular resistance between pipes [K·m/W]
+        R_t1_b = 0.1        # Annular resistance from pipe 1 to borehole [K·m/W]
+        R_t2_b = 0.1        # Annular resistance from pipe 2 to borehole [K·m/W]
         
-        # Total resistances
-        R_12 = 0.3         # Total thermal resistance between pipes [K·m/W]
-        R_1b = 0.1         # Total thermal resistance from pipe 1 to borehole wall [K·m/W]
-        R_2b = 0.1         # Total thermal resistance from pipe 2 to borehole wall [K·m/W]
+        # Total delta resistances
+        R_f1_f2 = 0.3         # Total thermal resistance between pipes [K·m/W]
+        R_f1_b = 0.1         # Total thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_f2_b = 0.1         # Total thermal resistance from pipe 2 to borehole wall [K·m/W]
     end
     
-    # Calculate Reynolds numbers for each pipe
-    A_1 = π * (D_p1_i/2)^2
-    v_1 = ṁ / (ρ_f * A_1)
-    Re_1 = ρ_f * v_1 * D_p1_i / μ_f
-    
-    A_2 = π * (D_p2_i/2)^2
-    v_2 = ṁ / (ρ_f * A_2)
-    Re_2 = ρ_f * v_2 * D_p2_i / μ_f
-    
-    # Calculate Prandtl number
-    Pr_f = cp_f * μ_f / λ_f
-    
-    # Calculate relative roughness
-    ε_D_1 = ε_1 / D_p1_i
-    ε_D_2 = ε_2 / D_p2_i
-    
-    # Calculate friction factors using smooth transition
-    f_1 = friction_factor_pipe(Re_1, ε_D_1)
-    f_2 = friction_factor_pipe(Re_2, ε_D_2)
-    
-    # Calculate Nusselt numbers using smooth transition
-    Nu_1 = nusselt_pipe_flow(Re_1, Pr_f, f_1)
-    Nu_2 = nusselt_pipe_flow(Re_2, Pr_f, f_2)
-    
     eqs = [
-        # Calculate heat transfer coefficients
-        h_1 ~ Nu_1 * λ_f / D_p1_i,
-        h_2 ~ Nu_2 * λ_f / D_p2_i,
-        
-        # Convective resistances calculation
-        R_conv_1 ~ 1 / (π * D_p1_i * h_1),
-        R_conv_2 ~ 1 / (π * D_p2_i * h_2),
-        
-        # Pipe wall resistances calculation
+		h_1 ~ htc_forced_convection_tube(ṁ, D_p1_i, ρ_1, μ_1, cp_1, λ_1),
+		h_2 ~ htc_forced_convection_tube(ṁ, D_p2_i, ρ_2, μ_2, cp_2, λ_2),
+        # Calculate pipe wall resistances
         R_p1 ~ log(D_p1_o / D_p1_i) / (2 * π * λ_pipe_1),
         R_p2 ~ log(D_p2_o / D_p2_i) / (2 * π * λ_pipe_2),
         
+        # Calculate convective resistances
+        R_conv_1 ~ 1 / (π * D_p1_i * h_1),
+        R_conv_2 ~ 1 / (π * D_p2_i * h_2),
+        
         # Total resistances calculations
         # From fluid in pipe 1 to borehole wall
-        R_1b ~ R_conv_1 + R_p1 + Ra_1b,
+        R_f1_b ~ R_conv_1 + R_p1 + R_t1_b,
         
         # From fluid in pipe 2 to borehole wall
-        R_2b ~ R_conv_2 + R_p2 + Ra_2b,
+        R_f2_b ~ R_conv_2 + R_p2 + R_t2_b,
         
         # Between pipes (through annular medium)
-        R_12 ~ R_conv_1 + R_p1 + Ra_12 + R_p2 + R_conv_2
+        R_f1_f2 ~ R_conv_1 + R_p1 + R_t1_t2 + R_p2 + R_conv_2
     ]
     
     return NonlinearSystem(eqs, sts, ps; name=name)
 end
 
-# ╔═╡ 01d97a0d-d69a-4dab-920f-5a28bfc9bf9c
+# ╔═╡ 2d42a7e9-c756-4053-858e-5659e069470a
 """
 Test function for UTubeResistances component with calculated heat transfer coefficients.
 """
@@ -1447,16 +874,21 @@ function test_utube_resistances_with_htc()
                                           utube_res.ṁ ~ 0.5,          # 0.5 kg/s
                                           
                                           # Fluid properties (water at 15°C)
-                                          utube_res.T_f ~ 288.15,     # 15°C
-                                          utube_res.ρ_f ~ 999.1,      # kg/m³
-                                          utube_res.μ_f ~ 0.00114,    # Pa·s
-                                          utube_res.cp_f ~ 4185.0,    # J/(kg·K)
-                                          utube_res.λ_f ~ 0.589,      # W/(m·K)
+                                          utube_res.ρ_1 ~ 999.1,      # kg/m³
+                                          utube_res.μ_1 ~ 0.00114,    # Pa·s
+                                          utube_res.cp_1 ~ 4185.0,    # J/(kg·K)
+                                          utube_res.λ_1 ~ 0.589,      # W/(m·K)
+                                          
+                                          # Fluid properties (water at 15°C)
+                                          utube_res.ρ_2 ~ 999.1,      # kg/m³
+                                          utube_res.μ_2 ~ 0.00114,    # Pa·s
+                                          utube_res.cp_2 ~ 4185.0,    # J/(kg·K)
+                                          utube_res.λ_2 ~ 0.589,      # W/(m·K)
                                           
                                           # Annular resistances
-                                          utube_res.Ra_12 ~ 0.3,      # K·m/W
-                                          utube_res.Ra_1b ~ 0.1,      # K·m/W
-                                          utube_res.Ra_2b ~ 0.1       # K·m/W
+                                          utube_res.R_t1_t2 ~ 0.3,      # K·m/W
+                                          utube_res.R_t1_b ~ 0.1,      # K·m/W
+                                          utube_res.R_t2_b ~ 0.1       # K·m/W
                                       ])
     
     # Simplify and solve
@@ -1468,8 +900,8 @@ function test_utube_resistances_with_htc()
     return sol.retcode == ModelingToolkit.ReturnCode.Success
 end
 
-# ╔═╡ 4e513dbc-f427-4538-8a13-a3fff8a3ce5e
-test_utube_resistances_with_htc()
+# ╔═╡ ed6d7ff7-7c72-4445-9627-d9141c5031dc
+@test test_utube_resistances_with_htc()
 
 # ╔═╡ aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
 """
@@ -1477,9 +909,9 @@ WaterFilledAnnularResistances calculates thermal resistances in the annular spac
 between pipes and borehole wall for water-filled boreholes based on natural convection.
 
 This component calculates:
-- Ra_12: Thermal resistance between the two pipes
-- Ra_1b: Thermal resistance from pipe 1 to borehole wall
-- Ra_2b: Thermal resistance from pipe 2 to borehole wall
+- R_t1_t2: Thermal resistance between the two pipes
+- R_t1_b: Thermal resistance from pipe 1 to borehole wall
+- R_t2_b: Thermal resistance from pipe 2 to borehole wall
 """
 function WaterFilledAnnularResistances(; name::Symbol)
     ps = @parameters begin
@@ -1536,9 +968,9 @@ function WaterFilledAnnularResistances(; name::Symbol)
         R_bw_cv = 0.1    # Thermal resistance from borehole wall to water [K·m/W]
         
         # Output resistances (annular resistances)
-        Ra_12 = 0.3      # Thermal resistance between pipes [K·m/W]
-        Ra_1b = 0.1      # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        Ra_2b = 0.1      # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_t1_t2 = 0.3      # Thermal resistance between pipes [K·m/W]
+        R_t1_b = 0.1      # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_t2_b = 0.1      # Thermal resistance from pipe 2 to borehole wall [K·m/W]
     end
     
     # Derived variables
@@ -1573,9 +1005,9 @@ function WaterFilledAnnularResistances(; name::Symbol)
     
     # Calculate the output annular resistances
     # For pipes to borehole wall: convection path through water
-    eq_Ra_1b = Ra_1b ~ R_1w_cv + R_bw_cv
-    eq_Ra_2b = Ra_2b ~ R_2w_cv + R_bw_cv
-    eq_Ra_12 = Ra_12 ~ R_1w_cv + R_2w_cv
+    eq_R_t1_b = R_t1_b ~ R_1w_cv + R_bw_cv
+    eq_R_t2_b = R_t2_b ~ R_2w_cv + R_bw_cv
+    eq_R_t1_t2 = R_t1_t2 ~ R_1w_cv + R_2w_cv
     
     # System equations
     eqs = [
@@ -1584,7 +1016,7 @@ function WaterFilledAnnularResistances(; name::Symbol)
         eq_Nu_1, eq_Nu_2, eq_Nu_b,
         eq_h_1_w, eq_h_2_w, eq_h_b_w,
         eq_R_1w_cv, eq_R_2w_cv, eq_R_bw_cv,
-        eq_Ra_1b, eq_Ra_2b, eq_Ra_12
+        eq_R_t1_b, eq_R_t2_b, eq_R_t1_t2
     ]
     
     return NonlinearSystem(eqs, sts, ps; name=name)
@@ -1638,9 +1070,9 @@ Parameters:
 - J: Order of the multipole approximation
 
 Returns:
-- RΔ12: Thermal resistance between pipes [K·m/W]
-- RΔ1b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
-- RΔ2b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
+- R_t1_t2: Thermal resistance between pipes [K·m/W]
+- R_t1_b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
+- R_t2_b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
 """
 function GroutedBoreholeThermalResistance(; name::Symbol, J::Int=1)
     ps = @parameters begin
@@ -1652,9 +1084,9 @@ function GroutedBoreholeThermalResistance(; name::Symbol, J::Int=1)
     end
     
     sts = @variables begin
-        RΔ12
-        RΔ1b
-        RΔ2b
+        R_t1_t2
+        R_t1_b
+        R_t2_b
     end
     
     begin
@@ -1693,24 +1125,24 @@ function GroutedBoreholeThermalResistance(; name::Symbol, J::Int=1)
         R⁻ = R₀⁻ .+ B⁻
     
         # Calculate delta circuit resistances
-        R_1b_p_c = R⁺
-        R_2b_p_c = R⁺
-        R_12_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
+        R_f1_b_p_c = R⁺
+        R_f2_b_p_c = R⁺
+        R_f1_f2_p_c = (2*R⁺*R⁻)/(R⁺-R⁻)
         
         # Substitute actual parameters
-        exp_R_1b = substitute(R_1b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-        exp_R_2b = substitute(R_2b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
-        exp_R_12 = substitute(R_12_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+        exp_R_f1_b = substitute(R_f1_b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+        exp_R_f2_b = substitute(R_f2_b_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
+        exp_R_f1_f2 = substitute(R_f1_f2_p_c, [p_0 => r_p/(2χ_p), p_1 => r_p*χ_p/(r_b^2-χ_p^2), p_2 => r_p*χ_p/(r_b^2+χ_p^2), σ => (λ_grout-λ_ground)/(λ_grout+λ_ground)])
         # Substitute χ_p with position parameter
-        exp_R_12 = substitute(exp_R_12, [χ_p => α*r_b])
-        exp_R_1b = substitute(exp_R_1b, [χ_p => α*r_b])
-        exp_R_2b = substitute(exp_R_2b, [χ_p => α*r_b])
+        exp_R_f1_f2 = substitute(exp_R_f1_f2, [χ_p => α*r_b])
+        exp_R_f1_b = substitute(exp_R_f1_b, [χ_p => α*r_b])
+        exp_R_f2_b = substitute(exp_R_f2_b, [χ_p => α*r_b])
     end
 
     eqs = [
-        exp_R_12 ~ RΔ12,
-        exp_R_1b ~ RΔ1b,
-        exp_R_2b ~ RΔ2b,
+        exp_R_f1_f2 ~ R_t1_t2,
+        exp_R_f1_b ~ R_t1_b,
+        exp_R_f2_b ~ R_t2_b,
     ]
 
     return NonlinearSystem(eqs, sts, ps; name=name)
@@ -1731,9 +1163,9 @@ function test_grouted_borehole_resistance()
     sol = NonlinearSolve.solve(problem)
     
     # Check results
-    display(sol[grout_res.RΔ1b])
-    display(sol[grout_res.RΔ2b])
-    display(sol[grout_res.RΔ12])
+    display(sol[grout_res.R_t1_b])
+    display(sol[grout_res.R_t2_b])
+    display(sol[grout_res.R_t1_t2])
 	
     # Return solution success status
     return sol.retcode == ModelingToolkit.ReturnCode.Success
@@ -1742,10 +1174,215 @@ end
 # ╔═╡ d16dbefd-39cc-4cba-b6f2-64365b180324
 @test test_grouted_borehole_resistance()
 
+# ╔═╡ a52213f1-7406-4cea-ac94-6dc6df809f33
+md"""
+# Combining the temperature + resistances
+"""
+
+# ╔═╡ 17185176-b737-4364-903e-9989c45e8636
+function UTubeGrouted(; name::Symbol)
+    # Define top-level parameters
+    ps = @parameters begin
+        depth = 100.0          # Borehole length [m]
+        D_p1_o = 0.032         # Outer diameter of pipe 1 [m]
+        D_p1_i = 0.026         # Inner diameter of pipe 1 [m]
+        D_p2_o = 0.032         # Outer diameter of pipe 2 [m]
+        D_p2_i = 0.026         # Inner diameter of pipe 2 [m]
+        D_b = 0.11             # Borehole diameter [m]
+        λ_pipe_1 = 0.4         # Thermal conductivity of pipe 1 [W/(m·K)]
+        λ_pipe_2 = 0.4         # Thermal conductivity of pipe 2 [W/(m·K)]
+        λ_grout = 1.5          # Thermal conductivity of grout [W/(m·K)]
+        λ_soil = 2.0           # Thermal conductivity of soil [W/(m·K)]
+        T_wall = 283.15        # Borehole wall temperature [K]
+        s = 0.075              # Shank spacing (center-to-center distance) [m]
+        χ = 0.0                # Glycol mass fraction
+    end
+    
+    # Define system states
+    sts = @variables begin
+        ṁ = 0.5                # Mass flow rate [kg/s]
+        T_1 = 293.15       # Inlet fluid temperature [K]
+        T_2 = 283.15      # Outlet fluid temperature [K]
+        cp_1 = 4200.0          # Fluid specific heat capacity [J/(kg·K)]
+        cp_2 = 4200.0          # Fluid specific heat capacity [J/(kg·K)]
+		ρ_1 = 1000.0
+		ρ_2 = 1000.0
+		μ_1 = 1e-3
+		μ_2 = 1e-3
+		λ_1 = 0.7
+		λ_2 = 0.7
+    end
+    
+    # Create component instances
+    @named utube_res = UTubeResistances()
+    @named annular_res = GroutedBoreholeThermalResistance()
+    @named thermal = BoreholeThermal()
+
+    
+    # Connection equations
+    eqs = [
+        
+		# Flow parameters
+		utube_res.ṁ ~ ṁ,          # 0.5 kg/s
+		
+		# Fluid properties (water at 15°C)
+		utube_res.ρ_1 ~ ρ_1,      # kg/m³
+		utube_res.ρ_2 ~ ρ_2,      # kg/m³
+		utube_res.μ_1 ~ μ_1,    # Pa·s
+		utube_res.μ_2 ~ μ_2,    # Pa·s
+		utube_res.cp_1 ~ cp_1,    # J/(kg·K)
+		utube_res.cp_2 ~ cp_2,    # J/(kg·K)
+		utube_res.λ_1 ~ λ_1,      # W/(m·K)
+		utube_res.λ_2 ~ λ_2,      # W/(m·K)
+		
+		# Annular resistances
+		utube_res.R_t1_t2 ~ annular_res.R_t1_t2,      # K·m/W
+		utube_res.R_t1_b ~ annular_res.R_t1_b,      # K·m/W
+		utube_res.R_t2_b ~ annular_res.R_t2_b ,      # K·m/W
+
+
+        # Set all necessary inputs directly on the top-level component
+        thermal.T_1 ~ T_1,    # 20°C inlet temperature
+        thermal.T_2 ~ T_2,#
+        thermal.ṁ ~ ṁ,             # 0.5 kg/s flow rate
+        thermal.cp_1 ~ cp_1, 
+        thermal.cp_2 ~ cp_2, 
+        thermal.R_f1_b ~ utube_res.R_f1_b,
+        thermal.R_f2_b ~ utube_res.R_f2_b,
+        thermal.R_f1_f2 ~ utube_res.R_f1_f2,
+
+    ]
+    
+    # Create the parent system with connected components
+    sys = NonlinearSystem(eqs, sts, ps, name=name)
+    return ModelingToolkit.compose(sys, [utube_res, annular_res, thermal], name=name)
+end
+
+# ╔═╡ 376f91ca-71b3-4db7-b2a8-e894dd287321
+"""
+Test function for UTubeGroutedCollector.
+Creates a complete model of a grouted U-tube borehole heat exchanger and solves it.
+"""
+function test_utube_grouted()
+    # Create the model with default parameters
+    @named collector = UTubeGrouted()
+    @named prop = Properties.DynamicIncompressibleProps()
+
+
+	
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([collector, prop], 
+                                      equations = [
+		collector.T_1 ~ 310.0,    # 20°C inlet temperature
+		prop.T ~ 310.0,    # 20°C inlet temperature
+        1.0 ~ collector.ṁ,             # 0.5 kg/s flow rate
+        prop.cp ~ collector.cp_1, 
+        prop.cp ~ collector.cp_2, 
+        prop.ρ ~ collector.ρ_1, 
+        prop.ρ ~ collector.ρ_2, 
+        prop.λ ~ collector.λ_1, 
+        prop.λ ~ collector.λ_2, 
+        prop.μ ~ collector.μ_1, 
+        prop.μ ~ collector.μ_2, 
+                                      ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+	
+    # Check results
+    display(sol[collector.T_1])
+    display(sol[collector.T_2])
+    
+    # Return solution success status
+    return sol.retcode == ModelingToolkit.ReturnCode.Success
+end
+
+# ╔═╡ 66075428-0b8a-4ca9-bf92-11cd4b9ce017
+test_utube_grouted()
+
+# ╔═╡ 118c0637-66e7-4347-90e4-89c65083e48e
+function DynamicUTubeGrouted(; name::Symbol,fluid="mea", χ=1.0)
+    # Define top-level parameters
+    ps = @parameters begin
+        χ = χ# Glycol mass fraction
+    end
+    
+    # Define system states
+    sts = @variables begin
+        ṁ = 0.5                # Mass flow rate [kg/s]
+        T_1 = 293.15       # Inlet fluid temperature [K]
+        T_2 = 283.15      # Outlet fluid temperature [K]
+    end
+    
+    # Create component instances
+    @named utube = UTubeGrouted()
+
+	@named prop = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+
+
+	
+    # Connect components
+    eqs = [
+		T_1 ~ prop.T,
+		utube.T_1 ~ T_1,
+		utube.T_2 ~ T_2,
+		
+		utube.ṁ ~ ṁ,          # 0.5 kg/s
+		
+		# Fluid properties (water at 15°C)
+		utube.ρ_1 ~ prop.ρ,      # kg/m³
+		utube.ρ_2 ~ prop.ρ,      # kg/m³
+		utube.μ_1 ~ prop.μ,    # Pa·s
+		utube.μ_2 ~ prop.μ,    # Pa·s
+		utube.cp_1 ~ prop.cp,    # J/(kg·K)
+		utube.cp_2 ~ prop.cp,    # J/(kg·K)
+		utube.λ_1 ~ prop.λ,      # W/(m·K)
+		utube.λ_2 ~ prop.λ,      # W/(m·K)
+    ]
+    
+    # Create the parent system with connected components
+    sys = NonlinearSystem(eqs, sts, ps, name=name)
+    return ModelingToolkit.compose(sys, [utube, prop], name=name)
+end
+
+# ╔═╡ f78bce12-0e91-4693-8030-99fbb2cbd716
+function test_dynamic_utube_grouted()
+    # Create the model with default parameters
+    @named BHE_U = DynamicUTubeGrouted()
+    
+    # Set up test conditions
+    @named constrained_sys = assemble([BHE_U], 
+                                      equations = [
+		BHE_U.T_1 ~ 310.0,    # 20°C inlet temperature
+        1.0 ~ BHE_U.ṁ,
+                                      ])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+	
+    # Check results
+    display(sol[BHE_U.T_1])
+    display(sol[BHE_U.T_2])
+    
+    # Return solution success status
+    return sol.retcode# == ModelingToolkit.ReturnCode.Success
+end
+
+# ╔═╡ eb6a37cb-5e84-4826-a1d1-17b70b683717
+test_dynamic_utube_grouted()
+
 # ╔═╡ 1093c1d5-3263-4a81-9e9d-9677b3003ea4
 md"""
 # Anciliary heating
 """
+
+# ╔═╡ 8a44ecc5-6553-4450-b5cf-ac456c89229e
+
 
 # ╔═╡ e884fbb3-e069-484d-87fa-c84535f02403
 md"# Utilities"
@@ -4864,57 +4501,20 @@ version = "3.6.0+0"
 # ╠═da77d4ce-898e-4dac-a193-ec03eb088c2d
 # ╠═17af46d6-c740-489f-84d7-cd70da1045e7
 # ╠═681b6b67-2f78-4085-9abb-5c2d4abdb117
-# ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
 # ╠═f05d0696-202e-4158-bf2a-a47c33493f71
 # ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
 # ╠═121f3c96-8e06-4e26-99f2-46f12ea83d8d
 # ╠═858f94fa-aa22-442c-96ee-52209d62d9cd
 # ╠═5ae06bb9-9687-4e25-b3ee-44c11f1eb79f
-# ╠═c04ec6f0-e43f-4947-a545-01d09d46b982
-# ╠═d882d2ae-e976-4bc5-b58c-011f22ae0d04
-# ╠═da0560a5-fde0-4997-a8ae-34a294a403b8
 # ╠═e3e8a633-0572-4032-a6ed-3c03ead67180
 # ╠═cd4d60e8-724c-4fe9-8947-061df7072bf4
-# ╠═f266e88f-ce01-4030-8740-b792a16bb99a
 # ╠═4cfd9965-69d0-4409-a15e-bc5a0fec9f11
-# ╠═c5c82402-d105-4346-9eac-bc6064da4c41
-# ╠═5f8caf93-d3fe-4343-9b20-bbe5ea706549
-# ╠═ab501cca-a573-4c35-9926-aa42e075c128
-# ╠═caf4b4da-0e15-40e5-983a-dd364e40f235
-# ╠═d797d02a-fb17-4967-8b5a-91c0cc817d33
-# ╠═b33b59ad-d750-49c8-a32b-aa5e1c4ef0fa
-# ╠═29594d9b-b007-40ac-bdb2-16286abc8d6c
 # ╠═df8d848c-bde6-477a-b9ff-09154b3ee375
-# ╠═7adc28f8-c020-4ba3-af18-0d8037f78416
-# ╠═b177db0b-a08e-4c78-950c-f2723f402b50
-# ╠═247513bd-9b58-485e-b920-07b532e28f18
-# ╠═37c6fed7-275b-423d-992d-0e5f6e6e2cf1
 # ╠═4e432eee-7c1e-4a89-8a06-3ba874f55e2b
 # ╠═da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
 # ╠═18df1038-aa05-43e8-b88b-6d13586cf503
 # ╠═6034ad9e-4787-42e7-9f9a-592d5da1369d
-# ╠═9ffdac54-ec39-4c4c-b3f9-b58877f52b33
-# ╠═8327ca86-5c71-482a-a605-29de14de9081
-# ╠═4972527a-d3c2-4f61-96c2-478b2e3d4113
-# ╠═274f3783-65e8-4b2b-9f87-ef181e5cb618
-# ╠═7eeb426b-fa00-46a9-8076-8ef43e87fec2
-# ╠═689b3394-87ed-477d-be96-4c7475882398
-# ╠═452e93d4-ee46-4563-8572-362d5dbb64f6
-# ╠═b1a806ff-ec69-46a7-a006-83dd25654e1e
-# ╠═9b8d052c-8f75-47fb-a320-275dc7a39bbe
-# ╠═3253b31e-d586-4c6d-9a57-575649f83894
-# ╠═b7234bda-3dfd-4a53-b995-320c8aec4846
-# ╠═8e6c599d-7f3a-49fe-b9ca-9a2f2585d41c
-# ╠═5028aee6-1138-408a-ab1d-ebfdf3e604ea
-# ╠═eb86c8ed-a2c1-4637-9319-1364165ea18c
-# ╠═f104a6e3-4e3b-4cbd-bf2b-55ad3a98b7ce
-# ╠═f5186f8a-2789-47d8-890a-82284fb6898f
-# ╠═abb2c4bf-a835-4d9d-a746-29bc317130e4
-# ╠═0a80bead-8b86-4efe-9272-bdffcdfed727
-# ╠═9bb82a58-a11b-432b-9a02-4ba1b4b4ac51
-# ╠═5b6a8aa4-b752-4175-a2da-f7a222e03c93
 # ╠═571a62a6-2bee-43c0-939f-e96346108c67
-# ╟─1b76f1ee-7c28-441d-9586-7fd37c6dbee6
 # ╠═fe000077-8514-4ac7-8dc9-52a87ad28b2c
 # ╠═b8ac6f9a-d15a-4a91-9057-bb98c6b58044
 # ╟─fae38d18-0c77-4b4e-9c30-9976a17c3a2b
@@ -4924,30 +4524,34 @@ version = "3.6.0+0"
 # ╠═4fe2de48-d332-48a7-8bad-0193769b5955
 # ╠═5b8db305-4447-4943-b0fa-61051b86d112
 # ╟─8232ef24-b67c-45ea-afe6-086178027a11
-# ╠═089ef48a-b35c-490f-9b77-898a4dea195b
-# ╠═59ba8bc5-9ca7-4ab5-964c-9c7a8c8141ca
-# ╠═e7812966-cff7-4169-b255-20bfb4c1d2f2
-# ╠═d81fa98e-bdff-40a8-97e4-fc21eef8e635
-# ╠═d3931d58-e02a-42b5-80f5-06963f2c1ad9
-# ╠═cdc17c0b-341f-4b7e-bcdc-57fc800bf9d8
-# ╠═dae309a7-8bc3-461f-b2a1-92b916b9bf15
-# ╠═69ced9d5-9053-4aaa-b485-ef32d3b66e07
-# ╠═6ef88a89-1365-49b4-a284-491290703e93
-# ╠═15c8fb5a-27e4-4a1d-8242-fd5237e39532
-# ╠═2d39b4ee-299d-4baf-b2d9-92858e91f5d9
-# ╠═d5937b16-747a-4a9a-9144-0eb0b550f928
-# ╠═65de1e1c-e06c-444d-983b-50b0e05a397b
-# ╠═e1cf0ab5-3a10-4c67-b393-ff2200cfdb3d
-# ╠═3dc1ddbc-b78f-4a80-8e28-c9e1329be549
-# ╠═01d97a0d-d69a-4dab-920f-5a28bfc9bf9c
-# ╠═4e513dbc-f427-4538-8a13-a3fff8a3ce5e
-# ╠═aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
-# ╠═792fa039-6cea-4a46-80a3-d4ce16114676
+# ╟─7226d893-5d58-4997-93c6-a532e76bbd33
+# ╟─5516c29d-96fd-4614-ad98-6afeb0d7a6c6
+# ╟─6053e72f-a71f-4d66-bdec-825bfc71f3ff
+# ╟─ac31a014-260e-427a-a12e-507d08bcf69e
+# ╟─e5f237e2-9a05-4526-9cee-8cfab38c5b8b
+# ╟─dfb5326f-ffdf-485b-a237-01f3c33d378c
+# ╟─d75c03e6-6f55-4933-88fc-88428fc22869
+# ╠═529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
+# ╟─37d8b287-5446-4cfe-bb13-6d24f3f5ace3
+# ╠═7f108fec-1aa8-437a-88b4-1933694eb22b
+# ╠═303c4cac-c9b9-42f7-8fc7-85239423b0e4
+# ╠═2d42a7e9-c756-4053-858e-5659e069470a
+# ╠═ed6d7ff7-7c72-4445-9627-d9141c5031dc
+# ╟─aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
+# ╟─792fa039-6cea-4a46-80a3-d4ce16114676
 # ╠═f9e43407-de5b-4158-9e6c-b5127eb3930d
 # ╠═f76e582c-f4b9-46b4-b416-28d5f2fac519
 # ╠═9c1b132f-451d-4803-b71f-27f3542c44a5
 # ╠═d16dbefd-39cc-4cba-b6f2-64365b180324
+# ╟─a52213f1-7406-4cea-ac94-6dc6df809f33
+# ╠═17185176-b737-4364-903e-9989c45e8636
+# ╠═376f91ca-71b3-4db7-b2a8-e894dd287321
+# ╠═66075428-0b8a-4ca9-bf92-11cd4b9ce017
+# ╠═118c0637-66e7-4347-90e4-89c65083e48e
+# ╠═f78bce12-0e91-4693-8030-99fbb2cbd716
+# ╠═eb6a37cb-5e84-4826-a1d1-17b70b683717
 # ╠═1093c1d5-3263-4a81-9e9d-9677b3003ea4
+# ╠═8a44ecc5-6553-4450-b5cf-ac456c89229e
 # ╠═e884fbb3-e069-484d-87fa-c84535f02403
 # ╠═62625d10-5988-43dc-9ce0-4ea60f9f6e29
 # ╠═686d6091-d607-43df-9d0a-7fbf5c907086
