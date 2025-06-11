@@ -3,10 +3,10 @@
 ####################
 using OptimalGshpFlow, CoolProp, Parameters, LinearAlgebra
 
-sec_fl_name="MEA-20%" # MEA-28% MEG-37%
+sec_fl_name="MEA-14%" # MEA-28% MEG-37%
 
 refrigerant_name, secondaryfluid_name = "R290", "INCOMP::"*sec_fl_name
-Q_evap=10000.
+Q_evap=6000.
 evaporator = EvaporatorDesign(Q_evap, 273.15 - 8 ,273.15+40, refrigerant_name,secondaryfluid_name; U =2000., ΔTs = 3., ΔT_l = 1.5)
 
 T_f=CoolProp.PropsSI("T_FREEZE", secondaryfluid_name) - 273.15
@@ -29,7 +29,7 @@ borehole = SingleUPipeBorehole(H = H, D = 4., rpo = dout/2, SDR=17., rb = 0.115/
 
 λground = 3.
 
-Tb = 273.15 + 10   
+Tb = 273.15 + 10
 ΔTsup = 5
 ηpump = 0.4
 
@@ -135,10 +135,13 @@ ga = fig[1, 1] = GridLayout()
 ax = Axis(fig[1, 1], xlabel = "Temperature difference [K]", ylabel = "COP")
 lcop1 = lines!(ax, ΔTs, COP1, color = :dodgerblue, linewidth = 2, label = "COP1")
 lcop2 = lines!(ax, ΔTs, COP2, color = :indianred, linewidth = 2, label = "COP2")
+WGLMakie.ylims!(ax,3,5)
 
 # Add a secondary axis for Q1
 ax2 = Axis(fig[1, 1], xlabel = "Temperature difference [K]", ylabel = "Q1 [kW]", yaxisposition = :right)
 lq1 = lines!(ax2, ΔTs, Q1/1000, color = :green, linewidth = 2, label = "Q1")
+WGLMakie.ylims!(ax2,6,10)
+fig
 
 # Add dashed vertical line for the maximum of COP2
 max_COP2_index = argmax(COP2)
@@ -170,6 +173,7 @@ ltin= lines!(ax3, ΔTs, Tin_bh .- 273.15, color = :blue, linewidth = 2, label = 
 ltout = lines!(ax3, ΔTs, Tout_bh .- 273.15, color = :red, linewidth = 2, label = "T_out_bh")
 ltb = lines!(ax3, ΔTs, Tb*ones(length(Vs)) .- 273.15, color = :green, linewidth = 2, label = "T_out_bh")
 lte = lines!(ax3, ΔTs, Tevap .- 273.15, color = :darkblue, linewidth = 2, label = "T_evap")
+WGLMakie.ylims!(ax3,-15,11)
 
 # Add a subplot for Reynolds number vs flow rate under the existing plots
 # ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
@@ -177,7 +181,7 @@ lte = lines!(ax3, ΔTs, Tevap .- 273.15, color = :darkblue, linewidth = 2, label
 
 # axislegend(ax4, [lre], ["Re"], position = :rb)
 
-axislegend(ax3, [ltb, ltin, ltout], ["Borehole wall", "Inlet borehole","Outlet borehole"], position = :rc)
+axislegend(ax3, [ltb, ltin, ltout, lte], ["Borehole wall", "Inlet borehole","Outlet borehole","Evaporation"], position = :rb)
 
 # # Add a subplot for Reynolds number vs flow rate under the existing plots
 # ax4 = Axis(fig[3, 1], xlabel = "Flow rate [l/s]", ylabel = "Reynolds Number")
@@ -195,12 +199,14 @@ axislegend(ax3, [ltb, ltin, ltout], ["Borehole wall", "Inlet borehole","Outlet b
 
 
 # Save the combined plot
+WGLMakie.xlims!(ax,2,10)
+WGLMakie.xlims!(ax2,2,10)
 str_save="opt_combined_Tb$(round(Int, Tb - 273.15))°C_sup$(round(ΔTsup, digits=1))K_Q_evap$(round(Q_evap/1000;digits=1))kW_H$(round(H;digits=0))m_sf-$(sec_fl_name)"
 save(joinpath(mypath, str_save*".png"), fig)
 linkxaxes!(ax,ax2,ax3)
 # WGLMakie.ylims!(ax,2,5.5)
-WGLMakie.ylims!(ax2,4,10)
-WGLMakie.xlims!(ax,2,10)
+# WGLMakie.ylims!(ax2,4,10)
+
 WGLMakie.DataInspector(fig)
 # fig
 

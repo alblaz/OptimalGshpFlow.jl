@@ -110,6 +110,9 @@ function uniform_Tb_coeffs(borehole::SingleUPipeBorehole, λ, mass_flow, Tref, f
     det = (R11*R22 - R12^2)
 
     β1β2 = (R22 - R12 + R11 - R12) / (det * mfc) # 8.80
+
+    
+
     β12 = R12 / (det * mfc)
 
     γ = sqrt(β1β2^2 / 4 + β1β2 * β12) #8.80
@@ -118,6 +121,9 @@ function uniform_Tb_coeffs(borehole::SingleUPipeBorehole, λ, mass_flow, Tref, f
 
     k_i = (1-L)/(1+L)
     # return k_i, -1., 1 - k_i#, R11, R22, R12
+    # if k_i < 0
+    #     @show R22, R11, R12, det, β1β2
+    # end
     return k_i
 end
 
