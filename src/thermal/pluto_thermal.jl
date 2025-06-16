@@ -4,6 +4,18 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    #! format: off
+    return quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+    #! format: on
+end
+
 # ╔═╡ 2f0fd7c9-b47c-45ee-8a92-e7cf468c5ae0
 using PlutoDevMacros
 
@@ -19,9 +31,15 @@ using Printf
 # ╔═╡ 681b6b67-2f78-4085-9abb-5c2d4abdb117
 using NonlinearSolve
 
+# ╔═╡ 572701dd-5f06-41ea-b920-bc6a5c01be72
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
+
 # ╔═╡ f05d0696-202e-4158-bf2a-a47c33493f71
 @fromparent begin
-	using ..Utils
+	#using ..Utils
 	using ..Properties
 end
 
@@ -34,8 +52,11 @@ using Distributions
 # ╔═╡ 18df1038-aa05-43e8-b88b-6d13586cf503
 using LinearAlgebra
 
-# ╔═╡ 5b8db305-4447-4943-b0fa-61051b86d112
-using PlutoTest
+# ╔═╡ c32b5df3-e560-4af0-9b2a-2f1032042414
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Plots
+  ╠═╡ =#
 
 # ╔═╡ 1e019ddb-1873-4cea-a765-83b6f7316b34
 using SteadyStateDiffEq
@@ -59,10 +80,7 @@ using NLSolvers
 using PETSc
 
 # ╔═╡ 9a1c9032-fd54-401e-9c34-8f4004724674
-# ╠═╡ skip_as_script = true
-#=╠═╡
 using PlutoUI
-  ╠═╡ =#
 
 # ╔═╡ 9577e62f-795a-4d33-9667-fca61b12ee75
 using Unitful
@@ -74,28 +92,19 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ eca62203-4f5b-48b7-8a9f-7e515ae99842
-# ╠═╡ skip_as_script = true
-#=╠═╡
 using Logging
-  ╠═╡ =#
 
 # ╔═╡ e0c96a01-908c-409d-81c5-2d6475ad7f14
-# ╠═╡ skip_as_script = true
-#=╠═╡
 begin
     using WGLMakie
     set_theme!(theme_dark())
 end
-  ╠═╡ =#
 
 # ╔═╡ d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
 using Nemo
 
 # ╔═╡ 47ac09a5-9907-4283-8ea9-6f8c584a989a
-# ╠═╡ skip_as_script = true
-#=╠═╡
 using PlutoExtras
-  ╠═╡ =#
 
 # ╔═╡ 48ef9603-6e6c-4d78-a85d-f26436ef3348
 function U_fill_R_s(;name, J::Int=1)
@@ -156,32 +165,6 @@ function U_fill_R_s(;name, J::Int=1)
 	return NonlinearSystem(eqs, sts, ps; name = name);
 end
 
-# ╔═╡ 121f3c96-8e06-4e26-99f2-46f12ea83d8d
-function UBorehole(;name)
-	ps = @parameters begin
-	end
-	sts = @variables begin
-	end
-	begin
-		@variables p_0 p_1 p_2 k σ s j i χ_p χ_b
-		
-	end
-
-    eqs = [
-	]
-
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-
-# ╔═╡ 858f94fa-aa22-442c-96ee-52209d62d9cd
-@named ubhe = UBorehole()
-
-# ╔═╡ 5ae06bb9-9687-4e25-b3ee-44c11f1eb79f
-# ╠═╡ skip_as_script = true
-#=╠═╡
-@named Upipe = U_fill_R_s(J=3)
-  ╠═╡ =#
-
 # ╔═╡ e3e8a633-0572-4032-a6ed-3c03ead67180
 md" # U-tube: filled"
 
@@ -206,22 +189,25 @@ assemble(systems::Vector{NonlinearSystem}; equations=[], name) = ModelingToolkit
 UTubeParameters calculates the key parameters needed for the analytical solution of U-tube 
 temperature profiles. It solves for eigenvalues, eigenvector ratios, and integration constants.
 """
-function BoreholeTemperatureParameters(; name::Symbol)
+function BoreholeTemperatureParameters(; name::Symbol, 
+                                   L_bh=100.0, T_wall=283.15, T_1_in=293.15,
+                                   ṁ=0.5, cp_1=4200.0, cp_2=4200.0,
+                                   R_f1_b=0.1, R_f2_b=0.1, R_f1_f2=0.3)
     ps = @parameters begin
     end
     
     sts = @variables begin
-        L_bh = 100.0  # Borehole length [m]
-        T_wall = 283.15  # Borehole wall temperature [K]
-        T_1_in = 293.15  # Inlet fluid temperature [K]
-        ṁ = 0.5     # Fluid mass flow rate [kg/s]
+        L_bh = L_bh  # Borehole length [m]
+        T_wall = T_wall  # Borehole wall temperature [K]
+        T_1_in = T_1_in  # Inlet fluid temperature [K]
+        ṁ = ṁ     # Fluid mass flow rate [kg/s]
         
-		cp_1 = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
-        cp_2 = 4200.0  # Fluid specific heat capacity [J/(kg·K)]
+		cp_1 = cp_1  # Fluid specific heat capacity [J/(kg·K)]
+        cp_2 = cp_2  # Fluid specific heat capacity [J/(kg·K)]
         
-		R_f1_b = 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        R_f2_b = 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
-        R_f1_f2 = 0.3    # Thermal resistance between pipes [K·m/W]
+		R_f1_b = R_f1_b    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        R_f2_b = R_f2_b    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        R_f1_f2 = R_f1_f2    # Thermal resistance between pipes [K·m/W]
 		
         λ_1 = -0.00614         # First eigenvalue for the temperature solution
         λ_2 = 0.00614         # Second eigenvalue for the temperature solution
@@ -346,7 +332,9 @@ function test_utube_parameters_simple()
 end
 
 # ╔═╡ fae38d18-0c77-4b4e-9c30-9976a17c3a2b
+#=╠═╡
 @test test_utube_parameters_simple()
+  ╠═╡ =#
 
 # ╔═╡ 3a9ef928-cb59-45dd-87db-71d57c38e15a
 """
@@ -388,7 +376,7 @@ the temperature profile of a U-tube borehole heat exchanger.
 This component connects the parameter calculation with temperature profiles at the top
 of the borehole to calculate inlet/outlet temperatures and total heat transfer.
 """
-function BoreholeThermal(; name::Symbol, depth=100.0, T_wall = 300.0)
+function BoreholeThermal(; name::Symbol, depth=100.0, T_wall=283.15)
     # Define top-level parameters (depth and wall temperature)
     ps = @parameters begin
         depth = depth      # Borehole length [m]
@@ -408,7 +396,8 @@ function BoreholeThermal(; name::Symbol, depth=100.0, T_wall = 300.0)
     end
     
     # Create component instances
-    @named params = BoreholeTemperatureParameters()
+    @named params = BoreholeTemperatureParameters(L_bh=depth, T_wall=T_wall, 
+                                              R_f1_b=R_f1_b, R_f2_b=R_f2_b, R_f1_f2=R_f1_f2)
     @named temp_top = BoreholeTemperature()    # For inlet/outlet temperatures
     
     # Connect components with each other
@@ -482,7 +471,9 @@ function test_utube_borehole()
 end
 
 # ╔═╡ 4fe2de48-d332-48a7-8bad-0193769b5955
+#=╠═╡
 @test test_utube_borehole()
+  ╠═╡ =#
 
 # ╔═╡ 8232ef24-b67c-45ea-afe6-086178027a11
 md"""
@@ -776,24 +767,26 @@ Returns:
 - R_f1_b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
 - R_f2_b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
 """
-function UTubeResistances(; name::Symbol)
+function UTubeResistances(; name::Symbol, 
+                           D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
+                           λ_pipe_1=0.4, λ_pipe_2=0.4, ε_1=1.5e-6, ε_2=1.5e-6, D_b=0.11, χ=0.0)
     ps = @parameters begin
         # Thermal properties of pipe materials
-        λ_pipe_1 = 0.4       # Thermal conductivity of pipe 1 material [W/(m·K)]
-        λ_pipe_2 = 0.4       # Thermal conductivity of pipe 2 material [W/(m·K)]
+        λ_pipe_1 = λ_pipe_1       # Thermal conductivity of pipe 1 material [W/(m·K)]
+        λ_pipe_2 = λ_pipe_2       # Thermal conductivity of pipe 2 material [W/(m·K)]
         
         # Geometry - now separate for each pipe
-        D_p1_o = 0.032      # Outer diameter of U-tube pipe 1 [m]
-        D_p1_i = 0.026      # Inner diameter of U-tube pipe 1 [m]
-        D_p2_o = 0.032      # Outer diameter of U-tube pipe 2 [m]
-        D_p2_i = 0.026      # Inner diameter of U-tube pipe 2 [m]
-        D_b = 0.11         # Borehole diameter [m]
+        D_p1_o = D_p1_o      # Outer diameter of U-tube pipe 1 [m]
+        D_p1_i = D_p1_i      # Inner diameter of U-tube pipe 1 [m]
+        D_p2_o = D_p2_o      # Outer diameter of U-tube pipe 2 [m]
+        D_p2_i = D_p2_i      # Inner diameter of U-tube pipe 2 [m]
+        D_b = D_b         # Borehole diameter [m]
         
         # Pipe roughness
-        ε_1 = 1.5e-6       # Surface roughness of pipe 1 [m]
-        ε_2 = 1.5e-6       # Surface roughness of pipe 2 [m]
+        ε_1 = ε_1       # Surface roughness of pipe 1 [m]
+        ε_2 = ε_2       # Surface roughness of pipe 2 [m]
         
-        χ = 0.0            # Glycol mass fraction
+        χ = χ            # Glycol mass fraction
     end
     
     sts = @variables begin
@@ -864,8 +857,10 @@ end
 Test function for UTubeResistances component with calculated heat transfer coefficients.
 """
 function test_utube_resistances_with_htc()
-    # Create the model
-    @named utube_res = UTubeResistances()
+    # Create the model with default parameters
+    @named utube_res = UTubeResistances(D_p1_o=0.032, D_p1_i=0.026, 
+                                      D_p2_o=0.032, D_p2_i=0.026,
+                                      λ_pipe_1=0.4, λ_pipe_2=0.4)
     
     # Set up test conditions
     @named constrained_sys = assemble([utube_res], 
@@ -901,7 +896,9 @@ function test_utube_resistances_with_htc()
 end
 
 # ╔═╡ ed6d7ff7-7c72-4445-9627-d9141c5031dc
+#=╠═╡
 @test test_utube_resistances_with_htc()
+  ╠═╡ =#
 
 # ╔═╡ aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
 """
@@ -1054,7 +1051,9 @@ function test_water_filled_annular_resistances()
 end
 
 # ╔═╡ f9e43407-de5b-4158-9e6c-b5127eb3930d
+#=╠═╡
 @test test_water_filled_annular_resistances()
+  ╠═╡ =#
 
 # ╔═╡ f76e582c-f4b9-46b4-b416-28d5f2fac519
 """
@@ -1074,13 +1073,14 @@ Returns:
 - R_t1_b: Thermal resistance from pipe 1 to borehole wall [K·m/W]
 - R_t2_b: Thermal resistance from pipe 2 to borehole wall [K·m/W]
 """
-function GroutedBoreholeThermalResistance(; name::Symbol, J::Int=1)
+function GroutedBoreholeThermalResistance(; name::Symbol, J::Int=1, 
+                                     λ_ground=2.0, λ_grout=1.5, r_p=0.016, r_b=0.055, α=0.5)
     ps = @parameters begin
-        λ_ground = 3.5
-        λ_grout = 2.0
-        r_p = 40e-3/2
-        r_b = 115e-3/2
-        α = 0.5 #"centered"
+        λ_ground = λ_ground  # Thermal conductivity of soil/ground [W/(m·K)]
+        λ_grout = λ_grout    # Thermal conductivity of grout [W/(m·K)]
+        r_p = r_p            # Pipe radius [m]
+        r_b = r_b            # Borehole radius [m]
+        α = α                # Position parameter (0.5 means centered)
     end
     
     sts = @variables begin
@@ -1154,8 +1154,13 @@ Test function for GroutedBoreholeThermalResistance component.
 Creates a simple system, sets necessary parameters, and solves it.
 """
 function test_grouted_borehole_resistance()
-    # Create the model with default parameters and first-order multipole (J=1)
-    @named grout_res = GroutedBoreholeThermalResistance(J=1)
+    # Create the model with first-order multipole (J=1) and specified parameters
+    @named grout_res = GroutedBoreholeThermalResistance(J=1, 
+                                                      λ_ground=2.0, 
+                                                      λ_grout=1.5, 
+                                                      r_p=0.016, 
+                                                      r_b=0.055, 
+                                                      α=0.5)
     
     # Simplify and solve
     simpl_sys = structural_simplify(grout_res)
@@ -1172,7 +1177,9 @@ function test_grouted_borehole_resistance()
 end
 
 # ╔═╡ d16dbefd-39cc-4cba-b6f2-64365b180324
+#=╠═╡
 @test test_grouted_borehole_resistance()
+  ╠═╡ =#
 
 # ╔═╡ a52213f1-7406-4cea-ac94-6dc6df809f33
 md"""
@@ -1180,22 +1187,25 @@ md"""
 """
 
 # ╔═╡ 17185176-b737-4364-903e-9989c45e8636
-function UTubeGrouted(; name::Symbol)
+function UTubeGrouted(; name::Symbol,
+                       depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
+                       D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
+                       T_wall=283.15, s=0.075, χ=0.0)
     # Define top-level parameters
     ps = @parameters begin
-        depth = 100.0          # Borehole length [m]
-        D_p1_o = 0.032         # Outer diameter of pipe 1 [m]
-        D_p1_i = 0.026         # Inner diameter of pipe 1 [m]
-        D_p2_o = 0.032         # Outer diameter of pipe 2 [m]
-        D_p2_i = 0.026         # Inner diameter of pipe 2 [m]
-        D_b = 0.11             # Borehole diameter [m]
-        λ_pipe_1 = 0.4         # Thermal conductivity of pipe 1 [W/(m·K)]
-        λ_pipe_2 = 0.4         # Thermal conductivity of pipe 2 [W/(m·K)]
-        λ_grout = 1.5          # Thermal conductivity of grout [W/(m·K)]
-        λ_soil = 2.0           # Thermal conductivity of soil [W/(m·K)]
-        T_wall = 283.15        # Borehole wall temperature [K]
-        s = 0.075              # Shank spacing (center-to-center distance) [m]
-        χ = 0.0                # Glycol mass fraction
+        depth = depth          # Borehole length [m]
+        D_p1_o = D_p1_o         # Outer diameter of pipe 1 [m]
+        D_p1_i = D_p1_i         # Inner diameter of pipe 1 [m]
+        D_p2_o = D_p2_o         # Outer diameter of pipe 2 [m]
+        D_p2_i = D_p2_i         # Inner diameter of pipe 2 [m]
+        D_b = D_b             # Borehole diameter [m]
+        λ_pipe_1 = λ_pipe_1         # Thermal conductivity of pipe 1 [W/(m·K)]
+        λ_pipe_2 = λ_pipe_2         # Thermal conductivity of pipe 2 [W/(m·K)]
+        λ_grout = λ_grout          # Thermal conductivity of grout [W/(m·K)]
+        λ_soil = λ_soil           # Thermal conductivity of soil [W/(m·K)]
+        T_wall = T_wall        # Borehole wall temperature [K]
+        s = s              # Shank spacing (center-to-center distance) [m]
+        χ = χ                # Glycol mass fraction
     end
     
     # Define system states
@@ -1213,10 +1223,23 @@ function UTubeGrouted(; name::Symbol)
 		λ_2 = 0.7
     end
     
-    # Create component instances
-    @named utube_res = UTubeResistances()
-    @named annular_res = GroutedBoreholeThermalResistance()
-    @named thermal = BoreholeThermal()
+    # Create component instances with parameters passed from parent
+    @named utube_res = UTubeResistances(D_p1_o=D_p1_o, D_p1_i=D_p1_i, 
+                                      D_p2_o=D_p2_o, D_p2_i=D_p2_i,
+                                      λ_pipe_1=λ_pipe_1, λ_pipe_2=λ_pipe_2,
+                                      D_b=D_b, χ=χ)
+                                      
+    # Calculate borehole radius from diameter
+    r_b = D_b/2
+    # Calculate pipe radius (assuming same for both pipes)
+    r_p = (D_p1_o + D_p2_o)/4
+    # Calculate alpha parameter from shank spacing
+    α = s/(2*r_b)
+    
+    @named annular_res = GroutedBoreholeThermalResistance(λ_ground=λ_soil, 
+                                                        λ_grout=λ_grout,
+                                                        r_p=r_p, r_b=r_b, α=α)
+    @named thermal = BoreholeThermal(depth=depth, T_wall=T_wall)
 
     
     # Connection equations
@@ -1264,9 +1287,14 @@ Test function for UTubeGroutedCollector.
 Creates a complete model of a grouted U-tube borehole heat exchanger and solves it.
 """
 function test_utube_grouted()
-    # Create the model with default parameters
-    @named collector = UTubeGrouted()
-    @named prop = Properties.DynamicIncompressibleProps()
+    # Create the model with specific parameters
+    @named collector = UTubeGrouted(depth=100.0, 
+                                  D_p1_o=0.032, D_p1_i=0.026, 
+                                  D_p2_o=0.032, D_p2_i=0.026,
+                                  D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, 
+                                  λ_grout=1.5, λ_soil=2.0,
+                                  T_wall=283.15, s=0.075, χ=0.0)
+    @named prop = Properties.IncompressibleProps()
 
 
 	
@@ -1304,10 +1332,25 @@ end
 test_utube_grouted()
 
 # ╔═╡ 118c0637-66e7-4347-90e4-89c65083e48e
-function DynamicUTubeGrouted(; name::Symbol,fluid="mea", χ=1.0)
+function DynamicUTubeGrouted(; name::Symbol, fluid="mea", χ=1.0,
+                           depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
+                           D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
+                           T_wall=283.15, s=0.075)
     # Define top-level parameters
     ps = @parameters begin
-        χ = χ# Glycol mass fraction
+        χ = χ                # Glycol mass fraction
+        depth = depth          # Borehole length [m]
+        D_p1_o = D_p1_o         # Outer diameter of pipe 1 [m]
+        D_p1_i = D_p1_i         # Inner diameter of pipe 1 [m]
+        D_p2_o = D_p2_o         # Outer diameter of pipe 2 [m]
+        D_p2_i = D_p2_i         # Inner diameter of pipe 2 [m]
+        D_b = D_b             # Borehole diameter [m]
+        λ_pipe_1 = λ_pipe_1         # Thermal conductivity of pipe 1 [W/(m·K)]
+        λ_pipe_2 = λ_pipe_2         # Thermal conductivity of pipe 2 [W/(m·K)]
+        λ_grout = λ_grout          # Thermal conductivity of grout [W/(m·K)]
+        λ_soil = λ_soil           # Thermal conductivity of soil [W/(m·K)]
+        T_wall = T_wall        # Borehole wall temperature [K]
+        s = s              # Shank spacing (center-to-center distance) [m]
     end
     
     # Define system states
@@ -1317,10 +1360,14 @@ function DynamicUTubeGrouted(; name::Symbol,fluid="mea", χ=1.0)
         T_2 = 283.15      # Outlet fluid temperature [K]
     end
     
-    # Create component instances
-    @named utube = UTubeGrouted()
+    # Create component instances with passed parameters
+    @named utube = UTubeGrouted(depth=depth, D_p1_o=D_p1_o, D_p1_i=D_p1_i, 
+                              D_p2_o=D_p2_o, D_p2_i=D_p2_i, D_b=D_b,
+                              λ_pipe_1=λ_pipe_1, λ_pipe_2=λ_pipe_2,
+                              λ_grout=λ_grout, λ_soil=λ_soil,
+                              T_wall=T_wall, s=s, χ=χ)
 
-	@named prop = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named prop = Properties.IncompressibleProps(fluid=fluid, χ=χ)
 
 
 	
@@ -1356,8 +1403,8 @@ function test_dynamic_utube_grouted()
     # Set up test conditions
     @named constrained_sys = assemble([BHE_U], 
                                       equations = [
-		BHE_U.T_1 ~ 310.0,    # 20°C inlet temperature
-        1.0 ~ BHE_U.ṁ,
+		BHE_U.T_1 ~ 3000.0,    # 20°C inlet temperature
+        10.0 ~ BHE_U.ṁ,
                                       ])
     
     # Simplify and solve
@@ -1370,11 +1417,167 @@ function test_dynamic_utube_grouted()
     display(sol[BHE_U.T_2])
     
     # Return solution success status
-    return sol.retcode# == ModelingToolkit.ReturnCode.Success
+    return sol.retcode == ModelingToolkit.ReturnCode.Success
 end
 
 # ╔═╡ eb6a37cb-5e84-4826-a1d1-17b70b683717
-test_dynamic_utube_grouted()
+#=╠═╡
+@test test_dynamic_utube_grouted()
+  ╠═╡ =#
+
+# ╔═╡ adc67f95-858e-4a71-91d0-7610aea038e7
+begin
+	# 1a) Build your model
+	@named BHE = DynamicUTubeGrouted()
+	
+	# 1b) Assemble with your boundary conditions
+	@named model = assemble([BHE],
+	    equations = [
+	      BHE.T_1 ~ 300.0,    # inlet T = 300 K
+	      10.0     ~ BHE.ṁ    # mass‐flow = 10 kg/s
+	    ]
+	)
+	
+	# 1c) Do the structural simplify once
+	simp = structural_simplify(model)
+	function solve_uncertain(χ_val, Ti, ṁ_val)
+	  # 2a) build the Dict of Monte-Carlo parameters
+	  p = Dict(
+	    #BHE.λ_grout    => 1.5,    # example: grout cond.
+	    BHE.χ   => χ_val,    # example: fluid cₚ
+	    BHE.T_1    => Ti,          # fixed BC, could also be ±0.0
+	    BHE.ṁ      => ṁ_val           # uncertain mass‐flow
+	  )
+	
+	  # 2b) remake the problem with the same simplified system + new p & u0
+	  prob = remake(NonlinearProblem(simp, [], p))
+	  sol  = NonlinearSolve.solve(prob; verbose=false)
+
+
+
+    	return(
+			sol[BHE.utube.thermal.params.λ_1],
+        sol[BHE.utube.thermal.params.λ_2],
+        sol[BHE.utube.thermal.params.γ_1],
+        sol[BHE.utube.thermal.params.γ_2],
+        sol[BHE.utube.thermal.params.C_1],
+		sol[BHE.utube.thermal.params.C_2],
+		)
+	end
+end
+
+# ╔═╡ 3f467f08-fbbf-4768-adcb-312f6b005dc9
+# Register your solve_wrapper
+@time register_primitive_multi(solve_uncertain)
+
+# Then call it directly on Particles inputs:
+
+# ╔═╡ 19907f6b-84d2-4fc8-b931-b2e769bc00a0
+N = 100
+
+# ╔═╡ 782c2ab9-51c0-4814-a301-77f19b917bd5
+χ = Particles(N, Uniform(0.1,0.4))
+
+# ╔═╡ 38fc7166-b946-40ef-ba90-826617d743dc
+T_ = Particles(N, Uniform(295,305))
+
+# ╔═╡ 20dd46ac-da6b-4965-bca2-4b599ef10bb2
+ṁ = Particles(N, Uniform(.020,1.0))
+
+# ╔═╡ c1891c9d-d5c7-42ab-9780-a8b93d580386
+@time out_tuple = solve_uncertain(χ, T_, ṁ)  # returns a tuple of Particles
+
+# ╔═╡ 7847e709-1ed5-4313-b9e5-bbc6e391c059
+T_down(p, T_wall, x) = T_wall + p[5] * exp(p[1] * x) + p[6] * exp(p[2] * x)
+
+# ╔═╡ d2acfb92-f66a-48de-9a06-d801e0b35a9d
+T_up(p, T_wall, x) = T_wall + p[5] * p[3] * exp(p[1] * x) + p[6] * p[4] * exp(p[2] * x)
+
+# ╔═╡ 097d755d-9808-4ff2-a06a-7f2b97c0c4ac
+#=╠═╡
+begin
+	pl1 = Plots.plot()
+	for p in out_tuple.particles
+		pl1 = Plots.plot!(x-> T_down(p, 300, x), 0, 100, color=:red)
+		pl1 = Plots.plot!(x-> T_up(p, 300, x), 0, 100, color=:orange)
+	end
+	pl1 = Plots.plot!(legend=false)
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ f16d66db-1b49-46d6-a2db-ee60618139ea
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+	pars = @parameters a, b
+	vars = @variables x, y
+	
+	eqs = [
+	    x ~ a
+	    y ~ x + b
+	]
+	
+	@mtkbuild model = NonlinearSystem(eqs, vars, pars) #split=false
+	
+	u0 = Dict(
+	    x => 1, 
+	    y => 2
+	)
+	
+	
+	function solve_wrapper(a0, b0)
+	    p = Dict(
+	        model.a => a0,
+	        model.b => b0
+	        )
+	
+	    prob = NonlinearProblem(model, u0, p)
+	    sol = NonlinearSolve.solve(prob)
+	    [sol[model.x], sol[model.y]]
+	end
+	
+	
+	a0 = 1
+	b0 = 1
+	solve_wrapper(a0, b0)
+	
+	a = 1 ± 0.1
+	b = 1 ± 0.1
+	xy = @bymap solve_wrapper(a, b)
+end
+  ╠═╡ =#
+
+# ╔═╡ 843fcf98-2899-4172-b167-027b140dccf6
+"""
+    calculate_temperature_profile(params, positions)
+
+Calculate temperature profiles at the given positions using the parameters
+extracted from a solved model.
+
+# Arguments
+- `params`: Parameters from `extract_temperature_parameters`
+- `positions`: Vector of positions along the borehole length (0 = top, depth = bottom)
+
+# Returns
+- A tuple with (positions, T_down, T_up) where T_down and T_up are the temperature
+  profiles in the downward and upward pipes respectively.
+"""
+function calculate_temperature_profile(params, positions)
+    T_down = similar(positions)
+    T_up = similar(positions)
+    
+    for (i, x) in enumerate(positions)
+        # Calculate temperatures using the analytical solution
+        T_down[i] = params.T_wall + params.C_1 * exp(params.λ_1 * x) + 
+                   params.C_2 * exp(params.λ_2 * x)
+        T_up[i] = params.T_wall + params.C_1 * params.γ_1 * exp(params.λ_1 * x) + 
+                 params.C_2 * params.γ_2 * exp(params.λ_2 * x)
+    end
+    
+    return (positions, T_down, T_up)
+end
 
 # ╔═╡ 1093c1d5-3263-4a81-9e9d-9677b3003ea4
 md"""
@@ -1388,7 +1591,6 @@ md"""
 md"# Utilities"
 
 # ╔═╡ 62625d10-5988-43dc-9ce0-4ea60f9f6e29
-#=╠═╡
 begin
 	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
 	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
@@ -1413,7 +1615,6 @@ begin
 
 	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
 end
-  ╠═╡ =#
 
 # ╔═╡ 686d6091-d607-43df-9d0a-7fbf5c907086
 # Function to compute the largest rectangle in a binary matrix.
@@ -1489,6 +1690,361 @@ candidate_solvers = [
 # ╔═╡ 082476a0-a87b-4c16-a8fe-a19290772c07
 md"---"
 
+# ╔═╡ 800ed7f4-1c60-4df7-90ca-91cfd15b2858
+"""
+    extract_temperature_parameters(sol, model)
+
+Extract parameters needed to calculate temperature profiles along the borehole depth
+from a solved model. Returns the parameters required to calculate temperatures at
+any position along the borehole.
+"""
+function extract_temperature_parameters(sol, model)
+    # Extract basic parameters
+    depth = sol[model.depth]
+    T_wall = sol[model.T_wall]
+    
+    # Get eigenvalues and parameters from thermal component
+    # First we need to find the embedded thermal model
+    # This assumes model is a UTubeGrouted instance with a thermal component inside
+    thermal_params = nothing
+    for field in ModelingToolkit.get_systems(model)
+        if field isa ModelingToolkit.NonlinearSystem && startswith(string(ModelingToolkit.getname(field)), "thermal")
+            # Found the thermal component
+            # Now find the params component inside it
+            for subfield in ModelingToolkit.get_systems(field)
+                if startswith(string(ModelingToolkit.getname(subfield)), "params")
+                    thermal_params = subfield
+                    break
+                end
+            end
+            break
+        end
+    end
+    
+    if isnothing(thermal_params)
+        throw(ArgumentError("Could not find thermal parameters in the model"))
+    end
+    
+    # Extract eigenvalues and integration constants
+    λ_1 = sol[thermal_params.λ_1]
+    λ_2 = sol[thermal_params.λ_2]
+    γ_1 = sol[thermal_params.γ_1]
+    γ_2 = sol[thermal_params.γ_2]
+    C_1 = sol[thermal_params.C_1]
+    C_2 = sol[thermal_params.C_2]
+    
+    return (
+        depth = depth,
+        T_wall = T_wall,
+        λ_1 = λ_1,
+        λ_2 = λ_2,
+        γ_1 = γ_1,
+        γ_2 = γ_2,
+        C_1 = C_1,
+        C_2 = C_2
+    )
+end
+
+# ╔═╡ 49ee62d6-a5c6-471f-8c3c-6a0e3789fca8
+#=╠═╡
+"""
+    plot_borehole_temperature_profile(sol, model; n_points=100)
+
+Plot the temperature profiles along the borehole length.
+
+# Arguments
+- `sol`: Solution object from solving the borehole model
+- `model`: The borehole model (UTubeGrouted instance)
+- `n_points`: Number of points to plot along the borehole length
+
+# Returns
+- A Plots.jl plot object
+"""
+function plot_borehole_temperature_profile(sol, model; n_points=100)
+    # Extract parameters for temperature profiles
+    params = extract_temperature_parameters(sol, model)
+    
+    # Generate positions along the borehole
+    positions = range(0, params.depth, length=n_points)
+    
+    # Calculate temperature profiles
+    (x, T_down, T_up) = calculate_temperature_profile(params, positions)
+    
+    # Create plot
+    p = plot(T_down, x, 
+        label="Downward pipe", 
+        xlabel="Temperature [K]", 
+        ylabel="Depth [m]",
+        title="Borehole Temperature Profile",
+        legend=:bottomright,
+        yflip=true,  # To show depth increasing downward
+        linewidth=2)
+    
+    plot!(p, T_up, x, 
+        label="Upward pipe", 
+        linewidth=2,
+        linestyle=:dash)
+    
+    # Add wall temperature line
+    plot!(p, [params.T_wall, params.T_wall], [0, params.depth], 
+        label="Borehole wall", 
+        linewidth=2,
+        linestyle=:dot)
+    
+    return p
+end
+  ╠═╡ =#
+
+# ╔═╡ bef8a408-8bc7-4b19-b6ce-e0b8c8fa4e6f
+#=╠═╡
+"""
+    plot_mc_temperature_profile(sol, model; n_points=100, confidence_level=0.95)
+
+Plot the temperature profiles with uncertainty bands along the borehole length
+when using MonteCarloMeasurements.
+
+# Arguments
+- `sol`: Solution object from solving the borehole model
+- `model`: The borehole model (UTubeGrouted instance)
+- `n_points`: Number of points to plot along the borehole length
+- `confidence_level`: Confidence level for uncertainty bands (0.0-1.0)
+
+# Returns
+- A Plots.jl plot object
+"""
+function plot_mc_temperature_profile(sol, model; n_points=100, confidence_level=0.95)
+    # Extract parameters for temperature profiles
+    params = extract_temperature_parameters(sol, model)
+    
+    # Generate positions along the borehole
+    mean_depth = params.depth isa Particles ? mean(params.depth) : params.depth
+    positions = range(0, mean_depth, length=n_points)
+    
+    # Calculate temperature profiles
+    (x, T_down, T_up) = calculate_temperature_profile(params, positions)
+    
+    # For MonteCarloMeasurements, extract mean and quantiles
+    α = (1 - confidence_level) / 2
+    
+    # Process downward pipe data
+    if T_down[1] isa Particles
+        T_down_mean = [mean(T) for T in T_down]
+        T_down_lower = [quantile(T, α) for T in T_down]
+        T_down_upper = [quantile(T, 1-α) for T in T_down]
+        
+        # Process upward pipe data
+        T_up_mean = [mean(T) for T in T_up]
+        T_up_lower = [quantile(T, α) for T in T_up]
+        T_up_upper = [quantile(T, 1-α) for T in T_up]
+        
+        # Wall temperature
+        T_wall_mean = params.T_wall isa Particles ? mean(params.T_wall) : params.T_wall
+    else
+        # If not using particles, just use the values directly
+        T_down_mean = T_down
+        T_down_lower = T_down
+        T_down_upper = T_down
+        
+        T_up_mean = T_up
+        T_up_lower = T_up
+        T_up_upper = T_up
+        
+        T_wall_mean = params.T_wall
+    end
+    
+    # Create plot
+    p = plot(T_down_mean, x, 
+        label="Downward pipe", 
+        xlabel="Temperature [K]", 
+        ylabel="Depth [m]",
+        title="Borehole Temperature Profile with Uncertainty",
+        legend=:bottomright,
+        yflip=true,  # To show depth increasing downward
+        linewidth=2)
+    
+    # Add uncertainty bands if we have particles
+    if T_down[1] isa Particles
+        plot!(p, T_down_lower, x, 
+            linealpha=0.0, 
+            label=nothing)
+        plot!(p, T_down_upper, x, 
+            linealpha=0.0, 
+            label=nothing, 
+            fillrange=T_down_lower, 
+            fillalpha=0.2, 
+            fillcolor=:blue)
+            
+        plot!(p, T_up_mean, x, 
+            label="Upward pipe", 
+            linewidth=2,
+            linestyle=:dash)
+            
+        plot!(p, T_up_lower, x, 
+            linealpha=0.0, 
+            label=nothing)
+        plot!(p, T_up_upper, x, 
+            linealpha=0.0, 
+            label=nothing, 
+            fillrange=T_up_lower, 
+            fillalpha=0.2, 
+            fillcolor=:red)
+    else
+        plot!(p, T_up_mean, x, 
+            label="Upward pipe", 
+            linewidth=2,
+            linestyle=:dash)
+    end
+    
+    # Add wall temperature line
+    plot!(p, [T_wall_mean, T_wall_mean], [0, mean_depth], 
+        label="Borehole wall", 
+        linewidth=2,
+        linestyle=:dot)
+    
+    return p
+end
+  ╠═╡ =#
+
+# ╔═╡ f5eb6c16-56cf-4aed-9dac-c97db38ef430
+#=╠═╡
+"""
+    compare_temperature_profiles(results_list, labels; n_points=100)
+
+Compare temperature profiles from multiple simulations.
+
+# Arguments
+- `results_list`: List of (sol, model) tuples from different simulations
+- `labels`: List of labels for each simulation
+- `n_points`: Number of points to plot along the borehole length
+
+# Returns
+- A Plots.jl plot object
+"""
+function compare_temperature_profiles(results_list, labels; n_points=100)
+    if length(results_list) != length(labels)
+        throw(ArgumentError("Number of results must match number of labels"))
+    end
+    
+    # Determine maximum depth
+    max_depth = 0.0
+    for (sol, model) in results_list
+        params = extract_temperature_parameters(sol, model)
+        this_depth = params.depth isa Particles ? mean(params.depth) : params.depth
+        max_depth = max(max_depth, this_depth)
+    end
+    
+    # Generate positions along the borehole
+    positions = range(0, max_depth, length=n_points)
+    
+    # Create plot
+    p = plot(
+        xlabel="Temperature [K]", 
+        ylabel="Depth [m]",
+        title="Borehole Temperature Profile Comparison",
+        legend=:bottomright,
+        yflip=true,  # To show depth increasing downward
+    )
+    
+    # Colors for different simulations
+    colors = [:blue, :red, :green, :purple, :orange, :cyan, :magenta, :yellow]
+    
+    # Plot each simulation
+    for (i, ((sol, model), label)) in enumerate(zip(results_list, labels))
+        params = extract_temperature_parameters(sol, model)
+        this_depth = params.depth isa Particles ? mean(params.depth) : params.depth
+        
+        # Truncate positions to this simulation's depth
+        these_positions = positions[positions .≤ this_depth]
+        
+        # Calculate temperature profiles
+        (x, T_down, T_up) = calculate_temperature_profile(params, these_positions)
+        
+        # Extract means if using particles
+        if T_down[1] isa Particles
+            T_down = [mean(T) for T in T_down]
+            T_up = [mean(T) for T in T_up]
+        end
+        
+        # Plot downward pipe
+        color_idx = mod(i-1, length(colors)) + 1
+        plot!(p, T_down, x, 
+            label="$(label) (down)", 
+            linewidth=2,
+            color=colors[color_idx])
+        
+        # Plot upward pipe
+        plot!(p, T_up, x, 
+            label="$(label) (up)", 
+            linewidth=2,
+            linestyle=:dash,
+            color=colors[color_idx])
+    end
+    
+    return p
+end
+
+# Example usage
+  ╠═╡ =#
+
+# ╔═╡ ffb730c2-3648-4566-ba81-ec1eaa06b6c4
+#=╠═╡
+function example_temperature_profiles()
+    # Run a simple model
+    result = solve_borehole_model()
+    
+    # Plot temperature profiles
+    return plot_borehole_temperature_profile(result.sol, result.model)
+end
+
+# Example with uncertainty
+  ╠═╡ =#
+
+# ╔═╡ f676116d-a5c9-4b82-be7f-55d1938f79d2
+#=╠═╡
+function example_mc_temperature_profiles()
+    # Run a model with uncertain depth
+    result = mc_solve_borehole(
+        depth = Particles(500, Uniform(90.0, 110.0)),
+        n_particles = 500
+    )
+    
+    # Extract a random sample from the result (since mc_solve_borehole doesn't return model with sol)
+    # In a real application, you would run solve_borehole_model with particles directly
+    base_model = solve_borehole_model()
+    
+    # Create a plot with uncertainty bands
+    return plot_mc_temperature_profile(base_model.sol, base_model.model)
+end
+
+# Example comparing different flow rates
+  ╠═╡ =#
+
+# ╔═╡ f0d4f7ae-85e7-44c0-8006-2c585e102304
+#=╠═╡
+function example_compare_temperature_profiles()
+    # Run models with different flow rates
+    flow_rates = [0.2, 0.5, 1.0]
+    results = []
+    
+    for ṁ in flow_rates
+        res = solve_borehole_model(ṁ=ṁ)
+        push!(results, (res.sol, res.model))
+    end
+    
+    # Create labels
+    labels = ["Flow rate = $(ṁ) kg/s" for ṁ in flow_rates]
+    
+    # Compare temperature profiles
+    return compare_temperature_profiles(results, labels)
+end
+  ╠═╡ =#
+
+# ╔═╡ b1016786-e40b-446a-b963-cf99c1249f0b
+# ╠═╡ disabled = true
+#=╠═╡
+example_compare_temperature_profiles()
+  ╠═╡ =#
+
 # ╔═╡ 83e53fd9-15a5-4b11-b918-76fcca073f8e
 md" # Imports"
 
@@ -1508,6 +2064,7 @@ NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoExtras = "ed5d0301-4775-4676-b788-cf71e66ff8ed"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
@@ -1529,6 +2086,7 @@ NLsolve = "~4.5.1"
 Nemo = "~0.49.4"
 NonlinearSolve = "~4.8.0"
 PETSc = "~0.3.1"
+Plots = "~1.40.13"
 PlutoDevMacros = "~0.9.0"
 PlutoExtras = "~0.7.15"
 PlutoTest = "~0.2.2"
@@ -1546,7 +2104,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "a96828dda37a7b2aa372ed95dbe772e1747e8b96"
+project_hash = "a40c90aba6939fa8ea0f7f843e27112fb66bb262"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1769,18 +2327,19 @@ weakdeps = ["Adapt", "BandedMatrices"]
 
 [[deps.Bonito]]
 deps = ["Base64", "CodecZlib", "Colors", "Dates", "Deno_jll", "HTTP", "Hyperscript", "LinearAlgebra", "Markdown", "MsgPack", "Observables", "RelocatableFolders", "SHA", "Sockets", "Tables", "ThreadPools", "URIs", "UUIDs", "WidgetsBase"]
-git-tree-sha1 = "e48e53213512466cebc99c267e275238aaabad6a"
+git-tree-sha1 = "548dd16e479145c8ba8f8545b854ccc898a43ff6"
 uuid = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
-version = "4.0.3"
+version = "4.0.5"
 
 [[deps.BracketingNonlinearSolve]]
 deps = ["CommonSolve", "ConcreteStructs", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase"]
-git-tree-sha1 = "637ebe439ba587828fd997b7810d8171eed2ea1b"
+git-tree-sha1 = "a9014924595b7a2c1dd14aac516e38fa10ada656"
 uuid = "70df07ce-3d50-431d-a3e7-ca6ddb60ac1e"
-version = "1.2.0"
-weakdeps = ["ForwardDiff"]
+version = "1.3.0"
+weakdeps = ["ChainRulesCore", "ForwardDiff"]
 
     [deps.BracketingNonlinearSolve.extensions]
+    BracketingNonlinearSolveChainRulesCoreExt = ["ChainRulesCore", "ForwardDiff"]
     BracketingNonlinearSolveForwardDiffExt = "ForwardDiff"
 
 [[deps.Bzip2_jll]]
@@ -1999,11 +2558,23 @@ deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
 
+[[deps.Dbus_jll]]
+deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "473e9afc9cf30814eb67ffa5f2db7df82c3ad9fd"
+uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
+version = "1.16.2+0"
+
 [[deps.DelaunayTriangulation]]
 deps = ["AdaptivePredicates", "EnumX", "ExactPredicates", "Random"]
 git-tree-sha1 = "5620ff4ee0084a6ab7097a27ba0c19290200b037"
 uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
 version = "1.6.4"
+
+[[deps.DelimitedFiles]]
+deps = ["Mmap"]
+git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
+uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+version = "1.9.1"
 
 [[deps.Deno_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -2013,9 +2584,9 @@ version = "1.33.4+0"
 
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
-git-tree-sha1 = "6a0f6f17adbeb77688220cfb3e665c8f6e2a60ea"
+git-tree-sha1 = "a0e5b5669df9465bc3dd32ea4a8ddeefbc0f7b5c"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.172.0"
+version = "6.175.0"
 
     [deps.DiffEqBase.extensions]
     DiffEqBaseCUDAExt = "CUDA"
@@ -2028,6 +2599,7 @@ version = "6.172.0"
     DiffEqBaseMPIExt = "MPI"
     DiffEqBaseMeasurementsExt = "Measurements"
     DiffEqBaseMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    DiffEqBaseMooncakeExt = "Mooncake"
     DiffEqBaseReverseDiffExt = "ReverseDiff"
     DiffEqBaseSparseArraysExt = "SparseArrays"
     DiffEqBaseTrackerExt = "Tracker"
@@ -2044,6 +2616,7 @@ version = "6.172.0"
     MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
     MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
@@ -2051,9 +2624,9 @@ version = "6.172.0"
 
 [[deps.DiffEqCallbacks]]
 deps = ["ConcreteStructs", "DataStructures", "DiffEqBase", "DifferentiationInterface", "Functors", "LinearAlgebra", "Markdown", "RecipesBase", "RecursiveArrayTools", "SciMLBase", "StaticArraysCore"]
-git-tree-sha1 = "f98c17df6b2f3ac7d4a7c9b33c161b85c9b496f0"
+git-tree-sha1 = "76292e889472e810d40a844b714743c0ffb1c53b"
 uuid = "459566f4-90b8-5000-8ac3-15dfb0a30def"
-version = "4.4.1"
+version = "4.6.0"
 
 [[deps.DiffEqNoiseProcess]]
 deps = ["DiffEqBase", "Distributions", "GPUArraysCore", "LinearAlgebra", "Markdown", "Optim", "PoissonRandom", "QuadGK", "Random", "Random123", "RandomNumbers", "RecipesBase", "RecursiveArrayTools", "ResettableStacks", "SciMLBase", "StaticArraysCore", "Statistics"]
@@ -2173,9 +2746,9 @@ version = "0.25.120"
     Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.DocStringExtensions]]
-git-tree-sha1 = "e7b7e6f178525d17c720ab9c081e4ef04429f860"
+git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-version = "0.9.4"
+version = "0.9.5"
 
 [[deps.DomainSets]]
 deps = ["CompositeTypes", "IntervalSets", "LinearAlgebra", "Random", "StaticArrays"]
@@ -2194,9 +2767,9 @@ version = "1.6.0"
 
 [[deps.DynamicPolynomials]]
 deps = ["Future", "LinearAlgebra", "MultivariatePolynomials", "MutableArithmetics", "Reexport", "Test"]
-git-tree-sha1 = "9a3ae38b460449cc9e7dd0cfb059c76028724627"
+git-tree-sha1 = "98c4bb95af37e5d980129261fdd6dab0392c6607"
 uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
-version = "0.6.1"
+version = "0.6.2"
 
 [[deps.DynamicQuantities]]
 deps = ["DispatchDoctor", "PrecompileTools", "TestItems", "Tricks"]
@@ -2228,13 +2801,19 @@ uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 version = "1.0.5"
 
 [[deps.EnzymeCore]]
-git-tree-sha1 = "0cdb7af5c39e92d78a0ee8d0a447d32f7593137e"
+git-tree-sha1 = "7d7822a643c33bbff4eab9c87ca8459d7c688db0"
 uuid = "f151be2c-9106-41f4-ab19-57ee4f262869"
-version = "0.8.8"
+version = "0.8.11"
 weakdeps = ["Adapt"]
 
     [deps.EnzymeCore.extensions]
     AdaptExt = "Adapt"
+
+[[deps.EpollShim_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a4be429317c42cfae6a7fc03c31bad1970c310d"
+uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
+version = "0.0.20230411+1"
 
 [[deps.ExactPredicates]]
 deps = ["IntervalArithmetic", "Random", "StaticArrays"]
@@ -2269,11 +2848,17 @@ git-tree-sha1 = "b309b36a9e02fe7be71270dd8c0fd873625332b4"
 uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
 version = "0.1.6"
 
+[[deps.FFMPEG]]
+deps = ["FFMPEG_jll"]
+git-tree-sha1 = "53ebe7511fa11d33bec688a9178fac4e49eeee00"
+uuid = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
+version = "0.4.2"
+
 [[deps.FFMPEG_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
-git-tree-sha1 = "8cc47f299902e13f90405ddb5bf87e5d474c0d38"
+git-tree-sha1 = "466d45dc38e15794ec7d5d63ec03d776a9aff36e"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
-version = "6.1.2+0"
+version = "4.4.4+1"
 
 [[deps.FFTW]]
 deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
@@ -2464,6 +3049,12 @@ deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 version = "1.11.0"
 
+[[deps.GLFW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll", "libdecor_jll", "xkbcommon_jll"]
+git-tree-sha1 = "fcb0584ff34e25155876418979d4c8971243bb89"
+uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
+version = "3.4.0+2"
+
 [[deps.GMP_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
@@ -2474,6 +3065,18 @@ deps = ["Adapt"]
 git-tree-sha1 = "83cf05ab16a73219e5f6bd1bdfa9848fa24ac627"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
+
+[[deps.GR]]
+deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Preferences", "Printf", "Qt6Wayland_jll", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "p7zip_jll"]
+git-tree-sha1 = "4424dca1462cc3f19a0e6f07b809ad948ac1d62b"
+uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+version = "0.73.16"
+
+[[deps.GR_jll]]
+deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "FreeType2_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Qt6Base_jll", "Zlib_jll", "libpng_jll"]
+git-tree-sha1 = "d7ecfaca1ad1886de4f9053b5b8aef34f36ede7f"
+uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
+version = "0.73.16+0"
 
 [[deps.GenericSchur]]
 deps = ["LinearAlgebra", "Printf"]
@@ -2528,10 +3131,10 @@ uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
 version = "1.3.15+0"
 
 [[deps.Graphs]]
-deps = ["ArnoldiMethod", "Compat", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
-git-tree-sha1 = "3169fd3440a02f35e549728b0890904cfd4ae58a"
+deps = ["ArnoldiMethod", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
+git-tree-sha1 = "c5abfa0ae0aaee162a3fbb053c13ecda39be545b"
 uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
-version = "1.12.1"
+version = "1.13.0"
 
 [[deps.GridLayoutBase]]
 deps = ["GeometryBasics", "InteractiveUtils", "Observables"]
@@ -2732,6 +3335,12 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
+[[deps.JLFzf]]
+deps = ["REPL", "Random", "fzf_jll"]
+git-tree-sha1 = "82f7acdc599b65e0f8ccd270ffa1467c21cb647b"
+uuid = "1019f520-868f-41f5-a6de-eb00f4b6a39c"
+version = "0.1.11"
+
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
 git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
@@ -2780,10 +3389,10 @@ uuid = "70703baa-626e-46a2-a12c-08ffd08c73b4"
 version = "0.4.10"
 
 [[deps.JumpProcesses]]
-deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
-git-tree-sha1 = "f2bdec5b4580414aee3178c8caa6e46c344c0bbc"
+deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
+git-tree-sha1 = "fb7fd516de38db80f50fe15e57d44da2836365e7"
 uuid = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
-version = "9.14.3"
+version = "9.16.0"
 weakdeps = ["FastBroadcast"]
 
 [[deps.KernelDensity]]
@@ -2829,19 +3438,21 @@ version = "1.4.0"
 
 [[deps.Latexify]]
 deps = ["Format", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
-git-tree-sha1 = "cd10d2cc78d34c0e2a3a36420ab607b611debfbb"
+git-tree-sha1 = "4f34eaabe49ecb3fb0d58d6015e32fd31a733199"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.16.7"
+version = "0.16.8"
 
     [deps.Latexify.extensions]
     DataFramesExt = "DataFrames"
     SparseArraysExt = "SparseArrays"
     SymEngineExt = "SymEngine"
+    TectonicExt = "tectonic_jll"
 
     [deps.Latexify.weakdeps]
     DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+    tectonic_jll = "d7dd28d6-a5e6-559c-9131-7eb760cdacc5"
 
 [[deps.LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
@@ -2965,9 +3576,9 @@ version = "1.11.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
-git-tree-sha1 = "c5e80f547e47f00f53c290aa5d4a11034104b94d"
+git-tree-sha1 = "c0d1a91a50af6778863d320761f807f641f74935"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.11.0"
+version = "3.17.0"
 
     [deps.LinearSolve.extensions]
     LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -3149,6 +3760,11 @@ deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
 
+[[deps.Measures]]
+git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
+uuid = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
+version = "0.3.2"
+
 [[deps.MicrosoftMPI_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bc95bf4149bf535c09602e3acdf950d9b4376227"
@@ -3320,9 +3936,9 @@ version = "4.8.0"
 
 [[deps.NonlinearSolveBase]]
 deps = ["ADTypes", "Adapt", "ArrayInterface", "CommonSolve", "Compat", "ConcreteStructs", "DifferentiationInterface", "EnzymeCore", "FastClosures", "LinearAlgebra", "Markdown", "MaybeInplace", "Preferences", "Printf", "RecursiveArrayTools", "SciMLBase", "SciMLJacobianOperators", "SciMLOperators", "StaticArraysCore", "SymbolicIndexingInterface", "TimerOutputs"]
-git-tree-sha1 = "686fd9d0d455171e3530d3540cff94bb01222823"
+git-tree-sha1 = "404d71dd057759f4d590191a643113485c4a482a"
 uuid = "be0214bd-f91f-a760-ac4e-3421ce2b2da0"
-version = "1.7.0"
+version = "1.12.0"
 weakdeps = ["BandedMatrices", "DiffEqBase", "ForwardDiff", "LineSearch", "LinearSolve", "SparseArrays", "SparseMatrixColorings"]
 
     [deps.NonlinearSolveBase.extensions]
@@ -3342,9 +3958,9 @@ version = "1.5.0"
 
 [[deps.NonlinearSolveQuasiNewton]]
 deps = ["ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLOperators", "StaticArraysCore"]
-git-tree-sha1 = "eafb327f5c2d9f1ac890aa2b9fbe05a1bd7e4dc8"
+git-tree-sha1 = "e3888bdbab6e0bfadbc3164ef4595e40e7b7e954"
 uuid = "9a2c21bd-3a47-402d-9113-8faf9a0ee114"
-version = "1.4.0"
+version = "1.6.0"
 weakdeps = ["ForwardDiff"]
 
     [deps.NonlinearSolveQuasiNewton.extensions]
@@ -3502,6 +4118,12 @@ git-tree-sha1 = "0fac6313486baae819364c52b4f483450a9d793f"
 uuid = "5432bcbf-9aad-5242-b902-cca2824c8663"
 version = "0.5.12"
 
+[[deps.Pango_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "275a9a6d85dc86c24d03d1837a0010226a96f540"
+uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
+version = "1.56.3+0"
+
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
@@ -3535,11 +4157,37 @@ git-tree-sha1 = "f9501cc0430a26bc3d156ae1b5b0c1b47af4d6da"
 uuid = "eebad327-c553-4316-9ea0-9fa01ccd7688"
 version = "0.3.3"
 
+[[deps.PlotThemes]]
+deps = ["PlotUtils", "Statistics"]
+git-tree-sha1 = "41031ef3a1be6f5bbbf3e8073f210556daeae5ca"
+uuid = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
+version = "3.3.0"
+
 [[deps.PlotUtils]]
 deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random", "Reexport", "StableRNGs", "Statistics"]
 git-tree-sha1 = "3ca9a356cd2e113c420f2c13bea19f8d3fb1cb18"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
 version = "1.4.3"
+
+[[deps.Plots]]
+deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "PrecompileTools", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "TOML", "UUIDs", "UnicodeFun", "UnitfulLatexify", "Unzip"]
+git-tree-sha1 = "809ba625a00c605f8d00cd2a9ae19ce34fc24d68"
+uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+version = "1.40.13"
+
+    [deps.Plots.extensions]
+    FileIOExt = "FileIO"
+    GeometryBasicsExt = "GeometryBasics"
+    IJuliaExt = "IJulia"
+    ImageInTerminalExt = "ImageInTerminal"
+    UnitfulExt = "Unitful"
+
+    [deps.Plots.weakdeps]
+    FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+    GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+    IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
+    ImageInTerminal = "d8c32880-2388-543b-8c61-d9f865259254"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.PlutoDevMacros]]
 deps = ["JuliaInterpreter", "Logging", "MacroTools", "Pkg", "TOML"]
@@ -3573,9 +4221,9 @@ version = "0.4.4"
 
 [[deps.Polyester]]
 deps = ["ArrayInterface", "BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "ManualMemory", "PolyesterWeave", "Static", "StaticArrayInterface", "StrideArraysCore", "ThreadingUtilities"]
-git-tree-sha1 = "6d38fea02d983051776a856b7df75b30cf9a3c1f"
+git-tree-sha1 = "6f7cd22a802094d239824c57d94c8e2d0f7cfc7d"
 uuid = "f517fe37-dbe3-4b94-8317-1923a5111588"
-version = "0.7.16"
+version = "0.7.18"
 
 [[deps.PolyesterWeave]]
 deps = ["BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "Static", "ThreadingUtilities"]
@@ -3640,6 +4288,30 @@ git-tree-sha1 = "8b3fc30bc0390abdce15f8822c889f669baed73d"
 uuid = "4b34888f-f399-49d4-9bb3-47ed5cae4e65"
 version = "1.0.1"
 
+[[deps.Qt6Base_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Vulkan_Loader_jll", "Xorg_libSM_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_cursor_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "libinput_jll", "xkbcommon_jll"]
+git-tree-sha1 = "eb38d376097f47316fe089fc62cb7c6d85383a52"
+uuid = "c0090381-4147-56d7-9ebc-da0b1113ec56"
+version = "6.8.2+1"
+
+[[deps.Qt6Declarative_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6ShaderTools_jll"]
+git-tree-sha1 = "da7adf145cce0d44e892626e647f9dcbe9cb3e10"
+uuid = "629bc702-f1f5-5709-abd5-49b8460ea067"
+version = "6.8.2+1"
+
+[[deps.Qt6ShaderTools_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll"]
+git-tree-sha1 = "9eca9fc3fe515d619ce004c83c31ffd3f85c7ccf"
+uuid = "ce943373-25bb-56aa-8eca-768745ed7b5a"
+version = "6.8.2+1"
+
+[[deps.Qt6Wayland_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6Declarative_jll"]
+git-tree-sha1 = "2766344a35a1a5ec1147305c4b343055d7c22c90"
+uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
+version = "6.8.2+0"
+
 [[deps.QuadGK]]
 deps = ["DataStructures", "LinearAlgebra"]
 git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
@@ -3664,9 +4336,9 @@ version = "1.11.0"
 
 [[deps.Random123]]
 deps = ["Random", "RandomNumbers"]
-git-tree-sha1 = "4743b43e5a9c4a2ede372de7061eed81795b12e7"
+git-tree-sha1 = "dbe5fd0b334694e905cb9fda73cd8554333c46e2"
 uuid = "74087812-796a-5b5d-8853-05524746bad3"
-version = "1.7.0"
+version = "1.7.1"
 
 [[deps.RandomExtensions]]
 deps = ["Random", "SparseArrays"]
@@ -3700,6 +4372,12 @@ deps = ["PrecompileTools"]
 git-tree-sha1 = "5c3d09cc4f31f5fc6af001c250bf1278733100ff"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 version = "1.3.4"
+
+[[deps.RecipesPipeline]]
+deps = ["Dates", "NaNMath", "PlotUtils", "PrecompileTools", "RecipesBase"]
+git-tree-sha1 = "45cf9fd0ca5839d06ef333c8201714e888486342"
+uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
+version = "0.6.12"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
@@ -3771,9 +4449,9 @@ version = "0.2.1"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
-git-tree-sha1 = "7cb9d10026d630ce2dd2a1fc6006a3d5041b34c0"
+git-tree-sha1 = "86a8a8b783481e1ea6b9c91dd949cb32191f8ab4"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
-version = "0.5.14"
+version = "0.5.15"
 
 [[deps.SCALAPACK32_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS32_jll", "OpenMPI_jll", "Pkg", "TOML"]
@@ -3815,10 +4493,10 @@ uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
 version = "0.6.43"
 
 [[deps.SciMLBase]]
-deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "2fd047893cb0089b180fcbb7e8434ba15dcc2841"
+deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
+git-tree-sha1 = "9efabb3d79f9076710f41af77017e42d8fa780d9"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.87.0"
+version = "2.97.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -3843,15 +4521,15 @@ version = "2.87.0"
 
 [[deps.SciMLJacobianOperators]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "ConstructionBase", "DifferentiationInterface", "FastClosures", "LinearAlgebra", "SciMLBase", "SciMLOperators"]
-git-tree-sha1 = "1e2033bdf0792aa2a2f21de8e9378197f13386ec"
+git-tree-sha1 = "7da1216346ad79499d08d7e2a3dbf297dc80c829"
 uuid = "19f34311-ddf3-4b8b-af20-060888a46c0e"
-version = "0.1.4"
+version = "0.1.6"
 
 [[deps.SciMLOperators]]
 deps = ["Accessors", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "MacroTools"]
-git-tree-sha1 = "1c4b7f6c3e14e6de0af66e66b86d525cae10ecb4"
+git-tree-sha1 = "3249fe77f322fe539e935ecb388c8290cd38a3fc"
 uuid = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
-version = "0.3.13"
+version = "1.3.1"
 weakdeps = ["SparseArrays", "StaticArraysCore"]
 
     [deps.SciMLOperators.extensions]
@@ -3910,9 +4588,9 @@ version = "1.2.0"
 
 [[deps.SimpleNonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "Setfield", "StaticArraysCore"]
-git-tree-sha1 = "068c16a16834c1483c299b0e27e901599439570d"
+git-tree-sha1 = "7aaa5fe4617271b64fce0466d187f2a72edbd81a"
 uuid = "727e6d20-b764-4bd8-a329-72de5adea6c7"
-version = "2.4.0"
+version = "2.5.0"
 
     [deps.SimpleNonlinearSolve.extensions]
     SimpleNonlinearSolveChainRulesCoreExt = "ChainRulesCore"
@@ -3954,10 +4632,10 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.11.0"
 
 [[deps.SparseMatrixColorings]]
-deps = ["ADTypes", "DocStringExtensions", "LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "76e9564f0de0d1d7a46095e758ae13ceba680cfb"
+deps = ["ADTypes", "DocStringExtensions", "LinearAlgebra", "PrecompileTools", "Random", "SparseArrays"]
+git-tree-sha1 = "ab958b4fec46d1f1d057bb8e2a99bfdb90744646"
 uuid = "0a514795-09f3-496d-8182-132a7b665d35"
-version = "0.4.19"
+version = "0.4.20"
 
     [deps.SparseMatrixColorings.extensions]
     SparseMatrixColoringsCliqueTreesExt = "CliqueTrees"
@@ -4133,9 +4811,9 @@ version = "0.2.2"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Bijections", "ChainRulesCore", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "ExproniconLite", "LinearAlgebra", "MultivariatePolynomials", "NaNMath", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "TimerOutputs", "Unityper", "WeakValueDicts"]
-git-tree-sha1 = "e893939e258de0de23dc233ec6a618a4b53554ff"
+git-tree-sha1 = "fa63e8f55e99aee528951ba26544403b09645979"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "3.27.0"
+version = "3.29.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsLabelledArraysExt = "LabelledArrays"
@@ -4147,9 +4825,9 @@ version = "3.27.0"
 
 [[deps.Symbolics]]
 deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "LaTeXStrings", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "OffsetArrays", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
-git-tree-sha1 = "8a39dd8c60cd38124c49a30ac9c9007634f7b616"
+git-tree-sha1 = "e14834f421edaa8a30493f7864dfc8582855bb3c"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "6.39.0"
+version = "6.40.0"
 
     [deps.Symbolics.extensions]
     SymbolicsForwardDiffExt = "ForwardDiff"
@@ -4180,9 +4858,9 @@ version = "1.0.1"
 
 [[deps.Tables]]
 deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
-git-tree-sha1 = "598cd7c1f68d1e205689b1c2fe65a9f85846f297"
+git-tree-sha1 = "f2c1efbc8f3a609aadf318094f8fc5204bdaf344"
 uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-version = "1.12.0"
+version = "1.12.1"
 
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
@@ -4223,21 +4901,21 @@ version = "2.1.1"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]
-git-tree-sha1 = "18ad3613e129312fe67789a71720c3747e598a61"
+git-tree-sha1 = "2d529b6b22791f3e22e7ec5c60b9016e78f5f6bf"
 uuid = "8290d209-cae3-49c0-8002-c8c24d57dab5"
-version = "0.5.3"
+version = "0.5.4"
 
 [[deps.TiffImages]]
-deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedPointNumbers", "IndirectArrays", "Inflate", "Mmap", "OffsetArrays", "PkgVersion", "ProgressMeter", "SIMD", "UUIDs"]
-git-tree-sha1 = "f21231b166166bebc73b99cea236071eb047525b"
+deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedPointNumbers", "IndirectArrays", "Inflate", "Mmap", "OffsetArrays", "PkgVersion", "PrecompileTools", "ProgressMeter", "SIMD", "UUIDs"]
+git-tree-sha1 = "02aca429c9885d1109e58f400c333521c13d48a0"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
-version = "0.11.3"
+version = "0.11.4"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]
-git-tree-sha1 = "f57facfd1be61c42321765d3551b3df50f7e09f6"
+git-tree-sha1 = "3748bd928e68c7c346b52125cf41fff0de6937d0"
 uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
-version = "0.5.28"
+version = "0.5.29"
 
     [deps.TimerOutputs.extensions]
     FlameGraphsExt = "FlameGraphs"
@@ -4302,11 +4980,22 @@ weakdeps = ["ConstructionBase", "InverseFunctions"]
     ConstructionBaseUnitfulExt = "ConstructionBase"
     InverseFunctionsUnitfulExt = "InverseFunctions"
 
+[[deps.UnitfulLatexify]]
+deps = ["LaTeXStrings", "Latexify", "Unitful"]
+git-tree-sha1 = "af305cc62419f9bd61b6644d19170a4d258c7967"
+uuid = "45397f5d-5981-4c77-b2b3-fc36d6e9b728"
+version = "1.7.0"
+
 [[deps.Unityper]]
 deps = ["ConstructionBase"]
 git-tree-sha1 = "25008b734a03736c41e2a7dc314ecb95bd6bbdb0"
 uuid = "a7c27f48-0311-42f6-a7f8-2c11e75eb415"
 version = "0.1.6"
+
+[[deps.Unzip]]
+git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
+uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
+version = "0.2.0"
 
 [[deps.VectorizationBase]]
 deps = ["ArrayInterface", "CPUSummary", "HostCPUFeatures", "IfElse", "LayoutPointers", "Libdl", "LinearAlgebra", "SIMDTypes", "Static", "StaticArrayInterface"]
@@ -4314,11 +5003,29 @@ git-tree-sha1 = "4ab62a49f1d8d9548a1c8d1a75e5f55cf196f64e"
 uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 version = "0.21.71"
 
+[[deps.Vulkan_Loader_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Xorg_libX11_jll", "Xorg_libXrandr_jll", "xkbcommon_jll"]
+git-tree-sha1 = "2f0486047a07670caad3a81a075d2e518acc5c59"
+uuid = "a44049a8-05dd-5a78-86c9-5fde0876e88c"
+version = "1.3.243+0"
+
 [[deps.WGLMakie]]
 deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
 git-tree-sha1 = "01c9f3f96844cd3bd0e6b81921b2d36d34855dc5"
 uuid = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 version = "0.11.4"
+
+[[deps.Wayland_jll]]
+deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "XML2_jll"]
+git-tree-sha1 = "49be0be57db8f863a902d59c0083d73281ecae8e"
+uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
+version = "1.23.1+0"
+
+[[deps.Wayland_protocols_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "5db3e9d307d32baba7067b13fc7b5aa6edd4a19a"
+uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
+version = "1.36.0+0"
 
 [[deps.WeakValueDicts]]
 git-tree-sha1 = "98528c2610a5479f091d470967a25becfd83edd0"
@@ -4355,6 +5062,18 @@ git-tree-sha1 = "fee71455b0aaa3440dfdd54a9a36ccef829be7d4"
 uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
 version = "5.8.1+0"
 
+[[deps.Xorg_libICE_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "a3ea76ee3f4facd7a64684f9af25310825ee3668"
+uuid = "f67eecfb-183a-506d-b269-f58e52b52d7c"
+version = "1.1.2+0"
+
+[[deps.Xorg_libSM_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libICE_jll"]
+git-tree-sha1 = "9c7ad99c629a44f81e7799eb05ec2746abb5d588"
+uuid = "c834827a-8449-5923-a945-d239c165b7dd"
+version = "1.2.6+0"
+
 [[deps.Xorg_libX11_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
 git-tree-sha1 = "b5899b25d17bf1889d25906fb9deed5da0c15b3b"
@@ -4366,6 +5085,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "aa1261ebbac3ccc8d16558ae6799524c450ed16b"
 uuid = "0c0b7dd1-d40b-584c-a123-a41640f87eec"
 version = "1.0.13+0"
+
+[[deps.Xorg_libXcursor_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXfixes_jll", "Xorg_libXrender_jll"]
+git-tree-sha1 = "6c74ca84bbabc18c4547014765d194ff0b4dc9da"
+uuid = "935fb764-8cf2-53bf-bb30-45bb1f8bf724"
+version = "1.2.4+0"
 
 [[deps.Xorg_libXdmcp_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -4379,6 +5104,30 @@ git-tree-sha1 = "a4c0ee07ad36bf8bbce1c3bb52d21fb1e0b987fb"
 uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
 version = "1.3.7+0"
 
+[[deps.Xorg_libXfixes_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "9caba99d38404b285db8801d5c45ef4f4f425a6d"
+uuid = "d091e8ba-531a-589c-9de9-94069b037ed8"
+version = "6.0.1+0"
+
+[[deps.Xorg_libXi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXfixes_jll"]
+git-tree-sha1 = "a376af5c7ae60d29825164db40787f15c80c7c54"
+uuid = "a51aa0fd-4e3c-5386-b890-e753decda492"
+version = "1.8.3+0"
+
+[[deps.Xorg_libXinerama_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll"]
+git-tree-sha1 = "a5bc75478d323358a90dc36766f3c99ba7feb024"
+uuid = "d1454406-59df-5ea1-beac-c340f2130bc3"
+version = "1.1.6+0"
+
+[[deps.Xorg_libXrandr_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXrender_jll"]
+git-tree-sha1 = "aff463c82a773cb86061bce8d53a0d976854923e"
+uuid = "ec84b674-ba8e-5d96-8ba1-2a689ba10484"
+version = "1.5.5+0"
+
 [[deps.Xorg_libXrender_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
 git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
@@ -4390,6 +5139,60 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_j
 git-tree-sha1 = "bfcaf7ec088eaba362093393fe11aa141fa15422"
 uuid = "c7cfdc94-dc32-55de-ac96-5a1b8d977c5b"
 version = "1.17.1+0"
+
+[[deps.Xorg_libxkbfile_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "e3150c7400c41e207012b41659591f083f3ef795"
+uuid = "cc61e674-0454-545c-8b26-ed2c68acab7a"
+version = "1.1.3+0"
+
+[[deps.Xorg_xcb_util_cursor_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_jll", "Xorg_xcb_util_renderutil_jll"]
+git-tree-sha1 = "04341cb870f29dcd5e39055f895c39d016e18ccd"
+uuid = "e920d4aa-a673-5f3a-b3d7-f755a4d47c43"
+version = "0.1.4+0"
+
+[[deps.Xorg_xcb_util_image_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "0fab0a40349ba1cba2c1da699243396ff8e94b97"
+uuid = "12413925-8142-5f55-bb0e-6d7ca50bb09b"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libxcb_jll"]
+git-tree-sha1 = "e7fd7b2881fa2eaa72717420894d3938177862d1"
+uuid = "2def613f-5ad1-5310-b15b-b15d46f528f5"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_keysyms_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "d1151e2c45a544f32441a567d1690e701ec89b00"
+uuid = "975044d2-76e6-5fbe-bf08-97ce7c6574c7"
+version = "0.4.0+1"
+
+[[deps.Xorg_xcb_util_renderutil_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "dfd7a8f38d4613b6a575253b3174dd991ca6183e"
+uuid = "0d47668e-0667-5a69-a72c-f761630bfb7e"
+version = "0.3.9+1"
+
+[[deps.Xorg_xcb_util_wm_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "e78d10aab01a4a154142c5006ed44fd9e8e31b67"
+uuid = "c22f9ab0-d5fe-5066-847c-f4bb1cd4e361"
+version = "0.4.1+1"
+
+[[deps.Xorg_xkbcomp_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxkbfile_jll"]
+git-tree-sha1 = "801a858fc9fb90c11ffddee1801bb06a738bda9b"
+uuid = "35661453-b289-5fab-8a00-3d9160c6a3a4"
+version = "1.4.7+0"
+
+[[deps.Xorg_xkeyboard_config_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xkbcomp_jll"]
+git-tree-sha1 = "00af7ebdc563c9217ecc67776d1bbf037dbcebf4"
+uuid = "33bec58e-1273-512f-9401-5d533626f822"
+version = "2.44.0+0"
 
 [[deps.Xorg_xtrans_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -4414,6 +5217,24 @@ git-tree-sha1 = "ca8a038b2cabd4fe3dd206de56ac1285131515a0"
 uuid = "b792d7bf-f512-5dba-8a02-6d8084434f1d"
 version = "1.3.12+0"
 
+[[deps.eudev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "gperf_jll"]
+git-tree-sha1 = "431b678a28ebb559d224c0b6b6d01afce87c51ba"
+uuid = "35ca27e7-8b34-5b7f-bca9-bdc33f59eb06"
+version = "3.2.9+0"
+
+[[deps.fzf_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "b6a34e0e0960190ac2a4363a1bd003504772d631"
+uuid = "214eeab7-80f7-51ab-84ad-2988db7cef09"
+version = "0.61.1+0"
+
+[[deps.gperf_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "3cad2cf2c8d80f1d17320652b3ea7778b30f473f"
+uuid = "1a1c6b14-54f6-533d-8383-74cd7377aa70"
+version = "3.3.0+0"
+
 [[deps.isoband_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "51b5eeb3f98367157a7a12a1fb0aa5328946c03c"
@@ -4437,11 +5258,29 @@ deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
 version = "5.11.0+0"
 
+[[deps.libdecor_jll]]
+deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
+git-tree-sha1 = "9bf7903af251d2050b467f76bdbe57ce541f7f4f"
+uuid = "1183f4f0-6f2a-5f1a-908b-139f9cdfea6f"
+version = "0.2.2+0"
+
+[[deps.libevdev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "141fe65dc3efabb0b1d5ba74e91f6ad26f84cc22"
+uuid = "2db6ffa8-e38f-5e21-84af-90c45d0032cc"
+version = "1.11.0+0"
+
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "8a22cf860a7d27e4f3498a0fe0811a7957badb38"
 uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
 version = "2.0.3+0"
+
+[[deps.libinput_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "eudev_jll", "libevdev_jll", "mtdev_jll"]
+git-tree-sha1 = "ad50e5b90f222cfe78aa3d5183a20a12de1322ce"
+uuid = "36db933b-70db-51c0-b978-0f229ee0e533"
+version = "1.18.0+0"
 
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
@@ -4467,6 +5306,12 @@ git-tree-sha1 = "d2408cac540942921e7bd77272c32e58c33d8a77"
 uuid = "c5f90fcd-3b7e-5836-afba-fc50a0988cb2"
 version = "1.5.0+0"
 
+[[deps.mtdev_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "814e154bdb7be91d78b6802843f76b6ece642f11"
+uuid = "009596ad-96f7-51b1-9f1b-5ce2d5e8a71e"
+version = "1.1.6+0"
+
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
@@ -4484,16 +5329,22 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
 
 [[deps.x264_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "14cc7083fc6dff3cc44f2bc435ee96d06ed79aa7"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "4fea590b89e6ec504593146bf8b988b2c00922b2"
 uuid = "1270edf5-f2f9-52d2-97e9-ab00b5d0237a"
-version = "10164.0.1+0"
+version = "2021.5.5+0"
 
 [[deps.x265_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "dcc541bb19ed5b0ede95581fb2e41ecf179527d2"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "ee567a171cce03570d77ad3a43e90218e38937a9"
 uuid = "dfaa095f-4041-5dcd-9319-2fabd8486b76"
-version = "3.6.0+0"
+version = "3.5.0+0"
+
+[[deps.xkbcommon_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
+git-tree-sha1 = "c950ae0a3577aec97bfccf3381f66666bc416729"
+uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
+version = "1.8.1+0"
 """
 
 # ╔═╡ Cell order:
@@ -4501,11 +5352,9 @@ version = "3.6.0+0"
 # ╠═da77d4ce-898e-4dac-a193-ec03eb088c2d
 # ╠═17af46d6-c740-489f-84d7-cd70da1045e7
 # ╠═681b6b67-2f78-4085-9abb-5c2d4abdb117
+# ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
 # ╠═f05d0696-202e-4158-bf2a-a47c33493f71
 # ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
-# ╠═121f3c96-8e06-4e26-99f2-46f12ea83d8d
-# ╠═858f94fa-aa22-442c-96ee-52209d62d9cd
-# ╠═5ae06bb9-9687-4e25-b3ee-44c11f1eb79f
 # ╠═e3e8a633-0572-4032-a6ed-3c03ead67180
 # ╠═cd4d60e8-724c-4fe9-8947-061df7072bf4
 # ╠═4cfd9965-69d0-4409-a15e-bc5a0fec9f11
@@ -4522,7 +5371,6 @@ version = "3.6.0+0"
 # ╠═6f1888cb-63ba-4cef-8151-bd7d09e5bc63
 # ╠═58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
 # ╠═4fe2de48-d332-48a7-8bad-0193769b5955
-# ╠═5b8db305-4447-4943-b0fa-61051b86d112
 # ╟─8232ef24-b67c-45ea-afe6-086178027a11
 # ╟─7226d893-5d58-4997-93c6-a532e76bbd33
 # ╟─5516c29d-96fd-4614-ad98-6afeb0d7a6c6
@@ -4550,7 +5398,20 @@ version = "3.6.0+0"
 # ╠═118c0637-66e7-4347-90e4-89c65083e48e
 # ╠═f78bce12-0e91-4693-8030-99fbb2cbd716
 # ╠═eb6a37cb-5e84-4826-a1d1-17b70b683717
-# ╠═1093c1d5-3263-4a81-9e9d-9677b3003ea4
+# ╠═adc67f95-858e-4a71-91d0-7610aea038e7
+# ╠═3f467f08-fbbf-4768-adcb-312f6b005dc9
+# ╠═19907f6b-84d2-4fc8-b931-b2e769bc00a0
+# ╠═782c2ab9-51c0-4814-a301-77f19b917bd5
+# ╠═38fc7166-b946-40ef-ba90-826617d743dc
+# ╠═20dd46ac-da6b-4965-bca2-4b599ef10bb2
+# ╠═c1891c9d-d5c7-42ab-9780-a8b93d580386
+# ╠═7847e709-1ed5-4313-b9e5-bbc6e391c059
+# ╠═d2acfb92-f66a-48de-9a06-d801e0b35a9d
+# ╠═097d755d-9808-4ff2-a06a-7f2b97c0c4ac
+# ╠═f16d66db-1b49-46d6-a2db-ee60618139ea
+# ╠═c32b5df3-e560-4af0-9b2a-2f1032042414
+# ╠═843fcf98-2899-4172-b167-027b140dccf6
+# ╟─1093c1d5-3263-4a81-9e9d-9677b3003ea4
 # ╠═8a44ecc5-6553-4450-b5cf-ac456c89229e
 # ╠═e884fbb3-e069-484d-87fa-c84535f02403
 # ╠═62625d10-5988-43dc-9ce0-4ea60f9f6e29
@@ -4558,6 +5419,14 @@ version = "3.6.0+0"
 # ╠═b1eab00d-89c6-4868-bdc9-5537a8cdab3c
 # ╠═345b1fa8-ee00-4a6f-8d6d-5cec9fe5151a
 # ╟─082476a0-a87b-4c16-a8fe-a19290772c07
+# ╠═800ed7f4-1c60-4df7-90ca-91cfd15b2858
+# ╠═49ee62d6-a5c6-471f-8c3c-6a0e3789fca8
+# ╠═bef8a408-8bc7-4b19-b6ce-e0b8c8fa4e6f
+# ╠═f5eb6c16-56cf-4aed-9dac-c97db38ef430
+# ╠═ffb730c2-3648-4566-ba81-ec1eaa06b6c4
+# ╠═f676116d-a5c9-4b82-be7f-55d1938f79d2
+# ╠═f0d4f7ae-85e7-44c0-8006-2c585e102304
+# ╠═b1016786-e40b-446a-b963-cf99c1249f0b
 # ╠═83e53fd9-15a5-4b11-b918-76fcca073f8e
 # ╠═1e019ddb-1873-4cea-a765-83b6f7316b34
 # ╠═94eef45c-9d7d-4f74-aa18-b95bf11e2196

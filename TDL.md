@@ -1,0 +1,1 @@
+- Make sure the parameters are inherited down in a dynamic manner in _pluto_thermal.jl_

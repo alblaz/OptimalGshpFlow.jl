@@ -1,5 +1,5 @@
 module ThermodynamicCycle
 
-include("pluto_thermo.jl")
+include("pluto_thermodynamic_cycle.jl")
 
 end # module OptimalGshpFlowac

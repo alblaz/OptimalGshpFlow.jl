@@ -30,7 +30,6 @@ using DataFrames
 
 # ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
 @fromparent begin
-	using ..Utils
 	using ..Properties
 end
 
@@ -38,12 +37,6 @@ end
 # ╠═╡ skip_as_script = true
 #=╠═╡
 using Plots
-  ╠═╡ =#
-
-# ╔═╡ 9a7db941-b8b8-4b81-918b-d86509b589a3
-# ╠═╡ disabled = true
-#=╠═╡
-@named ethanol = Properties.DynamicIncompressibleProps(χ = 0.2, fluid = "MEA")
   ╠═╡ =#
 
 # ╔═╡ aecdef58-bf84-460c-bf53-b88d92d42f85
@@ -1070,7 +1063,7 @@ function DynamicPropPipeBend(; name::Symbol,
     @named bend = PipeBend(θ=θ, R=R, Di=Di, g=g)
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect components
     connect_eqs = [
@@ -1123,7 +1116,7 @@ function DynamicPropAnnularBend180(; name::Symbol,
     @named bend = AnnularBend180(Do=Do, Di=Di, g=g)
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect components
     connect_eqs = [
@@ -1138,7 +1131,7 @@ end
 # ╔═╡ 800c5c52-94ad-4083-98c9-e7ec42cc70ed
 function test_dynamic_prop_pipe_bend()
     # Create the model
-    @named bend = DynamicPropPipeBend(θ=90.0, R=0.05, Di=0.02, fluid="water")
+    @named bend = DynamicPropPipeBend(θ=90.0, R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
     @named constrained_sys = assemble([bend], 
@@ -1175,7 +1168,7 @@ end
 # ╔═╡ f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
 function test_dynamic_prop_pipe_bend_90()
     # Create the model
-    @named bend90 = DynamicPropPipeBend90(R=0.05, Di=0.02, fluid="water")
+    @named bend90 = DynamicPropPipeBend90(R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
     @named constrained_sys = assemble([bend90], 
@@ -1203,7 +1196,7 @@ end
 # ╔═╡ 32c32c40-756b-4eae-a123-68e77920c112
 function test_dynamic_prop_pipe_bend_u()
     # Create the model
-    @named bendu = DynamicPropPipeBendU(R=0.05, Di=0.02, fluid="water")
+    @named bendu = DynamicPropPipeBendU(R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
     @named constrained_sys = assemble([bendu], 
@@ -1231,7 +1224,7 @@ end
 # ╔═╡ 5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
 function test_dynamic_prop_annular_bend_180()
     # Create the model
-    @named bend180 = DynamicPropAnnularBend180(Do=0.03, Di=0.02, fluid="water")
+    @named bend180 = DynamicPropAnnularBend180(Do=0.03, Di=0.02, fluid="MEA")
     
     # Set up test conditions
     @named constrained_sys = assemble([bend180], 
@@ -1281,9 +1274,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 18962ef4-5570-4b40-b31d-7fd211025965
-#=╠═╡
-@test test_dynamic_prop_annular_bend_180()
-  ╠═╡ =#
+test_dynamic_prop_annular_bend_180()
 
 # ╔═╡ fe6c00b8-fc3f-426f-920c-7deaae99dce8
 md"""
@@ -1299,7 +1290,7 @@ function DynamicPropAnnularChannel(; name::Symbol,
                                     g = 9.81,       # Gravity [m/s²]
                                     Re_low = 2300,  # Lower transition Reynolds number
                                     Re_high = 4000, # Upper transition Reynolds number
-                                    fluid = "water",
+                                    fluid = "MEA",
                                     χ = 0.0)        # Concentration (for mixtures)
 	pars = @parameters begin
 		L = L
@@ -1317,7 +1308,7 @@ function DynamicPropAnnularChannel(; name::Symbol,
                                   Re_low=Re_low, Re_high=Re_high)
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Additional equations to connect components
     connect_eqs = [
@@ -1335,7 +1326,7 @@ end
 # Test function for DynamicPropAnnularChannel model
 function test_dynamic_prop_annular_channel()
     # Create the model
-    @named annular = DynamicPropAnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6, fluid="water")
+    @named annular = DynamicPropAnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6, fluid="MEA")
     
     # Set up test conditions - note that we set temperature directly
     @named constrained_sys = assemble([annular], 
@@ -1382,7 +1373,7 @@ function DynamicPropStraightTube(; name::Symbol,
                                  g = 9.81,       # Gravity [m/s²]
                                  Re_low = 2300,  # Lower transition Reynolds number
                                  Re_high = 4000, # Upper transition Reynolds number
-                                 fluid = "water",
+                                 fluid = "MEA",
                                  χ = 0.0)        # Concentration (for mixtures)
 
      pars = @parameters begin
@@ -1400,7 +1391,7 @@ function DynamicPropStraightTube(; name::Symbol,
                                        Re_low=Re_low, Re_high=Re_high)
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect components
     connect_eqs = [
@@ -1417,7 +1408,7 @@ end
 # Test function for DynamicPropStraightTube model
 function test_dynamic_prop_straight_tube()
     # Create the model
-    @named tube = DynamicPropStraightTube(L=10.0, Di=0.02, ε=1.5e-6, fluid="water")
+    @named tube = DynamicPropStraightTube(L=10.0, Di=0.02, ε=1.5e-6, fluid="MEA")
     
     # Set up test conditions
     @named constrained_sys = assemble([tube], 
@@ -1475,7 +1466,7 @@ function BHE_Upipe_Hydraulic_Complete(; name::Symbol,
                     Re_low = 2300,     # Lower transition Reynolds number
                     Re_high = 4000,    # Upper transition Reynolds number
                     g = 9.81,          # Gravity [m/s²]
-                    fluid = "water",   # Fluid type
+                    fluid = "MEA",   # Fluid type
                     χ = 0.0)           # Concentration (for mixtures)
 
     # Define the BHE-level parameters
@@ -1698,7 +1689,7 @@ function BHE_Coaxial_Hydraulic_Complete(; name::Symbol,
                       Re_low = 2300,     # Lower transition Reynolds number
                       Re_high = 4000,    # Upper transition Reynolds number
                       g = 9.81,          # Gravity [m/s²]
-                      fluid = "water",   # Fluid type
+                      fluid = "MEA",   # Fluid type
                       χ = 0.0)           # Concentration (for mixtures)
                       
     # Define the BHE-level parameters
@@ -1977,9 +1968,6 @@ function estimate_pump_params(;
     )
 end
 
-# ╔═╡ a5e4545e-5110-49d3-8b4a-700352509bd5
-@named testP = Properties.DynamicRefrigerantProps();
-
 # ╔═╡ 42354632-77f6-43cb-8c48-0a65fe3f24a7
 function Pump(; name::Symbol,
         N         = 1.0,        # rotational speed [1/s]
@@ -2120,7 +2108,7 @@ function DynamicPropPump(; name::Symbol,
         N_max = 1.2,        # maximum rotational speed [1/s]
         P_elec_max = 1000.0, # maximum electrical power [W]
         H_max = 20.0,       # maximum head [m]
-        fluid = "water",    # Fluid type
+        fluid = "MEA",    # Fluid type
         χ = 0.0)            # Concentration (for mixtures)
     
     # Define the pump-level parameters for inheritance
@@ -2155,7 +2143,7 @@ function DynamicPropPump(; name::Symbol,
     )
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect properties to the pump
     connect_eqs = [
@@ -2183,7 +2171,7 @@ function DynamicPropBasicPump(; name::Symbol,
     N_max = 1.2 * N,         # Default maximum speed 20% above nominal
     P_elec_max = nothing,    # Default max power, will be calculated if not provided
     H_max = nothing,         # Default max head, will be calculated if not provided
-    fluid = "water",         # Fluid type
+    fluid = "MEA",         # Fluid type
     χ = 0.0)                 # Concentration (for mixtures)
     
     # Calculate pump parameters based on basic info
@@ -2239,7 +2227,7 @@ function test_dynamic_prop_pump()
         K = 0.3,
         φ_BEP = 0.08,
         η_max = 0.85,
-        fluid = "water"
+        fluid = "MEA"
     )
     
     # Set up test conditions
@@ -2280,7 +2268,7 @@ function test_pump_parametric()
     @named pump_base = DynamicPropBasicPump(
         H_shutoff = 12,
         Q_max = 13/3600,
-        fluid = "water"
+        fluid = "MEA"
     )
     
     # Set up the initial system with base conditions
@@ -2330,7 +2318,9 @@ function test_pump_parametric()
 end
 
 # ╔═╡ 75a9b1e0-6b75-4442-8a32-f0e692d1989b
-test_pump_parametric()
+#=╠═╡
+@test test_pump_parametric()
+  ╠═╡ =#
 
 # ╔═╡ cecce7db-5dc5-4c47-a666-af62bfe707a2
 md"""
@@ -2444,7 +2434,7 @@ function test_geothermal_loop()
         Di = 0.032,
         H_shutoff = 12,
         Q_max = 13/3600,
-        fluid = "water"
+        fluid = "MEA"
     )
     
     # Set up test conditions
@@ -2502,7 +2492,7 @@ function analyze_pump_speed_vs_consumption(;
     Di = 0.032,             # Inner diameter [m]
     H_shutoff = 12.0,       # Pump shutoff head [m]
     Q_max = 13/3600,        # Maximum pump flow [m³/s]
-    fluid = "water",        # Fluid type
+    fluid = "MEA",        # Fluid type
     χ = 0.0,                # Concentration
     T_supply = 303.15,      # Supply temperature [K] (30°C)
     T_return = 298.15       # Return temperature [K] (25°C)
@@ -2775,7 +2765,7 @@ function DynamicPropPlateHeatExchanger(; name::Symbol,
                          g = 9.81,       # Gravity [m/s²]
                          Re_low = 2300,  # Lower transition Reynolds number
                          Re_high = 4000, # Upper transition Reynolds number
-                         fluid = "water",
+                         fluid = "MEA",
                          χ = 0.0)        # Concentration (for mixtures)
                       
     # Define the PHX-level parameters for inheritance
@@ -2808,7 +2798,7 @@ function DynamicPropPlateHeatExchanger(; name::Symbol,
     )
     
     # Create the fluid property component
-    @named props = Properties.DynamicIncompressibleProps(fluid=fluid, χ=χ)
+    @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect components
     connect_eqs = [
@@ -2835,7 +2825,7 @@ function test_phx_heat_exchanger()
         np = 20,
         ϕ = 1.118,
         β = 30*π/180,
-        fluid = "water"
+        fluid = "MEA"
     )
     
     # Set up test conditions
@@ -2903,7 +2893,7 @@ function test_phx_parametric()
         W = 0.2, 
         b = 2e-3,
         np = 20,
-        fluid = "water"
+        fluid = "MEA"
     )
     
     # Set up the initial system with base conditions
@@ -2955,7 +2945,9 @@ function test_phx_parametric()
 end
 
 # ╔═╡ 30b031a4-98b6-4a11-a4ed-a74983078a7f
-test_phx_parametric()
+#=╠═╡
+@test test_phx_parametric()
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -5531,7 +5523,6 @@ version = "1.8.1+0"
 # ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
 # ╠═429b8af2-89da-4865-b484-aa9266ad5732
 # ╠═6f95a236-229a-4f68-be72-a8085f3aa025
-# ╠═9a7db941-b8b8-4b81-918b-d86509b589a3
 # ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╟─ff1be30a-fb09-4ecd-884f-3fe44f43cd92
 # ╟─3ca7a788-85b9-466c-89e0-fabd1cf5d0db
@@ -5583,10 +5574,10 @@ version = "1.8.1+0"
 # ╠═76570272-a765-42ed-adec-002bfecbec3e
 # ╠═c79eb2cb-8172-4123-b31b-535ef0f8bd95
 # ╠═06c0b7b0-35af-4f78-992a-7bc538fc280c
-# ╟─800c5c52-94ad-4083-98c9-e7ec42cc70ed
-# ╟─f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
-# ╟─32c32c40-756b-4eae-a123-68e77920c112
-# ╟─5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
+# ╠═800c5c52-94ad-4083-98c9-e7ec42cc70ed
+# ╠═f85b932d-e4a7-4ffa-a9b6-38f7f81a6f74
+# ╠═32c32c40-756b-4eae-a123-68e77920c112
+# ╠═5bdc6ae9-b3ea-473e-a4dd-fe0eada2a9be
 # ╠═db1950c3-3a9e-440d-87d9-141c4d07a8a4
 # ╠═d742e609-3a44-4a61-960b-c2c50f47ba9d
 # ╠═21be2680-3a26-4222-91f0-4dfe01a628ca
@@ -5596,7 +5587,7 @@ version = "1.8.1+0"
 # ╠═4f9b3f95-0ac4-45b4-a5db-7571045f69ac
 # ╠═b3b22def-aacb-4f4b-be4b-83ea2e26f986
 # ╠═003dad93-d071-4f6c-9ea9-7ee455a255fe
-# ╟─c160cc41-cc8d-4b69-9e76-b5a4aed8388c
+# ╠═c160cc41-cc8d-4b69-9e76-b5a4aed8388c
 # ╠═98c19d69-9118-4326-84d4-d9a575c4aac1
 # ╟─c16bf678-742e-4953-b3b6-d298bedfa9e9
 # ╠═14690559-f3a2-4d72-a188-53d859c74602
@@ -5614,14 +5605,13 @@ version = "1.8.1+0"
 # ╠═f8b8b7d9-4788-4fb4-bc60-f98e88109647
 # ╠═ca88f11d-0f9f-406c-8b73-6e399619d135
 # ╠═8ec23851-7775-4b2a-9ca5-c418ff46f5be
-# ╠═a5e4545e-5110-49d3-8b4a-700352509bd5
 # ╠═42354632-77f6-43cb-8c48-0a65fe3f24a7
 # ╠═4f21cf92-9f70-46e5-9f2e-1ccecbf2d0a6
 # ╠═e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
 # ╠═165e8538-776f-4c46-86c2-d43f3bb302e2
 # ╠═0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
 # ╠═75a9b1e0-6b75-4442-8a32-f0e692d1989b
-# ╠═cecce7db-5dc5-4c47-a666-af62bfe707a2
+# ╟─cecce7db-5dc5-4c47-a666-af62bfe707a2
 # ╠═771bc84e-cb07-4be7-a129-5772749dc845
 # ╠═d9f417b2-184e-4f5e-9c3a-9649a6cb4235
 # ╠═f03a950a-78bc-4483-8d25-c926a2a79724
