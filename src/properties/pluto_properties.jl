@@ -49,8 +49,38 @@ using PlutoTest
 # ╔═╡ 1cc60917-e74a-4bc8-a17a-1b14a3aa1379
 using Clapeyron
 
+# ╔═╡ 5205c0aa-1181-42eb-be3c-2ae061548725
+using DifferentialEquations
+
+# ╔═╡ 323f2e35-166f-4dd3-883d-5cb38dbf8006
+using DataFrames
+
+# ╔═╡ 9bb37d87-dbc7-45b0-a60f-6c53db2b87ea
+using NonlinearSolve
+
 # ╔═╡ b4de56ce-04ea-4feb-b580-ea63fd41ce1f
 using Statistics
+
+# ╔═╡ 528344ce-55d5-4d3c-bb57-238e6ef3baf8
+using SteadyStateDiffEq
+
+# ╔═╡ b9467275-45a3-40aa-8c1d-8f76033593a8
+using NLsolve
+
+# ╔═╡ 7a12a191-525a-44b7-a337-f41e1a400f62
+using Sundials
+
+# ╔═╡ 8a6f9ceb-d230-4567-96fb-72ec1f04378d
+using MINPACK
+
+# ╔═╡ 4267931a-0f4b-4ac4-86d9-66878d19c56f
+using SIAMFANLEquations
+
+# ╔═╡ 17c9fce0-f77e-4aa1-8a9a-d9663c8fb257
+using NLSolvers
+
+# ╔═╡ 0379b2ea-9089-460e-b9f0-07adb1f8d429
+using PETSc
 
 # ╔═╡ a8114d21-19e1-46d9-befe-eb62f6de6d24
 # ╠═╡ disabled = true
@@ -75,6 +105,12 @@ using FileIO
 #=╠═╡
 using DuckDB
   ╠═╡ =#
+
+# ╔═╡ f9aa28dc-efe6-43b6-9205-da37eb53c3f3
+
+
+# ╔═╡ 0d42c45e-1b15-4678-b316-e2a3db1e3e22
+
 
 # ╔═╡ 573f2156-b045-4b6b-bacd-ba85626f43b3
 begin
@@ -108,6 +144,13 @@ begin
 	@register_symbolic αf(s::String, V, T)
 	@register_symbolic μJTf(s::String, V, T)
 	@register_symbolic Zf(s::String, V, T)
+
+	
+	VT_pressure = Clapeyron.VT_pressure
+	VT_molar_density = Clapeyron.VT_molar_density
+	VT_mass_density = Clapeyron.VT_mass_density
+	VT_entropy = Clapeyron.VT_entropy
+	VT_enthalpy = Clapeyron.VT_enthalpy
 end
 
 # ╔═╡ 7b034564-0557-402e-80f2-66c2ab692f5a
@@ -331,7 +374,10 @@ function __init__()
 end
 
 # ╔═╡ 3dbe8934-0e13-4bdd-aa9f-5763158e8480
+# ╠═╡ disabled = true
+#=╠═╡
 list_available_fluids()
+  ╠═╡ =#
 
 # ╔═╡ 324144aa-7adc-4014-adc7-fc461bc9d6a1
 # ╠═╡ skip_as_script = true
@@ -450,7 +496,10 @@ using Symbolics
   ╠═╡ =#
 
 # ╔═╡ 76f271b3-2101-4959-b89b-9801e627914e
+# ╠═╡ skip_as_script = true
+#=╠═╡
 @variables symx symT
+  ╠═╡ =#
 
 # ╔═╡ c2edaba8-2eb8-4a60-a2f6-58c1ada4a16a
 # ╠═╡ skip_as_script = true
@@ -491,10 +540,8 @@ function test_incomp()
 	@named constrained_sys = assemble([prop_mea], equations = [prop_mea.T ~ 300.0])
 	simpl_sys = structural_simplify(constrained_sys)
 	prop_props = NonlinearProblem(simpl_sys, [])
-	sol = solve(prop_props)
-	sol[prop_mea.ρ]
 	new_prop = ModelingToolkit.remake(prop_props, p = [prop_mea.χ => 0.4])
-	new_sol = solve(new_prop)
+	new_sol = NonlinearSolve.solve(new_prop)
 	new_sol[prop_mea.ρ] ≈ 930.2481421014649
 	display(new_sol[prop_mea.ρ])# ≈ 930.2481421014649
 end
@@ -504,6 +551,306 @@ end
 #=╠═╡
 test_incomp()
   ╠═╡ =#
+
+# ╔═╡ 0573313d-90ed-401f-a92a-2c489e04cc16
+
+
+# ╔═╡ e60b869c-2153-4ab1-bedf-64f37e3d3653
+
+
+# ╔═╡ 34ad8d6f-2756-4135-a564-8a0099e2067e
+
+
+# ╔═╡ f5575b0c-827a-4ed8-bfcf-2aa45e7840f5
+"""
+    SimpleRefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
+
+A simplified version of RefrigerantProps that focuses only on core thermodynamic properties.
+This reduces potential NaN issues and improves solver convergence by limiting the system complexity.
+"""
+function SimpleRefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
+    # Create the Clapeyron model for the refrigerant
+    model = Clapeyron.SingleFluid(fluid)
+
+    # Create saturation curves with appropriate error handling
+    vP = logrange(1.0, 0.95*model.properties.Pc, length = nP)  # Avoid critical point
+    vVl = zeros(length(vP))
+    vVg = zeros(length(vP))
+    
+    for (i, P) in enumerate(vP)
+        try
+            _, vVl[i], vVg[i] = Clapeyron.saturation_temperature(model, P)
+        catch
+            vVl[i] = NaN
+            vVg[i] = NaN
+        end
+    end
+    
+    valid = .!isnan.(vVl) .&& .!isnan.(vVg)
+    vP = vP[valid]
+    vVl = vVl[valid]
+    vVg = vVg[valid]
+    
+    # Use linear interpolation for better stability
+    Vb_ = DataInterpolations.LinearInterpolation(vVl, vP, extrapolation = ExtrapolationType.Flat)
+    Vd_ = DataInterpolations.LinearInterpolation(vVg, vP, extrapolation = ExtrapolationType.Flat)
+    
+    # Parameters (none needed in this case)
+    pars = @parameters begin
+    end
+    
+    # Variables with reasonable starting points - only core thermodynamic properties
+    vars = @variables begin
+        # Basic thermodynamic state
+        T = 300.0     # [K] - temperature
+        Tb = 300.0    # [K] - bubble temperature
+        Td = 300.0    # [K] - dew temperature
+        p = 1.0e5     # [Pa] - pressure
+        
+        # Material properties
+        Mw = 0.1      # [kg/mol] - molecular weight
+        
+        # Volume properties - essential for (h,p) calculations
+        V = 0.001     # [m³/mol] - molar volume
+        v = 0.001     # [m³/kg] - specific volume
+        Vb = 0.001    # [m³/mol] - bubble point molar volume
+        Vd = 0.1      # [m³/mol] - dew point molar volume
+        
+        # Phase condition
+        X = 0.5       # [-] - vapor quality
+        
+        # Essential energy properties
+        H = 25000.0   # [J/mol] - molar enthalpy
+        Hb = 20000.0  # [J/mol] - bubble point molar enthalpy
+        Hd = 30000.0  # [J/mol] - dew point molar enthalpy
+        h = 250000.0  # [J/kg] - specific enthalpy
+        
+        # Density (for output convenience)
+        ρ = 1000.0    # [kg/m³] - mass density
+    end
+    
+    # Simplified equation set with only essential relationships
+    eqs = [
+        # Material properties
+        Mw ~ model.properties.Mw/1000,
+        
+        # Saturation volumes - with bounded values to avoid extreme results
+        Vb ~ max(1e-5, min(1.0, Vb_(p))),
+        Vd ~ max(1e-4, min(10.0, Vd_(p))),
+        
+        # Core pressure relationship
+        p ~ VT_pressure(model, V, T),
+        
+        # Saturation temperatures (essential for phase determination)
+        p ~ VT_pressure(model, Vb, Tb),
+        p ~ VT_pressure(model, Vd, Td),
+        
+        # Specific volume
+        v ~ V / Mw,
+        
+        # Essential enthalpy relationships
+        H ~ VT_enthalpy(model, V, T),
+        Hb ~ VT_enthalpy(model, Vb, Tb),
+        Hd ~ VT_enthalpy(model, Vd, Td),
+        
+        # Mass-based enthalpy
+        h ~ H / Mw,
+        
+        # Phase relationship - bounded to physical range [0,1]
+        X ~ max(0.0, min(1.0, (H-Hb)/(Hd-Hb))),
+        
+        # Density (for convenience)
+        ρ ~ Mw / V
+    ]
+    
+    return NonlinearSystem(eqs, vars, pars, name=name)
+end
+
+# ╔═╡ 0976e1a7-4cef-43c2-952c-beb236ca78e1
+"""
+    test_simple_ref(solver, h_val=500e3, p_val=1e5; fluid="R134A")
+
+Test function for the simplified refrigerant properties component.
+Focuses on the core thermodynamic properties with improved reliability.
+"""
+function test_simple_ref(solver, h_val=500e3, p_val=1e5; fluid="R134A")
+    @named prop_ref = SimpleRefrigerantProps(fluid=fluid)
+    
+    # Get estimated temperature for better initial guesses
+    model = Clapeyron.SingleFluid(fluid)
+    
+    # Try to estimate initial temperature from saturation
+    T_init = 300.0  # Default fallback
+    try
+        T_sat, _, _ = Clapeyron.saturation_pressure(model, T_init)
+        
+        # If pressure is close to saturation at this temperature, use it
+        if 0.8*p_val < T_sat < 1.2*p_val
+            T_init = T_sat
+        else
+            # Try another approach - very rough approximation
+            if h_val < 300e3  # Likely subcooled
+                T_init = 270.0
+            elseif h_val > 450e3  # Likely superheated
+                T_init = 350.0
+            else  # Likely two-phase
+                T_sat, _, _ = Clapeyron.saturation_temperature(model, p_val)
+                T_init = T_sat
+            end
+        end
+    catch
+        # Keep default
+    end
+    
+    # Create constrained system with custom initial guesses
+    @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ h_val, prop_ref.p ~ p_val])
+    simpl_sys = structural_simplify(constrained_sys)
+    
+    # Set custom initial guesses for key variables
+    u0 = Float64[]
+    
+    # Create a rough initial guess for volume based on h and p
+    V_init = 0.001  # Default small volume (liquid-like)
+    if h_val > 400e3  # If likely gas
+        V_init = 0.05
+    end
+    
+    # Map variables to initial guesses
+    var_guesses = Dict(
+        :T => T_init,
+        :V => V_init,
+        :v => V_init / (model.properties.Mw/1000),
+        :Tb => T_init * 0.95,
+        :Td => T_init * 1.05,
+        :X => clamp((h_val - 250e3) / 200e3, 0.0, 1.0)  # Rough estimate of quality
+    )
+    
+    # Populate initial values for all model variables
+    for var in ModelingToolkit.get_states(simpl_sys)
+        var_name = Symbol(ModelingToolkit.nameof(var))
+        if haskey(var_guesses, var_name)
+            push!(u0, var_guesses[var_name])
+        else
+            # Use default value from the model for other variables
+            idx = findfirst(v -> ModelingToolkit.nameof(v) == ModelingToolkit.nameof(var), 
+                           ModelingToolkit.get_states(prop_ref))
+            if idx !== nothing
+                default_val = ModelingToolkit.get_defaults(prop_ref)[idx]
+                push!(u0, default_val)
+            else
+                push!(u0, 1.0)  # Fallback
+            end
+        end
+    end
+    
+    # Create problem with custom initial values
+    prop_props = NonlinearProblem(simpl_sys, u0)
+    
+    # Add solver options for better convergence
+    sol = NonlinearSolve.solve(prop_props, solver, 
+                              reltol=1e-6,   # Relaxed tolerance
+                              abstol=1e-6,   # Relaxed tolerance
+                              maxiters=1000) # More iterations
+    
+    # Print results in a simplified format
+    println("\nSIMPLIFIED REFRIGERANT PROPERTIES ($fluid)")
+    println("=======================================")
+    
+    # Basic state
+    println("\n-- Basic State --")
+    println("Temperature:         $(sol[prop_ref.T]) K ($(sol[prop_ref.T]-273.15) °C)")
+    println("Bubble Temperature:  $(sol[prop_ref.Tb]) K ($(sol[prop_ref.Tb]-273.15) °C)")
+    println("Dew Temperature:     $(sol[prop_ref.Td]) K ($(sol[prop_ref.Td]-273.15) °C)")
+    println("Pressure:            $(sol[prop_ref.p]) Pa ($(sol[prop_ref.p]/1e5) bar)")
+    println("Vapor quality:       $(sol[prop_ref.X])")
+    
+    # Volume properties
+    println("\n-- Volume and Density --")
+    println("Molar volume:        $(sol[prop_ref.V]) m³/mol")
+    println("Specific volume:     $(sol[prop_ref.v]) m³/kg")
+    println("Mass density:        $(sol[prop_ref.ρ]) kg/m³")
+    
+    # Enthalpy properties
+    println("\n-- Enthalpy Properties --")
+    println("Specific enthalpy:   $(sol[prop_ref.h]) J/kg")
+    println("Molar enthalpy:      $(sol[prop_ref.H]) J/mol")
+    println("Bubble enthalpy:     $(sol[prop_ref.Hb]) J/mol")
+    println("Dew enthalpy:        $(sol[prop_ref.Hd]) J/mol")
+    
+    return sol
+end
+
+# ╔═╡ 60318174-9f9c-49d7-b030-626218b36ad8
+"""
+    safetest_simple(solver, h_val, p_val; fluid="R134A")
+
+Test if a solver successfully converges using the simplified refrigerant model.
+Returns true if the solver converges, false otherwise.
+"""
+function safetest_simple(solver, h_val, p_val; fluid="R134A")
+    res = try 
+        @named prop_ref = SimpleRefrigerantProps(fluid=fluid)
+        @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ h_val, prop_ref.p ~ p_val])
+        simpl_sys = structural_simplify(constrained_sys)
+        
+        # Create better initial guesses
+        model = Clapeyron.SingleFluid(fluid)
+        
+        # Create a rough initial guess for volume based on h and p
+        V_init = 0.001  # Default small volume (liquid-like)
+        if h_val > 400e3  # If likely gas
+            V_init = 0.05
+        end
+        
+        # Try to estimate initial temperature
+        T_init = 300.0
+        try
+            T_sat, _, _ = Clapeyron.saturation_temperature(model, p_val)
+            T_init = T_sat
+        catch
+            # Keep default
+        end
+        
+        # Set initial values explicitly
+        u0 = [
+            T_init,          # T
+            T_init * 0.95,   # Tb
+            T_init * 1.05,   # Td
+            p_val,           # p
+            model.properties.Mw/1000,  # Mw
+            V_init,          # V
+            V_init / (model.properties.Mw/1000),  # v
+            V_init * 0.5,    # Vb
+            V_init * 2.0,    # Vd
+            0.5,             # X
+            h_val * (model.properties.Mw/1000),  # H
+            h_val * 0.7 * (model.properties.Mw/1000),  # Hb
+            h_val * 1.3 * (model.properties.Mw/1000),  # Hd
+            h_val,           # h
+            (model.properties.Mw/1000) / V_init  # ρ
+        ]
+        
+        prop_props = NonlinearProblem(simpl_sys, u0)
+        sol = NonlinearSolve.solve(prop_props, solver,
+                                  reltol=1e-6,
+                                  abstol=1e-6,
+                                  maxiters=1000)
+        SciMLBase.successful_retcode(sol)
+    catch e
+        println("Error with solver $(typeof(solver)): $e")
+        false
+    end
+    return res
+end
+
+# ╔═╡ b47539a1-4979-4d95-9112-30efadb06648
+
+
+# ╔═╡ 370cd675-3c41-4f51-b0ca-a990bf2d6580
+
+
+# ╔═╡ a2f5d59c-222e-44bf-b451-c998bd1936a2
+
 
 # ╔═╡ 98d5f72c-c40f-4b73-819f-a68e54caae09
 function RefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
@@ -573,6 +920,9 @@ function RefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
         ΔHv = 20000.0 # [J/mol] - molar enthalpy of vaporization
         Cpb = 100.0   # [J/(mol·K)] - bubble point molar heat capacity
         Cpd = 100.0   # [J/(mol·K)] - dew point molar heat capacity
+
+		hb = 250e3
+		hd = 250e3
         
         # Mass thermodynamic properties
         s = 1000.0    # [J/(kg·K)] - specific entropy
@@ -619,9 +969,9 @@ function RefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
         Vd ~ Vd_(p),
         
         # Pressure relationship
-        p ~ Clapeyron.VT_pressure(model, V, T),
-        p ~ Clapeyron.VT_pressure(model, Vd, Td), #implicit eq for determining Td
-        p ~ Clapeyron.VT_pressure(model, Vb, Tb), #implicit eq for determining Tb
+        p ~ VT_pressure(model, V, T),
+        p ~ VT_pressure(model, Vd, Td), #implicit eq for determining Td
+        p ~ VT_pressure(model, Vb, Tb), #implicit eq for determining Tb
         
         # Specific volumes
         v ~ V / Mw,
@@ -629,19 +979,22 @@ function RefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
         vd ~ Vd / Mw,
         
         # Molar thermodynamic properties
-        S ~ Clapeyron.VT_entropy(model, V, T),
+        S ~ VT_entropy(model, V, T),
         U ~ Uf(fluid, V, T),
-        H ~ Clapeyron.VT_enthalpy(model, V, T),
+        H ~ VT_enthalpy(model, V, T),
         A ~ Af(fluid, V, T),
         G ~ Gf(fluid, V, T),
         Cp ~ Cpf(fluid, V, T),
         
         # Phase-specific molar properties
-        Hb ~ Clapeyron.VT_enthalpy(model, Vb, T),
-        Hd ~ Clapeyron.VT_enthalpy(model, Vd, T),
+        Hb ~ VT_enthalpy(model, Vb, Tb),
+        Hd ~ VT_enthalpy(model, Vd, Td),
         ΔHv ~ Hd - Hb,
         Cpb ~ Cpf(fluid, Vb, T),
         Cpd ~ Cpf(fluid, Vd, T),
+
+		hb ~ Hb/Mw,
+		hd ~ Hd/Mw,
         
         # Phase relationship
         X ~ (H-Hb)/ΔHv,
@@ -659,12 +1012,12 @@ function RefrigerantProps(; name::Symbol, fluid="R134A", nP = 300)
         cpd ~ Cpd / Mw,
         
         # Density properties
-        ρ_mol ~ Clapeyron.VT_molar_density(model, V, T),
-        ρ ~ Clapeyron.VT_mass_density(model, V, T),
-        ρ_mold ~ Clapeyron.VT_molar_density(model, Vd, T),
-        ρd ~ Clapeyron.VT_mass_density(model, Vd, T),
-        ρ_molb ~ Clapeyron.VT_molar_density(model, Vb, T),
-        ρb ~ Clapeyron.VT_mass_density(model, Vb, T),
+        ρ_mol ~ VT_molar_density(model, V, T),
+        ρ ~ VT_mass_density(model, V, T),
+        ρ_mold ~ VT_molar_density(model, Vd, T),
+        ρd ~ VT_mass_density(model, Vd, T),
+        ρ_molb ~ VT_molar_density(model, Vb, T),
+        ρb ~ VT_mass_density(model, Vb, T),
         
         # Transport properties - general
         λ ~ λf(fluid, p, T),
@@ -695,12 +1048,12 @@ end
 # ╔═╡ 81b0f187-842d-4719-8949-1d76344f44d9
 # ╠═╡ skip_as_script = true
 #=╠═╡
-function test_ref()
+function test_ref(solver, h_val=500e3, p_val=1e5)
     @named prop_ref = RefrigerantProps()
-    @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ 500e3, prop_ref.p ~ 1e5])
+    @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ h_val, prop_ref.p ~ p_val])
     simpl_sys = structural_simplify(constrained_sys)
     prop_props = NonlinearProblem(simpl_sys, [])
-    sol = solve(prop_props)
+    sol = NonlinearSolve.solve(prop_props, solver)
     
     # Print results in a simple format
     println("\nREFRIGERANT PROPERTIES (R134A)")
@@ -758,6 +1111,8 @@ function test_ref()
     println("Specific entropy:          $(sol[prop_ref.s]) J/(kg·K)")
     println("Specific internal energy:  $(sol[prop_ref.u]) J/kg")
     println("Specific enthalpy:         $(sol[prop_ref.h]) J/kg")
+    println("Specific dew enthalpy:         $(sol[prop_ref.hd]) J/kg")
+    println("Specific bub enthalpy:         $(sol[prop_ref.hb]) J/kg")
     println("Specific Helmholtz energy: $(sol[prop_ref.a]) J/kg")
     println("Specific Gibbs energy:     $(sol[prop_ref.g]) J/kg")
     println("Specific heat capacity:    $(sol[prop_ref.cp]) J/(kg·K)")
@@ -796,9 +1151,399 @@ function test_ref()
 end
   ╠═╡ =#
 
-# ╔═╡ d8be97a1-b13c-498b-9391-63ed47e104df
+# ╔═╡ 25f56f52-58e5-4b78-9749-5aba8158b453
 #=╠═╡
-test_ref()
+function safetest(solver, h, p)
+	res = try test_ref(solver, h, p).resid
+		catch
+			res = NaN
+	end
+	return res
+end
+  ╠═╡ =#
+
+# ╔═╡ 53712fde-61f9-4b43-84cb-ebdeefea30d7
+#=╠═╡
+test_ref(KINSOL(), 300e3, 1e5).retcode
+  ╠═╡ =#
+
+# ╔═╡ c9bf0465-7f8a-4967-ac2b-af63fe2d6057
+#=╠═╡
+test_ref(KINSOL(), 100e3, 1e5).retcode
+  ╠═╡ =#
+
+# ╔═╡ df3fc0e4-0265-4153-824d-1d0e2abe00b0
+#=╠═╡
+test_ref(SIAMFANLEquationsJL(), 350e3, 30e5).retcode
+  ╠═╡ =#
+
+# ╔═╡ 8dfbb123-fb4b-450c-a74a-c37997726d25
+"""
+    extract_property_values(result_dict, property; filter_status=:success)
+
+Extract all values for a specific property from the result dictionary.
+
+# Arguments
+- `result_dict`: Result dictionary from compare_solvers
+- `property`: Symbol of the property to extract
+- `filter_status`: Only extract values with this status (:success, :warning, or :any)
+
+# Returns
+- Dictionary mapping solver names to property values
+"""
+function extract_property_values(result_dict, property; filter_status=:success)
+    values_dict = Dict()
+    
+    for (solver_name, props) in result_dict
+        if haskey(props, property)
+            status, value = props[property]
+            
+            if filter_status == :any || status == filter_status
+                values_dict[solver_name] = value
+            end
+        end
+    end
+    
+    return values_dict
+end
+
+# ╔═╡ fc6206b0-10e7-4cd0-bc2b-2dc623ed2a80
+"""
+    best_solvers_for_property(df, property; min_success_rate=0.5)
+
+Find the best solvers for a specific property.
+
+# Arguments
+- `df`: DataFrame from compare_solvers
+- `property`: Symbol of the property to analyze
+- `min_success_rate`: Minimum overall success rate for a solver to be considered
+
+# Returns
+- Array of solver names that successfully calculate this property
+"""
+function best_solvers_for_property(df, property; min_success_rate=0.5)
+    # Filter solvers with good overall performance
+    good_solvers = df[df.Success_Rate .>= min_success_rate, :]
+    
+    # Find solvers that succeeded with this specific property
+    property_solvers = good_solvers[good_solvers[:, Symbol(property)] .== "✓", :]
+    
+    return property_solvers.Solver
+end
+
+# ╔═╡ f81a039d-d1d3-4a15-ad22-502aa1826168
+candidate_solvers = [
+    NewtonRaphson(),
+    NonlinearSolve.TrustRegion(),
+    LevenbergMarquardt(),
+    PseudoTransient(),
+    RobustMultiNewton(),
+    FastShortcutNonlinearPolyalg(),
+    Broyden(),
+    Klement(),
+    LimitedMemoryBroyden(),
+    SimpleNewtonRaphson(),
+    SimpleBroyden(),
+    SimpleLimitedMemoryBroyden(),
+    SimpleKlement(),
+    SimpleTrustRegion(),
+    SimpleDFSane(),
+    SimpleHalley(),
+    DynamicSS(),
+    SSRootfind(),#
+    NLsolveJL(method=:anderson),#
+    NLsolveJL(method=:newton),#
+    CMINPACK(method=:hybr),
+    CMINPACK(method=:lm),
+    CMINPACK(method=:lmdif),
+    CMINPACK(method=:hybrd),
+    KINSOL(linear_solver = :Dense),
+    KINSOL(linear_solver = :Band),
+    KINSOL(linear_solver = :LapackDense),
+    KINSOL(linear_solver = :GMRES),
+    KINSOL(linear_solver = :BCG),
+    KINSOL(linear_solver = :PCG),
+    KINSOL(linear_solver = :TFQMR),
+    KINSOL(linear_solver = :KLU),
+    KINSOL(),
+    SIAMFANLEquationsJL(),
+    #NLSolversJL(),
+    #PETScSNES(),
+]
+
+# ╔═╡ b7b6e978-0d40-4615-8a84-47d42cf02791
+#=╠═╡
+"""
+    compare_models(h_val=500e3, p_val=1e5; fluid="R134A")
+
+Compare the success rate of solvers between the full and simplified refrigerant models.
+Returns a DataFrame showing the comparison.
+"""
+function compare_models(h_val=500e3, p_val=1e5; fluid="R134A")
+    results = DataFrame(
+        Solver = String[],
+        Full_Model = Bool[],
+        Simple_Model = Bool[]
+    )
+    
+    for solver in candidate_solvers
+        solver_name = string(typeof(solver))
+        
+        # Test with full model
+        full_success = safetest(solver, h_val, p_val)
+        
+        # Test with simplified model
+        simple_success = safetest_simple(solver, h_val, p_val, fluid=fluid)
+        
+        # Make sure these are boolean values
+        full_success = full_success === true
+        simple_success = simple_success === true
+        
+        push!(results, (solver_name, full_success, simple_success))
+    end
+    
+    # Calculate improvement statistics
+    failed_full = count(.!results.Full_Model)
+    failed_simple = count(.!results.Simple_Model)
+    improved = count((!f) && s for (f, s) in zip(results.Full_Model, results.Simple_Model))
+    
+    println("Simplified model improved $(improved) out of $(failed_full) previously failing solvers")
+    println("Total solvers that still fail: $(failed_simple) out of $(nrow(results))")
+    
+    return results
+end
+  ╠═╡ =#
+
+# ╔═╡ 5b14def3-2ed0-41ec-a788-a6b26897dccc
+#=╠═╡
+compare_models(500e3, 1e5; fluid="R134A")
+  ╠═╡ =#
+
+# ╔═╡ 0c4b3fcc-1ead-484f-a0f1-5cb334b19ccb
+"""
+    compare_solvers(h_val=500e3, p_val=1e5; 
+                    solvers=candidate_solvers, 
+                    properties=[:T, :ρ, :cp, :λ, :η, :c, :γ, :Z, :μJT, :α, :X])
+
+Generate a DataFrame comparing solver performance across different thermophysical properties.
+
+# Arguments
+- `h_val`: Enthalpy value in J/kg for testing (default: 500e3)
+- `p_val`: Pressure value in Pa for testing (default: 1e5)
+- `solvers`: Array of solvers to test (default: candidate_solvers)
+- `properties`: Array of property symbols to test (default: common properties)
+
+# Returns
+- `DataFrame`: A DataFrame with solver performance for each property
+    - Green checkmark (✓) indicates successful calculation
+    - Red cross (✗) indicates failed calculation
+    - Yellow warning (⚠) indicates calculation with warnings
+- `result_dict`: Dictionary containing the actual values and errors for detailed inspection
+"""
+function compare_solvers(h_val=500e3, p_val=1e5; 
+                         solvers=candidate_solvers, 
+                         properties=[:T, :ρ, :cp, :λ, :η, :c, :γ, :Z, :μJT, :α, :X])
+    
+    # Create result storage
+    result_dict = Dict()
+    
+    # Initialize DataFrame with solver names as row names
+    df = DataFrame(Solver = [string(typeof(s)) for s in solvers])
+    
+    # Add columns for each property
+    for prop in properties
+        df[!, Symbol(prop)] = fill("", length(solvers))
+    end
+    
+    # Add a success rate column
+    df[!, :Success_Rate] = zeros(Float64, length(solvers))
+    
+    # Process each solver
+    for (i, solver) in enumerate(solvers)
+        successful_props = 0
+        solver_name = string(typeof(solver))
+        result_dict[solver_name] = Dict()
+        
+        # Create the refrigerant system with the specified solver
+        try
+            @named prop_ref = RefrigerantProps()
+            @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ h_val, prop_ref.p ~ p_val])
+            simpl_sys = structural_simplify(constrained_sys)
+            prop_props = NonlinearProblem(simpl_sys, [])
+            
+            # Try to solve the system
+            sol = try
+                NonlinearSolve.solve(prop_props, solver)
+            catch e
+                # If solver fails completely, mark all properties as failed
+                for prop in properties
+                    df[i, Symbol(prop)] = "✗"
+                    result_dict[solver_name][prop] = (:error, e)
+                end
+                continue
+            end
+            
+            # Check solution status
+            if SciMLBase.successful_retcode(sol)
+                # Check each requested property
+                for prop in properties
+                    # Try to access the property from the solution
+                    try
+                        prop_val = sol[getproperty(prop_ref, prop)]
+                        
+                        # Check if the value is reasonable (not NaN, not Inf)
+                        if isnan(prop_val) || isinf(prop_val)
+                            df[i, Symbol(prop)] = "⚠"
+                            result_dict[solver_name][prop] = (:warning, prop_val)
+                        else
+                            df[i, Symbol(prop)] = "✓"
+                            result_dict[solver_name][prop] = (:success, prop_val)
+                            successful_props += 1
+                        end
+                    catch e
+                        df[i, Symbol(prop)] = "✗"
+                        result_dict[solver_name][prop] = (:error, e)
+                    end
+                end
+            else
+                # Solution found but with warnings
+                for prop in properties
+                    try
+                        prop_val = sol[getproperty(prop_ref, prop)]
+                        
+                        # Even with warning, if we got reasonable values, mark them
+                        if !isnan(prop_val) && !isinf(prop_val)
+                            df[i, Symbol(prop)] = "⚠"
+                            result_dict[solver_name][prop] = (:warning, prop_val)
+                            successful_props += 0.5  # Count warnings as partial success
+                        else
+                            df[i, Symbol(prop)] = "✗"
+                            result_dict[solver_name][prop] = (:error, prop_val)
+                        end
+                    catch e
+                        df[i, Symbol(prop)] = "✗"
+                        result_dict[solver_name][prop] = (:error, e)
+                    end
+                end
+            end
+        catch e
+            # If setting up the system fails, mark all properties as failed
+            for prop in properties
+                df[i, Symbol(prop)] = "✗"
+                result_dict[solver_name][prop] = (:error, e)
+            end
+        end
+        
+        # Calculate success rate for this solver
+        df[i, :Success_Rate] = successful_props / length(properties)
+    end
+    
+    # Sort by success rate
+    sort!(df, :Success_Rate, rev=true)
+    
+    return df, result_dict
+end
+
+# ╔═╡ bd5d219c-c72b-471c-bd07-f797e3fcb991
+# ╠═╡ disabled = true
+#=╠═╡
+"""
+    property_success_matrix(h_val=500e3, p_val=1e5; test_ranges=true)
+
+Generate a more comprehensive comparison across different enthalpy and pressure values.
+Useful for identifying solvers that work well across a range of conditions.
+
+# Arguments
+- `h_val`: Base enthalpy value in J/kg (default: 500e3)
+- `p_val`: Base pressure value in Pa (default: 1e5)
+- `test_ranges`: If true, tests multiple points in the h-p space
+
+# Returns
+- `DataFrame`: A summary DataFrame with overall solver performance
+"""
+function property_success_matrix(h_val=500e3, p_val=1e5; test_ranges=true)
+    if !test_ranges
+        df, _ = compare_solvers(h_val, p_val)
+        return df
+    end
+    
+    # Define test points for h and p
+    h_values = [100e3, 300e3, 500e3, 700e3]
+    p_values = [0.5e5, 1e5, 5e5, 10e5]
+    
+    # Initialize the summary DataFrame
+    summary_df = DataFrame(Solver = [string(typeof(s)) for s in candidate_solvers])
+    
+    for h in h_values
+        for p in p_values
+            # Get the test point name
+            point_name = "h$(round(Int, h/1000))k_p$(round(Int, p/1e5))bar"
+            
+            # Run the comparison
+            df, _ = compare_solvers(h, p)
+            
+            # Add the success rate for this test point
+            summary_df[!, Symbol(point_name)] = zeros(Float64, nrow(summary_df))
+            
+            # Map solver names to their success rates
+            success_map = Dict(zip(df.Solver, df.Success_Rate))
+            
+            # Update the summary DataFrame
+            for (i, solver) in enumerate(summary_df.Solver)
+                if haskey(success_map, solver)
+                    summary_df[i, Symbol(point_name)] = success_map[solver]
+                else
+                    summary_df[i, Symbol(point_name)] = 0.0
+                end
+            end
+        end
+    end
+    
+    # Add an overall average success rate
+    property_cols = [col for col in names(summary_df) if col != "Solver"]
+    summary_df[!, :Overall_Success] = [mean(row[property_cols]) for row in eachrow(summary_df)]
+    
+    # Sort by overall success rate
+    sort!(summary_df, :Overall_Success, rev=true)
+    
+    return summary_df
+end
+  ╠═╡ =#
+
+# ╔═╡ d5e187ad-60f8-4e42-a348-d1923be9b305
+# Basic comparison at a single point
+df, results = compare_solvers(500e3, 1e5, solvers=candidate_solvers)
+
+# See which solvers work best for calculating thermal conductivity
+
+# ╔═╡ 0def9c0d-dab1-48ea-9b96-160bcb77d82a
+better_candidates = [
+    #NLsolveJL(method=:anderson),#
+    NLsolveJL(method=:newton),#
+    KINSOL(linear_solver = :Dense),
+    KINSOL(linear_solver = :LapackDense),
+]
+
+# ╔═╡ 93450e36-f875-4b0f-8881-ae972ee9493c
+#=╠═╡
+test_ref(NLsolveJL(method=:newton), 150e3, 30e5).retcode
+  ╠═╡ =#
+
+# ╔═╡ 0663f91a-721e-4ee6-91e5-b4b0085c0e45
+# Basic comparison at a single point
+df_2, results_2 = compare_solvers(500e3, 30e5, solvers=better_candidates)
+
+# See which solvers work best for calculating thermal conductivity
+
+# ╔═╡ 7685d6d5-bd2f-4a65-bcb5-7023219dd26b
+# ╠═╡ disabled = true
+#=╠═╡
+comprehensive_df = property_success_matrix()
+  ╠═╡ =#
+
+# ╔═╡ 82e20fda-5d9a-43c7-b61e-720cbd5cf499
+#=╠═╡
+comprehensive_df
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -808,18 +1553,24 @@ Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
 CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
-DuckDB = "d2f5444f-75bc-4fdf-ac35-56f514c445e1"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 EntropyScaling = "36a13073-9e6e-4b19-b12b-cb530e79ee8e"
-FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+MINPACK = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-Parquet = "626c502c-15b0-58ad-a749-f091afb673ae"
+NLSolvers = "337daf1e-9722-11e9-073e-8b9effe078ba"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
 StaticPolynomials = "62e018b1-6e46-5407-a5a7-97d4fbcae734"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
+Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
@@ -827,16 +1578,22 @@ Clapeyron = "~0.6.12"
 CoolProp = "~0.2.1"
 DataFrames = "~1.7.0"
 DataInterpolations = "~8.0.1"
-DuckDB = "~1.3.0"
+DifferentialEquations = "~7.16.1"
 EntropyScaling = "~0.3.2"
-FileIO = "~1.17.0"
 JSON3 = "~1.14.3"
+MINPACK = "~1.3.0"
 ModelingToolkit = "~9.78.0"
-Parquet = "~0.8.5"
+NLSolvers = "~0.5.0"
+NLsolve = "~4.5.1"
+NonlinearSolve = "~4.9.0"
+PETSc = "~0.3.1"
 Plots = "~1.40.13"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
+SIAMFANLEquations = "~1.0.2"
 StaticPolynomials = "~1.3.7"
+SteadyStateDiffEq = "~2.5.0"
+Sundials = "~4.28.0"
 Symbolics = "~6.41.0"
 """
 
@@ -846,7 +1603,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "82189a927c5c0ff37e1dac6aeddf2ca99bd89984"
+project_hash = "8b8e1f5597ca0ec0d572b9a9bf91fe00bc87b7f7"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -858,6 +1615,17 @@ weakdeps = ["ChainRulesCore", "ConstructionBase", "EnzymeCore"]
     ADTypesChainRulesCoreExt = "ChainRulesCore"
     ADTypesConstructionBaseExt = "ConstructionBase"
     ADTypesEnzymeCoreExt = "EnzymeCore"
+
+[[deps.AbstractFFTs]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.5.0"
+weakdeps = ["ChainRulesCore", "Test"]
+
+    [deps.AbstractFFTs.extensions]
+    AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+    AbstractFFTsTestExt = "Test"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -904,6 +1672,12 @@ deps = ["PtrArrays", "Random"]
 git-tree-sha1 = "9876e1e164b144ca45e9e3198d0b689cadfed9ff"
 uuid = "66dad0bd-aa9a-41b7-9441-69ab47430ed8"
 version = "1.1.3"
+
+[[deps.AlmostBlockDiagonals]]
+deps = ["ConcreteStructs"]
+git-tree-sha1 = "743abe5e5fe8cff96dad4123f263c0d8eee281c0"
+uuid = "a95523ee-d6da-40b5-98cc-27bc505739d5"
+version = "0.1.10"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -961,6 +1735,20 @@ weakdeps = ["SparseArrays"]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
 
+[[deps.BandedMatrices]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "PrecompileTools"]
+git-tree-sha1 = "e35c672b239c5105f597963c33e740eeb46cf0ab"
+uuid = "aae01518-5342-5314-be14-df237901396f"
+version = "1.9.4"
+
+    [deps.BandedMatrices.extensions]
+    BandedMatricesSparseArraysExt = "SparseArrays"
+    CliqueTreesExt = "CliqueTrees"
+
+    [deps.BandedMatrices.weakdeps]
+    CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
@@ -974,12 +1762,6 @@ version = "0.1.10"
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
 version = "0.1.9"
-
-[[deps.BitIntegers]]
-deps = ["Random"]
-git-tree-sha1 = "f98cfeaba814d9746617822032d50a31c9926604"
-uuid = "c3b6d118-76ef-56ca-8cc7-ebb389d030a1"
-version = "0.3.5"
 
 [[deps.BitTwiddlingConvenienceFunctions]]
 deps = ["Static"]
@@ -1002,14 +1784,59 @@ deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
 git-tree-sha1 = "a8c0f363186263d75e97a41878d10dd842797561"
 uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 version = "1.6.3"
+weakdeps = ["Adapt", "BandedMatrices"]
 
     [deps.BlockArrays.extensions]
     BlockArraysAdaptExt = "Adapt"
     BlockArraysBandedMatricesExt = "BandedMatrices"
 
-    [deps.BlockArrays.weakdeps]
-    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+[[deps.BoundaryValueDiffEq]]
+deps = ["ADTypes", "BoundaryValueDiffEqAscher", "BoundaryValueDiffEqCore", "BoundaryValueDiffEqFIRK", "BoundaryValueDiffEqMIRK", "BoundaryValueDiffEqMIRKN", "BoundaryValueDiffEqShooting", "DiffEqBase", "FastClosures", "ForwardDiff", "LinearAlgebra", "Reexport", "SciMLBase"]
+git-tree-sha1 = "d6ec33e4516b2e790a64128afdb54f3b536667a7"
+uuid = "764a87c0-6b3e-53db-9096-fe964310641d"
+version = "5.18.0"
+
+    [deps.BoundaryValueDiffEq.extensions]
+    BoundaryValueDiffEqODEInterfaceExt = "ODEInterface"
+
+    [deps.BoundaryValueDiffEq.weakdeps]
+    ODEInterface = "54ca160b-1b9f-5127-a996-1867f4bc2a2c"
+
+[[deps.BoundaryValueDiffEqAscher]]
+deps = ["ADTypes", "AlmostBlockDiagonals", "BoundaryValueDiffEqCore", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastClosures", "ForwardDiff", "LinearAlgebra", "PreallocationTools", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield"]
+git-tree-sha1 = "64a777e06d995f677c86c7ddbb85f393074a0877"
+uuid = "7227322d-7511-4e07-9247-ad6ff830280e"
+version = "1.7.0"
+
+[[deps.BoundaryValueDiffEqCore]]
+deps = ["ADTypes", "Adapt", "ArrayInterface", "ConcreteStructs", "DiffEqBase", "ForwardDiff", "LineSearch", "LinearAlgebra", "Logging", "NonlinearSolveFirstOrder", "PreallocationTools", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "SparseArrays", "SparseConnectivityTracer", "SparseMatrixColorings"]
+git-tree-sha1 = "c83bf97da90dd379b1e3f4d9c6f3d0ae48eb0b29"
+uuid = "56b672f2-a5fe-4263-ab2d-da677488eb3a"
+version = "1.10.0"
+
+[[deps.BoundaryValueDiffEqFIRK]]
+deps = ["ADTypes", "ArrayInterface", "BandedMatrices", "BoundaryValueDiffEqCore", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastAlmostBandedMatrices", "FastClosures", "ForwardDiff", "LinearAlgebra", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "SparseArrays"]
+git-tree-sha1 = "e58ee9acfc6dce6dcc368fc0483952bec5625513"
+uuid = "85d9eb09-370e-4000-bb32-543851f73618"
+version = "1.8.1"
+
+[[deps.BoundaryValueDiffEqMIRK]]
+deps = ["ADTypes", "ArrayInterface", "BandedMatrices", "BoundaryValueDiffEqCore", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastAlmostBandedMatrices", "FastClosures", "ForwardDiff", "LinearAlgebra", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "SparseArrays"]
+git-tree-sha1 = "43debeee94167e2dc744f4a385213c4f0d16b4c3"
+uuid = "1a22d4ce-7765-49ea-b6f2-13c8438986a6"
+version = "1.8.1"
+
+[[deps.BoundaryValueDiffEqMIRKN]]
+deps = ["ADTypes", "ArrayInterface", "BandedMatrices", "BoundaryValueDiffEqCore", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastAlmostBandedMatrices", "FastClosures", "ForwardDiff", "LinearAlgebra", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "SparseArrays"]
+git-tree-sha1 = "1d92c9f7567b627514e143a3caf93af6d235c2db"
+uuid = "9255f1d6-53bf-473e-b6bd-23f1ff009da4"
+version = "1.7.1"
+
+[[deps.BoundaryValueDiffEqShooting]]
+deps = ["ADTypes", "ArrayInterface", "BandedMatrices", "BoundaryValueDiffEqCore", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastAlmostBandedMatrices", "FastClosures", "ForwardDiff", "LinearAlgebra", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "SparseArrays"]
+git-tree-sha1 = "1460c449c91c9bc4c8fb08fb5e878811ab38d667"
+uuid = "ed55bfe0-3725-4db6-871e-a1dc9f42a757"
+version = "1.8.1"
 
 [[deps.BracketingNonlinearSolve]]
 deps = ["CommonSolve", "ConcreteStructs", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase"]
@@ -1054,19 +1881,6 @@ deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jl
 git-tree-sha1 = "fde3bf89aead2e723284a8ff9cdf5b551ed700e8"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.5+0"
-
-[[deps.CategoricalArrays]]
-deps = ["DataAPI", "Future", "Missings", "Printf", "Requires", "Statistics", "Unicode"]
-git-tree-sha1 = "1568b28f91293458345dabba6a5ea3f183250a61"
-uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
-version = "0.10.8"
-weakdeps = ["JSON", "RecipesBase", "SentinelArrays", "StructTypes"]
-
-    [deps.CategoricalArrays.extensions]
-    CategoricalArraysJSONExt = "JSON"
-    CategoricalArraysRecipesBaseExt = "RecipesBase"
-    CategoricalArraysSentinelArraysExt = "SentinelArrays"
-    CategoricalArraysStructTypesExt = "StructTypes"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -1119,12 +1933,6 @@ deps = ["TranscodingStreams", "Zlib_jll"]
 git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.8"
-
-[[deps.CodecZstd]]
-deps = ["TranscodingStreams", "Zstd_jll"]
-git-tree-sha1 = "d0073f473757f0d39ac9707f1eb03b431573cbd8"
-uuid = "6b39b394-51ab-5f42-8807-6242bab2b4c2"
-version = "0.8.6"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
@@ -1270,11 +2078,6 @@ git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.1"
 
-[[deps.DBInterface]]
-git-tree-sha1 = "a444404b3f94deaa43ca2a58e18153a82695282b"
-uuid = "a10d1c49-ce27-4219-8d33-6db1a4562965"
-version = "2.6.1"
-
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -1327,10 +2130,11 @@ git-tree-sha1 = "473e9afc9cf30814eb67ffa5f2db7df82c3ad9fd"
 uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
 
-[[deps.Decimals]]
-git-tree-sha1 = "e98abef36d02a0ec385d68cd7dadbce9b28cbd88"
-uuid = "abce61dc-4473-55a0-ba07-351d65e31d42"
-version = "0.4.1"
+[[deps.DelayDiffEq]]
+deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "LinearAlgebra", "Logging", "OrdinaryDiffEq", "OrdinaryDiffEqCore", "OrdinaryDiffEqDefault", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "OrdinaryDiffEqRosenbrock", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SimpleUnPack", "SymbolicIndexingInterface"]
+git-tree-sha1 = "8b416f6b1f9ef8df4c13dd0fe6c191752722b36f"
+uuid = "bcd4f6db-9728-5f36-b5f7-82caef46ccdb"
+version = "5.53.1"
 
 [[deps.DelimitedFiles]]
 deps = ["Mmap"]
@@ -1406,6 +2210,12 @@ git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "1.15.1"
 
+[[deps.DifferentialEquations]]
+deps = ["BoundaryValueDiffEq", "DelayDiffEq", "DiffEqBase", "DiffEqCallbacks", "DiffEqNoiseProcess", "JumpProcesses", "LinearAlgebra", "LinearSolve", "NonlinearSolve", "OrdinaryDiffEq", "Random", "RecursiveArrayTools", "Reexport", "SciMLBase", "SteadyStateDiffEq", "StochasticDiffEq", "Sundials"]
+git-tree-sha1 = "afdc7dfee475828b4f0286d63ffe66b97d7a3fa7"
+uuid = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+version = "7.16.1"
+
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
 git-tree-sha1 = "8b9f605f582f633eeb9c3ec14effaed2dca6ef5c"
@@ -1467,6 +2277,17 @@ weakdeps = ["ChainRulesCore", "EnzymeCore"]
     DispatchDoctorChainRulesCoreExt = "ChainRulesCore"
     DispatchDoctorEnzymeCoreExt = "EnzymeCore"
 
+[[deps.Distances]]
+deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
+git-tree-sha1 = "c7e3a542b999843086e2f29dac96a618c105be1d"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.12"
+weakdeps = ["ChainRulesCore", "SparseArrays"]
+
+    [deps.Distances.extensions]
+    DistancesChainRulesCoreExt = "ChainRulesCore"
+    DistancesSparseArraysExt = "SparseArrays"
+
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -1509,18 +2330,6 @@ version = "0.7.15"
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.6.0"
-
-[[deps.DuckDB]]
-deps = ["DBInterface", "Dates", "DuckDB_jll", "FixedPointDecimals", "Tables", "UUIDs", "WeakRefStrings"]
-git-tree-sha1 = "f7ae2a72cc440fa20fb3e5313e205a8af7406037"
-uuid = "d2f5444f-75bc-4fdf-ac35-56f514c445e1"
-version = "1.3.0"
-
-[[deps.DuckDB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "7dfe7934673f5acb149374aa78459fa6cc91b84d"
-uuid = "2cbbab25-fc8b-58cf-88d4-687a02676033"
-version = "1.3.0+0"
 
 [[deps.DynamicPolynomials]]
 deps = ["Future", "LinearAlgebra", "MultivariatePolynomials", "MutableArithmetics", "Reexport", "Test"]
@@ -1589,6 +2398,16 @@ git-tree-sha1 = "d55dffd9ae73ff72f1c0482454dcf2ec6c6c4a63"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.6.5+0"
 
+[[deps.ExponentialUtilities]]
+deps = ["Adapt", "ArrayInterface", "GPUArraysCore", "GenericSchur", "LinearAlgebra", "PrecompileTools", "Printf", "SparseArrays", "libblastrampoline_jll"]
+git-tree-sha1 = "cae251c76f353e32d32d76fae2fea655eab652af"
+uuid = "d4d017d3-3776-5f7e-afef-a10c40355c18"
+version = "1.27.0"
+weakdeps = ["StaticArrays"]
+
+    [deps.ExponentialUtilities.extensions]
+    ExponentialUtilitiesStaticArraysExt = "StaticArrays"
+
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
@@ -1611,6 +2430,24 @@ git-tree-sha1 = "466d45dc38e15794ec7d5d63ec03d776a9aff36e"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.4+1"
 
+[[deps.FFTW]]
+deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
+git-tree-sha1 = "797762812ed063b9b94f6cc7742bc8883bb5e69e"
+uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+version = "1.9.0"
+
+[[deps.FFTW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6d6219a004b8cf1e0b4dbe27a2860b8e04eba0be"
+uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
+version = "3.3.11+0"
+
+[[deps.FastAlmostBandedMatrices]]
+deps = ["ArrayInterface", "ArrayLayouts", "BandedMatrices", "ConcreteStructs", "LazyArrays", "LinearAlgebra", "MatrixFactorizations", "PrecompileTools", "Reexport"]
+git-tree-sha1 = "9482a2b4face8ade73792c23a54796c79ed1bcbf"
+uuid = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
+version = "0.1.5"
+
 [[deps.FastBroadcast]]
 deps = ["ArrayInterface", "LinearAlgebra", "Polyester", "Static", "StaticArrayInterface", "StrideArraysCore"]
 git-tree-sha1 = "ab1b34570bcdf272899062e1a56285a53ecaae08"
@@ -1621,6 +2458,12 @@ version = "0.3.5"
 git-tree-sha1 = "acebe244d53ee1b461970f8910c235b259e772ef"
 uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 version = "0.3.2"
+
+[[deps.FastGaussQuadrature]]
+deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "fd923962364b645f3719855c88f7074413a6ad92"
+uuid = "442a2c76-b920-505d-bb47-c5924d526838"
+version = "1.0.2"
 
 [[deps.FastPower]]
 git-tree-sha1 = "df32f07f373f06260cd6af5371385b5ef85dd762"
@@ -1642,16 +2485,6 @@ version = "1.1.2"
     MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
-
-[[deps.FileIO]]
-deps = ["Pkg", "Requires", "UUIDs"]
-git-tree-sha1 = "b66970a70db13f45b7e57fbda1736e1cf72174ea"
-uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.17.0"
-weakdeps = ["HTTP"]
-
-    [deps.FileIO.extensions]
-    HTTPExt = "HTTP"
 
 [[deps.FilePathsBase]]
 deps = ["Compat", "Dates"]
@@ -1702,12 +2535,6 @@ version = "2.27.0"
     BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-
-[[deps.FixedPointDecimals]]
-deps = ["BitIntegers", "Parsers"]
-git-tree-sha1 = "cf637cd2d786280d2d4afa59c69294f110e2a28c"
-uuid = "fb4d412d-6eee-574d-9565-ede6634db7b0"
-version = "0.6.3"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -1794,6 +2621,12 @@ git-tree-sha1 = "d7ecfaca1ad1886de4f9053b5b8aef34f36ede7f"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
 version = "0.73.16+0"
 
+[[deps.GenericSchur]]
+deps = ["LinearAlgebra", "Printf"]
+git-tree-sha1 = "f88e0ba1f6b42121a7c1dfe93a9687d8e164c91b"
+uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
+version = "0.5.5"
+
 [[deps.Gettext_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
 git-tree-sha1 = "9b02998aba7bf074d14de89f9d37ca24a1a0b046"
@@ -1839,6 +2672,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.1+0"
+
+[[deps.Hwloc_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "92f65c4d78ce8cdbb6b68daf88889950b0a99d11"
+uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
+version = "2.12.1+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
@@ -2048,19 +2887,21 @@ version = "1.4.0"
 
 [[deps.Latexify]]
 deps = ["Format", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
-git-tree-sha1 = "cd10d2cc78d34c0e2a3a36420ab607b611debfbb"
+git-tree-sha1 = "4f34eaabe49ecb3fb0d58d6015e32fd31a733199"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.16.7"
+version = "0.16.8"
 
     [deps.Latexify.extensions]
     DataFramesExt = "DataFrames"
     SparseArraysExt = "SparseArrays"
     SymEngineExt = "SymEngine"
+    TectonicExt = "tectonic_jll"
 
     [deps.Latexify.weakdeps]
     DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+    tectonic_jll = "d7dd28d6-a5e6-559c-9131-7eb760cdacc5"
 
 [[deps.LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
@@ -2096,6 +2937,12 @@ deps = ["AbstractTrees"]
 git-tree-sha1 = "fb6803dafae4a5d62ea5cab204b1e657d9737e7f"
 uuid = "1d6d02ad-be62-4b6b-8a6d-2f90e265016e"
 version = "0.2.0"
+
+[[deps.LevyArea]]
+deps = ["LinearAlgebra", "Random", "SpecialFunctions"]
+git-tree-sha1 = "56513a09b8e0ae6485f34401ea9e2f31357958ec"
+uuid = "2d8b4e74-eb68-11e8-0fb9-d5eb67b50637"
+version = "1.0.0"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -2225,12 +3072,6 @@ version = "3.11.0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 
-[[deps.LittleEndianBase128]]
-deps = ["Test"]
-git-tree-sha1 = "2cad132b52c86e0ccfc75116362ab57f0047893a"
-uuid = "1724a1d5-ab78-548d-94b3-135c294f96cf"
-version = "0.3.0"
-
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
 git-tree-sha1 = "13ca9e2586b89836fd20cccf56e57e2b9ae7f38f"
@@ -2257,6 +3098,12 @@ git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
 
+[[deps.MINPACK]]
+deps = ["LinearAlgebra", "Printf", "cminpack_jll"]
+git-tree-sha1 = "7833d5fda5c9a7a62b39d37ebd3c7d716fbc0cfc"
+uuid = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
+version = "1.3.0"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
 git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
@@ -2267,6 +3114,38 @@ version = "2025.0.1+1"
 git-tree-sha1 = "bc38dff0548128765760c79eb7388a4b37fae2c8"
 uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
 version = "0.4.17"
+
+[[deps.MPI]]
+deps = ["Distributed", "DocStringExtensions", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "PkgVersion", "PrecompileTools", "Requires", "Serialization", "Sockets"]
+git-tree-sha1 = "892676019c58f34e38743bc989b0eca5bce5edc5"
+uuid = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+version = "0.20.22"
+
+    [deps.MPI.extensions]
+    AMDGPUExt = "AMDGPU"
+    CUDAExt = "CUDA"
+
+    [deps.MPI.weakdeps]
+    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[[deps.MPICH_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
+git-tree-sha1 = "3aa3210044138a1749dbd350a9ba8680869eb503"
+uuid = "7cb0a576-ebde-5e09-9194-50597f1243b4"
+version = "4.3.0+1"
+
+[[deps.MPIPreferences]]
+deps = ["Libdl", "Preferences"]
+git-tree-sha1 = "c105fe467859e7f6e9a852cb15cb4301126fac07"
+uuid = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
+version = "0.1.11"
+
+[[deps.MPItrampoline_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
+git-tree-sha1 = "ff91ca13c7c472cef700f301c8d752bc2aaff1a8"
+uuid = "f1f71cc9-e9ae-5b93-9b94-4fe0e1ad3748"
+version = "5.5.3+0"
 
 [[deps.MacroTools]]
 git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
@@ -2282,6 +3161,16 @@ version = "0.1.8"
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
+
+[[deps.MatrixFactorizations]]
+deps = ["ArrayLayouts", "LinearAlgebra", "Printf", "Random"]
+git-tree-sha1 = "16a726dba99685d9e94c8d0a8f655383121fc608"
+uuid = "a3b82374-2e81-5b9e-98ce-41277c0e4c87"
+version = "3.0.1"
+weakdeps = ["BandedMatrices"]
+
+    [deps.MatrixFactorizations.extensions]
+    MatrixFactorizationsBandedMatricesExt = "BandedMatrices"
 
 [[deps.MaybeInplace]]
 deps = ["ArrayInterface", "LinearAlgebra", "MacroTools"]
@@ -2308,6 +3197,12 @@ version = "2.28.6+0"
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
 uuid = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
 version = "0.3.2"
+
+[[deps.MicrosoftMPI_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "bc95bf4149bf535c09602e3acdf950d9b4376227"
+uuid = "9237b28f-5490-5468-be7b-bb81f5f5e6cf"
+version = "10.1.4+3"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -2380,6 +3275,12 @@ git-tree-sha1 = "b14c7be6046e7d48e9063a0053f95ee0fc954176"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
 version = "7.9.1"
 
+[[deps.NLsolve]]
+deps = ["Distances", "LineSearches", "LinearAlgebra", "NLSolversBase", "Printf", "Reexport"]
+git-tree-sha1 = "019f12e9a1a7880459d0173c182e6a99365d7ac1"
+uuid = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+version = "4.5.1"
+
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
 git-tree-sha1 = "9b8215b1ee9e78a293f99797cd31375471b2bcae"
@@ -2392,9 +3293,9 @@ version = "1.2.0"
 
 [[deps.NonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "NonlinearSolveBase", "NonlinearSolveFirstOrder", "NonlinearSolveQuasiNewton", "NonlinearSolveSpectralMethods", "PrecompileTools", "Preferences", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SparseArrays", "SparseMatrixColorings", "StaticArraysCore", "SymbolicIndexingInterface"]
-git-tree-sha1 = "7fd96e0e6585063a7193007349799155ba5a069f"
+git-tree-sha1 = "aeb6fb02e63b4d4f90337ed90ce54ceb4c0efe77"
 uuid = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
-version = "4.8.0"
+version = "4.9.0"
 
     [deps.NonlinearSolve.extensions]
     NonlinearSolveFastLevenbergMarquardtExt = "FastLevenbergMarquardt"
@@ -2427,6 +3328,7 @@ deps = ["ADTypes", "Adapt", "ArrayInterface", "CommonSolve", "Compat", "Concrete
 git-tree-sha1 = "686fd9d0d455171e3530d3540cff94bb01222823"
 uuid = "be0214bd-f91f-a760-ac4e-3421ce2b2da0"
 version = "1.7.0"
+weakdeps = ["BandedMatrices", "DiffEqBase", "ForwardDiff", "LineSearch", "LinearSolve", "SparseArrays", "SparseMatrixColorings"]
 
     [deps.NonlinearSolveBase.extensions]
     NonlinearSolveBaseBandedMatricesExt = "BandedMatrices"
@@ -2436,15 +3338,6 @@ version = "1.7.0"
     NonlinearSolveBaseLinearSolveExt = "LinearSolve"
     NonlinearSolveBaseSparseArraysExt = "SparseArrays"
     NonlinearSolveBaseSparseMatrixColoringsExt = "SparseMatrixColorings"
-
-    [deps.NonlinearSolveBase.weakdeps]
-    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
-    DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
-    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-    LineSearch = "87fe0de2-c867-4266-b59a-2f0a94fc965b"
-    LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-    SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
 
 [[deps.NonlinearSolveFirstOrder]]
 deps = ["ADTypes", "ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLJacobianOperators", "Setfield", "StaticArraysCore"]
@@ -2487,6 +3380,12 @@ git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
 version = "1.3.5+1"
 
+[[deps.OpenBLAS32_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "ece4587683695fe4c5f20e990da0ed7e83c351e7"
+uuid = "656ef2d0-ae68-5445-9ca0-591084a874a2"
+version = "0.3.29+0"
+
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
@@ -2496,6 +3395,12 @@ version = "0.3.27+1"
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.5+0"
+
+[[deps.OpenMPI_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
+git-tree-sha1 = "047b66eb62f3cae59ed260ebb9075a32a04350f1"
+uuid = "fe0851c0-eecd-5654-98d4-656369965a5c"
+version = "5.0.7+2"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -2572,6 +3477,196 @@ git-tree-sha1 = "cc4054e898b852042d7b503313f7ad03de99c3dd"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.8.0"
 
+[[deps.OrdinaryDiffEq]]
+deps = ["ADTypes", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "EnumX", "ExponentialUtilities", "FastBroadcast", "FastClosures", "FillArrays", "FiniteDiff", "ForwardDiff", "FunctionWrappersWrappers", "InteractiveUtils", "LineSearches", "LinearAlgebra", "LinearSolve", "Logging", "MacroTools", "MuladdMacro", "NonlinearSolve", "OrdinaryDiffEqAdamsBashforthMoulton", "OrdinaryDiffEqBDF", "OrdinaryDiffEqCore", "OrdinaryDiffEqDefault", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqExplicitRK", "OrdinaryDiffEqExponentialRK", "OrdinaryDiffEqExtrapolation", "OrdinaryDiffEqFIRK", "OrdinaryDiffEqFeagin", "OrdinaryDiffEqFunctionMap", "OrdinaryDiffEqHighOrderRK", "OrdinaryDiffEqIMEXMultistep", "OrdinaryDiffEqLinear", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqLowStorageRK", "OrdinaryDiffEqNonlinearSolve", "OrdinaryDiffEqNordsieck", "OrdinaryDiffEqPDIRK", "OrdinaryDiffEqPRK", "OrdinaryDiffEqQPRK", "OrdinaryDiffEqRKN", "OrdinaryDiffEqRosenbrock", "OrdinaryDiffEqSDIRK", "OrdinaryDiffEqSSPRK", "OrdinaryDiffEqStabilizedIRK", "OrdinaryDiffEqStabilizedRK", "OrdinaryDiffEqSymplecticRK", "OrdinaryDiffEqTsit5", "OrdinaryDiffEqVerner", "Polyester", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleNonlinearSolve", "SimpleUnPack", "SparseArrays", "Static", "StaticArrayInterface", "StaticArrays", "TruncatedStacktraces"]
+git-tree-sha1 = "1c2b2df870944e0dc01454fd87479847c55fa26c"
+uuid = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+version = "6.98.0"
+
+[[deps.OrdinaryDiffEqAdamsBashforthMoulton]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqLowOrderRK", "Polyester", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "82f78099ecf4e0fa53545811318520d87e7fe0b8"
+uuid = "89bda076-bce5-4f1c-845f-551c83cdda9a"
+version = "1.2.0"
+
+[[deps.OrdinaryDiffEqBDF]]
+deps = ["ADTypes", "ArrayInterface", "DiffEqBase", "FastBroadcast", "LinearAlgebra", "MacroTools", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "OrdinaryDiffEqSDIRK", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "StaticArrays", "TruncatedStacktraces"]
+git-tree-sha1 = "9124a686af119063bb4d3a8f87044a8f312fcad9"
+uuid = "6ad6398a-0878-4a85-9266-38940aa047c8"
+version = "1.6.0"
+
+[[deps.OrdinaryDiffEqCore]]
+deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "EnumX", "FastBroadcast", "FastClosures", "FastPower", "FillArrays", "FunctionWrappersWrappers", "InteractiveUtils", "LinearAlgebra", "Logging", "MacroTools", "MuladdMacro", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleUnPack", "Static", "StaticArrayInterface", "StaticArraysCore", "SymbolicIndexingInterface", "TruncatedStacktraces"]
+git-tree-sha1 = "08dac9c6672a4548439048089bac293759a897fd"
+uuid = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
+version = "1.26.1"
+weakdeps = ["EnzymeCore"]
+
+    [deps.OrdinaryDiffEqCore.extensions]
+    OrdinaryDiffEqCoreEnzymeCoreExt = "EnzymeCore"
+
+[[deps.OrdinaryDiffEqDefault]]
+deps = ["ADTypes", "DiffEqBase", "EnumX", "LinearAlgebra", "LinearSolve", "OrdinaryDiffEqBDF", "OrdinaryDiffEqCore", "OrdinaryDiffEqRosenbrock", "OrdinaryDiffEqTsit5", "OrdinaryDiffEqVerner", "PrecompileTools", "Preferences", "Reexport"]
+git-tree-sha1 = "8eeed32442874d1bdcc2192a874a73f1a9a07e31"
+uuid = "50262376-6c5a-4cf5-baba-aaf4f84d72d7"
+version = "1.4.0"
+
+[[deps.OrdinaryDiffEqDifferentiation]]
+deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "ConstructionBase", "DiffEqBase", "DifferentiationInterface", "FastBroadcast", "FiniteDiff", "ForwardDiff", "FunctionWrappersWrappers", "LinearAlgebra", "LinearSolve", "OrdinaryDiffEqCore", "SciMLBase", "SciMLOperators", "SparseArrays", "SparseMatrixColorings", "StaticArrayInterface", "StaticArrays"]
+git-tree-sha1 = "efecf0c4cc44e16251b0e718f08b0876b2a82b80"
+uuid = "4302a76b-040a-498a-8c04-15b101fed76b"
+version = "1.10.0"
+
+[[deps.OrdinaryDiffEqExplicitRK]]
+deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "TruncatedStacktraces"]
+git-tree-sha1 = "4dbce3f9e6974567082ce5176e21aab0224a69e9"
+uuid = "9286f039-9fbf-40e8-bf65-aa933bdc4db0"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqExponentialRK]]
+deps = ["ADTypes", "DiffEqBase", "ExponentialUtilities", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqSDIRK", "OrdinaryDiffEqVerner", "RecursiveArrayTools", "Reexport", "SciMLBase"]
+git-tree-sha1 = "8d2ab84d7fabdfde995e5f567361f238069497f5"
+uuid = "e0540318-69ee-4070-8777-9e2de6de23de"
+version = "1.4.0"
+
+[[deps.OrdinaryDiffEqExtrapolation]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "FastPower", "LinearSolve", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "Polyester", "RecursiveArrayTools", "Reexport"]
+git-tree-sha1 = "80a636aac325c546b04e3bf20f0c80eaa0173dd4"
+uuid = "becaefa8-8ca2-5cf9-886d-c06f3d2bd2c4"
+version = "1.5.0"
+
+[[deps.OrdinaryDiffEqFIRK]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "FastGaussQuadrature", "FastPower", "LinearAlgebra", "LinearSolve", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "Polyester", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators"]
+git-tree-sha1 = "0da8ec3491821262a3d2828e6370e76b51a770a3"
+uuid = "5960d6e9-dd7a-4743-88e7-cf307b64f125"
+version = "1.12.0"
+
+[[deps.OrdinaryDiffEqFeagin]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "a7cc74d3433db98e59dc3d58bc28174c6c290adf"
+uuid = "101fe9f7-ebb6-4678-b671-3a81e7194747"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqFunctionMap]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "SciMLBase", "Static"]
+git-tree-sha1 = "925a91583d1ab84f1f0fea121be1abf1179c5926"
+uuid = "d3585ca7-f5d3-4ba6-8057-292ed1abd90f"
+version = "1.1.1"
+
+[[deps.OrdinaryDiffEqHighOrderRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "103e017ff186ac39d731904045781c9bacfca2b0"
+uuid = "d28bc4f8-55e1-4f49-af69-84c1a99f0f58"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqIMEXMultistep]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "Reexport"]
+git-tree-sha1 = "095bab73a3ff185e9ef971fc42ecc93c7824e589"
+uuid = "9f002381-b378-40b7-97a6-27a27c83f129"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqLinear]]
+deps = ["DiffEqBase", "ExponentialUtilities", "LinearAlgebra", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators"]
+git-tree-sha1 = "940cef72ec8799d869ff1ba3dcf47cf7758e51cf"
+uuid = "521117fe-8c41-49f8-b3b6-30780b3f0fb5"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqLowOrderRK]]
+deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "SciMLBase", "Static"]
+git-tree-sha1 = "d4bb32e09d6b68ce2eb45fb81001eab46f60717a"
+uuid = "1344f307-1e59-4825-a18e-ace9aa3fa4c6"
+version = "1.2.0"
+
+[[deps.OrdinaryDiffEqLowStorageRK]]
+deps = ["Adapt", "DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static", "StaticArrays"]
+git-tree-sha1 = "52ec7081e65291fa5c19749312df0818db2fa1bc"
+uuid = "b0944070-b475-4768-8dec-fb6eb410534d"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqNonlinearSolve]]
+deps = ["ADTypes", "ArrayInterface", "DiffEqBase", "FastBroadcast", "FastClosures", "ForwardDiff", "LinearAlgebra", "LinearSolve", "MuladdMacro", "NonlinearSolve", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "PreallocationTools", "RecursiveArrayTools", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleNonlinearSolve", "StaticArrays"]
+git-tree-sha1 = "ffdb0f5207b0e30f8b1edf99b3b9546d9c48ccaf"
+uuid = "127b3ac7-2247-4354-8eb6-78cf4e7c58e8"
+version = "1.10.0"
+
+[[deps.OrdinaryDiffEqNordsieck]]
+deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqTsit5", "Polyester", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "ef44754f10e0dfb9bb55ded382afed44cd94ab57"
+uuid = "c9986a66-5c92-4813-8696-a7ec84c806c8"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqPDIRK]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "Polyester", "Reexport", "StaticArrays"]
+git-tree-sha1 = "ab9897e4bc8e3cf8e15f1cf61dbdd15d6a2341d7"
+uuid = "5dd0a6cf-3d4b-4314-aa06-06d4e299bc89"
+version = "1.3.1"
+
+[[deps.OrdinaryDiffEqPRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "Reexport"]
+git-tree-sha1 = "da525d277962a1b76102c79f30cb0c31e13fe5b9"
+uuid = "5b33eab2-c0f1-4480-b2c3-94bc1e80bda1"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqQPRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "332f9d17d0229218f66a73492162267359ba85e9"
+uuid = "04162be5-8125-4266-98ed-640baecc6514"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqRKN]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "RecursiveArrayTools", "Reexport"]
+git-tree-sha1 = "41c09d9c20877546490f907d8dffdd52690dd65f"
+uuid = "af6ede74-add8-4cfd-b1df-9a4dbb109d7a"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqRosenbrock]]
+deps = ["ADTypes", "DiffEqBase", "DifferentiationInterface", "FastBroadcast", "FiniteDiff", "ForwardDiff", "LinearAlgebra", "LinearSolve", "MacroTools", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static"]
+git-tree-sha1 = "1ce0096d920e95773220e818f29bf4b37ea2bb78"
+uuid = "43230ef6-c299-4910-a778-202eb28ce4ce"
+version = "1.11.0"
+
+[[deps.OrdinaryDiffEqSDIRK]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "LinearAlgebra", "MacroTools", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "RecursiveArrayTools", "Reexport", "SciMLBase", "TruncatedStacktraces"]
+git-tree-sha1 = "b3a7e3a2f355d837c823b435630f035aef446b45"
+uuid = "2d112036-d095-4a1e-ab9a-08536f3ecdbf"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqSSPRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static", "StaticArrays"]
+git-tree-sha1 = "651756c030df7a1d49ad484288937f8c398e8a08"
+uuid = "669c94d9-1f4b-4b64-b377-1aa079aa2388"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqStabilizedIRK]]
+deps = ["ADTypes", "DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "RecursiveArrayTools", "Reexport", "StaticArrays"]
+git-tree-sha1 = "111c23b68ad644b47e38242af920d5805c7bedb1"
+uuid = "e3e12d00-db14-5390-b879-ac3dd2ef6296"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqStabilizedRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "StaticArrays"]
+git-tree-sha1 = "1b0d894c880e25f7d0b022d7257638cf8ce5b311"
+uuid = "358294b1-0aab-51c3-aafe-ad5ab194a2ad"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqSymplecticRK]]
+deps = ["DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "RecursiveArrayTools", "Reexport"]
+git-tree-sha1 = "a13d59a2d6cfb6a3332a7782638ca6e1cb6ca688"
+uuid = "fa646aed-7ef9-47eb-84c4-9443fc8cbfa8"
+version = "1.3.0"
+
+[[deps.OrdinaryDiffEqTsit5]]
+deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static", "TruncatedStacktraces"]
+git-tree-sha1 = "96552f7d4619fabab4038a29ed37dd55e9eb513a"
+uuid = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+version = "1.1.0"
+
+[[deps.OrdinaryDiffEqVerner]]
+deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static", "TruncatedStacktraces"]
+git-tree-sha1 = "08f2d3be30874b6e2e937a06b501fb9811f7d8bd"
+uuid = "79d7bb75-1356-48c1-b8c0-6832512096c2"
+version = "1.2.0"
+
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
@@ -2582,6 +3677,18 @@ deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
 git-tree-sha1 = "0e1340b5d98971513bddaa6bbed470670cebbbfe"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
 version = "0.11.34"
+
+[[deps.PETSc]]
+deps = ["Libdl", "LinearAlgebra", "MPI", "MPIPreferences", "PETSc_jll", "Pkg", "SparseArrays"]
+git-tree-sha1 = "0df6fc164a6254fa3311e3717c4155c32cc56a66"
+uuid = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
+version = "0.3.1"
+
+[[deps.PETSc_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS32_jll", "OpenMPI_jll", "SCALAPACK32_jll", "TOML"]
+git-tree-sha1 = "e67be069aea02ce689bd94eb3f7ee011396bf1bd"
+uuid = "8fa3689e-f0b9-5420-9873-adf6ccf46f2d"
+version = "3.22.0+0"
 
 [[deps.PackedVectorsOfVectors]]
 git-tree-sha1 = "78a46960967e9e37f81dbf7f61b45b0159637afe"
@@ -2599,12 +3706,6 @@ deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
 uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 version = "0.12.3"
-
-[[deps.Parquet]]
-deps = ["CategoricalArrays", "CodecZlib", "CodecZstd", "DataAPI", "Dates", "Decimals", "LittleEndianBase128", "Missings", "Mmap", "SentinelArrays", "Snappy", "Tables", "Thrift"]
-git-tree-sha1 = "9710bed2527030fe0e0b9a455595259c6b398556"
-uuid = "626c502c-15b0-58ad-a749-f091afb673ae"
-version = "0.8.5"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
@@ -2626,6 +3727,12 @@ weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
     REPLExt = "REPL"
+
+[[deps.PkgVersion]]
+deps = ["Pkg"]
+git-tree-sha1 = "f9501cc0430a26bc3d156ae1b5b0c1b47af4d6da"
+uuid = "eebad327-c553-4316-9ea0-9fa01ccd7688"
+version = "0.3.3"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -2700,6 +3807,20 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
 uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
 version = "0.2.4"
+
+[[deps.PreallocationTools]]
+deps = ["Adapt", "ArrayInterface", "ForwardDiff"]
+git-tree-sha1 = "6d98eace73d82e47f5b16c393de198836d9f790a"
+uuid = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
+version = "0.4.27"
+
+    [deps.PreallocationTools.extensions]
+    PreallocationToolsReverseDiffExt = "ReverseDiff"
+    PreallocationToolsSparseConnectivityTracerExt = "SparseConnectivityTracer"
+
+    [deps.PreallocationTools.weakdeps]
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -2906,6 +4027,12 @@ git-tree-sha1 = "7cb9d10026d630ce2dd2a1fc6006a3d5041b34c0"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 version = "0.5.14"
 
+[[deps.SCALAPACK32_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS32_jll", "OpenMPI_jll", "Pkg", "TOML"]
+git-tree-sha1 = "3fd1ffad6374491b54fe50ee9033318f30f39982"
+uuid = "aabda75e-bfe4-5a37-92e3-ffe54af3c273"
+version = "2.2.1+1"
+
 [[deps.SCCNonlinearSolve]]
 deps = ["CommonSolve", "PrecompileTools", "Reexport", "SciMLBase", "SymbolicIndexingInterface"]
 git-tree-sha1 = "5e67b56af8615d1b47720fdc04e34482279c4559"
@@ -2915,6 +4042,12 @@ version = "1.2.0"
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
+
+[[deps.SIAMFANLEquations]]
+deps = ["AbstractFFTs", "BandedMatrices", "FFTW", "LaTeXStrings", "LinearAlgebra", "Printf", "QuadGK", "SparseArrays", "SuiteSparse", "Test"]
+git-tree-sha1 = "1c7ffc244c458bb52e2b311dd6e0902b2b13fc14"
+uuid = "084e46ad-d928-497d-ad5e-07fa361a48c4"
+version = "1.0.2"
 
 [[deps.SIMDTypes]]
 git-tree-sha1 = "330289636fb8107c5f32088d2741e9fd7a061a5c"
@@ -3033,11 +4166,10 @@ git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.4"
 
-[[deps.Snappy]]
-deps = ["CEnum", "snappy_jll"]
-git-tree-sha1 = "098adf970792fd9404788f4558e94958473f7d57"
-uuid = "59d4ed8c-697a-5b28-a4c7-fe95c22820f9"
-version = "0.4.3"
+[[deps.SimpleUnPack]]
+git-tree-sha1 = "58e6353e72cde29b90a69527e56df1b5c3d8c437"
+uuid = "ce78b400-467f-4804-87d8-8f486da07d0a"
+version = "1.1.0"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -3186,6 +4318,18 @@ weakdeps = ["ChainRulesCore", "InverseFunctions"]
     StatsFunsChainRulesCoreExt = "ChainRulesCore"
     StatsFunsInverseFunctionsExt = "InverseFunctions"
 
+[[deps.SteadyStateDiffEq]]
+deps = ["ConcreteStructs", "DiffEqBase", "DiffEqCallbacks", "LinearAlgebra", "NonlinearSolveBase", "Reexport", "SciMLBase"]
+git-tree-sha1 = "66a028f9a2bb44d0f6de0814a2b9840af548143a"
+uuid = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
+version = "2.5.0"
+
+[[deps.StochasticDiffEq]]
+deps = ["ADTypes", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DiffEqNoiseProcess", "DocStringExtensions", "FastPower", "FiniteDiff", "ForwardDiff", "JumpProcesses", "LevyArea", "LinearAlgebra", "Logging", "MuladdMacro", "NLsolve", "OrdinaryDiffEqCore", "OrdinaryDiffEqDifferentiation", "OrdinaryDiffEqNonlinearSolve", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SparseArrays", "StaticArrays", "UnPack"]
+git-tree-sha1 = "2992af2739fdcf5862b12dcf53a5f6e3e4acd358"
+uuid = "789caeaf-c7a9-5a7d-9973-96adeb23e2a0"
+version = "6.80.0"
+
 [[deps.StrideArraysCore]]
 deps = ["ArrayInterface", "CloseOpenIntervals", "IfElse", "LayoutPointers", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface", "ThreadingUtilities"]
 git-tree-sha1 = "f35f6ab602df8413a50c4a25ca14de821e8605fb"
@@ -3216,6 +4360,18 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "7.7.0+0"
+
+[[deps.Sundials]]
+deps = ["CEnum", "DataStructures", "DiffEqBase", "Libdl", "LinearAlgebra", "Logging", "PrecompileTools", "Reexport", "SciMLBase", "SparseArrays", "Sundials_jll"]
+git-tree-sha1 = "7c7a7ee705724b3c80d5451ac49779db36c6f758"
+uuid = "c3572dad-4567-51f8-b174-8c6c989267f4"
+version = "4.28.0"
+
+[[deps.Sundials_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "SuiteSparse_jll", "libblastrampoline_jll"]
+git-tree-sha1 = "91db7ed92c66f81435fe880947171f1212936b14"
+uuid = "fb77eaff-e24c-56d4-86b1-d163f2edb164"
+version = "5.2.3+0"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "PrettyTables", "RuntimeGeneratedFunctions", "StaticArraysCore"]
@@ -3324,18 +4480,6 @@ deps = ["ManualMemory"]
 git-tree-sha1 = "18ad3613e129312fe67789a71720c3747e598a61"
 uuid = "8290d209-cae3-49c0-8002-c8c24d57dab5"
 version = "0.5.3"
-
-[[deps.Thrift]]
-deps = ["CodecZlib", "CodecZstd", "Distributed", "Sockets", "ThriftJuliaCompiler_jll", "TranscodingStreams"]
-git-tree-sha1 = "bc24b4dc9ec4b34bca36659ae7efae9085442d80"
-uuid = "8d9c9c80-f77e-5080-9541-c6f69d204e22"
-version = "0.8.5"
-
-[[deps.ThriftJuliaCompiler_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "949a51ca85d31b063531eed49e38a6c9b9bae58b"
-uuid = "815b9798-8dd0-5549-95cc-3cf7d01bce66"
-version = "0.12.1+0"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]
@@ -3613,6 +4757,12 @@ git-tree-sha1 = "446b23e73536f84e8037f5dce465e92275f6a308"
 uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.5.7+1"
 
+[[deps.cminpack_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS32_jll"]
+git-tree-sha1 = "ca8a038b2cabd4fe3dd206de56ac1285131515a0"
+uuid = "b792d7bf-f512-5dba-8a02-6d8084434f1d"
+version = "1.3.12+0"
+
 [[deps.eudev_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "gperf_jll"]
 git-tree-sha1 = "431b678a28ebb559d224c0b6b6d01afce87c51ba"
@@ -3706,12 +4856,6 @@ deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
 
-[[deps.snappy_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "ca88363dd41d2547f52118287dd34dbbc14f3eb7"
-uuid = "fe1e1685-f7be-5f59-ac9f-4ca204017dfd"
-version = "1.2.3+0"
-
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "4fea590b89e6ec504593146bf8b988b2c00922b2"
@@ -3748,6 +4892,8 @@ version = "1.8.1+0"
 # ╠═3a4b4d1d-abbf-4858-891a-1e24a9b4ea5b
 # ╠═6480643c-069d-48ed-9750-ec00d81a3e54
 # ╠═1cc60917-e74a-4bc8-a17a-1b14a3aa1379
+# ╠═f9aa28dc-efe6-43b6-9205-da37eb53c3f3
+# ╠═0d42c45e-1b15-4678-b316-e2a3db1e3e22
 # ╠═573f2156-b045-4b6b-bacd-ba85626f43b3
 # ╠═7b034564-0557-402e-80f2-66c2ab692f5a
 # ╠═800b767f-2543-4653-aaf4-9a7fa433450a
@@ -3774,9 +4920,44 @@ version = "1.8.1+0"
 # ╠═cde60bbc-b47a-4e00-b494-fbf23d727a4b
 # ╠═b60f53c1-bfa6-4599-8a6c-bb96b2836760
 # ╠═6d568112-75df-4310-81bd-1379d2aa426e
+# ╠═0573313d-90ed-401f-a92a-2c489e04cc16
+# ╠═e60b869c-2153-4ab1-bedf-64f37e3d3653
+# ╠═34ad8d6f-2756-4135-a564-8a0099e2067e
+# ╠═f5575b0c-827a-4ed8-bfcf-2aa45e7840f5
+# ╠═0976e1a7-4cef-43c2-952c-beb236ca78e1
+# ╠═60318174-9f9c-49d7-b030-626218b36ad8
+# ╠═b7b6e978-0d40-4615-8a84-47d42cf02791
+# ╠═5b14def3-2ed0-41ec-a788-a6b26897dccc
+# ╠═b47539a1-4979-4d95-9112-30efadb06648
+# ╠═370cd675-3c41-4f51-b0ca-a990bf2d6580
+# ╠═a2f5d59c-222e-44bf-b451-c998bd1936a2
 # ╠═98d5f72c-c40f-4b73-819f-a68e54caae09
-# ╟─81b0f187-842d-4719-8949-1d76344f44d9
-# ╠═d8be97a1-b13c-498b-9391-63ed47e104df
+# ╠═81b0f187-842d-4719-8949-1d76344f44d9
+# ╠═5205c0aa-1181-42eb-be3c-2ae061548725
+# ╠═25f56f52-58e5-4b78-9749-5aba8158b453
+# ╠═53712fde-61f9-4b43-84cb-ebdeefea30d7
+# ╠═c9bf0465-7f8a-4967-ac2b-af63fe2d6057
+# ╠═df3fc0e4-0265-4153-824d-1d0e2abe00b0
+# ╠═0c4b3fcc-1ead-484f-a0f1-5cb334b19ccb
+# ╠═8dfbb123-fb4b-450c-a74a-c37997726d25
+# ╠═fc6206b0-10e7-4cd0-bc2b-2dc623ed2a80
+# ╠═bd5d219c-c72b-471c-bd07-f797e3fcb991
+# ╠═f81a039d-d1d3-4a15-ad22-502aa1826168
+# ╠═d5e187ad-60f8-4e42-a348-d1923be9b305
+# ╠═0def9c0d-dab1-48ea-9b96-160bcb77d82a
+# ╠═93450e36-f875-4b0f-8881-ae972ee9493c
+# ╠═0663f91a-721e-4ee6-91e5-b4b0085c0e45
+# ╠═7685d6d5-bd2f-4a65-bcb5-7023219dd26b
+# ╠═82e20fda-5d9a-43c7-b61e-720cbd5cf499
+# ╠═323f2e35-166f-4dd3-883d-5cb38dbf8006
+# ╠═9bb37d87-dbc7-45b0-a60f-6c53db2b87ea
 # ╠═b4de56ce-04ea-4feb-b580-ea63fd41ce1f
+# ╠═528344ce-55d5-4d3c-bb57-238e6ef3baf8
+# ╠═b9467275-45a3-40aa-8c1d-8f76033593a8
+# ╠═7a12a191-525a-44b7-a337-f41e1a400f62
+# ╠═8a6f9ceb-d230-4567-96fb-72ec1f04378d
+# ╠═4267931a-0f4b-4ac4-86d9-66878d19c56f
+# ╠═17c9fce0-f77e-4aa1-8a9a-d9663c8fb257
+# ╠═0379b2ea-9089-460e-b9f0-07adb1f8d429
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

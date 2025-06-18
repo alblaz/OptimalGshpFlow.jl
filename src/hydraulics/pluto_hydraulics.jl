@@ -1274,7 +1274,9 @@ end
   ╠═╡ =#
 
 # ╔═╡ 18962ef4-5570-4b40-b31d-7fd211025965
-test_dynamic_prop_annular_bend_180()
+#=╠═╡
+@test test_dynamic_prop_annular_bend_180()
+  ╠═╡ =#
 
 # ╔═╡ fe6c00b8-fc3f-426f-920c-7deaae99dce8
 md"""

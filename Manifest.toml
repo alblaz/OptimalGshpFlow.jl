@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "e717a472611323125209942672aa3f9ea4661690"
+project_hash = "dc6994d2d92941f82e5e140dc5e127bfa1a3e96c"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1746,12 +1746,6 @@ deps = ["AbstractPlutoDingetjes", "DocStringExtensions", "HypertextLiteral", "In
 git-tree-sha1 = "91d3820f5910572fd9c6077f177ba375e06f7a0e"
 uuid = "ed5d0301-4775-4676-b788-cf71e66ff8ed"
 version = "0.7.15"
-
-[[deps.PlutoTest]]
-deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
-git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
-uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
-version = "0.2.2"
 
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]

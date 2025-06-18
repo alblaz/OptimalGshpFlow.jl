@@ -4,36 +4,6 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 3efb8ab9-1d4b-4408-b224-a85611388348
-using PlutoDevMacros
-
-# ╔═╡ bfdb6ceb-a0e0-4f87-b650-913a3579085e
-using Printf
-
-# ╔═╡ 69504032-712c-4d3c-8231-be9f15d683de
-using Parquet
-
-# ╔═╡ e01e0c08-459e-4636-8fef-b0f6790ee964
-using FileIO
-
-# ╔═╡ a943d92d-2672-4f52-9b9e-bfa51f042bcf
-using DuckDB
-
-# ╔═╡ 93d5f510-e03b-4ced-9ae7-ef1837b2fb34
-using PlutoTest
-
-# ╔═╡ e0a8dace-aa48-4ed7-958e-0d2595746609
-using NonlinearSolve
-
-# ╔═╡ badf578f-6cc7-48c2-8693-370856d659dd
-@fromparent begin
-	using ..Utils
-	using ..Properties
-end
-
-# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
-using LinearAlgebra
-
 # ╔═╡ f0dae363-b54b-4f43-8f75-ef1f1e525e7d
 using SpecialFunctions
 
@@ -70,12 +40,6 @@ using PETSc
 using PlutoUI
   ╠═╡ =#
 
-# ╔═╡ 8857ee4a-9620-4071-ae78-6e63ea0b7f0e
-using CoolProp
-
-# ╔═╡ a9eddcc7-ac94-483e-8622-e6c9dca8351b
-using Unitful
-
 # ╔═╡ 0405ca05-0ca9-4b6c-ac93-91e5f50cab91
 # ╠═╡ skip_as_script = true
 #=╠═╡
@@ -87,9 +51,6 @@ using Markdown
 #=╠═╡
 using InteractiveUtils
   ╠═╡ =#
-
-# ╔═╡ 79bc4f64-38b6-460d-b244-b3d25de13009
-using DataFrames
 
 # ╔═╡ 4dd5e489-a155-48c3-b7da-0d459f6c7588
 # ╠═╡ skip_as_script = true
@@ -109,6 +70,9 @@ end
 # ╔═╡ 1c61fab6-f56b-460b-870f-8e3a83337312
 using ModelingToolkit
 
+# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
+using LinearAlgebra
+
 # ╔═╡ fa00c042-0b93-4635-ac75-4513e61671ec
 using Nemo
 
@@ -118,14 +82,97 @@ using Nemo
 using PlutoExtras
   ╠═╡ =#
 
+# ╔═╡ 3efb8ab9-1d4b-4408-b224-a85611388348
+using PlutoDevMacros
+
+# ╔═╡ bfdb6ceb-a0e0-4f87-b650-913a3579085e
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Printf
+  ╠═╡ =#
+
+# ╔═╡ 69504032-712c-4d3c-8231-be9f15d683de
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Parquet
+  ╠═╡ =#
+
+# ╔═╡ a943d92d-2672-4f52-9b9e-bfa51f042bcf
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using DuckDB
+  ╠═╡ =#
+
+# ╔═╡ 93d5f510-e03b-4ced-9ae7-ef1837b2fb34
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using PlutoTest
+  ╠═╡ =#
+
+# ╔═╡ e0a8dace-aa48-4ed7-958e-0d2595746609
+using NonlinearSolve
+
+# ╔═╡ badf578f-6cc7-48c2-8693-370856d659dd
+@fromparent begin
+	using ..Properties
+end
+
+# ╔═╡ 57a059fe-3929-4cc5-9591-49fa7cdb18cc
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using MonteCarloMeasurements
+  ╠═╡ =#
+
+# ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Distributions
+  ╠═╡ =#
+
+# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+#=╠═╡
+md" # Imports"
+  ╠═╡ =#
+
+# ╔═╡ 8857ee4a-9620-4071-ae78-6e63ea0b7f0e
+# ╠═╡ disabled = true
+#=╠═╡
+using CoolProp
+  ╠═╡ =#
+
+# ╔═╡ a9eddcc7-ac94-483e-8622-e6c9dca8351b
+# ╠═╡ disabled = true
+#=╠═╡
+using Unitful
+  ╠═╡ =#
+
+# ╔═╡ 79bc4f64-38b6-460d-b244-b3d25de13009
+# ╠═╡ disabled = true
+#=╠═╡
+using DataFrames
+  ╠═╡ =#
+
+# ╔═╡ e01e0c08-459e-4636-8fef-b0f6790ee964
+# ╠═╡ disabled = true
+#=╠═╡
+using FileIO
+  ╠═╡ =#
+
+# ╔═╡ 47acf615-6bce-4b01-bf71-6b9a52316942
+assemble(systems::Vector{NonlinearSystem}; equations=[], name) = ModelingToolkit.compose(NonlinearSystem(equations, [], [], name=name), systems)
+
+
 # ╔═╡ ba2f13d7-0cb8-4556-933c-bb7b5d86db96
 #=╠═╡
 md" # Sub Model: Compressor"
   ╠═╡ =#
 
+# ╔═╡ fe0bff23-112b-439d-b5a6-78a2539c36f3
+
+
 # ╔═╡ 9538bfde-6ac2-4557-aaba-6b5e55f5b774
 function Compressor(; name,
-	fluid= "r134a",
+	fluid= "R134A",
 	η_is = 0.7,
 	V = 0.2/50,
 	# pars
@@ -134,7 +181,6 @@ function Compressor(; name,
 	#xy = [0.0, 0.0], u = [0.0, 0.0]
 )
 	
-	model = SingleFluid(fluid)
 	ps = @parameters begin
 		V = V
 		η_is = η_is
@@ -148,9 +194,9 @@ function Compressor(; name,
 		ṁ = 1.0
 	end
 	
-	@named i = Properties.DynamicRefrigerantProps()
-	@named o_is = Properties.DynamicRefrigerantProps()
-	@named o = Properties.DynamicRefrigerantProps()
+	@named i = Properties.RefrigerantProps(fluid = fluid)
+	@named o_is = Properties.RefrigerantProps(fluid = fluid)
+	@named o = Properties.RefrigerantProps(fluid = fluid)
 	
 	eqs = [
 		# pulling up variables
@@ -177,18 +223,21 @@ function Compressor(; name,
     return ModelingToolkit.compose(sys, [i, o_is, o], name=name)
 end
 
+# ╔═╡ 3d8a6b29-b5de-4a3b-bbf1-d50c94d130cd
+
+
 # ╔═╡ f3b7093a-8527-49b5-9597-f2fec712891f
 @named comp1 = Compressor();
 
-# ╔═╡ 84ddc3d8-66e0-4282-9d86-a26fab25d3bb
+# ╔═╡ 9d89f040-e0ae-4807-876a-2e089363049e
 function test_compressor()
     # Create the borehole model
 	@named compressor = Compressor()
 
 	eqs=[
-		compressor.i.T ~ 300,
+		compressor.i.h ~ 400e3,
 		#compressor.o.T ~ 300,
-		compressor.o.p ~ 2e5,
+		compressor.o.p ~ 4e5,
 		#compressor.o_is.T ~ 300,
 		#compressor.o_is.p ~ 2e5,
 		compressor.i.p ~ 1e5,
@@ -200,15 +249,25 @@ function test_compressor()
     # Create the parent system with connected components
     @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [compressor])
 
-	
     # Simplify and solve
     simpl_sys = structural_simplify(sys)
     problem = NonlinearProblem(simpl_sys, [])
+	return problem
     sol = NonlinearSolve.solve(problem)
+	sol.retcode
 end
 
-# ╔═╡ 4c51d2f1-1223-4033-92f4-4663df1dfa8b
-test_compressor()
+# ╔═╡ 11d90544-aa10-463b-ae1d-d1fa70141e42
+prob = test_compressor()
+
+# ╔═╡ dafad75d-915c-49c0-8cae-2dba35db3bb1
+# ╠═╡ disabled = true
+#=╠═╡
+NonlinearSolve.solve(prob)
+  ╠═╡ =#
+
+# ╔═╡ 43aa4cbb-2930-44e3-86fb-9b421ea81bb3
+sol = NonlinearSolve.solve(prob, NewtonRaphson(), abstol=1e-6, maxiters=1000)
 
 # ╔═╡ c89c0195-7f93-4a49-993a-7efa861db428
 #=╠═╡
@@ -219,6 +278,9 @@ md" ## Sub model: Evaporator"
 #=╠═╡
 md""" # Solving the system"""
   ╠═╡ =#
+
+# ╔═╡ ebf3e61a-c624-407f-9af2-c0e03a39a902
+
 
 # ╔═╡ 5e2946e4-436b-4232-93f6-5549b0a1377d
 function htc(ρ, ṁ, dh, μ, β, b, np)
@@ -336,7 +398,7 @@ begin
 end;
 
 # ╔═╡ 25d99fb7-1c60-4ca8-a929-126ff6140af6
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 	eq_superheating = T_r_out ~ T_evap+ΔT_SH_
@@ -479,57 +541,13 @@ sol_.ps[T_b_in]
 sin(sol_[αL])^2
   ╠═╡ =#
 
-# ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	#https://docs.sciml.ai/NonlinearSolve/stable/solvers/nonlinear_system_solvers/#NLSolvers.jl
-    logger = ConsoleLogger(stderr, Logging.Error)  # Only show errors
-	valid_sols = Any[]
-    # Get variable names as strings and then as symbols
-    names_unk = string.(unknowns)
-    var_names_sym = Symbol.(names_unk)
-    
-    # Global DataFrame columns: Solver and the unknowns
-    col_names = [:Solver; var_names_sym...]
-    results_df = DataFrame([name => Any[] for name in col_names]...)
-
-    for alg in candidate_solvers
-        solver_name = string(typeof(alg))
-        try
-            sol_ = Logging.with_logger(logger) do
-                NonlinearSolve.solve(prob_, alg)
-            end
-            # Create a dictionary where keys are Symbols
-            sol_dict = Dict(var_names_sym .=> sol_.u)
-            # Merge with a dictionary for the solver name:
-            row_dict = merge(Dict(:Solver => solver_name), sol_dict)
-			#row_dict.LA = sol_["LA"]
-            # You can push the dictionary directly as a row:
-            push!(results_df, row_dict)
-            valid_sols= [valid_sols]
-        catch e
-        end
-    end
-    results_df;
-	
-end
-
-  ╠═╡ =#
-
 # ╔═╡ 91478fb6-9ffc-4bc2-94ff-415e11c00c6e
 #=╠═╡
 md" # Combined problem"
   ╠═╡ =#
 
-# ╔═╡ e0e3b049-8874-44f4-a661-50e88d164e3a
-# ╠═╡ disabled = true
-#=╠═╡
-T_b_out |> get_variables
-  ╠═╡ =#
-
 # ╔═╡ 66def5d1-7150-44fa-96be-0540aab0e097
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 	eqs_coupled = [
@@ -665,7 +683,7 @@ md" # BHE + Evap + Compressor"
   ╠═╡ =#
 
 # ╔═╡ bdd82c91-2c36-4b5f-8f0f-e4716bcf61de
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 UA_12_cd_tot |> get_variables
 #	UA_1w_cd_tot = 1/R_1w_cd_tot
@@ -676,7 +694,7 @@ UA_12_cd_tot |> get_variables
   ╠═╡ =#
 
 # ╔═╡ 04cf2b12-35c2-4b4b-abe5-4bce6b2ce1cf
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 	@variables D_p T_p_bh
@@ -686,7 +704,6 @@ end
   ╠═╡ =#
 
 # ╔═╡ c900c406-5e25-467b-8771-feedfe933685
-# ╠═╡ disabled = true
 #=╠═╡
 begin
 	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp
@@ -870,7 +887,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 	
@@ -886,7 +903,7 @@ md" # Internal forced convection"
   ╠═╡ =#
 
 # ╔═╡ beeb113e-3476-41e5-8faa-0123bae41e67
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 function h_tube(;name)
 	ps = @parameters begin
@@ -926,19 +943,19 @@ end
   ╠═╡ =#
 
 # ╔═╡ 2da011ed-131f-48d7-baac-285b2b7d147e
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @named h1 = h_tube()
   ╠═╡ =#
 
 # ╔═╡ 075e8fb2-89ff-4936-8c67-ca8e90159a5a
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @named h2 = h_tube()
   ╠═╡ =#
 
 # ╔═╡ 92c361eb-bb54-4565-8ac6-d6cbad4141d9
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
 	ps = @parameters begin
@@ -965,8 +982,20 @@ function Prop_SF(;name, fluid::String = "ethanol", χ0 = 0.285)
 end
   ╠═╡ =#
 
+# ╔═╡ 3cd0e1aa-f35e-4455-ae74-5973bbedd54d
+# ╠═╡ skip_as_script = true
+#=╠═╡
+begin
+	
+		ρ_g_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:gas)
+		ρ_l_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:liquid)
+		@register_symbolic ρ_l_(p, T)
+		@register_symbolic ρ_g_(p, T)
+end
+  ╠═╡ =#
+
 # ╔═╡ 569d53eb-45d2-47d0-93cb-866018abeb4f
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 function Prop_REF_gas(;name, refrigerant::String = "R134A")
 	ps = @parameters begin
@@ -991,20 +1020,8 @@ function Prop_REF_gas(;name, refrigerant::String = "R134A")
 end
   ╠═╡ =#
 
-# ╔═╡ 3cd0e1aa-f35e-4455-ae74-5973bbedd54d
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	
-		ρ_g_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:gas)
-		ρ_l_(p, T) = 1/Clapeyron.volume(modelref, p, T, phase=:liquid)
-		@register_symbolic ρ_l_(p, T)
-		@register_symbolic ρ_g_(p, T)
-end
-  ╠═╡ =#
-
 # ╔═╡ ad17bd58-b5c6-4560-9be4-ff2eadf594d9
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 function Prop_REF_liq(;name, refrigerant::String = "R134A")
 	ps = @parameters begin
@@ -1029,7 +1046,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ e83823bb-e069-4e5d-9d94-b22b09135a94
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 #TDL: make the htc into other components
 function Evaporator(;name, refrigerant::String = "R134A")
@@ -1196,7 +1213,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 30ed60b4-8ef8-4a0a-995d-1a8e7cb1249a
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 @named Evap1 = Evaporator();
@@ -1324,7 +1341,7 @@ md" # Quick analysis: parametric study"
   ╠═╡ =#
 
 # ╔═╡ 9058e171-6b6f-4478-a492-40cbb7cbf406
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 	m_Y = [median(y.particles) for y in YY]
@@ -1334,7 +1351,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 274c189d-8325-4634-927b-f40976190bb2
-# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
 fig_study = Makie.lines(XX, m_Y)
@@ -1343,16 +1360,10 @@ fig_study = Makie.lines(XX, m_Y)
 end
   ╠═╡ =#
 
-# ╔═╡ 57a059fe-3929-4cc5-9591-49fa7cdb18cc
+# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
 # ╠═╡ disabled = true
 #=╠═╡
-using MonteCarloMeasurements
-  ╠═╡ =#
-
-# ╔═╡ 086bc03f-081e-428b-b3e5-62d90a632bec
-# ╠═╡ disabled = true
-#=╠═╡
-using Distributions
+using LinearAlgebra
   ╠═╡ =#
 
 # ╔═╡ b7c12215-f78a-4b4f-8c4e-46228b5687dc
@@ -1398,30 +1409,54 @@ candidate_solvers = [
     #PETScSNES(),
 	];
 
+# ╔═╡ f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
+#=╠═╡
+begin
+	#https://docs.sciml.ai/NonlinearSolve/stable/solvers/nonlinear_system_solvers/#NLSolvers.jl
+    logger = ConsoleLogger(stderr, Logging.Error)  # Only show errors
+	valid_sols = Any[]
+    # Get variable names as strings and then as symbols
+    names_unk = string.(unknowns)
+    var_names_sym = Symbol.(names_unk)
+    
+    # Global DataFrame columns: Solver and the unknowns
+    col_names = [:Solver; var_names_sym...]
+    results_df = DataFrame([name => Any[] for name in col_names]...)
+
+    for alg in candidate_solvers
+        solver_name = string(typeof(alg))
+        try
+            sol_ = Logging.with_logger(logger) do
+                NonlinearSolve.solve(prob_, alg)
+            end
+            # Create a dictionary where keys are Symbols
+            sol_dict = Dict(var_names_sym .=> sol_.u)
+            # Merge with a dictionary for the solver name:
+            row_dict = merge(Dict(:Solver => solver_name), sol_dict)
+			#row_dict.LA = sol_["LA"]
+            # You can push the dictionary directly as a row:
+            push!(results_df, row_dict)
+            valid_sols= [valid_sols]
+        catch e
+        end
+    end
+    results_df;
+	
+end
+
+  ╠═╡ =#
+
 # ╔═╡ 38384b61-a30c-435c-a13c-228f16e6169e
 #=╠═╡
 md"---"
-  ╠═╡ =#
-
-# ╔═╡ 679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-#=╠═╡
-md" # Imports"
-  ╠═╡ =#
-
-# ╔═╡ fbf3c417-8b31-4256-8981-84b0f0ce34b0
-# ╠═╡ disabled = true
-#=╠═╡
-using LinearAlgebra
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
-CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DuckDB = "d2f5444f-75bc-4fdf-ac35-56f514c445e1"
-FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -1429,6 +1464,7 @@ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MINPACK = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 NLSolvers = "337daf1e-9722-11e9-073e-8b9effe078ba"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
@@ -1444,18 +1480,16 @@ SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
-Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
-Clapeyron = "~0.6.10"
-CoolProp = "~0.2.0"
-DataFrames = "~1.7.0"
+Clapeyron = "~0.6.13"
+Distributions = "~0.25.119"
 DuckDB = "~1.2.2"
-FileIO = "~1.17.0"
 Interpolations = "~0.15.1"
 MINPACK = "~1.3.0"
 ModelingToolkit = "~9.62.0"
+MonteCarloMeasurements = "~1.4.6"
 NLSolvers = "~0.5.0"
 NLsolve = "~4.5.1"
 Nemo = "~0.48.1"
@@ -1470,7 +1504,6 @@ SIAMFANLEquations = "~1.0.2"
 SpecialFunctions = "~2.5.0"
 SteadyStateDiffEq = "~2.4.1"
 Sundials = "~4.26.1"
-Unitful = "~1.22.0"
 WGLMakie = "~0.11.1"
 """
 
@@ -1480,7 +1513,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "3423cec36b2235ae9c56cd1a10c43cea43cfec10"
+project_hash = "148261bfd048aa2ddd50124e113851aa1064376d"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fb97701c117c8162e84dfcf80215caa904aef44f"
@@ -1798,9 +1831,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.Clapeyron]]
 deps = ["BlackBoxOptim", "CSV", "DiffResults", "Downloads", "FillArrays", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "NLSolvers", "OrderedCollections", "PackedVectorsOfVectors", "PositiveFactorizations", "PrecompileTools", "Preferences", "Roots", "Scratch", "SparseArrays", "StableTasks", "StaticArrays", "Tables", "UUIDs"]
-git-tree-sha1 = "122da4c3d5069b75d5f176736647a356b523a44a"
+git-tree-sha1 = "a5eb507e2a680e3397e2e8b6e930f39d11a7cdbe"
 uuid = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
-version = "0.6.10"
+version = "0.6.13"
 
     [deps.Clapeyron.extensions]
     ClapeyronCoolPropExt = "CoolProp"
@@ -1961,18 +1994,6 @@ git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
 
-[[deps.CoolProp]]
-deps = ["CoolProp_jll", "Markdown", "Unitful"]
-git-tree-sha1 = "e17766ab84c180ffde975e1128109fa389fdf22c"
-uuid = "e084ae63-2819-5025-826e-f8e611a84251"
-version = "0.2.0"
-
-[[deps.CoolProp_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "f0f70a17d132d2ab5bf2b61993db36ac1099f6c7"
-uuid = "3351c21f-4feb-5f29-afb9-f4fcb0e27549"
-version = "6.6.0+0"
-
 [[deps.CpuId]]
 deps = ["Markdown"]
 git-tree-sha1 = "fcbb72b032692610bfbdb15018ac16a36cf2e406"
@@ -1993,12 +2014,6 @@ version = "2.6.1"
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.16.0"
-
-[[deps.DataFrames]]
-deps = ["Compat", "DataAPI", "DataStructures", "Future", "InlineStrings", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrecompileTools", "PrettyTables", "Printf", "Random", "Reexport", "SentinelArrays", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "fb61b4812c49343d7ef0b533ba982c46021938a6"
-uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.7.0"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -2513,6 +2528,12 @@ git-tree-sha1 = "83cf05ab16a73219e5f6bd1bdfa9848fa24ac627"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
 
+[[deps.GenericSchur]]
+deps = ["LinearAlgebra", "Printf"]
+git-tree-sha1 = "f88e0ba1f6b42121a7c1dfe93a9687d8e164c91b"
+uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
+version = "0.5.5"
+
 [[deps.GeoFormatTypes]]
 git-tree-sha1 = "8e233d5167e63d708d41f87597433f59a0f213fe"
 uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
@@ -2587,6 +2608,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "55c53be97790242c29031e5cd45e8ac296dadda3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.0+0"
+
+[[deps.HostCPUFeatures]]
+deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Libdl", "Static"]
+git-tree-sha1 = "8e070b599339d622e9a081d17230d74a5c473293"
+uuid = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
+version = "0.1.17"
 
 [[deps.Hwloc_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -2742,11 +2769,6 @@ weakdeps = ["Dates", "Test"]
     InverseFunctionsDatesExt = "Dates"
     InverseFunctionsTestExt = "Test"
 
-[[deps.InvertedIndices]]
-git-tree-sha1 = "6da3c4316095de0f5ee2ebd875df8721e7e0bdbe"
-uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
-version = "1.3.1"
-
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
@@ -2788,9 +2810,9 @@ version = "0.21.4"
 
 [[deps.JSON3]]
 deps = ["Dates", "Mmap", "Parsers", "PrecompileTools", "StructTypes", "UUIDs"]
-git-tree-sha1 = "1d322381ef7b087548321d3f878cb4c9bd8f8f9b"
+git-tree-sha1 = "411eccfe8aba0814ffa0fdf4860913ed09c34975"
 uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
-version = "1.14.1"
+version = "1.14.3"
 
     [deps.JSON3.extensions]
     JSON3ArrowExt = ["ArrowTypes"]
@@ -3249,6 +3271,26 @@ version = "9.62.0"
     InfiniteOpt = "20393b10-9daf-11e9-18c9-8db751c92c57"
     LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
 
+[[deps.MonteCarloMeasurements]]
+deps = ["Distributions", "GenericSchur", "LinearAlgebra", "MacroTools", "Random", "SLEEFPirates", "StaticArrays", "Statistics", "StatsBase"]
+git-tree-sha1 = "e9f946f013632de7ba4f399bbdc339bbb28cc4ec"
+uuid = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+version = "1.4.6"
+
+    [deps.MonteCarloMeasurements.extensions]
+    ForwardDiffExt = "ForwardDiff"
+    MakieExt = "Makie"
+    MeasurementsExt = "Measurements"
+    RecipesBaseExt = "RecipesBase"
+    UnitfulExt = "Unitful"
+
+    [deps.MonteCarloMeasurements.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
 [[deps.MosaicViews]]
 deps = ["MappedArrays", "OffsetArrays", "PaddedViews", "StackViews"]
 git-tree-sha1 = "7b86a5d4d70a9f5cdf2dacb3cbe6d251d1a61dbe"
@@ -3653,12 +3695,6 @@ git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.4.3"
 
-[[deps.PrettyTables]]
-deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "1101cd475833706e4d0e7b122218257178f48f34"
-uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "2.4.0"
-
 [[deps.Primes]]
 deps = ["IntegerMathUtils"]
 git-tree-sha1 = "cb420f77dc474d23ee47ca8d14c90810cafe69e7"
@@ -3813,9 +3849,9 @@ version = "0.5.1+0"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "442b4353ee8c26756672afb2db81894fc28811f3"
+git-tree-sha1 = "3ac13765751ffc81e3531223782d9512f6023f71"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.2.6"
+version = "2.2.7"
 
     [deps.Roots.extensions]
     RootsChainRulesCoreExt = "ChainRulesCore"
@@ -3874,6 +3910,12 @@ version = "3.7.1"
 git-tree-sha1 = "330289636fb8107c5f32088d2741e9fd7a061a5c"
 uuid = "94e857df-77ce-4151-89e5-788b33177be4"
 version = "0.1.0"
+
+[[deps.SLEEFPirates]]
+deps = ["IfElse", "Static", "VectorizationBase"]
+git-tree-sha1 = "456f610ca2fbd1c14f5fcf31c6bfadc55e7d66e0"
+uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
+version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "Expronicon", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
@@ -4056,9 +4098,9 @@ uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
 version = "1.0.2"
 
 [[deps.StableTasks]]
-git-tree-sha1 = "db1a5a7807c3b21fbbd853c835ce4fcb178993c7"
+git-tree-sha1 = "c4f6610f85cb965bee5bfafa64cbeeda55a4e0b2"
 uuid = "91464d47-22a1-43fe-8b7f-2d57ee82463f"
-version = "0.1.6"
+version = "0.1.7"
 
 [[deps.StackViews]]
 deps = ["OffsetArrays"]
@@ -4143,12 +4185,6 @@ deps = ["ArrayInterface", "CloseOpenIntervals", "IfElse", "LayoutPointers", "Lin
 git-tree-sha1 = "f35f6ab602df8413a50c4a25ca14de821e8605fb"
 uuid = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 version = "0.5.7"
-
-[[deps.StringManipulation]]
-deps = ["PrecompileTools"]
-git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
-uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
-version = "0.4.1"
 
 [[deps.StructArrays]]
 deps = ["ConstructionBase", "DataAPI", "Tables"]
@@ -4397,6 +4433,12 @@ git-tree-sha1 = "25008b734a03736c41e2a7dc314ecb95bd6bbdb0"
 uuid = "a7c27f48-0311-42f6-a7f8-2c11e75eb415"
 version = "0.1.6"
 
+[[deps.VectorizationBase]]
+deps = ["ArrayInterface", "CPUSummary", "HostCPUFeatures", "IfElse", "LayoutPointers", "Libdl", "LinearAlgebra", "SIMDTypes", "Static", "StaticArrayInterface"]
+git-tree-sha1 = "4ab62a49f1d8d9548a1c8d1a75e5f55cf196f64e"
+uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
+version = "0.21.71"
+
 [[deps.WGLMakie]]
 deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
 git-tree-sha1 = "d76bbe29bdac0dc4096e3838c044ed079bb8682b"
@@ -4609,6 +4651,29 @@ version = "3.6.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╟─679aae37-451e-4bf2-b7ef-c8ba6bb9e542
+# ╠═f0dae363-b54b-4f43-8f75-ef1f1e525e7d
+# ╠═0e6790ed-f7fd-49ac-939a-72ff4f782b98
+# ╠═42268bb5-c95c-45ab-bdc6-125897bb0fcf
+# ╠═1d44ba55-15e5-4691-86e1-bc6429e34938
+# ╠═42976c82-9438-4f83-85e9-332e63bd9ce4
+# ╠═31371da9-384d-4ec4-95da-260f22b40bcd
+# ╠═879d3fb5-b766-4bde-80f9-75b676e743c0
+# ╠═b4bd9251-e114-411d-8fde-d528e6176c0c
+# ╠═4fd26428-13ca-48ad-9dae-faa408eb3899
+# ╠═43d00f8a-9f71-47d1-b68d-d51f3e4b6bfc
+# ╠═bc6d9b90-734e-4d9d-be0f-104a3b99aea2
+# ╠═8857ee4a-9620-4071-ae78-6e63ea0b7f0e
+# ╠═a9eddcc7-ac94-483e-8622-e6c9dca8351b
+# ╠═0405ca05-0ca9-4b6c-ac93-91e5f50cab91
+# ╠═c691da35-ff83-4dc6-af9f-2be03d95187a
+# ╠═79bc4f64-38b6-460d-b244-b3d25de13009
+# ╠═4dd5e489-a155-48c3-b7da-0d459f6c7588
+# ╠═f6b9843f-bb5e-4275-bea2-05e9d594207f
+# ╠═1c61fab6-f56b-460b-870f-8e3a83337312
+# ╠═fbf3c417-8b31-4256-8981-84b0f0ce34b0
+# ╠═fa00c042-0b93-4635-ac75-4513e61671ec
+# ╠═e5f88f64-0777-4a12-8fff-ab0c2b468a7c
 # ╠═3efb8ab9-1d4b-4408-b224-a85611388348
 # ╠═bfdb6ceb-a0e0-4f87-b650-913a3579085e
 # ╠═69504032-712c-4d3c-8231-be9f15d683de
@@ -4617,13 +4682,19 @@ version = "3.6.0+0"
 # ╠═93d5f510-e03b-4ced-9ae7-ef1837b2fb34
 # ╠═e0a8dace-aa48-4ed7-958e-0d2595746609
 # ╠═badf578f-6cc7-48c2-8693-370856d659dd
+# ╠═47acf615-6bce-4b01-bf71-6b9a52316942
 # ╟─ba2f13d7-0cb8-4556-933c-bb7b5d86db96
+# ╠═fe0bff23-112b-439d-b5a6-78a2539c36f3
 # ╠═9538bfde-6ac2-4557-aaba-6b5e55f5b774
+# ╠═3d8a6b29-b5de-4a3b-bbf1-d50c94d130cd
 # ╠═f3b7093a-8527-49b5-9597-f2fec712891f
-# ╟─84ddc3d8-66e0-4282-9d86-a26fab25d3bb
-# ╠═4c51d2f1-1223-4033-92f4-4663df1dfa8b
+# ╠═9d89f040-e0ae-4807-876a-2e089363049e
+# ╠═11d90544-aa10-463b-ae1d-d1fa70141e42
+# ╠═dafad75d-915c-49c0-8cae-2dba35db3bb1
+# ╠═43aa4cbb-2930-44e3-86fb-9b421ea81bb3
 # ╟─c89c0195-7f93-4a49-993a-7efa861db428
 # ╟─1b08d63a-db57-44c7-b1ec-10acbcaa7951
+# ╠═ebf3e61a-c624-407f-9af2-c0e03a39a902
 # ╠═5e2946e4-436b-4232-93f6-5549b0a1377d
 # ╠═d4aba512-dd8c-49a5-a7b1-eccf7ca24eab
 # ╠═25d99fb7-1c60-4ca8-a929-126ff6140af6
@@ -4634,7 +4705,6 @@ version = "3.6.0+0"
 # ╠═352f52d6-70ec-47d7-8b46-892f6f1f6184
 # ╠═f19816e2-4bdc-4467-9504-c5eb0b0d1dd0
 # ╟─91478fb6-9ffc-4bc2-94ff-415e11c00c6e
-# ╠═e0e3b049-8874-44f4-a661-50e88d164e3a
 # ╠═66def5d1-7150-44fa-96be-0540aab0e097
 # ╠═bdda6bf9-673d-4127-8de4-4d92576a87b8
 # ╠═51248ccf-dcff-416f-9500-9e0099062c55
@@ -4688,28 +4758,5 @@ version = "3.6.0+0"
 # ╟─1d57cda4-8948-4b00-be29-4acbc17dd7ae
 # ╠═8da5d4ea-0951-4e87-8e2b-45000a2cf95a
 # ╟─38384b61-a30c-435c-a13c-228f16e6169e
-# ╟─679aae37-451e-4bf2-b7ef-c8ba6bb9e542
-# ╠═f0dae363-b54b-4f43-8f75-ef1f1e525e7d
-# ╠═0e6790ed-f7fd-49ac-939a-72ff4f782b98
-# ╠═42268bb5-c95c-45ab-bdc6-125897bb0fcf
-# ╠═1d44ba55-15e5-4691-86e1-bc6429e34938
-# ╠═42976c82-9438-4f83-85e9-332e63bd9ce4
-# ╠═31371da9-384d-4ec4-95da-260f22b40bcd
-# ╠═879d3fb5-b766-4bde-80f9-75b676e743c0
-# ╠═b4bd9251-e114-411d-8fde-d528e6176c0c
-# ╠═4fd26428-13ca-48ad-9dae-faa408eb3899
-# ╠═43d00f8a-9f71-47d1-b68d-d51f3e4b6bfc
-# ╠═bc6d9b90-734e-4d9d-be0f-104a3b99aea2
-# ╠═8857ee4a-9620-4071-ae78-6e63ea0b7f0e
-# ╠═a9eddcc7-ac94-483e-8622-e6c9dca8351b
-# ╠═0405ca05-0ca9-4b6c-ac93-91e5f50cab91
-# ╠═c691da35-ff83-4dc6-af9f-2be03d95187a
-# ╠═79bc4f64-38b6-460d-b244-b3d25de13009
-# ╠═4dd5e489-a155-48c3-b7da-0d459f6c7588
-# ╠═f6b9843f-bb5e-4275-bea2-05e9d594207f
-# ╠═1c61fab6-f56b-460b-870f-8e3a83337312
-# ╠═fbf3c417-8b31-4256-8981-84b0f0ce34b0
-# ╠═fa00c042-0b93-4635-ac75-4513e61671ec
-# ╠═e5f88f64-0777-4a12-8fff-ab0c2b468a7c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

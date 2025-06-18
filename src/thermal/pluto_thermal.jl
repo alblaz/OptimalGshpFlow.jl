@@ -4,18 +4,6 @@
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    #! format: off
-    return quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-    #! format: on
-end
-
 # ╔═╡ 2f0fd7c9-b47c-45ee-8a92-e7cf468c5ae0
 using PlutoDevMacros
 
@@ -39,12 +27,14 @@ using PlutoTest
 
 # ╔═╡ f05d0696-202e-4158-bf2a-a47c33493f71
 @fromparent begin
-	#using ..Utils
 	using ..Properties
 end
 
 # ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using MonteCarloMeasurements
+  ╠═╡ =#
 
 # ╔═╡ da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
 using Distributions
@@ -80,7 +70,10 @@ using NLSolvers
 using PETSc
 
 # ╔═╡ 9a1c9032-fd54-401e-9c34-8f4004724674
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoUI
+  ╠═╡ =#
 
 # ╔═╡ 9577e62f-795a-4d33-9667-fca61b12ee75
 using Unitful
@@ -89,24 +82,35 @@ using Unitful
 using Markdown
 
 # ╔═╡ 05128731-497f-44ab-9786-10fca398f149
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using InteractiveUtils
+  ╠═╡ =#
 
 # ╔═╡ eca62203-4f5b-48b7-8a9f-7e515ae99842
 using Logging
 
 # ╔═╡ e0c96a01-908c-409d-81c5-2d6475ad7f14
+# ╠═╡ skip_as_script = true
+#=╠═╡
 begin
     using WGLMakie
     set_theme!(theme_dark())
 end
+  ╠═╡ =#
 
 # ╔═╡ d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
 using Nemo
 
 # ╔═╡ 47ac09a5-9907-4283-8ea9-6f8c584a989a
+# ╠═╡ skip_as_script = true
+#=╠═╡
 using PlutoExtras
+  ╠═╡ =#
 
 # ╔═╡ 48ef9603-6e6c-4d78-a85d-f26436ef3348
+# ╠═╡ skip_as_script = true
+#=╠═╡
 function U_fill_R_s(;name, J::Int=1)
 	ps = @parameters begin
 		λ_ground = 3.5
@@ -164,15 +168,7 @@ function U_fill_R_s(;name, J::Int=1)
 
 	return NonlinearSystem(eqs, sts, ps; name = name);
 end
-
-# ╔═╡ e3e8a633-0572-4032-a6ed-3c03ead67180
-md" # U-tube: filled"
-
-# ╔═╡ cd4d60e8-724c-4fe9-8947-061df7072bf4
-
-
-# ╔═╡ 4cfd9965-69d0-4409-a15e-bc5a0fec9f11
-md" # U tube: grouted"
+  ╠═╡ =#
 
 # ╔═╡ df8d848c-bde6-477a-b9ff-09154b3ee375
 md" # Quick analysis: parametric study"
@@ -471,6 +467,7 @@ function test_utube_borehole()
 end
 
 # ╔═╡ 4fe2de48-d332-48a7-8bad-0193769b5955
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @test test_utube_borehole()
   ╠═╡ =#
@@ -896,6 +893,7 @@ function test_utube_resistances_with_htc()
 end
 
 # ╔═╡ ed6d7ff7-7c72-4445-9627-d9141c5031dc
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @test test_utube_resistances_with_htc()
   ╠═╡ =#
@@ -1177,6 +1175,7 @@ function test_grouted_borehole_resistance()
 end
 
 # ╔═╡ d16dbefd-39cc-4cba-b6f2-64365b180324
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @test test_grouted_borehole_resistance()
   ╠═╡ =#
@@ -1332,7 +1331,7 @@ end
 test_utube_grouted()
 
 # ╔═╡ 118c0637-66e7-4347-90e4-89c65083e48e
-function DynamicUTubeGrouted(; name::Symbol, fluid="mea", χ=1.0,
+function DynamicUTubeGrouted(; name::Symbol, fluid="MEA", χ=1.0,
                            depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
                            D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
                            T_wall=283.15, s=0.075)
@@ -1421,6 +1420,7 @@ function test_dynamic_utube_grouted()
 end
 
 # ╔═╡ eb6a37cb-5e84-4826-a1d1-17b70b683717
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @test test_dynamic_utube_grouted()
   ╠═╡ =#
@@ -1467,25 +1467,35 @@ begin
 end
 
 # ╔═╡ 3f467f08-fbbf-4768-adcb-312f6b005dc9
+#=╠═╡
 # Register your solve_wrapper
 @time register_primitive_multi(solve_uncertain)
 
 # Then call it directly on Particles inputs:
+  ╠═╡ =#
 
 # ╔═╡ 19907f6b-84d2-4fc8-b931-b2e769bc00a0
 N = 100
 
 # ╔═╡ 782c2ab9-51c0-4814-a301-77f19b917bd5
+#=╠═╡
 χ = Particles(N, Uniform(0.1,0.4))
+  ╠═╡ =#
 
 # ╔═╡ 38fc7166-b946-40ef-ba90-826617d743dc
+#=╠═╡
 T_ = Particles(N, Uniform(295,305))
+  ╠═╡ =#
 
 # ╔═╡ 20dd46ac-da6b-4965-bca2-4b599ef10bb2
+#=╠═╡
 ṁ = Particles(N, Uniform(.020,1.0))
+  ╠═╡ =#
 
 # ╔═╡ c1891c9d-d5c7-42ab-9780-a8b93d580386
+#=╠═╡
 @time out_tuple = solve_uncertain(χ, T_, ṁ)  # returns a tuple of Particles
+  ╠═╡ =#
 
 # ╔═╡ 7847e709-1ed5-4313-b9e5-bbc6e391c059
 T_down(p, T_wall, x) = T_wall + p[5] * exp(p[1] * x) + p[6] * exp(p[2] * x)
@@ -1589,72 +1599,6 @@ md"""
 
 # ╔═╡ e884fbb3-e069-484d-87fa-c84535f02403
 md"# Utilities"
-
-# ╔═╡ 62625d10-5988-43dc-9ce0-4ea60f9f6e29
-begin
-	brine_bond = PlutoExtras.@BondsList "Secondary fluid" let tv = PlutoUI.Experimental.transformed_value
-	    md"Secondary fluid" = @bind fluid Select(["MEA" => "Ethanol - Water", "Water" => "Water", "MEG" => "Eth. Glycol - Water"])
-	    md"Fluid freezing temperature" = @bind Tfreeze_ Scrubbable(-20:0.1:20.0, default = 0.0, suffix = " °C")
-	    md"Concentration" = @bind χ_ tv(x -> x / 100, Scrubbable(0.0:1.0:100.0, default = 28.5, format=".0s", suffix = " % (mass)"))
-	    md"Temperature difference fluid-superheat" = @bind ΔT_brine_ Scrubbable(1.0:0.5:15.0, default = 5.0, suffix = " °C")
-	end
-
-	evap_bond = PlutoExtras.@BondsList "Evaporator" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant" = @bind refrigerant Select(["R134A" => "R134A", "R290" => "R290 (propane)"])
-		md"Width"  = @bind W_ Scrubbable(0.0:0.05:1.0, default = .20, suffix = " m")
-		md"Length"  = @bind L_PHX_ Scrubbable(0.0:0.05:1.0, default = .30, suffix = " m")
-		md"Number of plates"  = @bind np_ Scrubbable(1.0:1:30.0, default = 20.0)
-	end
-	
-	oper_bond = PlutoExtras.@BondsList "Operation" let tv = PlutoUI.Experimental.transformed_value
-		md"Refrigerant mass flow" = @bind ṁ_r_ Scrubbable(0.0:0.05:1.0, default = .1, suffix = " kg/s")
-		#md"Sec. fluid mass flow" = @bind ṁ_b_ Scrubbable(0.0:0.05:5.0, default = .3, suffix = " kg/s")
-		md"Evaporation temperature" = @bind T_evap_ Scrubbable(-20:0.1:20.0; default=-5.0, suffix = " °C")
-		md"Superheating degree" = @bind ΔT_SH_ Scrubbable(1.0:0.1:10.0; default=7.0, suffix = " K")
-	end
-
-	PlutoExtras.BondTable([oper_bond, brine_bond, evap_bond], description = "Inputs", collapsed = false)
-end
-
-# ╔═╡ 686d6091-d607-43df-9d0a-7fbf5c907086
-# Function to compute the largest rectangle in a binary matrix.
-# Returns the best rectangle as (row_min, row_max, col_min, col_max) and its area.
-function largest_valid_submatrix(B)
-    m, n = size(B)
-    height = zeros(Int, n)  # height histogram for each column
-    best_area = 0
-    best_coords = (1, 1, 1, 1)
-
-    for i in 1:m
-        # Update histogram: if B[i,j] is valid then increment, else reset to 0.
-        for j in 1:n
-            height[j] = B[i, j] ? height[j] + 1 : 0
-        end
-        # Compute largest rectangle in histogram for this row.
-        # We'll use a stack; the algorithm is similar to the classic one.
-        stack = Int[]  # will store column indices
-        # Process columns from 1 to n and add a sentinel at the end.
-        for j in 1:(n+1)
-            cur_height = (j <= n) ? height[j] : 0
-            while !isempty(stack) && cur_height < height[stack[end]]
-                h = height[pop!(stack)]
-                # Determine width of the rectangle
-                w = isempty(stack) ? j - 1 : j - stack[end] - 1
-                area = h * w
-                if area > best_area
-                    best_area = area
-                    row_max = i
-                    row_min = i - h + 1
-                    col_min = isempty(stack) ? 1 : stack[end] + 1
-                    col_max = j - 1
-                    best_coords = (row_min, row_max, col_min, col_max)
-                end
-            end
-            push!(stack, j)
-        end
-    end
-    return best_coords, best_area
-end
 
 # ╔═╡ b1eab00d-89c6-4868-bdc9-5537a8cdab3c
 md" # Other"
@@ -5355,9 +5299,6 @@ version = "1.8.1+0"
 # ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
 # ╠═f05d0696-202e-4158-bf2a-a47c33493f71
 # ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
-# ╠═e3e8a633-0572-4032-a6ed-3c03ead67180
-# ╠═cd4d60e8-724c-4fe9-8947-061df7072bf4
-# ╠═4cfd9965-69d0-4409-a15e-bc5a0fec9f11
 # ╠═df8d848c-bde6-477a-b9ff-09154b3ee375
 # ╠═4e432eee-7c1e-4a89-8a06-3ba874f55e2b
 # ╠═da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
@@ -5385,8 +5326,8 @@ version = "1.8.1+0"
 # ╠═303c4cac-c9b9-42f7-8fc7-85239423b0e4
 # ╠═2d42a7e9-c756-4053-858e-5659e069470a
 # ╠═ed6d7ff7-7c72-4445-9627-d9141c5031dc
-# ╟─aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
-# ╟─792fa039-6cea-4a46-80a3-d4ce16114676
+# ╠═aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
+# ╠═792fa039-6cea-4a46-80a3-d4ce16114676
 # ╠═f9e43407-de5b-4158-9e6c-b5127eb3930d
 # ╠═f76e582c-f4b9-46b4-b416-28d5f2fac519
 # ╠═9c1b132f-451d-4803-b71f-27f3542c44a5
@@ -5414,8 +5355,6 @@ version = "1.8.1+0"
 # ╟─1093c1d5-3263-4a81-9e9d-9677b3003ea4
 # ╠═8a44ecc5-6553-4450-b5cf-ac456c89229e
 # ╠═e884fbb3-e069-484d-87fa-c84535f02403
-# ╠═62625d10-5988-43dc-9ce0-4ea60f9f6e29
-# ╠═686d6091-d607-43df-9d0a-7fbf5c907086
 # ╠═b1eab00d-89c6-4868-bdc9-5537a8cdab3c
 # ╠═345b1fa8-ee00-4a6f-8d6d-5cec9fe5151a
 # ╟─082476a0-a87b-4c16-a8fe-a19290772c07
@@ -5427,7 +5366,7 @@ version = "1.8.1+0"
 # ╠═f676116d-a5c9-4b82-be7f-55d1938f79d2
 # ╠═f0d4f7ae-85e7-44c0-8006-2c585e102304
 # ╠═b1016786-e40b-446a-b963-cf99c1249f0b
-# ╠═83e53fd9-15a5-4b11-b918-76fcca073f8e
+# ╟─83e53fd9-15a5-4b11-b918-76fcca073f8e
 # ╠═1e019ddb-1873-4cea-a765-83b6f7316b34
 # ╠═94eef45c-9d7d-4f74-aa18-b95bf11e2196
 # ╠═7fc1869e-4ccb-4ffc-97a5-31589089fd75

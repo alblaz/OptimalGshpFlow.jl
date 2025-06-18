@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -1295,177 +1295,6 @@ html"""
 </style>
 """
 
-# ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp ṁ_comp
-	eqs_all = [
-		# Define the inlet and outlet isentropic entropies:
-		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		
-		# Define the inlet and outlet enthalpies:
-		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
-		
-		# Enforce the isentropic condition:
-		s_comp_in ~ s_comp_out_is,
-		
-		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
-		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
-	
-		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		ṁ_comp ~ ṁ_r,
-		ṁ_comp ~ V̇_comp * ρ_comp_in,
-		V̇_comp ~ f_comp * V_comp,
-		W_comp ~ ṁ_comp*(h_comp_out-h_comp_in),
-
-		T_r_out ~ T_evap+ΔT_SH,
-		h_r_in ~ h_bub_(p_PC(T_evap)),
-		T_b_out ~ Tbh_in,
-		Tbh_out ~ T_b_in,
-
-		
-		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
-		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
-	    ];
-
-	
-	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_comp, ṁ_r, ρ_comp_in,V̇_comp, ṁ_comp,
-		Tbh_in, T_b_in, αL, ṁ_b,
-	T_p_b, T_p_1, T_p_2]
-
-	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
-		b,
-		W,
-		np,
-		ϕ,
-		β,
-		L_PHX,
-		
-		#ṁ_r,
-		#ṁ_b,
-		
-		T_evap,
-		T_wall,
-		
-		#T_b_in,
-		#T_p_b,
-		T_p_r,
-		
-		λ_Cu,
-		th,
-
-		χ,
-
-		#αL,
-
-		L_bh,
-
-		UA_12,
-		UA_1w,
-		UA_2w,
-
-		#T_p_1,
-		#T_p_2,
-
-		ΔT_SH,
-	]
-	
-	guesses_all = [
-		# BH parameters
-		L_bh => 300.0,
-		UA_12 => 2,
-		UA_1w => 2,
-		UA_2w => 2,
-		
-		χ => χ_,
-
-		# Evaporator
-		
-		λ_Cu=> 300.0,
-		th => 1e-3,
-		
-		b => 2e-3,
-		W => W_,
-		np => np_,
-		ϕ => 1.189,
-		β => 30.0,
-		L_PHX => L_PHX_,
-
-		#Compressor
-		η_comp => 0.8,
-		V_comp => 0.1/50,
-
-		
-		# Operating conditions
-		f_comp => 50,
-
-		
-		T_evap => 273.15 + T_evap_,
-		T_p_r => T_evap,
-		T_wall => T_evap+20,
-
-		
-		T_b_in => 0.4T_evap+0.6T_wall,
-		Tbh_in => 0.6T_evap+0.4T_wall,
-
-		T_p_b => T_b_in,
-
-		T_p_1 => Tbh_in,
-		T_p_2 => Tbh_in,
-		
-		ΔT_SH => 5.0,
-		#---
-		
-		# Initial guesses:
-		ṁ_r => 0.4,
-		ṁ_comp => 0.4,
-		ṁ_b => 1.0,
-		αL => pi/2,
-
-		
-		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
-		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		s_comp_in => s_comp_out_is,
-		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
-		T_comp_out => T_comp_in + 10.0,
-		T_comp_out_is => T_comp_in + 10.0,
-		T_comp_in => 293.0,
-		P_comp_in => 101325.0,
-		ρ_comp_in => 1.0,
-		P_comp_out => 300000.0,
-		V̇_comp => V_comp*f_comp,
-		W_comp => 0.0,
-	
-	];
-	
-	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
-	all_coupled_ = complete(simplify(all_coupled));
-	
-	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
-
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
-	
-end
-  ╠═╡ =#
-
-# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	
-	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
-	sol_all.retcode
-	
-end
-  ╠═╡ =#
-
 # ╔═╡ c900c406-5e25-467b-8771-feedfe933685
 # ╠═╡ disabled = true
 #=╠═╡
@@ -1648,179 +1477,6 @@ begin
 	
 	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
 end
-  ╠═╡ =#
-
-# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-    # Plot using WGLMakie
-    fig = Figure(size=(800,600))
-    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
-              title="Evaporator temperature profile")
-    
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
-    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
-	
-    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
-    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
-    
-    # Add a vertical dashed line at x = L_EV_func()
-    vline = L_EV_func()
-    vlines!(ax, [vline], color=:black, linestyle=:dash)
-    
-    # Choose a y-position for the text (adjust as needed)
-    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
-    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
-    
-    # Add text labels to the left and right of the vertical line
-    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
-    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
-
-	
-	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
-    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
-    
-	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
-    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
-    
-    axislegend(ax, position = :lt)  # Add legend to the axis
-
-	DataInspector(fig)
-    fig  # Display the figure
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	@variables U_12 U_1w U_2w
-	
-	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
-	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
-	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
-                                        λ_2 => simplify(sλ2),
-                                        γ_1 => simplify(sγ1),
-                                        γ_2 => simplify(sγ2))) for s in sol_C]
-	sol_C_full = simplify.(sol_C_full)
-	sC_1 = sol_C_full[1]
-	sC_2 = sol_C_full[2]
-end
-  ╠═╡ =#
-
-# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
-#=╠═╡
-using LinearAlgebra
-  ╠═╡ =#
-
-# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
-begin
-	
-	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
-	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
-	
-	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
-
-	cp_1 = cp_b_(T_p_1, χ)
-	μ_1 = μ_b_(T_p_1, χ)
-	λp_1 = λ_b_(T_p_1, χ)
-	ρ_1 = ρ_b_(T_p_1, χ)
-	
-	V̇_1 = ṁ_1 / ρ_1
-	S_1 = π*D_1^2/4
-	v_1 = V̇_1 / S_1
-
-	Re_1_r= ρ_1*v_1*D_1/
-	Re_1 = sqrt(Re_1_r^2 + 1e-12)
-	Pr_1 = cp_1*μ_1/λp_1
-
-	Nu_lam_1 = 3.66
-	f_1 = 0.3164*Re_1^(-1//4)
-	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
-	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
-
-	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
-
-	h_1 = Nu_1 * λp_1/D_1
-
-	#---
-
-	cp_2 = cp_b_(T_p_2, χ)
-	μ_2 = μ_b_(T_p_2, χ)
-	λp_2 = λ_b_(T_p_2, χ)
-	ρ_2 = ρ_b_(T_p_2, χ)
-	
-	V̇_2 = ṁ_2 / ρ_2
-	S_2 = π*D_2^2/4
-	v_2 = V̇_2 / S_2
-
-	Re_2_r = ρ_2*v_2*D_2/μ_2
-	Re_2 = sqrt(Re_2_r^2 + 1e-12)
-	Pr_2 = cp_2*μ_2/λp_2
-
-	Nu_lam_2 = 3.66
-	f_2 = 0.3164*Re_2^(-1//4)
-	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
-	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
-
-	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_2*Nu_tur_2
-
-	h_2 = Nu_2 * λp_2/D_2;
-end;
-
-# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
-#=╠═╡
-begin
-	@variables UA_12 UA_1w UA_2w
-	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
-	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
-		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
-		P_2 => UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
-		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
-end;
   ╠═╡ =#
 
 # ╔═╡ abf2c0e4-9174-497f-823d-2ca76e0f8b75
@@ -2026,39 +1682,79 @@ begin
 end
 
 
-# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
+# ╔═╡ 18160123-a854-4568-9904-1d311d11e5a9
 #=╠═╡
 begin
-	#@variables U_12 U_1w U_2w
-	@variables P_1 P_w1 P_2 P_w2
-	
-	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
-	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
-	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
-	#   A = [ - (P1 + Pe1)     P1
-	#         - P2         P2 + Pe2 ]
-	
-	A_mat = [ -(P_1 + P_w1)   P_1;
-	          -P_2    P_2 + P_w2 ]
-	
-	# Solve for λ symbolically:
-	# The characteristic equation is det(A - λI)=0:
-
-	@variables λ_  # eigenvalue placeholder
-	I2 = Num.([1 0;
-          0 1])# 2x2 identity matrix (Symbolics-compatible)
-	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
-	sλ1 = λ[1]
-	sλ2 = λ[2]
-	sγ1 = (P_1 + P_w1 + sλ1) / P_1
-	sγ2 = (P_1 + P_w1 + sλ2) / P_1
-	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
-                                        λ_2 => sλ2,
-                                        γ_1 => sγ1,
-                                        γ_2 => sγ2)) for s in sol_C];
+	@variables UA_12 UA_1w UA_2w
+	sC_1 = substitute(sol_C_full[1], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)))
+	sC_2 = substitute(sol_C_full[2], Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_1 = substitute(sγ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sγ_2 = substitute(sγ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_1 = substitute(sλ1, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
+	sλ_2 = substitute(sλ2, Dict(P_1 => UA_12/(ṁ_b*cp_1),
+		P_w1 => UA_1w*UA_12/(ṁ_b*cp_1),
+		P_2 => UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2),
+		P_w2 => UA_2w*UA_12/(ṁ_b*cp_2)));
 end;
+  ╠═╡ =#
+
+# ╔═╡ 38cb4c93-fdeb-4839-8726-db7669682fc1
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+    # Plot using WGLMakie
+    fig = Figure(size=(800,600))
+    ax = Axis(fig[1, 1], xlabel="Heat Exchanger length (m)", ylabel="Temperature (°C)",
+              title="Evaporator temperature profile")
+    
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_b_SH_func(x - L_EV_func())-273.15, label = "Secondary fluid", color=:orange)
+    lines!(ax, 0..L_EV_func(), x->T_b_EV_func(x)-273.15, color=:orange)
+	
+    lines!(ax, L_EV_func()..L_EV_func()+L_SH_func(), x -> T_r_SH_func(x - L_EV_func())-273.15, label = "Refrigerant", color=:blue)
+    lines!(ax, 0..L_EV_func(), x->T_r_EV_func(x)-273.15, color=:blue)
+    
+    # Add a vertical dashed line at x = L_EV_func()
+    vline = L_EV_func()
+    vlines!(ax, [vline], color=:black, linestyle=:dash)
+    
+    # Choose a y-position for the text (adjust as needed)
+    # Here, we pick an arbitrary value. Alternatively, you can set it based on your data range.
+    y_text = 0.5*T_r_EV_func(0.0) + 0.5T_b_in_func(0.0) .-273.15
+    
+    # Add text labels to the left and right of the vertical line
+    text!(ax, vline - L_EV_func()/2, y_text, text = "Evaporation", align = (:center, :center), color=:black, rotation = pi/2)
+    text!(ax, vline + L_SH_func()/2, y_text, text = "Superheating", align = (:center, :center), color=:black, rotation = pi/2)
+
+	
+	m_b_form = Printf.@sprintf("%.2f", sol_[ṁ_b])
+    text!(ax, vline + L_SH_func()/2, 0.1*T_r_EV_func(0.0) + 0.9T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_b_form) kg/s", align = (:right, :center), color=:orange)
+    
+	m_r_form = Printf.@sprintf("%.2f", ṁ_r_)
+    text!(ax, vline - L_EV_func()/2, 0.9*T_r_EV_func(0.0) + 0.1T_b_in_func(0.0) .-273.15, text = "ṁ = $(m_r_form) kg/s", align = (:left, :center), color=:blue)
+    
+    axislegend(ax, position = :lt)  # Add legend to the axis
+
+	DataInspector(fig)
+    fig  # Display the figure
+end
+
   ╠═╡ =#
 
 # ╔═╡ 8d38ac9f-9fe7-4cb0-aeef-f5086ab355df
@@ -2100,6 +1796,310 @@ end
 #=╠═╡
 using LinearAlgebra
   ╠═╡ =#
+
+# ╔═╡ f2be30ec-1250-4edc-bbf9-bc249458e93c
+#=╠═╡
+begin
+	#@variables U_12 U_1w U_2w
+	@variables P_1 P_w1 P_2 P_w2
+	
+	#P_1   = UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_w1  = UA_1w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_1_bh)
+	#P_2   = UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	#P_w2  = UA_2w_cd_tot*UA_12_cd_tot/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
+
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => sλ1,
+                                        λ_2 => sλ2,
+                                        γ_1 => sγ1,
+                                        γ_2 => sγ2)) for s in sol_C];
+end;
+  ╠═╡ =#
+
+# ╔═╡ 31f4a311-4b38-4868-803b-e4f263468e55
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 8bc50a93-46ae-4622-810b-3db773b4324f
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@variables ΔT_SH V_comp f_comp s_comp_in s_comp_out_is h_comp_in h_comp_out_is h_comp_out η_comp ρ_comp_in P_comp_in T_comp_in P_comp_out T_comp_out_is T_comp_out V̇_comp W_comp ṁ_comp
+	eqs_all = [
+		# Define the inlet and outlet isentropic entropies:
+		s_comp_in ~ Clapeyron.entropy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		s_comp_out_is ~ Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		
+		# Define the inlet and outlet enthalpies:
+		h_comp_in ~ Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out ~ Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out, phase="unknown"),
+		
+		# Enforce the isentropic condition:
+		s_comp_in ~ s_comp_out_is,
+		
+		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
+		η_comp ~ (h_comp_out_is - h_comp_in) / (h_comp_out - h_comp_in),
+	
+		ρ_comp_in ~ Clapeyron.mass_density(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		ṁ_comp ~ ṁ_r,
+		ṁ_comp ~ V̇_comp * ρ_comp_in,
+		V̇_comp ~ f_comp * V_comp,
+		W_comp ~ ṁ_comp*(h_comp_out-h_comp_in),
+
+		T_r_out ~ T_evap+ΔT_SH,
+		h_r_in ~ h_bub_(p_PC(T_evap)),
+		T_b_out ~ Tbh_in,
+		Tbh_out ~ T_b_in,
+
+		
+		T_p_b ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_1 ~ 0.5*T_b_in+0.5*Tbh_in,
+		T_p_2 ~ 0.5*T_b_in+0.5*Tbh_in,
+	    ];
+
+	
+	unknowns_all= [T_comp_out, T_comp_out_is, s_comp_in, s_comp_out_is, h_comp_in, h_comp_out_is, h_comp_out, W_comp, ṁ_comp, ṁ_r, ρ_comp_in,V̇_comp, ṁ_comp,
+		Tbh_in, T_b_in, αL, ṁ_b,
+	T_p_b, T_p_1, T_p_2]
+
+	ps_all = [T_comp_in, P_comp_in, P_comp_out, η_comp, f_comp, V_comp,
+		b,
+		W,
+		np,
+		ϕ,
+		β,
+		L_PHX,
+		
+		#ṁ_r,
+		#ṁ_b,
+		
+		T_evap,
+		T_wall,
+		
+		#T_b_in,
+		#T_p_b,
+		T_p_r,
+		
+		λ_Cu,
+		th,
+
+		χ,
+
+		#αL,
+
+		L_bh,
+
+		UA_12,
+		UA_1w,
+		UA_2w,
+
+		#T_p_1,
+		#T_p_2,
+
+		ΔT_SH,
+	]
+	
+	guesses_all = [
+		# BH parameters
+		L_bh => 300.0,
+		UA_12 => 2,
+		UA_1w => 2,
+		UA_2w => 2,
+		
+		χ => χ_,
+
+		# Evaporator
+		
+		λ_Cu=> 300.0,
+		th => 1e-3,
+		
+		b => 2e-3,
+		W => W_,
+		np => np_,
+		ϕ => 1.189,
+		β => 30.0,
+		L_PHX => L_PHX_,
+
+		#Compressor
+		η_comp => 0.8,
+		V_comp => 0.1/50,
+
+		
+		# Operating conditions
+		f_comp => 50,
+
+		
+		T_evap => 273.15 + T_evap_,
+		T_p_r => T_evap,
+		T_wall => T_evap+20,
+
+		
+		T_b_in => 0.4T_evap+0.6T_wall,
+		Tbh_in => 0.6T_evap+0.4T_wall,
+
+		T_p_b => T_b_in,
+
+		T_p_1 => Tbh_in,
+		T_p_2 => Tbh_in,
+		
+		ΔT_SH => 5.0,
+		#---
+		
+		# Initial guesses:
+		ṁ_r => 0.4,
+		ṁ_comp => 0.4,
+		ṁ_b => 1.0,
+		αL => pi/2,
+
+		
+		h_comp_in => Clapeyron.enthalpy(modelref, P_comp_in, T_comp_in, phase="unknown"),
+		h_comp_out_is => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		h_comp_out => Clapeyron.enthalpy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		s_comp_in => s_comp_out_is,
+		s_comp_out_is => Clapeyron.entropy(modelref, P_comp_out, T_comp_out_is, phase="unknown"),
+		T_comp_out => T_comp_in + 10.0,
+		T_comp_out_is => T_comp_in + 10.0,
+		T_comp_in => 293.0,
+		P_comp_in => 101325.0,
+		ρ_comp_in => 1.0,
+		P_comp_out => 300000.0,
+		V̇_comp => V_comp*f_comp,
+		W_comp => 0.0,
+	
+	];
+	
+	@named all_coupled = NonlinearSystem(eqs_all, unknowns_all, ps_all);
+	all_coupled_ = complete(simplify(all_coupled));
+	
+	prob_all = NonlinearProblem(all_coupled_, [], guesses_all, symbolic_u0 = true)
+
+	sol_all = NonlinearSolve.solve(prob_all, reltol = 1e-5, abstol = 1e-5)
+	sol_all.retcode
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ f2310579-6f1d-4b7e-bb72-b99e11d92885
+#=╠═╡
+using LinearAlgebra
+  ╠═╡ =#
+
+# ╔═╡ 78b1b6d3-6547-43de-aed7-1d16b6dfd9ab
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@variables U_12 U_1w U_2w
+	
+	P_1   = U_12*Per_12/(ṁ_b*cp_1_bh)
+	P_w1  = U_w1*Per_w1*U_12*Per_12/(ṁ_b*cp_1_bh)
+	P_2   = U_12*Per_12/(ṁ_b*cp_2_bh)
+	P_w2  = U_w2*Per_w2*U_12*Per_12/(ṁ_b*cp_2_bh)
+	# Next, the coefficient matrix for the homogeneous system (in shifted variables) is:
+	#   A = [ - (P1 + Pe1)     P1
+	#         - P2         P2 + Pe2 ]
+	
+	A_mat = [ -(P_1 + P_w1)   P_1;
+	          -P_2    P_2 + P_w2 ]
+	
+	# Solve for λ symbolically:
+	# The characteristic equation is det(A - λI)=0:
+
+	@variables λ_  # eigenvalue placeholder
+	I2 = Num.([1 0;
+          0 1])# 2x2 identity matrix (Symbolics-compatible)
+	λ = Symbolics.symbolic_solve(det(A_mat - λ_*I2) ~ 0, λ_)
+	sλ1 = λ[1]
+	sλ2 = λ[2]
+	sγ1 = (P_1 + P_w1 + sλ1) / P_1
+	sγ2 = (P_1 + P_w1 + sλ2) / P_1
+	sol_C_full = [substitute(s, Dict(λ_1 => simplify(sλ1),
+                                        λ_2 => simplify(sλ2),
+                                        γ_1 => simplify(sγ1),
+                                        γ_2 => simplify(sγ2))) for s in sol_C]
+	sol_C_full = simplify.(sol_C_full)
+	sC_1 = sol_C_full[1]
+	sC_2 = sol_C_full[2]
+end
+  ╠═╡ =#
+
+# ╔═╡ ae86270b-a167-4826-8baf-01ff3ca9c675
+begin
+	
+	@variables D_1, D_2, D_b, th_1, th_2, ṁ_1, ṁ_2, T_p_1, T_p_2#, χ
+	#@variables U_w1 U_w2 Per_12 Per_w1 Per_w2
+	
+	@parameters Re_low Re_high λ_PE 𝝺_grout 𝝺_ground
+
+	cp_1 = cp_b_(T_p_1, χ)
+	μ_1 = μ_b_(T_p_1, χ)
+	λp_1 = λ_b_(T_p_1, χ)
+	ρ_1 = ρ_b_(T_p_1, χ)
+	
+	V̇_1 = ṁ_1 / ρ_1
+	S_1 = π*D_1^2/4
+	v_1 = V̇_1 / S_1
+
+	Re_1_r= ρ_1*v_1*D_1/
+	Re_1 = sqrt(Re_1_r^2 + 1e-12)
+	Pr_1 = cp_1*μ_1/λp_1
+
+	Nu_lam_1 = 3.66
+	f_1 = 0.3164*Re_1^(-1//4)
+	Nu_tur_1 = (f_1/8*(Re_1-1000)*Pr_1)/(1+12.7*sqrt(f_1/8)*(Pr_1^(2//3)-1))
+	turb_index_1 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_1 - (Re_low + Re_high)/2)))
+
+	Nu_1 = (1-turb_index_1)*Nu_lam_1 + turb_index_1*Nu_tur_1
+
+	h_1 = Nu_1 * λp_1/D_1
+
+	#---
+
+	cp_2 = cp_b_(T_p_2, χ)
+	μ_2 = μ_b_(T_p_2, χ)
+	λp_2 = λ_b_(T_p_2, χ)
+	ρ_2 = ρ_b_(T_p_2, χ)
+	
+	V̇_2 = ṁ_2 / ρ_2
+	S_2 = π*D_2^2/4
+	v_2 = V̇_2 / S_2
+
+	Re_2_r = ρ_2*v_2*D_2/μ_2
+	Re_2 = sqrt(Re_2_r^2 + 1e-12)
+	Pr_2 = cp_2*μ_2/λp_2
+
+	Nu_lam_2 = 3.66
+	f_2 = 0.3164*Re_2^(-1//4)
+	Nu_tur_2 = (f_2/8*(Re_2-1000)*Pr_2)/(1+12.7*sqrt(f_2/8)*(Pr_2^(2//3)-1))
+	turb_index_2 = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re_2 - (Re_low + Re_high)/2)))
+
+	Nu_2 = (1-turb_index_2)*Nu_lam_2 + turb_index_2*Nu_tur_2
+
+	h_2 = Nu_2 * λp_2/D_2;
+end;
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
