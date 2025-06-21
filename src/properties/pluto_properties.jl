@@ -40,9 +40,6 @@ using PlutoDevMacros
 using PlutoTest
   ╠═╡ =#
 
-# ╔═╡ 1cc60917-e74a-4bc8-a17a-1b14a3aa1379
-using Clapeyron
-
 # ╔═╡ 9bb37d87-dbc7-45b0-a60f-6c53db2b87ea
 using NonlinearSolve
 
@@ -51,6 +48,9 @@ using NonlinearSolve
 #=╠═╡
 using Statistics
   ╠═╡ =#
+
+# ╔═╡ 1cc60917-e74a-4bc8-a17a-1b14a3aa1379
+using Clapeyron
 
 # ╔═╡ 7b034564-0557-402e-80f2-66c2ab692f5a
 # Physical symbol mappings for properties
@@ -273,55 +273,7 @@ function __init__()
 end
 
 # ╔═╡ 3dbe8934-0e13-4bdd-aa9f-5763158e8480
-# ╠═╡ disabled = true
-#=╠═╡
 list_available_fluids()
-  ╠═╡ =#
-
-# ╔═╡ 324144aa-7adc-4014-adc7-fc461bc9d6a1
-# ╠═╡ disabled = true
-# ╠═╡ skip_as_script = true
-#=╠═╡
-begin
-	
-	# Select a fluid
-	fluid_name = "MEA"  # assuming MEA.json exists in your data folder
-	
-	println("\nAvailable properties for $fluid_name:")
-	props = list_available_properties(fluid_name)
-	println(join(props, ", "))
-	
-	# Calculate some properties
-	T = 293.15  # 20°C
-	x = 0.3     # 30% concentration
-	
-	println("\nProperty values for $fluid_name at T=$T K, x=$x:")
-	
-	if "density" in props
-	    println("Density (ρ): $(ρi(fluid_name, T, x)) kg/m³")
-	end
-	
-	if "conductivity" in props
-	    println("Thermal conductivity (λ): $(λi(fluid_name, T, x)) W/(m·K)")
-	end
-	
-	if "viscosity" in props
-	    println("Viscosity (μ): $(μi(fluid_name, T, x)) Pa·s")
-	end
-	
-	if "specific_heat" in props
-	    println("Specific heat (cp): $(cpi(fluid_name, T, x)) J/(kg·K)")
-	end
-	
-	if "T_freeze" in props
-	    println("Freezing temperature (Tf): $(Tfi(fluid_name, T, x)) K")
-	end
-end
-  ╠═╡ =#
-
-# ╔═╡ dd21529c-1c2d-4054-b338-e4826eec7f99
-assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
-
 
 # ╔═╡ c3d7befd-22d4-42f4-9a73-3932f5e1e2d8
 notebookpath() = replace(@__FILE__, r"#==#.*" => "")
@@ -335,62 +287,13 @@ notebookpath() = replace(@__FILE__, r"#==#.*" => "")
 notebookpath()
   ╠═╡ =#
 
-# ╔═╡ 43278bdb-f643-4bce-bd3f-d32f1a2e37e2
-# ╠═╡ disabled = true
-#=╠═╡
-function read_coolprop_fluid(json_path::String)
-    # Read the JSON file
-    json_str = read(json_path, String)
-    json_data = JSON3.read(json_str, Dict{String,Any})
-    
-    # Extract metadata
-    metadata = Dict{String,Any}()
-    for key in ["name", "description", "reference", "Tmin", "Tmax", "xmin", "xmax", "xid"]
-        if haskey(json_data, key)
-            metadata[key] = json_data[key]
-        end
-    end
-    
-    # Generate property functions
-    props = generate_property_functions(json_data)
-    
-    return (metadata=metadata, properties=props)
-end
-  ╠═╡ =#
-
-# ╔═╡ b876d683-b338-4c7b-8582-0328648d7278
-# ╠═╡ disabled = true
-#=╠═╡
-function load_all_coolprop_fluids(data_folder)
-    fluids = Dict{String,Any}()
-    
-    for file in readdir(data_folder)
-        if endswith(file, ".json")
-            path = joinpath(data_folder, file)
-            try
-                fluid = read_coolprop_fluid(path)
-                name = get(fluid.metadata, "name", basename(file))
-                fluids[name] = fluid
-            catch e
-                @warn "Failed to load $file: $e"
-            end
-        end
-    end
-    
-    return fluids
-end
-
-# Usage:
-# fluids = load_all_coolprop_fluids(data_folder)
-  ╠═╡ =#
-
 # ╔═╡ 7f80f28a-f128-4561-bd70-2c228b3499c1
 # ╠═╡ disabled = true
 #=╠═╡
 using Symbolics
   ╠═╡ =#
 
-# ╔═╡ cde60bbc-b47a-4e00-b494-fbf23d727a4b
+# ╔═╡ 6d013853-cfb6-48b9-be49-9c47e084df56
 function IncompressibleProps(; name::Symbol, fluid="MEA", χ = 0.0)
     pars = @parameters begin
 		χ = χ
@@ -420,7 +323,7 @@ end
 #=╠═╡
 function test_incomp()
 	@named prop_mea = IncompressibleProps()
-	@named constrained_sys = assemble([prop_mea], equations = [prop_mea.T ~ 300.0])
+	@named constrained_sys = compose(NonlinearSystem([prop_mea.T ~ 300.0], [], [], name=:constrained_sys), [prop_mea])
 	simpl_sys = structural_simplify(constrained_sys)
 	prop_props = NonlinearProblem(simpl_sys, [])
 	new_prop = ModelingToolkit.remake(prop_props, p = [prop_mea.χ => 0.4])
@@ -512,12 +415,15 @@ begin
     PH_helmholtz_free_energy(s, p, H) = Clapeyron.PH.helmholtz_free_energy(Clapeyron.SingleFluid(s), p, H)
     PH_mass_density(s, p, H) = Clapeyron.PH.mass_density(Clapeyron.SingleFluid(s), p, H)
     PH_molar_density(s, p, H) = Clapeyron.PH.molar_density(Clapeyron.SingleFluid(s), p, H)
-    
+
     # Access to flash function
     #PH_flash = Clapeyron.PH.flash
 end
 
-# ╔═╡ 98d5f72c-c40f-4b73-819f-a68e54caae09
+# ╔═╡ eb7c553d-8980-4c66-852a-3ea26915d405
+Clapeyron.PH.entropy(Clapeyron.SingleFluid("R134A"), 1e5, 250e3*(Clapeyron.SingleFluid("R134A").properties.Mw/1000), [1.0])
+
+# ╔═╡ 6910cf96-c290-4905-b044-11487973d407
 function RefrigerantProps(; name::Symbol, fluid="R134A")
     # Parameters (none needed in this case)
     pars = @parameters begin
@@ -688,15 +594,19 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
-# ╔═╡ d849b912-a80e-429d-8c11-99fc4f7a721d
-# ╠═╡ skip_as_script = true
+# ╔═╡ 879c02bf-2a8b-42f1-a493-47132e337c92
+# ╠═╡ disabled = true
 #=╠═╡
-function test_ref_properties(h_val=500e3, p_val=1e5)
+export Tf, Vf, Sf, Uf, Gf, Af, ρf, ρmolf, Hf, pf, Cpf, Cvf, γf, κTf, κSf, cf, αf, μJTf, Zf, λf, ηf, Tsatf, Vbf, Vdf, RefrigerantProps, test_ref_properties
+  ╠═╡ =#
+
+# ╔═╡ d849b912-a80e-429d-8c11-99fc4f7a721d
+function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
     @named prop_ref = RefrigerantProps()
-    @named constrained_sys = assemble([prop_ref], equations = [prop_ref.h ~ h_val, prop_ref.p ~ p_val])
+    @named constrained_sys = compose(NonlinearSystem([prop_ref.h ~ h_val, prop_ref.p ~ p_val], [], [], name=:constrained_sys), [prop_ref])
     simpl_sys = structural_simplify(constrained_sys)
     prop_props = NonlinearProblem(simpl_sys, [])
-    sol = NonlinearSolve.solve(prop_props)
+    sol = NonlinearSolve.solve(prop_props, abstol = abstol)
     
     # Print results in a simple format
     println("\nREFRIGERANT PROPERTIES (R134A)")
@@ -792,13 +702,15 @@ function test_ref_properties(h_val=500e3, p_val=1e5)
     
     return sol
 end
-  ╠═╡ =#
 
 # ╔═╡ 0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═╡ skip_as_script = true
 #=╠═╡
-test_ref_properties(300e3, 1e4)
+test_ref_properties(200e3, 1e5, 1e-6).retcode
   ╠═╡ =#
+
+# ╔═╡ 0e4ee629-6548-4232-8da4-c72f23167411
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2947,6 +2859,8 @@ version = "17.4.0+2"
 # ╠═122c8036-63f1-4deb-8e1d-4dcf471bd298
 # ╠═3a4b4d1d-abbf-4858-891a-1e24a9b4ea5b
 # ╠═6480643c-069d-48ed-9750-ec00d81a3e54
+# ╠═9bb37d87-dbc7-45b0-a60f-6c53db2b87ea
+# ╠═b4de56ce-04ea-4feb-b580-ea63fd41ce1f
 # ╠═1cc60917-e74a-4bc8-a17a-1b14a3aa1379
 # ╠═7b034564-0557-402e-80f2-66c2ab692f5a
 # ╠═800b767f-2543-4653-aaf4-9a7fa433450a
@@ -2960,21 +2874,18 @@ version = "17.4.0+2"
 # ╠═ef035f5a-0ad9-4233-bcdc-fbe93f18db5c
 # ╠═642002e2-7c6b-4b2d-8903-ed3d6ba9b56f
 # ╠═3dbe8934-0e13-4bdd-aa9f-5763158e8480
-# ╠═324144aa-7adc-4014-adc7-fc461bc9d6a1
-# ╠═dd21529c-1c2d-4054-b338-e4826eec7f99
 # ╠═c3d7befd-22d4-42f4-9a73-3932f5e1e2d8
 # ╠═743bcfb9-dc88-4011-8d63-1baaccefaf7c
-# ╠═43278bdb-f643-4bce-bd3f-d32f1a2e37e2
-# ╠═b876d683-b338-4c7b-8582-0328648d7278
 # ╠═7f80f28a-f128-4561-bd70-2c228b3499c1
-# ╠═cde60bbc-b47a-4e00-b494-fbf23d727a4b
+# ╠═6d013853-cfb6-48b9-be49-9c47e084df56
 # ╠═b60f53c1-bfa6-4599-8a6c-bb96b2836760
 # ╠═6d568112-75df-4310-81bd-1379d2aa426e
 # ╠═cee84cbe-7e22-423f-b9c6-d952ef96e442
-# ╠═98d5f72c-c40f-4b73-819f-a68e54caae09
+# ╠═eb7c553d-8980-4c66-852a-3ea26915d405
+# ╠═6910cf96-c290-4905-b044-11487973d407
+# ╠═879c02bf-2a8b-42f1-a493-47132e337c92
 # ╠═0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═d849b912-a80e-429d-8c11-99fc4f7a721d
-# ╠═9bb37d87-dbc7-45b0-a60f-6c53db2b87ea
-# ╠═b4de56ce-04ea-4feb-b580-ea63fd41ce1f
+# ╠═0e4ee629-6548-4232-8da4-c72f23167411
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

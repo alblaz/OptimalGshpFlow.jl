@@ -30,7 +30,14 @@ using PlutoTest
 	using ..Properties
 end
 
+# ╔═╡ c32b5df3-e560-4af0-9b2a-2f1032042414
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Plots
+  ╠═╡ =#
+
 # ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+# ╠═╡ disabled = true
 # ╠═╡ skip_as_script = true
 #=╠═╡
 using MonteCarloMeasurements
@@ -41,12 +48,6 @@ using Distributions
 
 # ╔═╡ 18df1038-aa05-43e8-b88b-6d13586cf503
 using LinearAlgebra
-
-# ╔═╡ c32b5df3-e560-4af0-9b2a-2f1032042414
-# ╠═╡ skip_as_script = true
-#=╠═╡
-using Plots
-  ╠═╡ =#
 
 # ╔═╡ 1e019ddb-1873-4cea-a765-83b6f7316b34
 using SteadyStateDiffEq
@@ -177,7 +178,7 @@ md" # Quick analysis: parametric study"
 md" # Temperature profiles"
 
 # ╔═╡ 571a62a6-2bee-43c0-939f-e96346108c67
-assemble(systems::Vector{NonlinearSystem}; equations=[], name) = ModelingToolkit.compose(NonlinearSystem(equations, [], [], name=name), systems)
+# Removed custom assemble function - using ModelingToolkit.compose directly
 
 
 # ╔═╡ fe000077-8514-4ac7-8dc9-52a87ad28b2c
@@ -285,18 +286,18 @@ function test_utube_parameters_simple()
     @named params = BoreholeTemperatureParameters()
     
     # Define a test system with default values
-    @named test_sys = assemble([params], equations=[
+    @named test_sys = ModelingToolkit.compose(NonlinearSystem([
 		
-        params.L_bh ~ 100.0  # Borehole length [m]
-        params.T_wall ~ 283.15  # Borehole wall temperature [K]
-        params.T_1_in ~ 293.15  # Inlet fluid temperature [K]
-        params.ṁ ~ 0.5     # Fluid mass flow rate [kg/s]
-        params.cp_1 ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
-        params.cp_2 ~ 4200.0  # Fluid specific heat capacity [J/(kg·K)]
-        params.R_f1_b ~ 0.1    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
-        params.R_f2_b ~ 0.1    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
+        params.L_bh ~ 100.0,  # Borehole length [m]
+        params.T_wall ~ 283.15,  # Borehole wall temperature [K]
+        params.T_1_in ~ 293.15,  # Inlet fluid temperature [K]
+        params.ṁ ~ 0.5,     # Fluid mass flow rate [kg/s]
+        params.cp_1 ~ 4200.0,  # Fluid specific heat capacity [J/(kg·K)]
+        params.cp_2 ~ 4200.0,  # Fluid specific heat capacity [J/(kg·K)]
+        params.R_f1_b ~ 0.1,    # Thermal resistance from pipe 1 to borehole wall [K·m/W]
+        params.R_f2_b ~ 0.1,    # Thermal resistance from pipe 2 to borehole wall [K·m/W]
         params.R_f1_f2 ~ 0.3    # Thermal resistance between pipes [K·m/W]
-	])
+	], [], [], name=:test_sys), [params])
     simpl_sys = structural_simplify(test_sys)
     
     # Solve the system
@@ -328,9 +329,7 @@ function test_utube_parameters_simple()
 end
 
 # ╔═╡ fae38d18-0c77-4b4e-9c30-9976a17c3a2b
-#=╠═╡
-@test test_utube_parameters_simple()
-  ╠═╡ =#
+test_utube_parameters_simple()
 
 # ╔═╡ 3a9ef928-cb59-45dd-87db-71d57c38e15a
 """
@@ -434,7 +433,7 @@ function test_utube_borehole()
     @named bh = BoreholeThermal()
     
     # Define a test system with input parameters
-    @named test_sys = assemble([bh], equations=[
+    @named test_sys = ModelingToolkit.compose(NonlinearSystem([
         # Set all necessary inputs directly on the top-level component
         bh.T_1 ~ 293.15,    # 20°C inlet temperature
         bh.ṁ ~ 0.5,             # 0.5 kg/s flow rate
@@ -443,7 +442,7 @@ function test_utube_borehole()
         bh.R_f1_b ~ 0.1,          # Thermal resistances
         bh.R_f2_b ~ 0.1,
         bh.R_f1_f2 ~ 0.3
-    ])
+    ], [], [], name=:test_sys), [bh])
     
     # Simplify and solve the system
     simpl_sys = structural_simplify(test_sys)
@@ -860,8 +859,7 @@ function test_utube_resistances_with_htc()
                                       λ_pipe_1=0.4, λ_pipe_2=0.4)
     
     # Set up test conditions
-    @named constrained_sys = assemble([utube_res], 
-                                      equations = [
+    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
                                           # Flow parameters
                                           utube_res.ṁ ~ 0.5,          # 0.5 kg/s
                                           
@@ -881,7 +879,7 @@ function test_utube_resistances_with_htc()
                                           utube_res.R_t1_t2 ~ 0.3,      # K·m/W
                                           utube_res.R_t1_b ~ 0.1,      # K·m/W
                                           utube_res.R_t2_b ~ 0.1       # K·m/W
-                                      ])
+                                      ], [], [], name=:constrained_sys), [utube_res])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1027,8 +1025,7 @@ function test_water_filled_annular_resistances()
     @named annular_res = WaterFilledAnnularResistances()
     
     # Set up test conditions - specify key parameters for testing
-    @named constrained_sys = assemble([annular_res], 
-                                      equations = [
+    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
 										  annular_res.T_1 ~ 293.15,  # 20°C
                                            annular_res.T_2 ~ 283.15,  # 10°C
                                            annular_res.T_b ~ 278.15,  # 5°C
@@ -1037,7 +1034,8 @@ function test_water_filled_annular_resistances()
                                            annular_res.μ_w ~ 0.001,
                                            annular_res.cp_w ~ 4186.0,
                                            annular_res.λ_w ~ 0.599,
-                                           annular_res.β_w ~ 2.07e-4])
+                                           annular_res.β_w ~ 2.07e-4
+                                      ], [], [], name=:constrained_sys), [annular_res])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1299,8 +1297,7 @@ function test_utube_grouted()
 	
     
     # Set up test conditions
-    @named constrained_sys = assemble([collector, prop], 
-                                      equations = [
+    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
 		collector.T_1 ~ 310.0,    # 20°C inlet temperature
 		prop.T ~ 310.0,    # 20°C inlet temperature
         1.0 ~ collector.ṁ,             # 0.5 kg/s flow rate
@@ -1311,8 +1308,8 @@ function test_utube_grouted()
         prop.λ ~ collector.λ_1, 
         prop.λ ~ collector.λ_2, 
         prop.μ ~ collector.μ_1, 
-        prop.μ ~ collector.μ_2, 
-                                      ])
+        prop.μ ~ collector.μ_2
+    ], [], [], name=:constrained_sys), [collector, prop])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1400,11 +1397,10 @@ function test_dynamic_utube_grouted()
     @named BHE_U = DynamicUTubeGrouted()
     
     # Set up test conditions
-    @named constrained_sys = assemble([BHE_U], 
-                                      equations = [
+    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
 		BHE_U.T_1 ~ 3000.0,    # 20°C inlet temperature
-        10.0 ~ BHE_U.ṁ,
-                                      ])
+        10.0 ~ BHE_U.ṁ
+    ], [], [], name=:constrained_sys), [BHE_U])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1431,12 +1427,10 @@ begin
 	@named BHE = DynamicUTubeGrouted()
 	
 	# 1b) Assemble with your boundary conditions
-	@named model = assemble([BHE],
-	    equations = [
+	@named model = ModelingToolkit.compose(NonlinearSystem([
 	      BHE.T_1 ~ 300.0,    # inlet T = 300 K
 	      10.0     ~ BHE.ṁ    # mass‐flow = 10 kg/s
-	    ]
-	)
+	    ], [], [], name=:model), [BHE])
 	
 	# 1c) Do the structural simplify once
 	simp = structural_simplify(model)
@@ -5298,6 +5292,7 @@ version = "1.8.1+0"
 # ╠═681b6b67-2f78-4085-9abb-5c2d4abdb117
 # ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
 # ╠═f05d0696-202e-4158-bf2a-a47c33493f71
+# ╠═c32b5df3-e560-4af0-9b2a-2f1032042414
 # ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
 # ╠═df8d848c-bde6-477a-b9ff-09154b3ee375
 # ╠═4e432eee-7c1e-4a89-8a06-3ba874f55e2b
@@ -5307,7 +5302,7 @@ version = "1.8.1+0"
 # ╠═571a62a6-2bee-43c0-939f-e96346108c67
 # ╠═fe000077-8514-4ac7-8dc9-52a87ad28b2c
 # ╠═b8ac6f9a-d15a-4a91-9057-bb98c6b58044
-# ╟─fae38d18-0c77-4b4e-9c30-9976a17c3a2b
+# ╠═fae38d18-0c77-4b4e-9c30-9976a17c3a2b
 # ╠═3a9ef928-cb59-45dd-87db-71d57c38e15a
 # ╠═6f1888cb-63ba-4cef-8151-bd7d09e5bc63
 # ╠═58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
@@ -5350,7 +5345,6 @@ version = "1.8.1+0"
 # ╠═d2acfb92-f66a-48de-9a06-d801e0b35a9d
 # ╠═097d755d-9808-4ff2-a06a-7f2b97c0c4ac
 # ╠═f16d66db-1b49-46d6-a2db-ee60618139ea
-# ╠═c32b5df3-e560-4af0-9b2a-2f1032042414
 # ╠═843fcf98-2899-4172-b167-027b140dccf6
 # ╟─1093c1d5-3263-4a81-9e9d-9677b3003ea4
 # ╠═8a44ecc5-6553-4450-b5cf-ac456c89229e

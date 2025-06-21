@@ -318,7 +318,7 @@ function head_loss_annular(ṁ, Do, Di, L, ρ, μ, ε; Re_low=2300, Re_high=4000
 end
 
 # ╔═╡ d64c53cb-b4a4-4811-8f80-42be4c0bbb48
-assemble(systems::Vector{NonlinearSystem}; equations=[], name) = compose(NonlinearSystem(equations, [], [], name=name), systems)
+# Removed custom assemble function - using ModelingToolkit.compose directly
 
 
 # ╔═╡ 70ff62fc-73b3-4020-bf18-6da05b5498b3
@@ -462,10 +462,9 @@ function test_straight_tube_gnielinski()
     @named straight_pipe = StraightTubeGnielinski(L=10.0, Di=0.02, ε=1.5e-6)
     
     # Set up test conditions
-    @named constrained_sys = assemble([straight_pipe], 
-                                      equations = [straight_pipe.ρ ~ 1000.0, 
-                                                   straight_pipe.μ ~ 0.001,
-                                                   straight_pipe.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([straight_pipe.ρ ~ 1000.0, 
+                                                     straight_pipe.μ ~ 0.001,
+                                                     straight_pipe.V̇ ~ 0.0005], [], [], name=:constrained_sys), [straight_pipe]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -496,10 +495,9 @@ function test_straight_tube_swamee_jain()
     @named straight_pipe = StraightTubeSwameeJain(L=10.0, Di=0.02, ε=1.5e-6)
     
     # Set up test conditions
-    @named constrained_sys = assemble([straight_pipe], 
-                                      equations = [straight_pipe.ρ ~ 1000.0, 
-                                                   straight_pipe.μ ~ 0.001,
-                                                   straight_pipe.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([straight_pipe.ρ ~ 1000.0, 
+                                                     straight_pipe.μ ~ 0.001,
+                                                     straight_pipe.V̇ ~ 0.0005], [], [], name=:constrained_sys), [straight_pipe]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -608,10 +606,9 @@ function test_pipe_bend_90()
     @named bend90 = PipeBend(θ=90.0, R=0.04, Di=0.02)
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend90], 
-                                      equations = [bend90.ρ ~ 1000.0, 
+    @named constrained_sys = compose(NonlinearSystem([bend90.ρ ~ 1000.0, 
                                                    bend90.μ ~ 0.001,
-                                                   bend90.V̇ ~ 0.0005]) # 0.5 L/s
+                                                   bend90.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend90]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -644,10 +641,9 @@ function test_pipe_bend()
     @named bend = PipeBend(θ=90.0, R=0.05, Di=0.02)
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend], 
-                                      equations = [bend.ρ ~ 1000.0, 
-                                                   bend.μ ~ 0.001,
-                                                   bend.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bend.ρ ~ 1000.0, 
+                                                     bend.μ ~ 0.001,
+                                                     bend.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -674,10 +670,9 @@ function test_pipe_bend_u()
     @named bendu = PipeBend(θ=180.0, R=0.04, Di=0.02)
     
     # Set up test conditions
-    @named constrained_sys = assemble([bendu], 
-                                      equations = [bendu.ρ ~ 1000.0, 
-                                                   bendu.μ ~ 0.001,
-                                                   bendu.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bendu.ρ ~ 1000.0, 
+                                                     bendu.μ ~ 0.001,
+                                                     bendu.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bendu]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -714,7 +709,7 @@ function test_pipe_bend_angles()
     ]
     
     # Assemble system
-    @named constrained_sys = assemble([bend45, bend90, bend180], equations = flow_conditions)
+    @named constrained_sys = compose(NonlinearSystem(flow_conditions, [], [], name=:constrained_sys), [bend45, bend90, bend180])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -926,10 +921,9 @@ function generate_pressure_drop_curve(component_type, component_params;
         @named component = component_type(; component_params...)
         
         # Set up the system with all constraints
-        @named constrained_sys = assemble([component], 
-                              equations = [component.ρ ~ ρ, 
-                                          component.μ ~ μ,
-                                          component.V̇ ~ V̇])
+        @named constrained_sys = compose(NonlinearSystem([component.ρ ~ ρ, 
+                                                         component.μ ~ μ,
+                                                         component.V̇ ~ V̇], [], [], name=:constrained_sys), [component])
         
         # Simplify and solve
         simpl_sys = structural_simplify(constrained_sys)
@@ -990,10 +984,9 @@ function test_annular_channel()
     @named annular = AnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6)
     
     # Set up test conditions
-    @named constrained_sys = assemble([annular], 
-                                      equations = [annular.ρ ~ 1000.0, 
-                                                   annular.μ ~ 0.001,
-                                                   annular.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([annular.ρ ~ 1000.0, 
+                                                     annular.μ ~ 0.001,
+                                                     annular.V̇ ~ 0.0005], [], [], name=:constrained_sys), [annular]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1021,10 +1014,9 @@ function test_annular_bend_180()
     @named bend180 = AnnularBend180(Do=0.03, Di=0.02)
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend180], 
-                                     equations = [bend180.ρ ~ 1000.0, 
-                                                  bend180.μ ~ 0.001,
-                                                  bend180.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bend180.ρ ~ 1000.0, 
+                                                     bend180.μ ~ 0.001,
+                                                     bend180.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend180]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1134,9 +1126,8 @@ function test_dynamic_prop_pipe_bend()
     @named bend = DynamicPropPipeBend(θ=90.0, R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend], 
-                                      equations = [bend.props.T ~ 293.15,  # 20°C
-                                                   bend.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bend.props.T ~ 293.15,  # 20°C
+                                                     bend.bend.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1171,9 +1162,8 @@ function test_dynamic_prop_pipe_bend_90()
     @named bend90 = DynamicPropPipeBend90(R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend90], 
-                                      equations = [bend90.props.T ~ 293.15,  # 20°C
-                                                   bend90.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bend90.props.T ~ 293.15,  # 20°C
+                                                     bend90.bend.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend90]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1199,9 +1189,8 @@ function test_dynamic_prop_pipe_bend_u()
     @named bendu = DynamicPropPipeBendU(R=0.05, Di=0.02, fluid="MEA")
     
     # Set up test conditions
-    @named constrained_sys = assemble([bendu], 
-                                      equations = [bendu.props.T ~ 293.15,  # 20°C
-                                                   bendu.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bendu.props.T ~ 293.15,  # 20°C
+                                                     bendu.bend.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bendu]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1227,9 +1216,8 @@ function test_dynamic_prop_annular_bend_180()
     @named bend180 = DynamicPropAnnularBend180(Do=0.03, Di=0.02, fluid="MEA")
     
     # Set up test conditions
-    @named constrained_sys = assemble([bend180], 
-                                      equations = [bend180.props.T ~ 293.15,  # 20°C
-                                                   bend180.bend.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([bend180.props.T ~ 293.15,  # 20°C
+                                                     bend180.bend.V̇ ~ 0.0005], [], [], name=:constrained_sys), [bend180]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1259,14 +1247,10 @@ end
 # Run the tests with PlutoTest
 
 # ╔═╡ db1950c3-3a9e-440d-87d9-141c4d07a8a4
-#=╠═╡
-@test test_dynamic_prop_pipe_bend()
-  ╠═╡ =#
+test_dynamic_prop_pipe_bend()
 
 # ╔═╡ d742e609-3a44-4a61-960b-c2c50f47ba9d
-#=╠═╡
-@test test_dynamic_prop_pipe_bend_90()
-  ╠═╡ =#
+test_dynamic_prop_pipe_bend_90()
 
 # ╔═╡ 21be2680-3a26-4222-91f0-4dfe01a628ca
 #=╠═╡
@@ -1331,9 +1315,8 @@ function test_dynamic_prop_annular_channel()
     @named annular = DynamicPropAnnularChannel(L=10.0, Do=0.03, Di=0.02, ε=1.5e-6, fluid="MEA")
     
     # Set up test conditions - note that we set temperature directly
-    @named constrained_sys = assemble([annular], 
-                                      equations = [annular.props.T ~ 293.15,  # 20°C
-                                                   annular.channel.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([annular.props.T ~ 293.15,  # 20°C
+                                                     annular.channel.V̇ ~ 0.0005], [], [], name=:constrained_sys), [annular]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1413,9 +1396,8 @@ function test_dynamic_prop_straight_tube()
     @named tube = DynamicPropStraightTube(L=10.0, Di=0.02, ε=1.5e-6, fluid="MEA")
     
     # Set up test conditions
-    @named constrained_sys = assemble([tube], 
-                                      equations = [tube.props.T ~ 293.15,  # 20°C
-                                                   tube.tube.V̇ ~ 0.0005]) # 0.5 L/s
+    @named constrained_sys = compose(NonlinearSystem([tube.props.T ~ 293.15,  # 20°C
+                                                     tube.tube.V̇ ~ 0.0005], [], [], name=:constrained_sys), [tube]) # 0.5 L/s
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1557,13 +1539,12 @@ function test_upipe_complete()
     @named bhe = BHE_Upipe_Hydraulic_Complete()
     
     # We can run with default values or override them
-    @named constrained_sys = assemble([bhe], 
-                                      equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                           bhe.T_leg1 ~ 303.15,  # Override to 30°C
                                           bhe.T_bend ~ 303.15,  # Override to 30°C
                                           bhe.T_leg2 ~ 303.15,  # Override to 30°C
                                           bhe.ṁ ~ 1.0         # Override to 1 kg/s
-                                      ])
+                                      ], [], [], name=:constrained_sys), [bhe])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1622,13 +1603,12 @@ function test_upipe_complete_parametric()
     @named bhe_base = BHE_Upipe_Hydraulic_Complete(depth = 100.0, Di = 0.032)
     
     # Set up the initial system with base conditions
-    @named constrained_sys = assemble([bhe_base], 
-                                    equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                         bhe_base.T_leg1 ~ 303.15, 
                                         bhe_base.T_bend ~ 303.15, 
                                         bhe_base.T_leg2 ~ 303.15,
                                         bhe_base.ṁ ~ 1.0
-                                    ])
+                                    ], [], [], name=:constrained_sys), [bhe_base])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
@@ -1783,13 +1763,12 @@ function test_coaxial_complete()
     @named bhe = BHE_Coaxial_Hydraulic_Complete()
     
     # We can run with default values or override them
-    @named constrained_sys = assemble([bhe], 
-                                      equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                           bhe.T_inner ~ 303.15,   # Override to 30°C
                                           bhe.T_bend ~ 303.15,    # Override to 30°C
                                           bhe.T_annular ~ 303.15, # Override to 30°C
                                           bhe.ṁ ~ 1.0           # Override to 1 kg/s
-                                      ])
+                                      ], [], [], name=:constrained_sys), [bhe])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1842,13 +1821,12 @@ function test_coaxial_complete_parametric()
     @named bhe_base = BHE_Coaxial_Hydraulic_Complete(depth = 100.0, Di_inner = 0.032)
     
     # Set up the initial system with base conditions
-    @named constrained_sys = assemble([bhe_base], 
-                                    equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                         bhe_base.T_inner ~ 303.15, 
                                         bhe_base.T_bend ~ 303.15, 
                                         bhe_base.T_annular ~ 303.15,
                                         bhe_base.ṁ ~ 1.0
-                                    ])
+                                    ], [], [], name=:constrained_sys), [bhe_base])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
@@ -2233,11 +2211,10 @@ function test_dynamic_prop_pump()
     )
     
     # Set up test conditions
-    @named constrained_sys = assemble([pump], 
-                                     equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                          pump.props.T ~ 293.15,  # 20°C
                                          pump.pump.V̇ ~ 0.001     # 1 L/s
-                                     ])
+                                     ], [], [], name=:constrained_sys), [pump])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -2274,11 +2251,10 @@ function test_pump_parametric()
     )
     
     # Set up the initial system with base conditions
-    @named constrained_sys = assemble([pump_base], 
-                                     equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                          pump_base.props.T ~ 293.15,  # 20°C
                                          pump_base.pump.V̇ ~ 0.001     # 1 L/s
-                                     ])
+                                     ], [], [], name=:constrained_sys), [pump_base])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
@@ -2440,11 +2416,10 @@ function test_geothermal_loop()
     )
     
     # Set up test conditions
-    @named constrained_sys = assemble([loop], 
-                                     equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                          loop.T_supply ~ 303.15,  # 30°C
                                          loop.T_return ~ 298.15   # 25°C
-                                     ])
+                                     ], [], [], name=:constrained_sys), [loop])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -2511,11 +2486,10 @@ function analyze_pump_speed_vs_consumption(;
     )
     
     # Set up the initial system with base conditions
-    @named constrained_sys = assemble([loop], 
-                                     equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                          loop.T_supply ~ T_supply,
                                          loop.T_return ~ T_return
-                                     ])
+                                     ], [], [], name=:constrained_sys), [loop])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
@@ -2831,11 +2805,10 @@ function test_phx_heat_exchanger()
     )
     
     # Set up test conditions
-    @named constrained_sys = assemble([phx], 
-                                      equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                           phx.props.T ~ 293.15,  # 20°C
                                           phx.phx.V̇ ~ 0.001     # 1 L/s
-                                      ])
+                                      ], [], [], name=:constrained_sys), [phx])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -2899,11 +2872,10 @@ function test_phx_parametric()
     )
     
     # Set up the initial system with base conditions
-    @named constrained_sys = assemble([phx_base], 
-                                    equations = [
+    @named constrained_sys = compose(NonlinearSystem([
                                         phx_base.props.T ~ 293.15,  # 20°C
                                         phx_base.phx.V̇ ~ 0.01     # 1 L/s
-                                    ])
+                                    ], [], [], name=:constrained_sys), [phx_base])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
