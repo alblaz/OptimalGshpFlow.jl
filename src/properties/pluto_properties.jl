@@ -421,7 +421,10 @@ begin
 end
 
 # ╔═╡ eb7c553d-8980-4c66-852a-3ea26915d405
+# ╠═╡ disabled = true
+#=╠═╡
 Clapeyron.PH.entropy(Clapeyron.SingleFluid("R134A"), 1e5, 250e3*(Clapeyron.SingleFluid("R134A").properties.Mw/1000), [1.0])
+  ╠═╡ =#
 
 # ╔═╡ 6910cf96-c290-4905-b044-11487973d407
 function RefrigerantProps(; name::Symbol, fluid="R134A")
@@ -460,10 +463,10 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         
         # Molar thermodynamic properties
         S = 100.0     # [J/(mol·K)] - molar entropy
-        U = 20000.0   # [J/mol] - molar internal energy
+        #U = 20000.0   # [J/mol] - molar internal energy
         H = 25000.0   # [J/mol] - molar enthalpy
-        A = 15000.0   # [J/mol] - molar Helmholtz free energy
-        G = 20000.0   # [J/mol] - molar Gibbs free energy
+        #A = 15000.0   # [J/mol] - molar Helmholtz free energy
+        #G = 20000.0   # [J/mol] - molar Gibbs free energy
         Cp = 100.0    # [J/(mol·K)] - molar heat capacity
         
         # Phase-specific molar properties
@@ -475,10 +478,10 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         
         # Mass thermodynamic properties
         s = 1000.0    # [J/(kg·K)] - specific entropy
-        u = 200000.0  # [J/kg] - specific internal energy
+        #u = 200000.0  # [J/kg] - specific internal energy
         h = 250000.0  # [J/kg] - specific enthalpy
-        a = 150000.0  # [J/kg] - specific Helmholtz free energy
-        g = 200000.0  # [J/kg] - specific Gibbs free energy
+        #a = 150000.0  # [J/kg] - specific Helmholtz free energy
+        #g = 200000.0  # [J/kg] - specific Gibbs free energy
         cp = 1000.0   # [J/(kg·K)] - specific heat capacity
         
         # Phase-specific mass properties
@@ -502,13 +505,13 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         νd = 1.0e-5   # [m²/s] - dew point kinematic viscosity
         
         # Other thermodynamic properties
-        Z = 0.9       # [-] - compressibility factor
-        γ = 1.2       # [-] - adiabatic index
-        κT = 1.0e-5   # [1/Pa] - isothermal compressibility
-        κS = 0.8e-5   # [1/Pa] - isentropic compressibility
-        c = 300.0     # [m/s] - speed of sound
-        α = 0.003     # [1/K] - isobaric expansivity
-        μJT = 1.0e-5  # [K/Pa] - Joule-Thomson coefficient
+        #Z = 0.9       # [-] - compressibility factor
+        #γ = 1.2       # [-] - adiabatic index
+        #κT = 1.0e-5   # [1/Pa] - isothermal compressibility
+        #κS = 0.8e-5   # [1/Pa] - isentropic compressibility
+        #c = 300.0     # [m/s] - speed of sound
+        #α = 0.003     # [1/K] - isobaric expansivity
+        #μJT = 1.0e-5  # [K/Pa] - Joule-Thomson coefficient
     end
 
     # Equations
@@ -535,19 +538,19 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         
         # Secondary thermodynamic properties derived from p,H
         S ~ Sf(fluid, p, H),
-        U ~ Uf(fluid, p, H),
-        A ~ Af(fluid, p, H),
-        G ~ Gf(fluid, p, H),
+        #U ~ Uf(fluid, p, H),
+        #A ~ Af(fluid, p, H),
+        #G ~ Gf(fluid, p, H),
         
         # Properties that require the volume and temperature
         Cp ~ Cpf(fluid, V, T),
-        Z ~ Zf(fluid, V, T),
-        γ ~ γf(fluid, V, T),
-        κT ~ κTf(fluid, V, T),
-        κS ~ κSf(fluid, V, T),
-        c ~ cf(fluid, V, T),
-        α ~ αf(fluid, V, T),
-        μJT ~ μJTf(fluid, V, T),
+        #Z ~ Zf(fluid, V, T),
+        #γ ~ γf(fluid, V, T),
+        #κT ~ κTf(fluid, V, T),
+        #κS ~ κSf(fluid, V, T),
+        #c ~ cf(fluid, V, T),
+        #α ~ αf(fluid, V, T),
+        #μJT ~ μJTf(fluid, V, T),
         
         # Phase-specific molar heat capacities
         Cpb ~ Cpf(fluid, Vb, Tsat),
@@ -579,13 +582,13 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         
         # Mass-based properties
         s ~ S / Mw,
-        u ~ U / Mw,
+        #u ~ U / Mw,
         h ~ H / Mw,
         hb ~ Hb / Mw,
         hd ~ Hd / Mw,
         Δhv ~ ΔHv / Mw,
-        a ~ A / Mw,
-        g ~ G / Mw,
+        #a ~ A / Mw,
+        #g ~ G / Mw,
         cp ~ Cp / Mw,
         cpb ~ Cpb / Mw,
         cpd ~ Cpd / Mw
@@ -644,10 +647,10 @@ function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
     # Molar thermodynamic properties
     println("\n-- Molar Thermodynamic Properties --")
     println("Molar entropy:          $(sol[prop_ref.S]) J/(mol·K)")
-    println("Molar internal energy:  $(sol[prop_ref.U]) J/mol")
+    #println("Molar internal energy:  $(sol[prop_ref.U]) J/mol")
     println("Molar enthalpy:         $(sol[prop_ref.H]) J/mol")
-    println("Molar Helmholtz energy: $(sol[prop_ref.A]) J/mol")
-    println("Molar Gibbs energy:     $(sol[prop_ref.G]) J/mol")
+    #println("Molar Helmholtz energy: $(sol[prop_ref.A]) J/mol")
+    #println("Molar Gibbs energy:     $(sol[prop_ref.G]) J/mol")
     println("Molar heat capacity:    $(sol[prop_ref.Cp]) J/(mol·K)")
     
     # Phase-specific molar properties
@@ -661,10 +664,10 @@ function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
     # Mass thermodynamic properties
     println("\n-- Mass Thermodynamic Properties --")
     println("Specific entropy:          $(sol[prop_ref.s]) J/(kg·K)")
-    println("Specific internal energy:  $(sol[prop_ref.u]) J/kg")
+    #println("Specific internal energy:  $(sol[prop_ref.u]) J/kg")
     println("Specific enthalpy:         $(sol[prop_ref.h]) J/kg")
-    println("Specific Helmholtz energy: $(sol[prop_ref.a]) J/kg")
-    println("Specific Gibbs energy:     $(sol[prop_ref.g]) J/kg")
+    #println("Specific Helmholtz energy: $(sol[prop_ref.a]) J/kg")
+    #println("Specific Gibbs energy:     $(sol[prop_ref.g]) J/kg")
     println("Specific heat capacity:    $(sol[prop_ref.cp]) J/(kg·K)")
     
     # Phase-specific mass properties
@@ -692,13 +695,13 @@ function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
     
     # Other thermodynamic properties
     println("\n-- Other Thermodynamic Properties --")
-    println("Compressibility factor:     $(sol[prop_ref.Z])")
-    println("Adiabatic index:            $(sol[prop_ref.γ])")
-    println("Isothermal compressibility: $(sol[prop_ref.κT]) 1/Pa")
-    println("Isentropic compressibility: $(sol[prop_ref.κS]) 1/Pa")
-    println("Speed of sound:             $(sol[prop_ref.c]) m/s")
-    println("Isobaric expansivity:       $(sol[prop_ref.α]) 1/K")
-    println("Joule-Thomson coefficient:  $(sol[prop_ref.μJT]) K/Pa")
+    #println("Compressibility factor:     $(sol[prop_ref.Z])")
+    #println("Adiabatic index:            $(sol[prop_ref.γ])")
+    #println("Isothermal compressibility: $(sol[prop_ref.κT]) 1/Pa")
+    #println("Isentropic compressibility: $(sol[prop_ref.κS]) 1/Pa")
+    #println("Speed of sound:             $(sol[prop_ref.c]) m/s")
+    #println("Isobaric expansivity:       $(sol[prop_ref.α]) 1/K")
+    #println("Joule-Thomson coefficient:  $(sol[prop_ref.μJT]) K/Pa")
     
     return sol
 end
@@ -706,7 +709,7 @@ end
 # ╔═╡ 0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═╡ skip_as_script = true
 #=╠═╡
-test_ref_properties(200e3, 1e5, 1e-6).retcode
+sol_props = test_ref_properties(200e3, 1e5, 1e-6)
   ╠═╡ =#
 
 # ╔═╡ 0e4ee629-6548-4232-8da4-c72f23167411
