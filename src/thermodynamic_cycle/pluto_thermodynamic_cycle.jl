@@ -1174,7 +1174,7 @@ sol_evap.resid
 md"""Next step is to link it to new "real" prop elements for the inlet and outlet, this way we'll be able to constrain the enthalpy and delta T? Not sure it's actually necessary"""
 
 # ╔═╡ e9738240-eb5a-49bd-8c37-46f8a8c84f7e
-
+md"""Need to figure out a better htc correlation"""
 
 # ╔═╡ 75e0b0ae-91ad-40a5-aaa9-5fb19fc6b3da
 
