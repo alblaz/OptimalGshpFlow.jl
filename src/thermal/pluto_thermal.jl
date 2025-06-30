@@ -36,13 +36,6 @@ end
 using Plots
   ╠═╡ =#
 
-# ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
-# ╠═╡ disabled = true
-# ╠═╡ skip_as_script = true
-#=╠═╡
-using MonteCarloMeasurements
-  ╠═╡ =#
-
 # ╔═╡ da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
 using Distributions
 
@@ -173,6 +166,13 @@ end
 
 # ╔═╡ df8d848c-bde6-477a-b9ff-09154b3ee375
 md" # Quick analysis: parametric study"
+
+# ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using MonteCarloMeasurements
+  ╠═╡ =#
 
 # ╔═╡ 6034ad9e-4787-42e7-9f9a-592d5da1369d
 md" # Temperature profiles"
@@ -1461,35 +1461,25 @@ begin
 end
 
 # ╔═╡ 3f467f08-fbbf-4768-adcb-312f6b005dc9
-#=╠═╡
 # Register your solve_wrapper
 @time register_primitive_multi(solve_uncertain)
 
 # Then call it directly on Particles inputs:
-  ╠═╡ =#
 
 # ╔═╡ 19907f6b-84d2-4fc8-b931-b2e769bc00a0
 N = 100
 
 # ╔═╡ 782c2ab9-51c0-4814-a301-77f19b917bd5
-#=╠═╡
 χ = Particles(N, Uniform(0.1,0.4))
-  ╠═╡ =#
 
 # ╔═╡ 38fc7166-b946-40ef-ba90-826617d743dc
-#=╠═╡
 T_ = Particles(N, Uniform(295,305))
-  ╠═╡ =#
 
 # ╔═╡ 20dd46ac-da6b-4965-bca2-4b599ef10bb2
-#=╠═╡
 ṁ = Particles(N, Uniform(.020,1.0))
-  ╠═╡ =#
 
 # ╔═╡ c1891c9d-d5c7-42ab-9780-a8b93d580386
-#=╠═╡
 @time out_tuple = solve_uncertain(χ, T_, ṁ)  # returns a tuple of Particles
-  ╠═╡ =#
 
 # ╔═╡ 7847e709-1ed5-4313-b9e5-bbc6e391c059
 T_down(p, T_wall, x) = T_wall + p[5] * exp(p[1] * x) + p[6] * exp(p[2] * x)

@@ -52,6 +52,9 @@ using Statistics
 # ╔═╡ 1cc60917-e74a-4bc8-a17a-1b14a3aa1379
 using Clapeyron
 
+# ╔═╡ 80f05707-83b6-43ed-a455-056cf6322443
+using LsqFit      # for curve_fit
+
 # ╔═╡ 7b034564-0557-402e-80f2-66c2ab692f5a
 # Physical symbol mappings for properties
 const PROPERTY_SYMBOLS = Dict{String, Symbol}(
@@ -271,6 +274,75 @@ function __init__()
         load_fluid_data(default_data_dir)
     end
 end
+
+# ╔═╡ 701e44e2-856e-41d4-990c-1ea43eabb382
+"""
+    fit_sigma_GK(fluid::String; npts::Int=20, T_lo_frac::Float64=0.1, T_hi_frac::Float64=0.99)
+
+Fit the Guggenheim–Katayama surface‐tension correlation
+σ = σ₀ * (1 – T_sat/T_c)^n
+to CoolProp data along the saturation line for the given `fluid`.
+
+This version skips any T values where CoolProp errors or returns NaN/Inf.
+
+# Keyword Arguments
+- `npts`: number of (T,p) sampling points  
+- `T_lo_frac`: lowest T_sat as fraction of T_c (default 0.1)  
+- `T_hi_frac`: highest T_sat fraction below T_c (default 0.99)  
+
+# Returns
+- `(σ₀, n)`: fitted parameters  
+"""
+function fit_sigma_GK(fluid::String; npts::Int=10,
+                                  T_lo_frac::Float64=0.1,
+                                  T_hi_frac::Float64=0.99)
+
+    # 1. Critical temperature
+    Tc = PropsSI("Tcrit", fluid)
+
+    # 2. Generate candidate T_sat grid
+    Ts_all = range(T_lo_frac*Tc, stop=T_hi_frac*Tc, length=npts)
+
+    Ts = Float64[]
+    sig = Float64[]
+
+    for T in Ts_all
+        # 3. Try-catch around PropsSI
+        σ_try = try
+            PropsSI("surface_tension", "T", T, "Q", 0, fluid)
+        catch err
+            # skip any error (range, convergence, etc.)
+            continue
+        end
+
+        # 4. Filter NaN/Inf/negative
+        if isfinite(σ_try) && σ_try ≥ 0.0
+            push!(Ts, T)
+            push!(sig, σ_try)
+        end
+    end
+
+    if length(sig) < 3
+        error("Too few valid σ points (got $(length(sig))). Check fluid/range.")
+    end
+
+    # 5. Prepare independent variable x = 1 – T/Tc
+    x = 1 .- Ts ./ Tc
+
+    # 6. Define GK model: σ = p[1] * x.^p[2]
+    model(x, p) = p[1] .* x .^ p[2]
+
+    # 7. Initial guess: σ₀≈0.02 N/m, n≈1.26
+    p0 = [rand(), rand()]
+
+    # 8. Fit
+    fit = curve_fit(model, x, sig, p0)
+
+    return fit.param[1], fit.param[2]
+end
+
+# ╔═╡ cefa4c6c-6957-4481-b29f-21e502c03498
+
 
 # ╔═╡ 3dbe8934-0e13-4bdd-aa9f-5763158e8480
 list_available_fluids()
@@ -512,12 +584,21 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         #c = 300.0     # [m/s] - speed of sound
         #α = 0.003     # [1/K] - isobaric expansivity
         #μJT = 1.0e-5  # [K/Pa] - Joule-Thomson coefficient
-    end
+		Prd
+		Prb
+		Pr
+		Tc
 
-    # Equations
+		σ
+    end
+	
+	#k = 2.1e-7
+    σ0, nσ = fit_sigma_GK(fluid)
+	# Equations
     eqs = [
         # Material properties
         Mw ~ Clapeyron.SingleFluid(fluid).properties.Mw/1000,
+        Tc ~ Clapeyron.SingleFluid(fluid).properties.Tc,
         
         # Saturation properties
         Tsat ~ Tsatf(fluid, p),
@@ -591,17 +672,17 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
         #g ~ G / Mw,
         cp ~ Cp / Mw,
         cpb ~ Cpb / Mw,
-        cpd ~ Cpd / Mw
+        cpd ~ Cpd / Mw,
+
+		σ ~ σ0 * (1-Tsat/Tc)^nσ,
+		#σ ~ k * Vb^(2/3) * (Tc - 6.0 - Tsat),
+		Pr ~ cp*η/λ,
+		Prb ~ cpb*ηb/λb,
+		Prd ~ cpd*ηd/λd,
     ]
     
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
-
-# ╔═╡ 879c02bf-2a8b-42f1-a493-47132e337c92
-# ╠═╡ disabled = true
-#=╠═╡
-export Tf, Vf, Sf, Uf, Gf, Af, ρf, ρmolf, Hf, pf, Cpf, Cvf, γf, κTf, κSf, cf, αf, μJTf, Zf, λf, ηf, Tsatf, Vbf, Vdf, RefrigerantProps, test_ref_properties
-  ╠═╡ =#
 
 # ╔═╡ d849b912-a80e-429d-8c11-99fc4f7a721d
 function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
@@ -702,6 +783,7 @@ function test_ref_properties(h_val=500e3, p_val=1e5, abstol = 1e-3)
     #println("Speed of sound:             $(sol[prop_ref.c]) m/s")
     #println("Isobaric expansivity:       $(sol[prop_ref.α]) 1/K")
     #println("Joule-Thomson coefficient:  $(sol[prop_ref.μJT]) K/Pa")
+    println("Surface tension:  $(sol[prop_ref.σ]) N/m")
     
     return sol
 end
@@ -723,6 +805,7 @@ CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 EntropyScaling = "36a13073-9e6e-4b19-b12b-cb530e79ee8e"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
@@ -738,6 +821,7 @@ CoolProp = "~0.2.1"
 DataInterpolations = "~8.0.1"
 EntropyScaling = "~0.3.2"
 JSON3 = "~1.14.3"
+LsqFit = "~0.15.1"
 ModelingToolkit = "~9.78.0"
 NonlinearSolve = "~4.9.0"
 PlutoDevMacros = "~0.9.0"
@@ -752,7 +836,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "c430276b3ac0f46e196f85ce3db40d95ca5a76cf"
+project_hash = "4e4304013b90b223ce7ee4322992f56db89d0f6a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1838,6 +1922,12 @@ git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
 
+[[deps.LsqFit]]
+deps = ["Distributions", "ForwardDiff", "LinearAlgebra", "NLSolversBase", "Printf", "StatsAPI"]
+git-tree-sha1 = "f386224fa41af0c27f45e2f9a8f323e538143b43"
+uuid = "2fda8390-95c7-5789-9bda-21331edee243"
+version = "0.15.1"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
 git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
@@ -2875,6 +2965,9 @@ version = "17.4.0+2"
 # ╠═d49091f8-b97f-4756-a68c-00377e670f46
 # ╠═c295adee-819b-406b-aaa4-4f040dc36901
 # ╠═ef035f5a-0ad9-4233-bcdc-fbe93f18db5c
+# ╠═80f05707-83b6-43ed-a455-056cf6322443
+# ╠═701e44e2-856e-41d4-990c-1ea43eabb382
+# ╠═cefa4c6c-6957-4481-b29f-21e502c03498
 # ╠═642002e2-7c6b-4b2d-8903-ed3d6ba9b56f
 # ╠═3dbe8934-0e13-4bdd-aa9f-5763158e8480
 # ╠═c3d7befd-22d4-42f4-9a73-3932f5e1e2d8
@@ -2886,7 +2979,6 @@ version = "17.4.0+2"
 # ╠═cee84cbe-7e22-423f-b9c6-d952ef96e442
 # ╠═eb7c553d-8980-4c66-852a-3ea26915d405
 # ╠═6910cf96-c290-4905-b044-11487973d407
-# ╠═879c02bf-2a8b-42f1-a493-47132e337c92
 # ╠═0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═d849b912-a80e-429d-8c11-99fc4f7a721d
 # ╠═0e4ee629-6548-4232-8da4-c72f23167411

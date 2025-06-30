@@ -28,16 +28,16 @@ using Interpolations
 using DataFrames
   ╠═╡ =#
 
-# ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
-@fromparent begin
-	using ..Properties
-end
-
 # ╔═╡ 107be9d7-6d21-4251-af2d-85c7f82f2652
 # ╠═╡ skip_as_script = true
 #=╠═╡
 using Plots
   ╠═╡ =#
+
+# ╔═╡ 6f95a236-229a-4f68-be72-a8085f3aa025
+@fromparent begin
+	using ..Properties
+end
 
 # ╔═╡ aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╠═╡ skip_as_script = true
@@ -485,7 +485,10 @@ end
 
 
 # ╔═╡ 8160473b-7a6f-475a-afc8-c61f50290f44
+# ╠═╡ skip_as_script = true
+#=╠═╡
 test_straight_tube_gnielinski()
+  ╠═╡ =#
 
 # ╔═╡ 9beb3f23-8110-4867-9b19-b9ddeeb711b0
 
@@ -517,6 +520,7 @@ end
 
 
 # ╔═╡ 3320cb17-a8ac-4f9e-ace1-29f8a4ba7906
+# ╠═╡ skip_as_script = true
 #=╠═╡
 @test test_straight_tube_swamee_jain()
   ╠═╡ =#
@@ -2587,32 +2591,6 @@ results = analyze_pump_speed_vs_consumption()
 # ╔═╡ 2009d02d-d2c0-44ea-96f2-b0bc4889fef1
 #=╠═╡
 plot_pump_speed_analysis(results)
-  ╠═╡ =#
-
-# ╔═╡ f5c942cf-5bbf-4455-954e-7db1bdcaba1b
-# ╠═╡ disabled = true
-#=╠═╡
-"""
-Utility function for plate heat exchanger friction factor with smooth transition.
-Uses error function for smooth transition between laminar and turbulent regimes.
-"""
-function phx_friction_factor_smooth(Re, β, Re_low=2300, Re_high=4000)
-    # Laminar flow regime
-    f_lam = 16.0 / Re
-    
-    # Turbulent flow regime based on chevron angle
-    C = 0.6 * sin(β) + 0.3  # Coefficient depends on chevron angle
-    m = 0.2 * sin(β) + 0.1  # Exponent depends on chevron angle
-    f_turb = C * Re^(-m)
-    
-    # Smooth transition between laminar and turbulent regimes
-    transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
-    
-    # Combined friction factor
-    f = (1-transition_factor) * f_lam + transition_factor * f_turb
-    
-    return f
-end
   ╠═╡ =#
 
 # ╔═╡ c45e2af7-7bf9-49d9-be63-c89094c1e540
@@ -5496,6 +5474,7 @@ version = "1.8.1+0"
 # ╠═e8d48aab-e227-48cc-8ad8-3cfb57a3e165
 # ╠═9fe54e9b-0879-4668-b6ee-5002dc6e5878
 # ╠═429b8af2-89da-4865-b484-aa9266ad5732
+# ╠═107be9d7-6d21-4251-af2d-85c7f82f2652
 # ╠═6f95a236-229a-4f68-be72-a8085f3aa025
 # ╟─aecdef58-bf84-460c-bf53-b88d92d42f85
 # ╟─ff1be30a-fb09-4ecd-884f-3fe44f43cd92
@@ -5534,7 +5513,6 @@ version = "1.8.1+0"
 # ╟─d654c8f0-3b41-4388-840b-acb46263a832
 # ╟─ef44e372-38f1-4e50-b474-8088eb6ae1a3
 # ╠═be8c1638-1b97-4787-b9f6-9727e85ba21f
-# ╠═107be9d7-6d21-4251-af2d-85c7f82f2652
 # ╠═15d54952-e218-4c14-b950-288b26cfc9fe
 # ╟─9ea17444-965d-4aec-885a-c3b7065dbdea
 # ╟─bc35b49e-b666-49a5-8a39-102164d1ce63
@@ -5593,7 +5571,6 @@ version = "1.8.1+0"
 # ╠═5a3b2bdc-b1be-491b-8339-b597338a58b3
 # ╠═1adad638-3111-446e-9bbd-085bde79a763
 # ╠═2009d02d-d2c0-44ea-96f2-b0bc4889fef1
-# ╠═f5c942cf-5bbf-4455-954e-7db1bdcaba1b
 # ╠═c45e2af7-7bf9-49d9-be63-c89094c1e540
 # ╠═551f3049-7ba7-4e79-8d9d-02f6fa835912
 # ╠═9ba05444-6ea6-460d-a674-3fef94c553f8
