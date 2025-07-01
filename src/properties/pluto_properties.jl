@@ -1,8 +1,11 @@
 ### A Pluto.jl notebook ###
-# v0.20.8
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
+
+# ╔═╡ 80f05707-83b6-43ed-a455-056cf6322443
+using LsqFit      # for curve_fit
 
 # ╔═╡ d1eb817e-58d6-41e8-9872-e5b9ac697011
 using DataInterpolations
@@ -51,9 +54,6 @@ using Statistics
 
 # ╔═╡ 1cc60917-e74a-4bc8-a17a-1b14a3aa1379
 using Clapeyron
-
-# ╔═╡ 80f05707-83b6-43ed-a455-056cf6322443
-using LsqFit      # for curve_fit
 
 # ╔═╡ 7b034564-0557-402e-80f2-66c2ab692f5a
 # Physical symbol mappings for properties
@@ -340,9 +340,6 @@ function fit_sigma_GK(fluid::String; npts::Int=10,
 
     return fit.param[1], fit.param[2]
 end
-
-# ╔═╡ cefa4c6c-6957-4481-b29f-21e502c03498
-
 
 # ╔═╡ 3dbe8934-0e13-4bdd-aa9f-5763158e8480
 list_available_fluids()
@@ -2942,6 +2939,7 @@ version = "17.4.0+2"
 """
 
 # ╔═╡ Cell order:
+# ╠═80f05707-83b6-43ed-a455-056cf6322443
 # ╠═d1eb817e-58d6-41e8-9872-e5b9ac697011
 # ╠═e9e9008e-5dfd-45d5-92d9-b8cf2493ff5c
 # ╠═d29428f3-38ea-486b-ac86-51c11b605881
@@ -2965,9 +2963,7 @@ version = "17.4.0+2"
 # ╠═d49091f8-b97f-4756-a68c-00377e670f46
 # ╠═c295adee-819b-406b-aaa4-4f040dc36901
 # ╠═ef035f5a-0ad9-4233-bcdc-fbe93f18db5c
-# ╠═80f05707-83b6-43ed-a455-056cf6322443
 # ╠═701e44e2-856e-41d4-990c-1ea43eabb382
-# ╠═cefa4c6c-6957-4481-b29f-21e502c03498
 # ╠═642002e2-7c6b-4b2d-8903-ed3d6ba9b56f
 # ╠═3dbe8934-0e13-4bdd-aa9f-5763158e8480
 # ╠═c3d7befd-22d4-42f4-9a73-3932f5e1e2d8

@@ -266,9 +266,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.Clapeyron]]
 deps = ["BlackBoxOptim", "CSV", "DiffResults", "Downloads", "FillArrays", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "NLSolvers", "OrderedCollections", "PackedVectorsOfVectors", "PositiveFactorizations", "PrecompileTools", "Preferences", "Roots", "Scratch", "SparseArrays", "StableTasks", "StaticArrays", "Tables", "UUIDs"]
-path = "copy_libs/Clapeyron.jl"
+git-tree-sha1 = "0d56a8934e5c15c2db23fd0074dc060ba26f7aeb"
 uuid = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
-version = "0.6.13"
+version = "0.6.14"
 
     [deps.Clapeyron.extensions]
     ClapeyronCoolPropExt = "CoolProp"
