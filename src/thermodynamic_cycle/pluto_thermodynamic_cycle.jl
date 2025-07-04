@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -28,6 +28,7 @@ using NonlinearSolve
 # ╔═╡ 734d74db-7b19-42fd-89ad-78816a939565
 @fromparent begin
 	using ..Properties
+	using ..Thermal
 end
 
 # ╔═╡ 00996e13-d7a2-4f9e-be84-4eec83428486
@@ -243,7 +244,7 @@ end
 function Compressor(; name,
 	fluid= "R134A",
 	η_is = 0.7,
-	V = 0.02/50,
+	V = 0.003/50,
 	# pars
 	#m = 1.0,
 	# vars
@@ -300,11 +301,11 @@ function test_compressor()
 	@named compressor = Compressor()
 
 	eqs=[
-		compressor.ṁ ~ 0.05,
-		compressor.f ~ 50,
+		compressor.ṁ ~ 0.03,
+		#compressor.f ~ 50,
 		compressor.i.h ~ 400e3,
-		#compressor.i.p ~ 1e5,
-		compressor.o.p ~ 5e5,
+		compressor.i.p ~ 2.8e5,
+		compressor.o.p ~ 7e5,
     ]
 
     
@@ -1617,17 +1618,17 @@ function test_ev()
 		hx.λ_pl ~ 16,
 		hx.λ_pitch ~ 4e-3,
 		hx.χ ~ 0.28,
-		hx.L ~ 0.2,
+		#hx.L ~ 0.2,
 		
 		#hx.p_2 ~ 2e5,
-        #hx.γṁ_1   ~ log(1.25),
+        hx.γṁ_1   ~ log(.365),
         hx.γṁ_2   ~ log(0.025),
         hx.T_in_1 ~ 273.15 + 10,
         hx.T_out_1 ~ hx.T_in_1 - 3,
         #hx.h2i ~ hx.ev.propref.hd,
-        #hx.h2i ~ 300.0e3,
+        hx.h2i ~ 220.0e3,
         hx.T_out_2 ~ hx.T_evap + 7,
-		hx.p_2 ~ 2.8e5,
+		#hx.p_2 ~ 2.8e5,
     ]
 
     @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], []; name=:test_plate), [hx])
@@ -1663,6 +1664,9 @@ function test_ev()
     println("EV h2 = ", sol[hx.ev.h_2], " W/m2/K")
     println("SH h1 = ", sol[hx.sh.h_1], " W/m2/K")
     println("SH h2 = ", sol[hx.sh.h_2], " W/m2/K")
+    println("=== Flow ===")
+    println("ṁ 1 = ", exp(sol[hx.γṁ_1]), " kg/s")
+    println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
 
@@ -1695,8 +1699,17 @@ function ThermodynamicCycle(; name,
     # ——— State variables ———
     sts = @variables begin
 		T_i_b = 9+273.15
-		T_cond = 45
-		p_cond = 2e5
+		ΔTb = 3
+		ΔTSH = 7
+		#T_cond = 45
+		#p_cond = 2e5
+		p_l = 1e5
+		p_h = 10e5
+
+		W_comp = 1000
+		Q_evap = 2000
+		Q_cond = -3000
+		COP1 = 5
     end
 
     # ——— Property components ———
@@ -1709,36 +1722,58 @@ function ThermodynamicCycle(; name,
 	
     eqs = [
 		
-		#hx.uz_fr_sh ~ 0.0,
-        evaporator.L      ~ 0.2,
-        evaporator.γṁ_1   ~ log(0.25),
-        evaporator.γṁ_2   ~ log(0.25),
-        #hx.γṁ_2   ~ log(0.25),
-        evaporator.T_in_1 ~ 320.0,
-        evaporator.T_out_1 ~ evaporator.T_in_1 - 3,
-        evaporator.h2i ~ 350.0e3,#
+		
+		evaporator.b ~ 0.002,
+		evaporator.np ~ 25,#*factor,
+		evaporator.W ~ 0.10,
+		evaporator.ϕ ~1.2,
+		evaporator.β ~ π/6,
+		evaporator.th ~ 0.5e-3,
+		evaporator.λ_pl ~ 16,
+		evaporator.λ_pitch ~ 4e-3,
+		evaporator.χ ~ 0.28,
+		evaporator.L ~ 0.2,
+		
 		#hx.p_2 ~ 2e5,
-		evaporator.h2mid ~ evaporator.sh.propref.hd,
-		#hx.uz_fr_sh ~ 0.2,
-    ]
-    eqs = [
-		compressor.i.h ~ evaporator.o_ref.h,
-		compressor.o.h ~ inlet_cond.h,
+        #hx.γṁ_1   ~ log(1.25),
+        #evaporator.γṁ_2   ~ log(0.025),
+        evaporator.T_in_1 ~ T_i_b,
+        evaporator.T_out_1 ~ evaporator.T_in_1 - ΔTb,
+        #hx.h2i ~ hx.ev.propref.hd,
+        #hx.h2i ~ 300.0e3,
+        evaporator.T_out_2 ~ evaporator.T_evap + ΔTSH,
+		#evaporator.p_2 ~ 2.8e5,
+
+
 		
-		inlet_exp.h ~ inlet_exp.hd,
-		
-		inlet_exp.h ~ evaporator.i_ref.h,
-		
-		p_l ~ evaporator.p_ref,
+		#evaporator <-> compressor
+		p_l ~ evaporator.p_2,
 		p_l ~ compressor.i.p,
+		evaporator.h2o ~ compressor.i.h,
 		
+		#compressor <-> condenser
 		p_h ~ compressor.o.p,
 		p_h ~ inlet_cond.p,
-		p_h ~ inlet_exp.p,
-		p_h ~4e5,
+		compressor.o.h ~ inlet_cond.h,
 
-        exp(evaporator.γṁ_ref)  ~ compressor.ṁ,
+		#condenser <-> exp valve
+
+		#exp valve <-> evaporator
+		p_h ~ inlet_exp.p,
+		evaporator.h2i ~ inlet_exp.h,
 		
+		
+		#inlet_exp.h ~ inlet_exp.hd,
+		
+
+        exp(evaporator.γṁ_2)  ~ compressor.ṁ,
+
+		W_comp ~ compressor.W,
+		Q_cond ~ compressor.ṁ*(inlet_exp.h - inlet_cond.h),
+		Q_evap ~ evaporator.Q,
+
+		COP1 ~ -Q_cond/W_comp,
+
     ]
 
     # ——— Assemble system ———
@@ -1746,6 +1781,9 @@ function ThermodynamicCycle(; name,
     return ModelingToolkit.compose(sys,
         [evaporator, compressor, inlet_exp, inlet_cond], name = name)
 end
+
+# ╔═╡ f6d31deb-09dc-4f3d-a183-709ab33cf3fa
+
 
 # ╔═╡ da834208-8f98-4527-924b-28ceb7587fdb
 """
@@ -1755,14 +1793,12 @@ function test_thermodynamic_cycle()
     
 	@named cycle = ThermodynamicCycle();
     eqs = [
-		
-		#cycle.compressor.f ~ 25,
-        # Brine inlet/outlet temps and flows
-        cycle.evaporator.i_sf.T  ~ 273.15 + 8,
-        cycle.evaporator.o_sf.T  ~ cycle.evaporator.mid_sf.T - 3,
-        cycle.evaporator.γṁ_ref  ~ log(0.05),
-        # Pseudo-angle to enforce length relation
-        cycle.evaporator.αL      ~ 3.0,
+		cycle.compressor.f ~ 50,
+		cycle.T_i_b ~ 273.15+10,
+		cycle.ΔTb ~ 3,
+		cycle.ΔTSH ~ 7,
+		cycle.p_h ~ 7e5,
+		cycle.p_l ~ 2.8e5,
     ]
 
     @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [cycle])
@@ -1775,408 +1811,79 @@ function test_thermodynamic_cycle()
         )
     sol         = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
 
+    # ——— Debug prints ———
+    println("=== Debugging Outputs ===")
+    println("Return code: ", sol.retcode)
+    # — parameters on the evaporator
+    println("  • evaporator.b (fin spacing)            = ", sol[cycle.evaporator.b], " m")
+    println("  • evaporator.np (num plates)            = ", sol[cycle.evaporator.np])
+    println("  • evaporator.W (width)                  = ", sol[cycle.evaporator.W], " m")
+    println("  • evaporator.ϕ (porosity)               = ", sol[cycle.evaporator.ϕ])
+    println("  • evaporator.β (inclination)            = ", sol[cycle.evaporator.β], " rad")
+    println("  • evaporator.th (plate thickness)       = ", sol[cycle.evaporator.th], " m")
+    println("  • evaporator.λ_pl (plate κ)             = ", sol[cycle.evaporator.λ_pl], " W/m·K")
+    println("  • evaporator.λ_pitch (pitch)            = ", sol[cycle.evaporator.λ_pitch], " m")
+    println("  • evaporator.χ (liquid fraction)        = ", sol[cycle.evaporator.χ])
+    println("  • evaporator.L (length)                 = ", sol[cycle.evaporator.L], " m")
+    # — evaporator in/out states
+    println("  • T_in_1 (feed temp)                    = ", sol[cycle.evaporator.T_in_1], " K")
+    println("  • T_out_1 (liquid side exit)            = ", sol[cycle.evaporator.T_out_1], " K")
+    println("  • T_evap (evaporating temp)             = ", sol[cycle.evaporator.T_evap], " K")
+    println("  • T_out_2 (vapour side exit)            = ", sol[cycle.evaporator.T_out_2], " K")
+    println("  • evaporator.p_2 (evap outlet P)        = ", sol[cycle.evaporator.p_2], " Pa")
+    println("  • evaporator.h2i (vapor enthalpy in)   = ", sol[cycle.evaporator.h2i], " J/kg")
+    println("  • evaporator.h2i (vapor enthalpy dew)   = ", sol[cycle.evaporator.h2mid], " J/kg")
+    println("  • evaporator.h2o (vapor enthalpy out)   = ", sol[cycle.evaporator.h2o], " J/kg")
+    println("  • evaporator.ṁ_1 (log mass‐flow)       = ", exp(sol[cycle.evaporator.γṁ_2]), "kg/s")
+    println("  • evaporator.ṁ_2 (log mass‐flow)       = ", exp(sol[cycle.evaporator.γṁ_1]), "kg/s")
+    # — compressor ports & flow
+    println("  • compressor.i.p (inlet P)              = ", sol[cycle.compressor.i.p], " Pa")
+    println("  • compressor.i.h (inlet h)              = ", sol[cycle.compressor.i.h], " J/kg")
+    println("  • compressor.o.p (outlet P)             = ", sol[cycle.compressor.o.p], " Pa")
+    println("  • compressor.o.h (outlet h)             = ", sol[cycle.compressor.o.h], " J/kg")
+    println("  • ṁ_compressor (mass flow)              = ", sol[cycle.compressor.ṁ], " kg/s")
+    println("  • compressor.f (speed)                  = ", sol[cycle.compressor.f])
+    # — condenser (refrigerant‐props) inlet
+    println("  • inlet_cond.p (cond inlet P)           = ", sol[cycle.inlet_cond.p], " Pa")
+    println("  • inlet_cond.h (cond inlet h)           = ", sol[cycle.inlet_cond.h], " J/kg")
+    println("===============================")
+    println("  • Q_cond          = ", sol[cycle.Q_cond], " W")
+    println("  • Q_evap          = ", sol[cycle.Q_evap], " W")
+    println("  • W_comp          = ", sol[cycle.W_comp], " W")
+    println("  • COP1          = ", sol[cycle.COP1], "")
+    println("===============================")
 
     return sol
 end
 
 
 # ╔═╡ ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
-test_thermodynamic_cycle()
+sol_cycle = test_thermodynamic_cycle()
 
-# ╔═╡ 69c6ad7d-5b14-4422-b3c7-5ca71add8891
-"""
-Test routine for the Evaporator model
-"""
-function test_cycle()
-    
-	@named cycle = ThermodynamicCycle();
-    eqs = [
-		
-		#cycle.compressor.f ~ 25,
-        # Brine inlet/outlet temps and flows
-        cycle.evaporator.i_sf.T  ~ 273.15 + 8,
-        cycle.evaporator.o_sf.T  ~ cycle.evaporator.mid_sf.T - 3,
-        cycle.evaporator.γṁ_ref  ~ log(0.05),
-        # Pseudo-angle to enforce length relation
-        cycle.evaporator.αL      ~ 3.0,
-    ]
-
-    @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [cycle])
-    simpl       = structural_simplify(sys)
-    prob        = NonlinearProblem(simpl, [])
-    #sol         = NonlinearSolve.solve(prob, abstol = 1e-6)
-	solver = NewtonRaphson(; 
-            linesearch = BackTracking(; maxstep=20), 
-            autodiff = AutoFiniteDiff()
-        )
-    sol         = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
-
-
-    return sol
-end
-
-
-# ╔═╡ d0fea23b-5993-485a-ba84-9f601b4e96b5
-"""
-
-"""
-function Cycle(; name,
-                     refrigerant = "R134A",
-                     fluid       = "MEA",
-                     χ           = 0.28,
-                     L           = 0.2,
-                     Per         = 2π * 0.05 * 1000)
-    # ——— Parameters ———
-    ps = @parameters begin
-    end
-
-    # ——— State variables ———
-    sts = @variables begin
-		p_h = 4e5
-		p_l = 2e5
-    end
-
-
-    # ——— Property components ———
-    @named evaporator  = Evaporator()
-    @named compressor = Compressor(fluid = refrigerant)
-	@named inlet_exp  = Properties.RefrigerantProps(fluid = refrigerant)
-	@named inlet_cond  = Properties.RefrigerantProps(fluid = refrigerant)
-
-    # ——— Governing equations ———
-    eqs = [
-		compressor.i.h ~ evaporator.o_ref.h,
-		compressor.o.h ~ inlet_cond.h,
-		
-		inlet_exp.h ~ inlet_exp.hd,
-		
-		inlet_exp.h ~ evaporator.i_ref.h,
-		
-		p_l ~ evaporator.p_ref,
-		p_l ~ compressor.i.p,
-		
-		p_h ~ compressor.o.p,
-		p_h ~ inlet_cond.p,
-		p_h ~ inlet_exp.p,
-		p_h ~4e5,
-		
-       	evaporator.U_SH    ~ 1000,
-        evaporator.U_EV    ~ 3000,
-
-        exp(evaporator.γṁ_ref)  ~ compressor.ṁ,
-		
-    ]
-
-    # ——— Assemble system ———
-    sys = NonlinearSystem(eqs, sts, ps, name = name)
-    return ModelingToolkit.compose(sys,
-        [evaporator, compressor, inlet_exp, inlet_cond], name = name)
-end
-
-# ╔═╡ 4437611d-700b-499e-91e0-cbc01afe3adb
-md" # Combined problem"
-
-# ╔═╡ 26da88e5-8a54-4b85-aaf3-b02993279aa4
-md" # BHE + Evap + Compressor"
-
-# ╔═╡ 8a327f7b-23e9-4af6-b58a-046a32d464a3
-md" # Internal forced convection"
-
-# ╔═╡ ef749cbd-01ce-45fc-9707-7b47417ffe58
-function h_tube(;name)
-	ps = @parameters begin
-		cp
-		μ
-		λ
-		ρ
-		Di
-	end
-	sts = @variables begin
-		h
-		ṁ
-	end
-	csts = @constants begin
-		Re_low = 2300
-		Re_high = 5000
-	end
-	
-	V̇ = ṁ / ρ
-	S = π * Di ^ 2 / 4
-	v = V̇ / S
-
-	Re = ρ * v * Di / μ
-	Pr = cp * μ / λ
-
-	Nu_lam = 3.66
-	f = 0.3164*Re^(-1//4)
-	Nu_tur = (f/8*(Re-1000)*Pr)/(1+12.7*sqrt(f/8)*(Pr^(2//3)-1))
-	turb_index = 0.5 * (1 + SpecialFunctions.erf((2 * SpecialFunctions.erfinv(0.98) / (Re_high - Re_low)) * (Re - (Re_low + Re_high)/2)))
-
-	Nu = (1-turb_index) * Nu_lam + turb_index * Nu_tur
-
-    eqs = [h ~ Nu * λ / Di]
-	
-	return NonlinearSystem(eqs, sts, ps; name = name);
-end
-
-# ╔═╡ c73d8d96-4ac7-4748-a844-a8f2bfbe0458
-#TDL: make the htc into other components
-function Evaporator1(;name, refrigerant::String = "R134A")
-	ps = @parameters begin
-		W = 0.2, [description = "Plate Heat eXchanger width"]
-		np = 20.0, [description = "Total number of plate"]
-		ϕ = 1.118, [description = "Surface enlargment factor"]
-		b = 2e-3, [description = "Pressing depth "]
-		β = 30, [description = "Chevron angle (°)"]
-		χ = 0.38, [description = "Secondary fluid concentration"]
-		L_PHX = 0.3, [description = "Plate Heat eXchanger length"]
-		th = 1e-3, [description = "Plate thickness"]
-		λ_Cu = 300.0, [description = "Wall (copper) thermal conductivity"]
-	end
-	sts = @variables begin
-		ṁ_r = 1.0
-		ṁ_b = 1.0
-		T_p_b = 1.0
-		T_p_r = 1.0
-		T_evap = 1.0
-		T_b_in = 1.0
-		αL = 1.0
-		T_b_interface = 1.0
-		T_r_interface = 1.0
-		T_r_out = 1.0
-		T_b_out = 1.0
-		h_r_interface = 1.0
-		h_r_in = 1.0
-		K_SH_r_ = 1.0
-		K_EV_r_ = 1.0
-		K_SH_b_ = 1.0
-
-		h1 = 1.0
-		h2 = 1.0
-	end
-
-	h_dew = h_dew_(T_evap)
-	h_bub = h_bub_(T_evap)
-	p_evap = p_PC(T_evap)
-
-	@named gphase = Prop_REF_gas()
-	@named lphase = Prop_REF_liq()
-	@named brine = Prop_SF(χ0 = χ)
-
-	#aliases
-	
-	cp_r_gas = gphase.cp
-	μ_r_gas = gphase.μ
-	λ_r_gas = gphase.λ
-	ρ_r_gas = gphase.ρ
-	
-	cp_r_liq = lphase.cp
-	μ_r_liq = lphase.μ
-	λ_r_liq = lphase.λ
-	ρ_r_liq = lphase.ρ
-	
-	cp_b = brine.cp
-	μ_b = brine.μ
-	λ_b = brine.λ
-	ρ_b = brine.ρ
-	
-	dh = 2*b                       # hydraulic diameter 
-	S = (b*np)/2 #assuming half volume/section in each channel
-	V̇_b = abs(ṁ_b)/ρ_b
-	
-	v_b = V̇_b/S                  # speed of the secondary fluid 
-	
-	V̇_r_gas = abs(ṁ_r)/ρ_r_gas
-	v_r_gas = V̇_r_gas/S
-
-	Re_raw_b = ρ_b * v_b * dh / μ_b           # Reynolds
-	Re_b = sqrt(Re_raw_b^2 + 1e-12) # < maybe solves some NaN problems?
-	
-	Pr_b = cp_b * μ_b / λ_b
-	Nul_b = 3.65/(β^0.455 * Re_b^0.339)
-	Nut_b = 12.6/(β^1.142) * Re_b^(0.642 + 0.00111*β)
-	Nu_b  = (Nul_b^3 + Nut_b^3)^(1/3) 
-	#very wrong correlation ⚠
-	Nudh_b = Nu_b * Pr_b^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_b = Nudh_b*λ_b/dh
-	
-	Re_r_gas = ρ_r_gas * v_r_gas * dh / μ_r_gas           # Reynolds
-	
-	Pr_r_gas = cp_r_gas * μ_r_gas / λ_r_gas
-	Nul_r_gas = 3.65/(β^0.455 * Re_r_gas^0.339)
-	Nut_r_gas = 12.6/(β^1.142) * Re_r_gas^(0.642 + 0.00111*β)
-	Nu_r_gas  = (Nul_r_gas^3 + Nut_r_gas^3)^(1/3) 
-	Nudh_r_gas = Nu_r_gas * Pr_r_gas^(1/3) # * (μ/μw)^0.17 # I approximate this to 1 for simplicity
-	h_r_gas = Nudh_r_gas*λ_r_gas/dh
-
-
-	U_SH = 1/(1/h_b + th/λ_Cu + 1/h_r_gas)
-	U_EV = 1/(1/h_b + th/λ_Cu)
-
-	Per_PHX = (W*ϕ)*np #only perimeter in contact with the other channels
-	
-	L_EV = sin(αL)^2 * L_PHX
-	L_SH = cos(αL)^2 * L_PHX
-	#L_SH = L_PHX
-
-	UA_SH = U_SH * L_SH * Per_PHX
-	UA_SH = L_SH * Per_PHX
-	UA_EV = U_EV * L_EV * Per_PHX
-	UA_EV = L_EV * Per_PHX
-
-	# "right" side of the HX; superheating.
-	# Term regarding the superheated gas
-	K_SH_r_ = 2e3 / ṁ_r / cp_r_gas
-	# Term regarding the brine (single phase)
-	K_SH_b_ = 2e3 / ṁ_b / cp_b
-
-	# "left" side of the HX: evaporation.
-	# Term regarding the brine (single phase)
-	K_EV_b_ = UA_EV / ṁ_b / cp_b
-	
-	# --- SH
-	
-	#variables that will not be present in the end system
-	@variables x_SH
-	T_b_SH = T_evap
-		+ (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)
-		+ (K_SH_b_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*exp(-(K_SH_b_+K_SH_r_)*(L_SH-x_SH))
-	#T_b_SH = T_evap + (T_b_in - T_evap)*exp(-K_SH_b_*x)
-	T_b_interface_ = substitute(T_b_SH, x_SH => 0.0)
-	#T_b_interface_ = substitute(T_b_SH, x => L_SH)
-
-	#T_r_SH = T_evap + (α_r_*(T_b_in - T_evap)*exp(-α_SH_*L_SH))/(α_r_ + α_SH_) * (exp((α_r_ + α_SH_)*x) - 1)/exp(α_r_*x)
-	#T_r_SH = T_evap + (K_SH_r_*(T_b_in - T_evap))/(K_SH_r_ + K_SH_b_)*(1 - exp(-(K_SH_r_ + K_SH_b_)*x))
-	T_r_SH = T_evap + (K_SH_r_/(K_SH_b_+K_SH_r_))*(T_b_in - T_evap)*(1 - exp(-(K_SH_b_+K_SH_r_)*x_SH))
-
-	
-	# --- EV
-
-	#variables that will not be present in the end system
-	@variables x_EV
-	
-	T_b_EV = T_evap + (T_b_interface_ - T_evap)*exp(-K_EV_b_*(L_EV-x_EV))
-	T_r_EV = T_evap
-	h_r_EV = h_dew - ṁ_b*cp_b/ṁ_r*(T_b_interface_-T_b_EV)
-
-	eqs = [
-		h1 ~ h_b
-		h2 ~ h_r_gas
-		K_SH_r_ ~ K_SH_r_
-		K_SH_b_ ~ K_SH_b_
-		K_EV_r_ ~ K_EV_r_
-		p_evap ~ lphase.p
-		p_evap ~ gphase.p
-		
-		T_p_r ~ lphase.T
-		T_p_r ~ gphase.T
-		
-		T_p_b ~ brine.T
-		
-		T_b_interface ~ T_b_interface_
-		T_r_interface ~ substitute(T_r_SH, x_SH => 0.0)
-		T_r_out ~ substitute(T_r_SH, x_SH => L_SH)
-		T_b_out ~ substitute(T_b_EV, x_EV => 0.0)
-		h_r_interface ~ h_dew
-		h_r_in ~ substitute(h_r_EV, x_EV=> 0.0)
-	]
-	return ModelingToolkit.compose(NonlinearSystem(eqs, sts, ps; name = name), [gphase, lphase, brine]);
-end
-
-# ╔═╡ 2d93742a-cd89-47d9-91f6-39ef3ca294fd
-begin
-@named Evap1 = Evaporator1();
-	
-	eqs_bc = [
-		Evap1.ṁ_r ~ 1.0
-		Evap1.ṁ_b ~ 1.0
-		
-		Evap1.T_evap ~ -10+273.15
-		Evap1.T_p_r ~ Evap1.T_evap + 5
-		Evap1.T_p_b ~ Evap1.T_p_r + 5
-		
-		Evap1.T_b_in ~ -2+273.15
-		Evap1.αL ~ pi/2*0.5
-	]
-	@named bcevap = ModelingToolkit.compose(NonlinearSystem(eqs_bc, [], []; name = :CJUBUIOname), [Evap1]);
-	sbce = structural_simplify(bcevap)
-	probev = NonlinearProblem(sbce, [])
-	sol_ev = NonlinearSolve.solve(probev, Klement())
-end;
-
-# ╔═╡ 78f31f40-509d-472c-9ada-a738c6137dca
-sol_ev.retcode
-
-# ╔═╡ d118db4b-a0e1-43b6-85e0-34730a25cd5a
-sol_ev.resid
-
-# ╔═╡ d77a1d30-41f4-49fb-9080-e3539d562ef4
-sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in]
-
-# ╔═╡ e4a528e3-09b6-4611-ad1c-87e034e9b5e1
-sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]
-
-# ╔═╡ f5df3fe2-06d2-4866-9527-b54e1cfe0e9e
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_in])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface])
-
-# ╔═╡ acc65d45-264e-4ff7-abab-d8a5eaf473e7
-((sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface])/(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]))/(sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r] / sol_ev[Evap1.brine.cp] / sol_ev[Evap1.ṁ_b])
-
-# ╔═╡ b1b07235-fc31-4a86-ba6f-d47ae8a52427
-sol_ev[Evap1.gphase.cp] / sol_ev[Evap1.brine.cp]
-
-# ╔═╡ 617aac0d-417c-4261-84c9-98c557148bc4
-md" # 1"
-
-# ╔═╡ adedee77-c7ee-4353-bcd5-b3ab89b66e61
-(sol_ev[Evap1.T_b_in] .- sol_ev[Evap1.T_b_interface]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-
-# ╔═╡ 4ce72a1e-5d92-48eb-b868-4941c8135fc6
-(sol_ev[Evap1.T_r_out] - sol_ev[Evap1.T_r_interface]) * sol_ev[Evap1.gphase.cp] * sol_ev[Evap1.ṁ_r]
-
-# ╔═╡ 5a4a7a0b-337e-43ed-b094-c0492089f25d
-md" # 2"
-
-# ╔═╡ 1743b928-9e5a-466f-a5a4-260dab7e3234
-(sol_ev[Evap1.T_b_interface] .- sol_ev[Evap1.T_b_out]) * sol_ev[Evap1.brine.cp] * sol_ev[Evap1.ṁ_b]
-
-# ╔═╡ 69e6eb61-2d3f-4eb3-943f-a5eaf619a341
-(sol_ev[Evap1.h_r_interface] .- sol_ev[Evap1.h_r_in]) * sol_ev[Evap1.ṁ_r]
-
-# ╔═╡ a1216c06-5404-40f3-9c12-4cfa57356d4c
-sol_ev[Evap1.T_r_interface]
-
-# ╔═╡ c4e9bd10-4946-4227-b2ec-1083c627c843
-sol_ev[Evap1.T_evap]
-
-# ╔═╡ 0255698a-8018-4719-afc9-8f108abd1dd5
-sol_ev[Evap1.gphase.cp]
-
-# ╔═╡ c801b8e4-cbb4-426e-bc84-8b50114ae62b
-sol_ev[Evap1.h1]
-
-# ╔═╡ 5a137256-ee74-41f7-8758-f9a1e2408fb1
-sol_ev[Evap1.h2]
-
-# ╔═╡ f010d662-9cfd-4436-9760-4507371d3fba
-md" ### Test props"
+# ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
+sol_cycle.retcode
 
 # ╔═╡ e563b30e-38b6-46db-9a74-184dd0a9117c
 md" # Quick analysis: parametric study"
 
 # ╔═╡ efea74fa-e2f8-4e68-944c-60ac7dabd571
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	m_Y = [median(y.particles) for y in YY]
 	q_05 = [quantile(y.particles, 0.025) for y in YY]
 	q_95 = [quantile(y.particles, 0.975) for y in YY]
 end
+  ╠═╡ =#
 
 # ╔═╡ ef2eec7f-a94f-4ce1-90fe-2190efc78a5d
+#=╠═╡
 begin
 fig_study = Makie.lines(XX, m_Y)
 	band!(XX, q_05, q_95)
 	fig_study
 end
+  ╠═╡ =#
 
 # ╔═╡ f10ce6fe-b32c-44a6-860f-77a10405b764
 md" # Temperature profiles"
@@ -2188,6 +1895,8 @@ md"# Utilities"
 md" # Other"
 
 # ╔═╡ 4aa25799-ffec-425a-ba91-d577b7f8b2f7
+# ╠═╡ disabled = true
+#=╠═╡
 candidate_solvers = [
     NewtonRaphson(),
     NonlinearSolve.TrustRegion(),
@@ -2214,6 +1923,7 @@ candidate_solvers = [
     #NLSolversJL(),
     #PETScSNES(),
 	];
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -4175,35 +3885,10 @@ version = "17.4.0+2"
 # ╠═6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
 # ╠═c81e49af-a294-45d2-b2fd-c605dad70ef3
 # ╠═9b628eb9-cc22-496e-b0f9-0327e52fb0d1
+# ╠═f6d31deb-09dc-4f3d-a183-709ab33cf3fa
+# ╠═e09caba7-c987-4c7b-af32-beec786c2504
 # ╠═ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
 # ╠═da834208-8f98-4527-924b-28ceb7587fdb
-# ╠═69c6ad7d-5b14-4422-b3c7-5ca71add8891
-# ╠═d0fea23b-5993-485a-ba84-9f601b4e96b5
-# ╠═4437611d-700b-499e-91e0-cbc01afe3adb
-# ╠═26da88e5-8a54-4b85-aaf3-b02993279aa4
-# ╠═8a327f7b-23e9-4af6-b58a-046a32d464a3
-# ╠═ef749cbd-01ce-45fc-9707-7b47417ffe58
-# ╠═c73d8d96-4ac7-4748-a844-a8f2bfbe0458
-# ╠═2d93742a-cd89-47d9-91f6-39ef3ca294fd
-# ╠═78f31f40-509d-472c-9ada-a738c6137dca
-# ╠═d118db4b-a0e1-43b6-85e0-34730a25cd5a
-# ╠═d77a1d30-41f4-49fb-9080-e3539d562ef4
-# ╠═e4a528e3-09b6-4611-ad1c-87e034e9b5e1
-# ╠═f5df3fe2-06d2-4866-9527-b54e1cfe0e9e
-# ╠═acc65d45-264e-4ff7-abab-d8a5eaf473e7
-# ╠═b1b07235-fc31-4a86-ba6f-d47ae8a52427
-# ╠═617aac0d-417c-4261-84c9-98c557148bc4
-# ╠═adedee77-c7ee-4353-bcd5-b3ab89b66e61
-# ╠═4ce72a1e-5d92-48eb-b868-4941c8135fc6
-# ╠═5a4a7a0b-337e-43ed-b094-c0492089f25d
-# ╠═1743b928-9e5a-466f-a5a4-260dab7e3234
-# ╠═69e6eb61-2d3f-4eb3-943f-a5eaf619a341
-# ╠═a1216c06-5404-40f3-9c12-4cfa57356d4c
-# ╠═c4e9bd10-4946-4227-b2ec-1083c627c843
-# ╠═0255698a-8018-4719-afc9-8f108abd1dd5
-# ╠═c801b8e4-cbb4-426e-bc84-8b50114ae62b
-# ╠═5a137256-ee74-41f7-8758-f9a1e2408fb1
-# ╠═f010d662-9cfd-4436-9760-4507371d3fba
 # ╠═e563b30e-38b6-46db-9a74-184dd0a9117c
 # ╠═efea74fa-e2f8-4e68-944c-60ac7dabd571
 # ╠═ef2eec7f-a94f-4ce1-90fe-2190efc78a5d

@@ -30,17 +30,17 @@ using PlutoTest
 	using ..Properties
 end
 
-# ╔═╡ c32b5df3-e560-4af0-9b2a-2f1032042414
-# ╠═╡ skip_as_script = true
-#=╠═╡
-using Plots
-  ╠═╡ =#
-
 # ╔═╡ da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
 using Distributions
 
 # ╔═╡ 18df1038-aa05-43e8-b88b-6d13586cf503
 using LinearAlgebra
+
+# ╔═╡ c32b5df3-e560-4af0-9b2a-2f1032042414
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using Plots
+  ╠═╡ =#
 
 # ╔═╡ 1e019ddb-1873-4cea-a765-83b6f7316b34
 using SteadyStateDiffEq
@@ -100,6 +100,13 @@ using Nemo
 # ╠═╡ skip_as_script = true
 #=╠═╡
 using PlutoExtras
+  ╠═╡ =#
+
+# ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
+# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
+#=╠═╡
+using MonteCarloMeasurements
   ╠═╡ =#
 
 # ╔═╡ 48ef9603-6e6c-4d78-a85d-f26436ef3348
@@ -164,22 +171,8 @@ function U_fill_R_s(;name, J::Int=1)
 end
   ╠═╡ =#
 
-# ╔═╡ df8d848c-bde6-477a-b9ff-09154b3ee375
-md" # Quick analysis: parametric study"
-
-# ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
-# ╠═╡ disabled = true
-# ╠═╡ skip_as_script = true
-#=╠═╡
-using MonteCarloMeasurements
-  ╠═╡ =#
-
 # ╔═╡ 6034ad9e-4787-42e7-9f9a-592d5da1369d
 md" # Temperature profiles"
-
-# ╔═╡ 571a62a6-2bee-43c0-939f-e96346108c67
-# Removed custom assemble function - using ModelingToolkit.compose directly
-
 
 # ╔═╡ fe000077-8514-4ac7-8dc9-52a87ad28b2c
 """
@@ -363,6 +356,113 @@ function BoreholeTemperature(; name::Symbol)
     return NonlinearSystem(eqs, sts, ps; name=name)
 end
 
+# ╔═╡ 74663487-ddbb-48ff-b61f-5e8317cfdcf0
+"""
+Test function for the BoreholeTemperature component to verify its behavior at different positions along the borehole.
+This demonstrates how the solution changes with depth.
+"""
+function test_borehole_temperature()
+    # Create the parameters component with typical values
+    @named params = BoreholeTemperatureParameters()
+    
+    # Solve the parameters first
+    @named param_sys = ModelingToolkit.compose(NonlinearSystem([
+        params.L_bh ~ 100.0,
+        params.T_wall ~ 283.15,
+        params.T_1_in ~ 293.15,
+        params.ṁ ~ 0.5,
+        params.cp_1 ~ 4200.0,
+        params.cp_2 ~ 4200.0,
+        params.R_f1_b ~ 0.1,
+        params.R_f2_b ~ 0.1,
+        params.R_f1_f2 ~ 0.3
+    ], [], [], name=:param_sys), [params])
+    
+    simpl_param_sys = structural_simplify(param_sys)
+    param_problem = NonlinearProblem(simpl_param_sys, [])
+    param_sol = NonlinearSolve.solve(param_problem)
+    
+    # Extract parameter values
+    λ_1_val = param_sol[params.λ_1]
+    λ_2_val = param_sol[params.λ_2]
+    γ_1_val = param_sol[params.γ_1]
+    γ_2_val = param_sol[params.γ_2]
+    C_1_val = param_sol[params.C_1]
+    C_2_val = param_sol[params.C_2]
+    T_wall_val = param_sol[params.T_wall]
+    
+    println("Parameter values:")
+    println("λ_1 = $(λ_1_val)")
+    println("λ_2 = $(λ_2_val)")
+    println("γ_1 = $(γ_1_val)")
+    println("γ_2 = $(γ_2_val)")
+    println("C_1 = $(C_1_val)")
+    println("C_2 = $(C_2_val)")
+    
+    # Test temperature calculations at different depths
+    depths = [0.0, 10.0, 25.0, 50.0, 75.0, 100.0]
+    println("\nTemperature profiles along the borehole:")
+    println("x [m]\t\tT_1 [°C]\t\tT_2 [°C]")
+    println("--------------------------------------------------")
+    
+    for x in depths
+        # Create a temperature component for this position
+        @named temp = BoreholeTemperature()
+        
+        # Set up the system
+        @named temp_sys = ModelingToolkit.compose(NonlinearSystem([
+            temp.x ~ x,
+            temp.T_wall ~ T_wall_val,
+            temp.λ_1 ~ λ_1_val,
+            temp.λ_2 ~ λ_2_val,
+            temp.γ_1 ~ γ_1_val,
+            temp.γ_2 ~ γ_2_val,
+            temp.C_1 ~ C_1_val,
+            temp.C_2 ~ C_2_val
+        ], [], [], name=:temp_sys), [temp])
+        
+        simpl_temp_sys = structural_simplify(temp_sys)
+        temp_problem = NonlinearProblem(simpl_temp_sys, [])
+        temp_sol = NonlinearSolve.solve(temp_problem)
+        
+        # Extract temperature values
+        T_1 = temp_sol[temp.T_1]
+        T_2 = temp_sol[temp.T_2]
+        
+        # Print results in celsius for better readability
+        println("$(x)\t\t$(round(T_1 - 273.15, digits=2))\t\t$(round(T_2 - 273.15, digits=2))")
+    end
+    
+    # Check if temperatures are physically reasonable
+    # Create one last test at the bottom
+    @named temp_bottom = BoreholeTemperature()
+    @named temp_bottom_sys = ModelingToolkit.compose(NonlinearSystem([
+        temp_bottom.x ~ 100.0,
+        temp_bottom.T_wall ~ T_wall_val,
+        temp_bottom.λ_1 ~ λ_1_val,
+        temp_bottom.λ_2 ~ λ_2_val,
+        temp_bottom.γ_1 ~ γ_1_val,
+        temp_bottom.γ_2 ~ γ_2_val,
+        temp_bottom.C_1 ~ C_1_val,
+        temp_bottom.C_2 ~ C_2_val
+    ], [], [], name=:temp_bottom_sys), [temp_bottom])
+    
+    simpl_temp_bottom_sys = structural_simplify(temp_bottom_sys)
+    temp_bottom_problem = NonlinearProblem(simpl_temp_bottom_sys, [])
+    temp_bottom_sol = NonlinearSolve.solve(temp_bottom_problem)
+    
+    T_1_bottom = temp_bottom_sol[temp_bottom.T_1]
+    T_2_bottom = temp_bottom_sol[temp_bottom.T_2]
+    
+    # For U-tube, T_1 and T_2 should converge at the bottom
+    is_physically_valid = abs(T_1_bottom - T_2_bottom) < 0.1
+    
+    return is_physically_valid
+end
+
+# ╔═╡ 1e5277ee-6806-40b7-86ea-aa2414648dc6
+test_borehole_temperature()
+
 # ╔═╡ 6f1888cb-63ba-4cef-8151-bd7d09e5bc63
 """
 UTubeBorehole combines the UTubeParameters and UTubeTemperature components to model
@@ -381,6 +481,8 @@ function BoreholeThermal(; name::Symbol, depth=100.0, T_wall=283.15)
     # System variables that will be inputs/outputs at the top level
     sts = @variables begin
         T_1 = 293.15   # Inlet fluid temperature [K]
+        T_b = 293.15   # Inlet fluid temperature [K]
+        #T_b2 = 293.15   # Inlet fluid temperature [K]
         T_2 = 283.15  # Outlet fluid temperature [K]
         ṁ = 0.5            # Fluid mass flow rate [kg/s]
         cp_1 = 4200.0        # Fluid specific heat capacity [J/(kg·K)]
@@ -394,6 +496,7 @@ function BoreholeThermal(; name::Symbol, depth=100.0, T_wall=283.15)
     @named params = BoreholeTemperatureParameters(L_bh=depth, T_wall=T_wall, 
                                               R_f1_b=R_f1_b, R_f2_b=R_f2_b, R_f1_f2=R_f1_f2)
     @named temp_top = BoreholeTemperature()    # For inlet/outlet temperatures
+    @named temp_bot = BoreholeTemperature()    # For inlet/outlet temperatures
     
     # Connect components with each other
     eqs = [
@@ -417,14 +520,25 @@ function BoreholeThermal(; name::Symbol, depth=100.0, T_wall=283.15)
         temp_top.γ_2 ~ params.γ_2,
         temp_top.C_1 ~ params.C_1,
         temp_top.C_2 ~ params.C_2,
+		
+        temp_bot.x ~ depth,
+        temp_bot.T_wall ~ T_wall,
+        temp_bot.λ_1 ~ params.λ_1,
+        temp_bot.λ_2 ~ params.λ_2,
+        temp_bot.γ_1 ~ params.γ_1,
+        temp_bot.γ_2 ~ params.γ_2,
+        temp_bot.C_1 ~ params.C_1,
+        temp_bot.C_2 ~ params.C_2,
         
         # Connect top-level outputs
         T_2 ~ temp_top.T_2,
+        #T_b1 ~ temp_bot.T_1,
+        T_b ~ temp_bot.T_2,
     ]
     
     # Create the parent system with connected components
     sys = NonlinearSystem(eqs, sts, ps, name=name)
-    return ModelingToolkit.compose(sys, [params, temp_top], name=name)
+    return ModelingToolkit.compose(sys, [params, temp_top, temp_bot], name=name)
 end
 
 # ╔═╡ 58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
@@ -452,6 +566,7 @@ function test_utube_borehole()
     # Extract key results
     T_outlet = sol[bh.T_2]
     T_inlet = sol[bh.T_1]
+    T_b = sol[bh.T_b]
     heat_transfer = sol[bh.ṁ] * sol[bh.cp_1] * (T_inlet - T_outlet)
     
     # Print the results
@@ -459,6 +574,7 @@ function test_utube_borehole()
     println("---------------------------")
     println("Inlet temperature: $(T_inlet) K ($(T_inlet - 273.15)°C)")
     println("Outlet temperature: $(T_outlet) K ($(T_outlet - 273.15)°C)")
+    println("Bottom temperature: $(T_b) K ($(T_b - 273.15)°C)")
     println("Temperature difference: $(T_inlet - T_outlet) K")
     println("Heat transfer rate: $(heat_transfer) W")
     
@@ -765,7 +881,7 @@ Returns:
 """
 function UTubeResistances(; name::Symbol, 
                            D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
-                           λ_pipe_1=0.4, λ_pipe_2=0.4, ε_1=1.5e-6, ε_2=1.5e-6, D_b=0.11, χ=0.0)
+                           λ_pipe_1=0.4, λ_pipe_2=0.4, ε_1=1.5e-6, ε_2=1.5e-6, D_b=0.11)
     ps = @parameters begin
         # Thermal properties of pipe materials
         λ_pipe_1 = λ_pipe_1       # Thermal conductivity of pipe 1 material [W/(m·K)]
@@ -781,8 +897,6 @@ function UTubeResistances(; name::Symbol,
         # Pipe roughness
         ε_1 = ε_1       # Surface roughness of pipe 1 [m]
         ε_2 = ε_2       # Surface roughness of pipe 2 [m]
-        
-        χ = χ            # Glycol mass fraction
     end
     
     sts = @variables begin
@@ -1185,6 +1299,7 @@ md"""
 
 # ╔═╡ 17185176-b737-4364-903e-9989c45e8636
 function UTubeGrouted(; name::Symbol,
+					  fluid = "MEA",
                        depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
                        D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
                        T_wall=283.15, s=0.075, χ=0.0)
@@ -1210,6 +1325,7 @@ function UTubeGrouted(; name::Symbol,
         ṁ = 0.5                # Mass flow rate [kg/s]
         T_1 = 293.15       # Inlet fluid temperature [K]
         T_2 = 283.15      # Outlet fluid temperature [K]
+        T_b = 283.15      # Outlet fluid temperature [K]
         cp_1 = 4200.0          # Fluid specific heat capacity [J/(kg·K)]
         cp_2 = 4200.0          # Fluid specific heat capacity [J/(kg·K)]
 		ρ_1 = 1000.0
@@ -1218,13 +1334,18 @@ function UTubeGrouted(; name::Symbol,
 		μ_2 = 1e-3
 		λ_1 = 0.7
 		λ_2 = 0.7
+		
+		Q_1 = 8000
+		Q_2 = 2000
+		Q = 1e4
+		ϵ =0.4
     end
     
     # Create component instances with parameters passed from parent
     @named utube_res = UTubeResistances(D_p1_o=D_p1_o, D_p1_i=D_p1_i, 
                                       D_p2_o=D_p2_o, D_p2_i=D_p2_i,
                                       λ_pipe_1=λ_pipe_1, λ_pipe_2=λ_pipe_2,
-                                      D_b=D_b, χ=χ)
+                                      D_b=D_b)
                                       
     # Calculate borehole radius from diameter
     r_b = D_b/2
@@ -1239,6 +1360,8 @@ function UTubeGrouted(; name::Symbol,
     @named thermal = BoreholeThermal(depth=depth, T_wall=T_wall)
 
     
+    @named prop1 = Properties.IncompressibleProps(fluid = fluid, χ=χ)
+    @named prop2 = Properties.IncompressibleProps(fluid = fluid, χ=χ)
     # Connection equations
     eqs = [
         
@@ -1264,6 +1387,7 @@ function UTubeGrouted(; name::Symbol,
         # Set all necessary inputs directly on the top-level component
         thermal.T_1 ~ T_1,    # 20°C inlet temperature
         thermal.T_2 ~ T_2,#
+        thermal.T_b ~ T_b,#
         thermal.ṁ ~ ṁ,             # 0.5 kg/s flow rate
         thermal.cp_1 ~ cp_1, 
         thermal.cp_2 ~ cp_2, 
@@ -1271,11 +1395,68 @@ function UTubeGrouted(; name::Symbol,
         thermal.R_f2_b ~ utube_res.R_f2_b,
         thermal.R_f1_f2 ~ utube_res.R_f1_f2,
 
+		# Linking properties
+		prop1.T ~ 0.5T_1 + 0.5T_b,
+        prop1.cp ~ cp_1, 
+	    prop1.ρ ~ ρ_1, 
+        prop1.λ ~ λ_1, 
+        prop1.μ ~ μ_1, 
+	
+		prop2.T ~ 0.5T_2 + 0.5T_b,
+        prop2.cp ~ cp_2, 
+        prop2.ρ ~ ρ_2, 
+        prop2.λ ~ λ_2, 
+        prop2.μ ~ μ_2,
+
+		Q_1 ~ ṁ*(T_b-T_1)*cp_1,
+		Q_2 ~ ṁ*(T_2-T_b)*cp_2,
+		Q ~ Q_1 + Q_2,
+		ϵ ~ 1-(T_2-T_wall)/(T_1-T_wall),
     ]
     
     # Create the parent system with connected components
     sys = NonlinearSystem(eqs, sts, ps, name=name)
-    return ModelingToolkit.compose(sys, [utube_res, annular_res, thermal], name=name)
+    return ModelingToolkit.compose(sys, [utube_res, annular_res, thermal, prop1, prop2], name=name)
+end
+
+# ╔═╡ 654a21c4-e857-43b6-891e-281163ceb2e6
+"""
+Test function for UTubeGroutedCollector.
+Creates a complete model of a grouted U-tube borehole heat exchanger and solves it.
+"""
+function test_utube_grouted2()
+    # Create the model with specific parameters
+    @named collector = UTubeGrouted(depth=250.0, 
+                                  D_p1_o=40e-3, D_p1_i=35.29e-3, 
+                                  D_p2_o=40e-3, D_p2_i=35.29e-3,
+                                  D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
+                                  λ_grout=1.5, λ_soil=2.0,
+                                  T_wall=273.15 + 10, s=0.075)
+
+
+	
+    
+    # Set up test conditions
+    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
+		collector.T_1 ~ 273.15 + 5,    # 20°C inlet temperature
+        0.9 ~ collector.ṁ,             # 0.5 kg/s flow rate
+    ], [], [], name=:constrained_sys), [collector])
+    
+    # Simplify and solve
+    simpl_sys = structural_simplify(constrained_sys)
+    problem = NonlinearProblem(simpl_sys, [])
+    sol = NonlinearSolve.solve(problem)
+	
+    # Check results
+    display(sol[collector.T_1]-273.15)
+    display(sol[collector.T_2]-273.15)
+    display(sol[collector.ϵ])
+    display(sol[collector.Q])
+    display(sol[collector.Q_1])
+    display(sol[collector.Q_2])
+    
+    # Return solution success status
+    return sol.retcode == ModelingToolkit.ReturnCode.Success
 end
 
 # ╔═╡ 376f91ca-71b3-4db7-b2a8-e894dd287321
@@ -1285,31 +1466,21 @@ Creates a complete model of a grouted U-tube borehole heat exchanger and solves 
 """
 function test_utube_grouted()
     # Create the model with specific parameters
-    @named collector = UTubeGrouted(depth=100.0, 
-                                  D_p1_o=0.032, D_p1_i=0.026, 
-                                  D_p2_o=0.032, D_p2_i=0.026,
-                                  D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, 
+    @named collector = UTubeGrouted(depth=250.0, 
+                                  D_p1_o=32e-3, D_p1_i=28.24e-3, 
+                                  D_p2_o=32e-3, D_p2_i=28.24e-3,
+                                  D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
                                   λ_grout=1.5, λ_soil=2.0,
-                                  T_wall=283.15, s=0.075, χ=0.0)
-    @named prop = Properties.IncompressibleProps()
+                                  T_wall=273.15 + 10, s=0.075)
 
 
 	
     
     # Set up test conditions
     @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
-		collector.T_1 ~ 310.0,    # 20°C inlet temperature
-		prop.T ~ 310.0,    # 20°C inlet temperature
-        1.0 ~ collector.ṁ,             # 0.5 kg/s flow rate
-        prop.cp ~ collector.cp_1, 
-        prop.cp ~ collector.cp_2, 
-        prop.ρ ~ collector.ρ_1, 
-        prop.ρ ~ collector.ρ_2, 
-        prop.λ ~ collector.λ_1, 
-        prop.λ ~ collector.λ_2, 
-        prop.μ ~ collector.μ_1, 
-        prop.μ ~ collector.μ_2
-    ], [], [], name=:constrained_sys), [collector, prop])
+		collector.T_1 ~ 273.15 + 5,    # 20°C inlet temperature
+        0.9 ~ collector.ṁ,             # 0.5 kg/s flow rate
+    ], [], [], name=:constrained_sys), [collector])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -1317,8 +1488,12 @@ function test_utube_grouted()
     sol = NonlinearSolve.solve(problem)
 	
     # Check results
-    display(sol[collector.T_1])
-    display(sol[collector.T_2])
+    display(sol[collector.T_1]-273.15)
+    display(sol[collector.T_2]-273.15)
+    display(sol[collector.ϵ])
+    display(sol[collector.Q])
+    display(sol[collector.Q_1])
+    display(sol[collector.Q_2])
     
     # Return solution success status
     return sol.retcode == ModelingToolkit.ReturnCode.Success
@@ -1326,6 +1501,9 @@ end
 
 # ╔═╡ 66075428-0b8a-4ca9-bf92-11cd4b9ce017
 test_utube_grouted()
+
+# ╔═╡ cd120784-b5b9-4d78-b9f8-f537422c0ebd
+test_utube_grouted2()
 
 # ╔═╡ 118c0637-66e7-4347-90e4-89c65083e48e
 function DynamicUTubeGrouted(; name::Symbol, fluid="MEA", χ=1.0,
@@ -1361,7 +1539,7 @@ function DynamicUTubeGrouted(; name::Symbol, fluid="MEA", χ=1.0,
                               D_p2_o=D_p2_o, D_p2_i=D_p2_i, D_b=D_b,
                               λ_pipe_1=λ_pipe_1, λ_pipe_2=λ_pipe_2,
                               λ_grout=λ_grout, λ_soil=λ_soil,
-                              T_wall=T_wall, s=s, χ=χ)
+                              T_wall=T_wall, s=s)
 
     @named prop = Properties.IncompressibleProps(fluid=fluid, χ=χ)
 
@@ -1460,26 +1638,31 @@ begin
 	end
 end
 
-# ╔═╡ 3f467f08-fbbf-4768-adcb-312f6b005dc9
-# Register your solve_wrapper
-@time register_primitive_multi(solve_uncertain)
-
-# Then call it directly on Particles inputs:
-
 # ╔═╡ 19907f6b-84d2-4fc8-b931-b2e769bc00a0
 N = 100
 
 # ╔═╡ 782c2ab9-51c0-4814-a301-77f19b917bd5
+# ╠═╡ disabled = true
+#=╠═╡
 χ = Particles(N, Uniform(0.1,0.4))
+  ╠═╡ =#
 
 # ╔═╡ 38fc7166-b946-40ef-ba90-826617d743dc
+# ╠═╡ disabled = true
+#=╠═╡
 T_ = Particles(N, Uniform(295,305))
+  ╠═╡ =#
 
 # ╔═╡ 20dd46ac-da6b-4965-bca2-4b599ef10bb2
+# ╠═╡ disabled = true
+#=╠═╡
 ṁ = Particles(N, Uniform(.020,1.0))
+  ╠═╡ =#
 
 # ╔═╡ c1891c9d-d5c7-42ab-9780-a8b93d580386
+#=╠═╡
 @time out_tuple = solve_uncertain(χ, T_, ṁ)  # returns a tuple of Particles
+  ╠═╡ =#
 
 # ╔═╡ 7847e709-1ed5-4313-b9e5-bbc6e391c059
 T_down(p, T_wall, x) = T_wall + p[5] * exp(p[1] * x) + p[6] * exp(p[2] * x)
@@ -1986,7 +2169,6 @@ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MINPACK = "4854310b-de5a-5eb6-a2a5-c1dee2bd17f9"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 NLSolvers = "337daf1e-9722-11e9-073e-8b9effe078ba"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
@@ -2008,7 +2190,6 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 Distributions = "~0.25.120"
 MINPACK = "~1.3.0"
 ModelingToolkit = "~9.78.0"
-MonteCarloMeasurements = "~1.4.6"
 NLSolvers = "~0.5.0"
 NLsolve = "~4.5.1"
 Nemo = "~0.49.4"
@@ -2032,7 +2213,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "a40c90aba6939fa8ea0f7f843e27112fb66bb262"
+project_hash = "843a98584d2054d1605d162aaa6875dcfdfa9d67"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -3006,12 +3187,6 @@ git-tree-sha1 = "d7ecfaca1ad1886de4f9053b5b8aef34f36ede7f"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
 version = "0.73.16+0"
 
-[[deps.GenericSchur]]
-deps = ["LinearAlgebra", "Printf"]
-git-tree-sha1 = "f88e0ba1f6b42121a7c1dfe93a9687d8e164c91b"
-uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
-version = "0.5.5"
-
 [[deps.GeoFormatTypes]]
 git-tree-sha1 = "8e233d5167e63d708d41f87597433f59a0f213fe"
 uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
@@ -3086,12 +3261,6 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.1+0"
-
-[[deps.HostCPUFeatures]]
-deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Libdl", "Static"]
-git-tree-sha1 = "8e070b599339d622e9a081d17230d74a5c473293"
-uuid = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
-version = "0.1.17"
 
 [[deps.Hwloc_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -3730,26 +3899,6 @@ version = "9.78.0"
     FMI = "14a09403-18e3-468f-ad8a-74f8dda2d9ac"
     InfiniteOpt = "20393b10-9daf-11e9-18c9-8db751c92c57"
     LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
-
-[[deps.MonteCarloMeasurements]]
-deps = ["Distributions", "GenericSchur", "LinearAlgebra", "MacroTools", "Random", "SLEEFPirates", "StaticArrays", "Statistics", "StatsBase"]
-git-tree-sha1 = "e9f946f013632de7ba4f399bbdc339bbb28cc4ec"
-uuid = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
-version = "1.4.6"
-
-    [deps.MonteCarloMeasurements.extensions]
-    ForwardDiffExt = "ForwardDiff"
-    MakieExt = "Makie"
-    MeasurementsExt = "Measurements"
-    RecipesBaseExt = "RecipesBase"
-    UnitfulExt = "Unitful"
-
-    [deps.MonteCarloMeasurements.weakdeps]
-    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
-    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
-    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.MosaicViews]]
 deps = ["MappedArrays", "OffsetArrays", "PaddedViews", "StackViews"]
@@ -4414,12 +4563,6 @@ git-tree-sha1 = "330289636fb8107c5f32088d2741e9fd7a061a5c"
 uuid = "94e857df-77ce-4151-89e5-788b33177be4"
 version = "0.1.0"
 
-[[deps.SLEEFPirates]]
-deps = ["IfElse", "Static", "VectorizationBase"]
-git-tree-sha1 = "456f610ca2fbd1c14f5fcf31c6bfadc55e7d66e0"
-uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
-version = "0.6.43"
-
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
 git-tree-sha1 = "9efabb3d79f9076710f41af77017e42d8fa780d9"
@@ -4925,12 +5068,6 @@ git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
 uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
 version = "0.2.0"
 
-[[deps.VectorizationBase]]
-deps = ["ArrayInterface", "CPUSummary", "HostCPUFeatures", "IfElse", "LayoutPointers", "Libdl", "LinearAlgebra", "SIMDTypes", "Static", "StaticArrayInterface"]
-git-tree-sha1 = "4ab62a49f1d8d9548a1c8d1a75e5f55cf196f64e"
-uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
-version = "0.21.71"
-
 [[deps.Vulkan_Loader_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Xorg_libX11_jll", "Xorg_libXrandr_jll", "xkbcommon_jll"]
 git-tree-sha1 = "2f0486047a07670caad3a81a075d2e518acc5c59"
@@ -5282,18 +5419,33 @@ version = "1.8.1+0"
 # ╠═681b6b67-2f78-4085-9abb-5c2d4abdb117
 # ╠═572701dd-5f06-41ea-b920-bc6a5c01be72
 # ╠═f05d0696-202e-4158-bf2a-a47c33493f71
-# ╠═c32b5df3-e560-4af0-9b2a-2f1032042414
-# ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
-# ╠═df8d848c-bde6-477a-b9ff-09154b3ee375
 # ╠═4e432eee-7c1e-4a89-8a06-3ba874f55e2b
 # ╠═da1fcc74-05fa-47f4-a6fe-79ec17a24dd3
 # ╠═18df1038-aa05-43e8-b88b-6d13586cf503
+# ╠═c32b5df3-e560-4af0-9b2a-2f1032042414
+# ╠═1e019ddb-1873-4cea-a765-83b6f7316b34
+# ╠═94eef45c-9d7d-4f74-aa18-b95bf11e2196
+# ╠═7fc1869e-4ccb-4ffc-97a5-31589089fd75
+# ╠═deb8cae6-ab88-41a8-b7c7-6bcad63a68ef
+# ╠═154297c3-6988-4815-b6da-e512562e7502
+# ╠═cfb6b78c-7e52-45c4-85ad-d738c181590a
+# ╠═fa7d3054-a1d8-4c19-867a-2acb21feed8e
+# ╠═9a1c9032-fd54-401e-9c34-8f4004724674
+# ╠═9577e62f-795a-4d33-9667-fca61b12ee75
+# ╠═ef3dfacb-befa-470a-a0eb-dfba087e963f
+# ╠═05128731-497f-44ab-9786-10fca398f149
+# ╠═eca62203-4f5b-48b7-8a9f-7e515ae99842
+# ╠═e0c96a01-908c-409d-81c5-2d6475ad7f14
+# ╠═d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
+# ╠═47ac09a5-9907-4283-8ea9-6f8c584a989a
+# ╠═48ef9603-6e6c-4d78-a85d-f26436ef3348
 # ╠═6034ad9e-4787-42e7-9f9a-592d5da1369d
-# ╠═571a62a6-2bee-43c0-939f-e96346108c67
 # ╠═fe000077-8514-4ac7-8dc9-52a87ad28b2c
 # ╠═b8ac6f9a-d15a-4a91-9057-bb98c6b58044
 # ╠═fae38d18-0c77-4b4e-9c30-9976a17c3a2b
 # ╠═3a9ef928-cb59-45dd-87db-71d57c38e15a
+# ╠═1e5277ee-6806-40b7-86ea-aa2414648dc6
+# ╠═74663487-ddbb-48ff-b61f-5e8317cfdcf0
 # ╠═6f1888cb-63ba-4cef-8151-bd7d09e5bc63
 # ╠═58ba5f6f-0a0a-4d26-9bcc-70d5dfaa5033
 # ╠═4fe2de48-d332-48a7-8bad-0193769b5955
@@ -5305,11 +5457,11 @@ version = "1.8.1+0"
 # ╟─e5f237e2-9a05-4526-9cee-8cfab38c5b8b
 # ╟─dfb5326f-ffdf-485b-a237-01f3c33d378c
 # ╟─d75c03e6-6f55-4933-88fc-88428fc22869
-# ╠═529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
+# ╟─529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
 # ╟─37d8b287-5446-4cfe-bb13-6d24f3f5ace3
-# ╠═7f108fec-1aa8-437a-88b4-1933694eb22b
+# ╟─7f108fec-1aa8-437a-88b4-1933694eb22b
 # ╠═303c4cac-c9b9-42f7-8fc7-85239423b0e4
-# ╠═2d42a7e9-c756-4053-858e-5659e069470a
+# ╟─2d42a7e9-c756-4053-858e-5659e069470a
 # ╠═ed6d7ff7-7c72-4445-9627-d9141c5031dc
 # ╠═aa604cb3-a94c-4f45-b9fe-584bad4a0b0a
 # ╠═792fa039-6cea-4a46-80a3-d4ce16114676
@@ -5319,13 +5471,14 @@ version = "1.8.1+0"
 # ╠═d16dbefd-39cc-4cba-b6f2-64365b180324
 # ╟─a52213f1-7406-4cea-ac94-6dc6df809f33
 # ╠═17185176-b737-4364-903e-9989c45e8636
+# ╠═654a21c4-e857-43b6-891e-281163ceb2e6
 # ╠═376f91ca-71b3-4db7-b2a8-e894dd287321
 # ╠═66075428-0b8a-4ca9-bf92-11cd4b9ce017
+# ╠═cd120784-b5b9-4d78-b9f8-f537422c0ebd
 # ╠═118c0637-66e7-4347-90e4-89c65083e48e
 # ╠═f78bce12-0e91-4693-8030-99fbb2cbd716
 # ╠═eb6a37cb-5e84-4826-a1d1-17b70b683717
 # ╠═adc67f95-858e-4a71-91d0-7610aea038e7
-# ╠═3f467f08-fbbf-4768-adcb-312f6b005dc9
 # ╠═19907f6b-84d2-4fc8-b931-b2e769bc00a0
 # ╠═782c2ab9-51c0-4814-a301-77f19b917bd5
 # ╠═38fc7166-b946-40ef-ba90-826617d743dc
@@ -5351,20 +5504,5 @@ version = "1.8.1+0"
 # ╠═f0d4f7ae-85e7-44c0-8006-2c585e102304
 # ╠═b1016786-e40b-446a-b963-cf99c1249f0b
 # ╟─83e53fd9-15a5-4b11-b918-76fcca073f8e
-# ╠═1e019ddb-1873-4cea-a765-83b6f7316b34
-# ╠═94eef45c-9d7d-4f74-aa18-b95bf11e2196
-# ╠═7fc1869e-4ccb-4ffc-97a5-31589089fd75
-# ╠═deb8cae6-ab88-41a8-b7c7-6bcad63a68ef
-# ╠═154297c3-6988-4815-b6da-e512562e7502
-# ╠═cfb6b78c-7e52-45c4-85ad-d738c181590a
-# ╠═fa7d3054-a1d8-4c19-867a-2acb21feed8e
-# ╠═9a1c9032-fd54-401e-9c34-8f4004724674
-# ╠═9577e62f-795a-4d33-9667-fca61b12ee75
-# ╠═ef3dfacb-befa-470a-a0eb-dfba087e963f
-# ╠═05128731-497f-44ab-9786-10fca398f149
-# ╠═eca62203-4f5b-48b7-8a9f-7e515ae99842
-# ╠═e0c96a01-908c-409d-81c5-2d6475ad7f14
-# ╠═d0bc5dd6-c435-4671-8c2c-4e1b18fad12b
-# ╠═47ac09a5-9907-4283-8ea9-6f8c584a989a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
