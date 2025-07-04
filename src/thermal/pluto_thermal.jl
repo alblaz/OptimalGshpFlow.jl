@@ -1419,46 +1419,6 @@ function UTubeGrouted(; name::Symbol,
     return ModelingToolkit.compose(sys, [utube_res, annular_res, thermal, prop1, prop2], name=name)
 end
 
-# ╔═╡ 654a21c4-e857-43b6-891e-281163ceb2e6
-"""
-Test function for UTubeGroutedCollector.
-Creates a complete model of a grouted U-tube borehole heat exchanger and solves it.
-"""
-function test_utube_grouted2()
-    # Create the model with specific parameters
-    @named collector = UTubeGrouted(depth=250.0, 
-                                  D_p1_o=40e-3, D_p1_i=35.29e-3, 
-                                  D_p2_o=40e-3, D_p2_i=35.29e-3,
-                                  D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
-                                  λ_grout=1.5, λ_soil=2.0,
-                                  T_wall=273.15 + 10, s=0.075)
-
-
-	
-    
-    # Set up test conditions
-    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
-		collector.T_1 ~ 273.15 + 5,    # 20°C inlet temperature
-        0.9 ~ collector.ṁ,             # 0.5 kg/s flow rate
-    ], [], [], name=:constrained_sys), [collector])
-    
-    # Simplify and solve
-    simpl_sys = structural_simplify(constrained_sys)
-    problem = NonlinearProblem(simpl_sys, [])
-    sol = NonlinearSolve.solve(problem)
-	
-    # Check results
-    display(sol[collector.T_1]-273.15)
-    display(sol[collector.T_2]-273.15)
-    display(sol[collector.ϵ])
-    display(sol[collector.Q])
-    display(sol[collector.Q_1])
-    display(sol[collector.Q_2])
-    
-    # Return solution success status
-    return sol.retcode == ModelingToolkit.ReturnCode.Success
-end
-
 # ╔═╡ 376f91ca-71b3-4db7-b2a8-e894dd287321
 """
 Test function for UTubeGroutedCollector.
@@ -1471,7 +1431,7 @@ function test_utube_grouted()
                                   D_p2_o=32e-3, D_p2_i=28.24e-3,
                                   D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
                                   λ_grout=1.5, λ_soil=2.0,
-                                  T_wall=273.15 + 10, s=0.075)
+                                  T_wall=273.15 + 10, s=0.075, χ=0.23)
 
 
 	
@@ -1501,145 +1461,6 @@ end
 
 # ╔═╡ 66075428-0b8a-4ca9-bf92-11cd4b9ce017
 test_utube_grouted()
-
-# ╔═╡ cd120784-b5b9-4d78-b9f8-f537422c0ebd
-test_utube_grouted2()
-
-# ╔═╡ 118c0637-66e7-4347-90e4-89c65083e48e
-function DynamicUTubeGrouted(; name::Symbol, fluid="MEA", χ=1.0,
-                           depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
-                           D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
-                           T_wall=283.15, s=0.075)
-    # Define top-level parameters
-    ps = @parameters begin
-        χ = χ                # Glycol mass fraction
-        depth = depth          # Borehole length [m]
-        D_p1_o = D_p1_o         # Outer diameter of pipe 1 [m]
-        D_p1_i = D_p1_i         # Inner diameter of pipe 1 [m]
-        D_p2_o = D_p2_o         # Outer diameter of pipe 2 [m]
-        D_p2_i = D_p2_i         # Inner diameter of pipe 2 [m]
-        D_b = D_b             # Borehole diameter [m]
-        λ_pipe_1 = λ_pipe_1         # Thermal conductivity of pipe 1 [W/(m·K)]
-        λ_pipe_2 = λ_pipe_2         # Thermal conductivity of pipe 2 [W/(m·K)]
-        λ_grout = λ_grout          # Thermal conductivity of grout [W/(m·K)]
-        λ_soil = λ_soil           # Thermal conductivity of soil [W/(m·K)]
-        T_wall = T_wall        # Borehole wall temperature [K]
-        s = s              # Shank spacing (center-to-center distance) [m]
-    end
-    
-    # Define system states
-    sts = @variables begin
-        ṁ = 0.5                # Mass flow rate [kg/s]
-        T_1 = 293.15       # Inlet fluid temperature [K]
-        T_2 = 283.15      # Outlet fluid temperature [K]
-    end
-    
-    # Create component instances with passed parameters
-    @named utube = UTubeGrouted(depth=depth, D_p1_o=D_p1_o, D_p1_i=D_p1_i, 
-                              D_p2_o=D_p2_o, D_p2_i=D_p2_i, D_b=D_b,
-                              λ_pipe_1=λ_pipe_1, λ_pipe_2=λ_pipe_2,
-                              λ_grout=λ_grout, λ_soil=λ_soil,
-                              T_wall=T_wall, s=s)
-
-    @named prop = Properties.IncompressibleProps(fluid=fluid, χ=χ)
-
-
-	
-    # Connect components
-    eqs = [
-		T_1 ~ prop.T,
-		utube.T_1 ~ T_1,
-		utube.T_2 ~ T_2,
-		
-		utube.ṁ ~ ṁ,          # 0.5 kg/s
-		
-		# Fluid properties (water at 15°C)
-		utube.ρ_1 ~ prop.ρ,      # kg/m³
-		utube.ρ_2 ~ prop.ρ,      # kg/m³
-		utube.μ_1 ~ prop.μ,    # Pa·s
-		utube.μ_2 ~ prop.μ,    # Pa·s
-		utube.cp_1 ~ prop.cp,    # J/(kg·K)
-		utube.cp_2 ~ prop.cp,    # J/(kg·K)
-		utube.λ_1 ~ prop.λ,      # W/(m·K)
-		utube.λ_2 ~ prop.λ,      # W/(m·K)
-    ]
-    
-    # Create the parent system with connected components
-    sys = NonlinearSystem(eqs, sts, ps, name=name)
-    return ModelingToolkit.compose(sys, [utube, prop], name=name)
-end
-
-# ╔═╡ f78bce12-0e91-4693-8030-99fbb2cbd716
-function test_dynamic_utube_grouted()
-    # Create the model with default parameters
-    @named BHE_U = DynamicUTubeGrouted()
-    
-    # Set up test conditions
-    @named constrained_sys = ModelingToolkit.compose(NonlinearSystem([
-		BHE_U.T_1 ~ 3000.0,    # 20°C inlet temperature
-        10.0 ~ BHE_U.ṁ
-    ], [], [], name=:constrained_sys), [BHE_U])
-    
-    # Simplify and solve
-    simpl_sys = structural_simplify(constrained_sys)
-    problem = NonlinearProblem(simpl_sys, [])
-    sol = NonlinearSolve.solve(problem)
-	
-    # Check results
-    display(sol[BHE_U.T_1])
-    display(sol[BHE_U.T_2])
-    
-    # Return solution success status
-    return sol.retcode == ModelingToolkit.ReturnCode.Success
-end
-
-# ╔═╡ eb6a37cb-5e84-4826-a1d1-17b70b683717
-# ╠═╡ skip_as_script = true
-#=╠═╡
-@test test_dynamic_utube_grouted()
-  ╠═╡ =#
-
-# ╔═╡ adc67f95-858e-4a71-91d0-7610aea038e7
-begin
-	# 1a) Build your model
-	@named BHE = DynamicUTubeGrouted()
-	
-	# 1b) Assemble with your boundary conditions
-	@named model = ModelingToolkit.compose(NonlinearSystem([
-	      BHE.T_1 ~ 300.0,    # inlet T = 300 K
-	      10.0     ~ BHE.ṁ    # mass‐flow = 10 kg/s
-	    ], [], [], name=:model), [BHE])
-	
-	# 1c) Do the structural simplify once
-	simp = structural_simplify(model)
-	function solve_uncertain(χ_val, Ti, ṁ_val)
-	  # 2a) build the Dict of Monte-Carlo parameters
-	  p = Dict(
-	    #BHE.λ_grout    => 1.5,    # example: grout cond.
-	    BHE.χ   => χ_val,    # example: fluid cₚ
-	    BHE.T_1    => Ti,          # fixed BC, could also be ±0.0
-	    BHE.ṁ      => ṁ_val           # uncertain mass‐flow
-	  )
-	
-	  # 2b) remake the problem with the same simplified system + new p & u0
-	  prob = remake(NonlinearProblem(simp, [], p))
-	  sol  = NonlinearSolve.solve(prob; verbose=false)
-
-
-
-    	return(
-			sol[BHE.utube.thermal.params.λ_1],
-        sol[BHE.utube.thermal.params.λ_2],
-        sol[BHE.utube.thermal.params.γ_1],
-        sol[BHE.utube.thermal.params.γ_2],
-        sol[BHE.utube.thermal.params.C_1],
-		sol[BHE.utube.thermal.params.C_2],
-		)
-	end
-end
-
-# ╔═╡ 19907f6b-84d2-4fc8-b931-b2e769bc00a0
-N = 100
 
 # ╔═╡ 782c2ab9-51c0-4814-a301-77f19b917bd5
 # ╠═╡ disabled = true
@@ -5471,15 +5292,8 @@ version = "1.8.1+0"
 # ╠═d16dbefd-39cc-4cba-b6f2-64365b180324
 # ╟─a52213f1-7406-4cea-ac94-6dc6df809f33
 # ╠═17185176-b737-4364-903e-9989c45e8636
-# ╠═654a21c4-e857-43b6-891e-281163ceb2e6
 # ╠═376f91ca-71b3-4db7-b2a8-e894dd287321
 # ╠═66075428-0b8a-4ca9-bf92-11cd4b9ce017
-# ╠═cd120784-b5b9-4d78-b9f8-f537422c0ebd
-# ╠═118c0637-66e7-4347-90e4-89c65083e48e
-# ╠═f78bce12-0e91-4693-8030-99fbb2cbd716
-# ╠═eb6a37cb-5e84-4826-a1d1-17b70b683717
-# ╠═adc67f95-858e-4a71-91d0-7610aea038e7
-# ╠═19907f6b-84d2-4fc8-b931-b2e769bc00a0
 # ╠═782c2ab9-51c0-4814-a301-77f19b917bd5
 # ╠═38fc7166-b946-40ef-ba90-826617d743dc
 # ╠═20dd46ac-da6b-4965-bca2-4b599ef10bb2

@@ -1689,9 +1689,7 @@ sol_evap.stats
 function ThermodynamicCycle(; name,
                      refrigerant = "R134A",
                      fluid       = "MEA",
-                     χ           = 0.28,
-                     L           = 0.2,
-                     Per         = 2π * 0.05 * 1000)
+                     χ           = 0.28)
     # ——— Parameters ———
     ps = @parameters begin
     end
@@ -1699,8 +1697,11 @@ function ThermodynamicCycle(; name,
     # ——— State variables ———
     sts = @variables begin
 		T_i_b = 9+273.15
+		T_o_b = 9+273.15
 		ΔTb = 3
 		ΔTSH = 7
+		ṁ_sf = 0.1
+		ṁ_ref = 0.1
 		#T_cond = 45
 		#p_cond = 2e5
 		p_l = 1e5
@@ -1738,6 +1739,7 @@ function ThermodynamicCycle(; name,
         #hx.γṁ_1   ~ log(1.25),
         #evaporator.γṁ_2   ~ log(0.025),
         evaporator.T_in_1 ~ T_i_b,
+        evaporator.T_out_1 ~ T_o_b,
         evaporator.T_out_1 ~ evaporator.T_in_1 - ΔTb,
         #hx.h2i ~ hx.ev.propref.hd,
         #hx.h2i ~ 300.0e3,
@@ -1767,11 +1769,15 @@ function ThermodynamicCycle(; name,
 		
 
         exp(evaporator.γṁ_2)  ~ compressor.ṁ,
+		ṁ_ref ~ compressor.ṁ,
 
 		W_comp ~ compressor.W,
 		Q_cond ~ compressor.ṁ*(inlet_exp.h - inlet_cond.h),
 		Q_evap ~ evaporator.Q,
 
+		
+		ṁ_sf ~ exp(evaporator.γṁ_1),
+		
 		COP1 ~ -Q_cond/W_comp,
 
     ]
@@ -1781,9 +1787,6 @@ function ThermodynamicCycle(; name,
     return ModelingToolkit.compose(sys,
         [evaporator, compressor, inlet_exp, inlet_cond], name = name)
 end
-
-# ╔═╡ f6d31deb-09dc-4f3d-a183-709ab33cf3fa
-
 
 # ╔═╡ da834208-8f98-4527-924b-28ceb7587fdb
 """
@@ -1862,6 +1865,97 @@ sol_cycle = test_thermodynamic_cycle()
 
 # ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
 sol_cycle.retcode
+
+# ╔═╡ 819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+"""
+
+"""
+function GSHP(; name,
+                     refrigerant = "R134A",
+                     fluid       = "MEA",
+                     χ           = 0.28,
+                     L           = 0.2,
+                     Per         = 2π * 0.05 * 1000)
+    # ——— Parameters ———
+    ps = @parameters begin
+    end
+
+    # ——— State variables ———
+    sts = @variables begin
+		T_i_b = 9+273.15
+		ΔTb = 3
+		ΔTSH = 7
+		#T_cond = 45
+		#p_cond = 2e5
+		p_l = 1e5
+		p_h = 10e5
+
+		W_comp = 1000
+		Q_evap = 2000
+		Q_cond = -3000
+		COP1 = 5
+    end
+
+    # ——— Property components ———
+    @named cycle  = ThermodynamicCycle(fluid = fluid, refrigerant = refrigerant)
+    @named bhe = Thermal.UTubeGrouted(depth=250.0, D_p1_o=32e-3, D_p1_i=28.24e-3, 
+                                  D_p2_o=32e-3, D_p2_i=28.24e-3,
+                                  D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
+                                  λ_grout=1.5, λ_soil=2.0,
+                                  T_wall=273.15 + 10, s=0.075, χ=0.23)
+
+    # ——— Governing equations ———
+	
+    eqs = [
+		bhe.T_2 ~ cycle.T_i_b,
+		cycle.T_o_b ~ bhe.T_1,
+		cycle.ṁ_sf ~ bhe.ṁ,
+    ]
+
+    # ——— Assemble system ———
+    sys = NonlinearSystem(eqs, sts, ps, name = name)
+    return ModelingToolkit.compose(sys,
+        [cycle, bhe], name = name)
+end
+
+# ╔═╡ 8e0dfa5c-66e8-4b02-81d1-4bf703edb296
+@named hp1 = GSHP();
+
+# ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
+"""
+Test routine for the Evaporator model
+"""
+function test_GSHP()
+    
+	@named hp = GSHP();
+    eqs = [
+		hp.cycle.compressor.f ~ 50,
+		hp.cycle.ΔTb ~ 3,
+		hp.cycle.ΔTSH ~ 7,
+		hp.cycle.p_h ~ 7e5,
+		hp.cycle.p_l ~ 2.4e5,
+    ]
+
+    @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
+    simpl       = structural_simplify(sys)
+    prob        = NonlinearProblem(simpl, [])
+	solver = NewtonRaphson(; 
+            linesearch = BackTracking(; maxstep=20), 
+            autodiff = AutoFiniteDiff()
+        )
+    sol         = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
+
+    display(sol[hp.cycle.ṁ_sf])
+    display(sol[hp.cycle.ṁ_ref])
+    display(sol[hp.bhe.T_1]-273.15)
+    display(sol[hp.bhe.T_2]-273.15)
+    display(sol[hp.bhe.T_b]-273.15)
+	
+	sol.retcode
+end
+
+# ╔═╡ b618a262-9856-465c-bbbc-7fa9597da28b
+test_GSHP()
 
 # ╔═╡ e563b30e-38b6-46db-9a74-184dd0a9117c
 md" # Quick analysis: parametric study"
@@ -3885,10 +3979,13 @@ version = "17.4.0+2"
 # ╠═6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
 # ╠═c81e49af-a294-45d2-b2fd-c605dad70ef3
 # ╠═9b628eb9-cc22-496e-b0f9-0327e52fb0d1
-# ╠═f6d31deb-09dc-4f3d-a183-709ab33cf3fa
 # ╠═e09caba7-c987-4c7b-af32-beec786c2504
 # ╠═ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
 # ╠═da834208-8f98-4527-924b-28ceb7587fdb
+# ╠═819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+# ╠═8e0dfa5c-66e8-4b02-81d1-4bf703edb296
+# ╠═80885b7b-9ab2-4010-a954-ed4790c277f0
+# ╠═b618a262-9856-465c-bbbc-7fa9597da28b
 # ╠═e563b30e-38b6-46db-9a74-184dd0a9117c
 # ╠═efea74fa-e2f8-4e68-944c-60ac7dabd571
 # ╠═ef2eec7f-a94f-4ce1-90fe-2190efc78a5d
