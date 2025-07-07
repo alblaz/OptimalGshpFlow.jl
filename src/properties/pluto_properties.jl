@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.6
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -40,7 +40,7 @@ using PlutoDevMacros
 # ╔═╡ 6480643c-069d-48ed-9750-ec00d81a3e54
 # ╠═╡ skip_as_script = true
 #=╠═╡
-using PlutoTest
+using PlutoTest: @test
   ╠═╡ =#
 
 # ╔═╡ 9bb37d87-dbc7-45b0-a60f-6c53db2b87ea

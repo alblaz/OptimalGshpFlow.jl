@@ -1297,7 +1297,7 @@ md"""
 # Combining the temperature + resistances
 """
 
-# ╔═╡ 17185176-b737-4364-903e-9989c45e8636
+# ╔═╡ 558aacc6-8749-4ce0-8c4e-12d0f7c50101
 function UTubeGrouted(; name::Symbol,
 					  fluid = "MEA",
                        depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
@@ -5291,7 +5291,7 @@ version = "1.8.1+0"
 # ╠═9c1b132f-451d-4803-b71f-27f3542c44a5
 # ╠═d16dbefd-39cc-4cba-b6f2-64365b180324
 # ╟─a52213f1-7406-4cea-ac94-6dc6df809f33
-# ╠═17185176-b737-4364-903e-9989c45e8636
+# ╠═558aacc6-8749-4ce0-8c4e-12d0f7c50101
 # ╠═376f91ca-71b3-4db7-b2a8-e894dd287321
 # ╠═66075428-0b8a-4ca9-bf92-11cd4b9ce017
 # ╠═782c2ab9-51c0-4814-a301-77f19b917bd5

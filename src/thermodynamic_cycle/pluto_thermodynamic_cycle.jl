@@ -29,6 +29,7 @@ using NonlinearSolve
 @fromparent begin
 	using ..Properties
 	using ..Thermal
+	using ..Hydraulics
 end
 
 # ╔═╡ 00996e13-d7a2-4f9e-be84-4eec83428486
@@ -1361,7 +1362,7 @@ function test_pcpwp_simple()
     # drive the model
     eqs = [
 		
-		hx.b ~ 0.002,
+		hx.b ~ 0.0015,
 		hx.np ~ 25,#*factor,
 		hx.W ~ 0.10,
 		hx.ϕ ~1.2,
@@ -1698,6 +1699,8 @@ function ThermodynamicCycle(; name,
     sts = @variables begin
 		T_i_b = 9+273.15
 		T_o_b = 9+273.15
+		h_i_r = 200e3
+		h_o_r = 200e3
 		ΔTb = 3
 		ΔTSH = 7
 		ṁ_sf = 0.1
@@ -1722,19 +1725,6 @@ function ThermodynamicCycle(; name,
     # ——— Governing equations ———
 	
     eqs = [
-		
-		
-		evaporator.b ~ 0.002,
-		evaporator.np ~ 25,#*factor,
-		evaporator.W ~ 0.10,
-		evaporator.ϕ ~1.2,
-		evaporator.β ~ π/6,
-		evaporator.th ~ 0.5e-3,
-		evaporator.λ_pl ~ 16,
-		evaporator.λ_pitch ~ 4e-3,
-		evaporator.χ ~ 0.28,
-		evaporator.L ~ 0.2,
-		
 		#hx.p_2 ~ 2e5,
         #hx.γṁ_1   ~ log(1.25),
         #evaporator.γṁ_2   ~ log(0.025),
@@ -1746,7 +1736,7 @@ function ThermodynamicCycle(; name,
         evaporator.T_out_2 ~ evaporator.T_evap + ΔTSH,
 		#evaporator.p_2 ~ 2.8e5,
 
-
+		
 		
 		#evaporator <-> compressor
 		p_l ~ evaporator.p_2,
@@ -1796,12 +1786,26 @@ function test_thermodynamic_cycle()
     
 	@named cycle = ThermodynamicCycle();
     eqs = [
+		
+		
+		cycle.evaporator.b ~ 0.002,
+		cycle.evaporator.np ~ 25,#*factor,
+		cycle.evaporator.W ~ 0.10,
+		cycle.evaporator.ϕ ~1.2,
+		cycle.evaporator.β ~ π/6,
+		cycle.evaporator.th ~ 0.5e-3,
+		cycle.evaporator.λ_pl ~ 16,
+		cycle.evaporator.λ_pitch ~ 4e-3,
+		cycle.evaporator.χ ~ 0.28,
+		cycle.evaporator.L ~ 0.3,
+		
 		cycle.compressor.f ~ 50,
 		cycle.T_i_b ~ 273.15+10,
 		cycle.ΔTb ~ 3,
 		cycle.ΔTSH ~ 7,
-		cycle.p_h ~ 7e5,
+		cycle.p_h ~ 10e5,
 		cycle.p_l ~ 2.8e5,
+		#cycle.inlet_cond.h ~ 240e3,
     ]
 
     @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [cycle])
@@ -1873,9 +1877,7 @@ sol_cycle.retcode
 function GSHP(; name,
                      refrigerant = "R134A",
                      fluid       = "MEA",
-                     χ           = 0.28,
-                     L           = 0.2,
-                     Per         = 2π * 0.05 * 1000)
+                     χ           = 0.28,)
     # ——— Parameters ———
     ps = @parameters begin
     end
@@ -1904,58 +1906,323 @@ function GSHP(; name,
                                   λ_grout=1.5, λ_soil=2.0,
                                   T_wall=273.15 + 10, s=0.075, χ=0.23)
 
+    # Create the base model with a standard pump
+    @named pump = Hydraulics.DynamicPropBasicPump(
+        H_shutoff = 12,
+        Q_max = 13/3600,
+        fluid = fluid
+    )
+
+
+
+    #@named phx = Hydraulics.DynamicPropPlateHeatExchanger(
+    #    L = 0.3,
+    #    W = 0.1,
+    #    b = 1.5e-3,
+    #    np = 20,
+    #    ϕ = 1.18,
+    #    β = 30*π/180,
+    #    fluid = "MEA"
+    #)
+    
     # ——— Governing equations ———
 	
     eqs = [
-		bhe.T_2 ~ cycle.T_i_b,
-		cycle.T_o_b ~ bhe.T_1,
+		bhe.T_2 ~ cycle.evaporator.T_in_1,
+		cycle.evaporator.T_out_1 ~ bhe.T_1,
 		cycle.ṁ_sf ~ bhe.ṁ,
+		pump.props.T ~ bhe.T_1,
+		pump.pump.ṁ ~ bhe.ṁ,
+		#phx.phx.ṁ ~ bhe.ṁ,
+		pump.pump.Δp ~ 1e5,#phx.phx.Δp,
+		#phx.props.T ~ bhe.T_1,
     ]
 
     # ——— Assemble system ———
     sys = NonlinearSystem(eqs, sts, ps, name = name)
     return ModelingToolkit.compose(sys,
-        [cycle, bhe], name = name)
-end
+        [cycle, bhe, pump], name = name)
 
-# ╔═╡ 8e0dfa5c-66e8-4b02-81d1-4bf703edb296
-@named hp1 = GSHP();
+    # ——— Assemble system ———
+    #sys = NonlinearSystem(eqs, sts, ps, name = name)
+    #return ModelingToolkit.compose(sys,
+    #    [cycle, bhe, pump, phx], name = name)
+end
 
 # ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
 """
-Test routine for the Evaporator model
+Test routine for the GSHP model
 """
 function test_GSHP()
     
-	@named hp = GSHP();
+    @named hp = GSHP();
     eqs = [
-		hp.cycle.compressor.f ~ 50,
-		hp.cycle.ΔTb ~ 3,
-		hp.cycle.ΔTSH ~ 7,
-		hp.cycle.p_h ~ 7e5,
-		hp.cycle.p_l ~ 2.4e5,
+        
+        hp.cycle.evaporator.b ~ 1.5e-3,
+        hp.cycle.evaporator.np ~ 20,
+        hp.cycle.evaporator.W ~ 0.10,
+        hp.cycle.evaporator.ϕ ~ 1.18,
+        hp.cycle.evaporator.β ~ π/6,
+        hp.cycle.evaporator.th ~ 0.5e-3,
+        hp.cycle.evaporator.λ_pl ~ 16,
+        hp.cycle.evaporator.λ_pitch ~ 4e-3,
+        hp.cycle.evaporator.χ ~ 0.28,
+        hp.cycle.evaporator.L ~ 0.3,
+        
+        hp.cycle.compressor.f ~ 50,
+        hp.cycle.ΔTb ~ 3,
+        hp.cycle.ΔTSH ~ 7,
+        hp.cycle.p_h ~ 14e5,
+        #hp.cycle.p_l ~ 2.4e5,
+        hp.cycle.inlet_cond.h ~ hp.cycle.inlet_cond.hd,
     ]
 
-    @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
-    simpl       = structural_simplify(sys)
-    prob        = NonlinearProblem(simpl, [])
-	solver = NewtonRaphson(; 
-            linesearch = BackTracking(; maxstep=20), 
-            autodiff = AutoFiniteDiff()
-        )
-    sol         = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
+    simpl = structural_simplify(sys)
+    prob = NonlinearProblem(simpl, [])
+    solver = NewtonRaphson(; 
+        linesearch = BackTracking(; maxstep=20), 
+        autodiff = AutoFiniteDiff()
+    )
+    sol = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
 
-    display(sol[hp.cycle.ṁ_sf])
-    display(sol[hp.cycle.ṁ_ref])
-    display(sol[hp.bhe.T_1]-273.15)
-    display(sol[hp.bhe.T_2]-273.15)
-    display(sol[hp.bhe.T_b]-273.15)
+    # Print results nicely
+    println("=== GSHP Test Results ===")
+    println("Solution status: ", sol.retcode)
+    println()
+    
+    # Mass flow rates
+    println("Mass Flow Rates:")
+    println("  • Secondary fluid ṁ_sf    = ", round(sol[hp.cycle.ṁ_sf], digits=4), " kg/s")
+    println("  • Refrigerant ṁ_ref       = ", round(sol[hp.cycle.ṁ_ref], digits=4), " kg/s")
+    println()
 	
-	sol.retcode
+    # Mass flow rates
+    println("  • Pump speed    = ", round(sol[hp.pump.pump.N], digits=4), " Hz")
+    println("  • Refrigerant ṁ_ref       = ", round(sol[hp.cycle.ṁ_ref], digits=4), " kg/s")
+    println()
+    
+    # BHE temperatures - using safe access
+    println("Borehole Heat Exchanger:")
+    println("  • Inlet temperature T_1   = ", round(sol[hp.bhe.T_1] - 273.15, digits=2), " °C")
+    println("  • Outlet temperature T_2  = ", round(sol[hp.bhe.T_2] - 273.15, digits=2), " °C")
+    
+    # Try to access bottom temperatures with different possible names
+    try
+        println("  • Bottom temperature T_b  = ", round(sol[hp.bhe.T_b] - 273.15, digits=2), " °C")
+    catch
+        try
+            println("  • Bottom temperature T_b1 = ", round(sol[hp.bhe.thermal.T_b1] - 273.15, digits=2), " °C")
+            println("  • Bottom temperature T_b2 = ", round(sol[hp.bhe.thermal.T_b2] - 273.15, digits=2), " °C")
+        catch
+            println("  • Bottom temperatures not accessible")
+        end
+    end
+    
+    println("  • Temperature drop ΔT     = ", round(sol[hp.bhe.T_1] - sol[hp.bhe.T_2], digits=2), " K")
+    
+    # Safe access to other BHE variables
+    try
+        println("  • Mass flow rate ṁ        = ", round(sol[hp.bhe.ṁ], digits=3), " kg/s")
+    catch
+        println("  • Mass flow rate not accessible")
+    end
+    
+    try
+        println("  • Thermal resistance R_f1_b = ", round(sol[hp.bhe.R_f1_b], digits=4), " K⋅m/W")
+        println("  • Thermal resistance R_f2_b = ", round(sol[hp.bhe.R_f2_b], digits=4), " K⋅m/W")
+        println("  • Thermal resistance R_f1_f2 = ", round(sol[hp.bhe.R_f1_f2], digits=4), " K⋅m/W")
+    catch
+        println("  • Thermal resistances not accessible")
+    end
+    
+    try
+        println("  • Fluid cp_1              = ", round(sol[hp.bhe.cp_1], digits=0), " J/(kg⋅K)")
+        println("  • Fluid cp_2              = ", round(sol[hp.bhe.cp_2], digits=0), " J/(kg⋅K)")
+    catch
+        println("  • Fluid properties not accessible")
+    end
+    println()
+    
+    # Thermodynamic cycle
+    println("Thermodynamic Cycle:")
+    println("  • High pressure p_h       = ", round(sol[hp.cycle.p_h]/1e5, digits=2), " bar")
+    println("  • Low pressure p_l        = ", round(sol[hp.cycle.p_l]/1e5, digits=2), " bar")
+    println("  • Subcooling ΔTb          = ", round(sol[hp.cycle.ΔTb], digits=2), " K")
+    println("  • Superheating ΔTSH       = ", round(sol[hp.cycle.ΔTSH], digits=2), " K")
+    println("  • Compressor frequency f  = ", round(sol[hp.cycle.compressor.f], digits=1), " Hz")
+    
+    try
+        println("  • Temperature T_i_b       = ", round(sol[hp.cycle.T_i_b] - 273.15, digits=2), " °C")
+    catch
+        println("  • Temperature T_i_b not accessible")
+    end
+    println()
+    
+    # Compressor details - with safe access
+    println("Compressor:")
+    try
+        println("  • Inlet pressure p_i      = ", round(sol[hp.cycle.compressor.i.p]/1e5, digits=2), " bar")
+        println("  • Inlet enthalpy h_i      = ", round(sol[hp.cycle.compressor.i.h]/1000, digits=1), " kJ/kg")
+        println("  • Outlet pressure p_o     = ", round(sol[hp.cycle.compressor.o.p]/1e5, digits=2), " bar")
+        println("  • Outlet enthalpy h_o     = ", round(sol[hp.cycle.compressor.o.h]/1000, digits=1), " kJ/kg")
+        println("  • Mass flow rate ṁ        = ", round(sol[hp.cycle.compressor.ṁ], digits=4), " kg/s")
+    catch
+        println("  • Compressor state points not accessible")
+    end
+    
+    try
+        println("  • Volumetric efficiency ηv = ", round(sol[hp.cycle.compressor.ηv], digits=3))
+        println("  • Isentropic efficiency ηs = ", round(sol[hp.cycle.compressor.ηs], digits=3))
+    catch
+        println("  • Compressor efficiencies not accessible")
+    end
+    println()
+    
+    # Heat transfer and power
+    println("Performance:")
+    println("  • Evaporator heat Q_evap  = ", round(sol[hp.cycle.Q_evap]/1000, digits=2), " kW")
+    println("  • Condenser heat Q_cond   = ", round(sol[hp.cycle.Q_cond]/1000, digits=2), " kW")
+    println("  • Compressor power W_comp = ", round(sol[hp.cycle.W_comp]/1000, digits=2), " kW")
+    println("  • COP                     = ", round(sol[hp.cycle.COP1], digits=2))
+    println()
+    
+    # Evaporator details
+    println("Evaporator Parameters:")
+    println("  • Fin spacing b           = ", sol[hp.cycle.evaporator.b]*1000, " mm")
+    println("  • Number of plates np     = ", sol[hp.cycle.evaporator.np])
+    println("  • Width W                 = ", sol[hp.cycle.evaporator.W]*1000, " mm")
+    println("  • Porosity ϕ              = ", round(sol[hp.cycle.evaporator.ϕ], digits=2))
+    println("  • Length L                = ", sol[hp.cycle.evaporator.L]*1000, " mm")
+    println("  • Liquid fraction χ       = ", round(sol[hp.cycle.evaporator.χ], digits=2))
+    println("  • Plate thickness th      = ", sol[hp.cycle.evaporator.th]*1000, " mm")
+    println("  • Plate conductivity λ_pl = ", sol[hp.cycle.evaporator.λ_pl], " W/(m⋅K)")
+    println("  • Pitch λ_pitch          = ", sol[hp.cycle.evaporator.λ_pitch]*1000, " mm")
+    println("  • Inclination angle β     = ", round(sol[hp.cycle.evaporator.β]*180/π, digits=1), " degrees")
+    println()
+    
+    # Evaporator temperatures and flow - with safe access
+    println("Evaporator Operation:")
+    try
+        println("  • Evaporating temp T_evap = ", round(sol[hp.cycle.evaporator.T_evap] - 273.15, digits=2), " °C")
+        println("  • Inlet temp T_in_1       = ", round(sol[hp.cycle.evaporator.T_in_1] - 273.15, digits=2), " °C")
+        println("  • Outlet temp T_out_1     = ", round(sol[hp.cycle.evaporator.T_out_1] - 273.15, digits=2), " °C")
+        println("  • Vapor outlet temp T_out_2 = ", round(sol[hp.cycle.evaporator.T_out_2] - 273.15, digits=2), " °C")
+    catch
+        println("  • Evaporator temperatures not accessible")
+    end
+    
+    try
+        println("  • Pressure p_2            = ", round(sol[hp.cycle.evaporator.p_2]/1e5, digits=2), " bar")
+        println("  • Inlet enthalpy h2i      = ", round(sol[hp.cycle.evaporator.h2i]/1000, digits=1), " kJ/kg")
+        println("  • Mid enthalpy h2mid      = ", round(sol[hp.cycle.evaporator.h2mid]/1000, digits=1), " kJ/kg")
+        println("  • Outlet enthalpy h2o     = ", round(sol[hp.cycle.evaporator.h2o]/1000, digits=1), " kJ/kg")
+    catch
+        println("  • Evaporator enthalpies not accessible")
+    end
+    
+    try
+        println("  • Log mass flow γṁ_1      = ", round(sol[hp.cycle.evaporator.γṁ_1], digits=3))
+        println("  • Log mass flow γṁ_2      = ", round(sol[hp.cycle.evaporator.γṁ_2], digits=3))
+        println("  • Mass flow ṁ_1 (actual) = ", round(exp(sol[hp.cycle.evaporator.γṁ_1]), digits=4), " kg/s")
+        println("  • Mass flow ṁ_2 (actual) = ", round(exp(sol[hp.cycle.evaporator.γṁ_2]), digits=4), " kg/s")
+    catch
+        println("  • Evaporator mass flows not accessible")
+    end
+    println()
+    
+    # Condenser inlet state
+    println("Condenser Inlet:")
+    try
+        println("  • Pressure p              = ", round(sol[hp.cycle.inlet_cond.p]/1e5, digits=2), " bar")
+        println("  • Enthalpy h              = ", round(sol[hp.cycle.inlet_cond.h]/1000, digits=1), " kJ/kg")
+        println("  • Dew point enthalpy hd   = ", round(sol[hp.cycle.inlet_cond.hd]/1000, digits=1), " kJ/kg")
+    catch
+        println("  • Condenser inlet state not accessible")
+    end
+    println()
+
+
+	
+    println("========================")
+    
+    return sol.retcode
 end
 
 # ╔═╡ b618a262-9856-465c-bbbc-7fa9597da28b
 test_GSHP()
+
+# ╔═╡ d56e6679-1745-4efe-8205-aab080a2c0b8
+function test_pump_phx()
+    # ——— Instantiate components ———
+    @named pump = Hydraulics.DynamicPropBasicPump(
+        H_shutoff = 12.0,      # m
+        Q_max     = 13/3600,   # m³/s
+        fluid     = "MEA"
+    )
+    @named phx = Hydraulics.DynamicPropPlateHeatExchanger(
+        L    = 0.3,       # m
+        W    = 0.1,       # m
+        b    = 1.5e-3,    # m
+        np   = 20,
+        ϕ    = 1.18,
+        β    = 30*π/180,
+        fluid = "MEA"
+    )
+
+    # ——— Unknown state variable ———
+    @variables ṁ        # mass flow [kg/s]
+
+    # ——— Simple algebraic equations ———
+    eqs = [
+        # fix inlet temperature to 10 °C
+        pump.props.T      ~ 273.15 + 10,
+        phx.props.T       ~ 273.15 + 10,
+
+        # fix pump speed to 50 Hz
+        pump.pump.N       ~ 50.0,
+
+        # tie the flow through both devices to the same ṁ
+        pump.pump.ṁ      ~ ṁ,
+        phx.phx.ṁ        ~ ṁ,
+
+        # enforce Δp_pump = Δp_phx
+        pump.pump.Δp      ~ phx.phx.Δp
+    ]
+
+    # ——— Build & solve the system ———
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [ṁ], [], name = :test), [pump, phx])
+    simpl = structural_simplify(sys)
+    prob = NonlinearProblem(simpl, [])
+    solver = NewtonRaphson(; 
+        linesearch = BackTracking(; maxstep=20), 
+        autodiff = AutoFiniteDiff()
+    )
+    sol = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
+
+    # ——— Report ———
+    println("=== Pump–HX Steady–State ===")
+    println("Converged: ", sol.retcode == :Converged)
+    println("Mass flow rate ṁ = ", round(sol[ṁ], digits=4), " kg/s")
+    println("Pump Δp = ", round(sol[pump.pump.Δp], digits=2), " Pa")
+    println("HX   Δp = ", round(sol[phx.phx.Δp], digits=2), " Pa")
+end
+
+# run the test
+
+# ╔═╡ de9faed9-2f88-44e7-94da-098238b99f09
+test_pump_phx()
+
+# ╔═╡ 7960a423-b601-4aec-b0ba-b35eebce82c5
+
+
+# ╔═╡ 2d8d7be2-6826-4258-8e19-cc96ddf79a32
+
+
+# ╔═╡ 83439a01-bafd-4a82-a751-2e25caa0828e
+
+    
 
 # ╔═╡ e563b30e-38b6-46db-9a74-184dd0a9117c
 md" # Quick analysis: parametric study"
@@ -3983,9 +4250,13 @@ version = "17.4.0+2"
 # ╠═ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
 # ╠═da834208-8f98-4527-924b-28ceb7587fdb
 # ╠═819264a6-e4b7-406c-9d97-8ac0f36c3ea8
-# ╠═8e0dfa5c-66e8-4b02-81d1-4bf703edb296
 # ╠═80885b7b-9ab2-4010-a954-ed4790c277f0
 # ╠═b618a262-9856-465c-bbbc-7fa9597da28b
+# ╠═d56e6679-1745-4efe-8205-aab080a2c0b8
+# ╠═de9faed9-2f88-44e7-94da-098238b99f09
+# ╠═7960a423-b601-4aec-b0ba-b35eebce82c5
+# ╠═2d8d7be2-6826-4258-8e19-cc96ddf79a32
+# ╠═83439a01-bafd-4a82-a751-2e25caa0828e
 # ╠═e563b30e-38b6-46db-9a74-184dd0a9117c
 # ╠═efea74fa-e2f8-4e68-944c-60ac7dabd571
 # ╠═ef2eec7f-a94f-4ce1-90fe-2190efc78a5d

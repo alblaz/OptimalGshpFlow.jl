@@ -16,7 +16,7 @@ using SpecialFunctions
 # ╔═╡ e8d48aab-e227-48cc-8ad8-3cfb57a3e165
 # ╠═╡ skip_as_script = true
 #=╠═╡
-using PlutoTest
+using PlutoTest: @test
   ╠═╡ =#
 
 # ╔═╡ 9fe54e9b-0879-4668-b6ee-5002dc6e5878
@@ -1946,7 +1946,7 @@ function estimate_pump_params(;
         Q_BEP = Q_BEP,
         η_BEP = η_BEP,
         η_motor = η_motor,
-        N = N,
+        #N = N,
         D = D,
         g = g
     )
@@ -1954,7 +1954,7 @@ end
 
 # ╔═╡ 42354632-77f6-43cb-8c48-0a65fe3f24a7
 function Pump(; name::Symbol,
-        N         = 1.0,        # rotational speed [1/s]
+        #N         = 1.0,        # rotational speed [1/s]
         D         = 0.1,        # impeller diameter [m]
         g         = 9.81,       # gravity [m/s^2]
         ψ₀        = 0.5,        # dead‐head coeff
@@ -1967,7 +1967,6 @@ function Pump(; name::Symbol,
         H_max     = 20.0,       # maximum head [m]
         )
     pars = @parameters begin
-        N         = N        # rotational speed [1/s]
         D         = D        # impeller diameter [m]
         g         = g        # gravity [m/s^2]
         ψ₀        = ψ₀       # dead‐head coeff
@@ -1981,10 +1980,11 @@ function Pump(; name::Symbol,
     end
 
     vars = @variables begin
+        N         = 50.0        # rotational speed [1/s]
         V̇ = 0.1      # volumetric flow [m^3/s]
         ρ = 1000.0   # density [kg/m^3]
         ṁ = 1.0      # mass flow [kg/s]
-        cp = 4180    # specific heat [J/(kg·K)]
+        #cp = 4180    # specific heat [J/(kg·K)]
         H = 10.0     # head [m]
         φ = 0.01     # flow coeff
         ψ = 0.1      # head coeff
@@ -1992,6 +1992,7 @@ function Pump(; name::Symbol,
         η = 0.5      # hydraulic efficiency
         P_shaft = 100.0  # shaft power [W]
         P_elec = 100.0   # electrical power [W]
+		Δp = 1e5
         
         # Flags for operational limits
         exceeding_max_speed = false    # true when N > N_max
@@ -2008,6 +2009,7 @@ function Pump(; name::Symbol,
       ψ        ~ g * H    / (N^2 * D^2),
       
       P_shaft  ~ κ * ρ * N^3 * D^5,
+	  Δp ~ ρ * g * H,
 
       # performance curves
       ψ        ~ ψ₀ - K * φ^2,
@@ -2041,7 +2043,7 @@ function BasicPump(;name,
     ppars = estimate_pump_params(
         H_shutoff = H_shutoff, 
         Q_max = Q_max,
-        N = N,
+        #N = N,
         D = D,
         g = g
     )
@@ -2060,7 +2062,7 @@ function BasicPump(;name,
     
     # Create pump with calculated parameters
     p = Pump(; name=name,
-        N         = ppars.N,         
+        #N         = ppars.N,         
         D         = ppars.D,        
         g         = g,       
         ψ₀        = ppars.ψ₀,        
@@ -2097,7 +2099,6 @@ function DynamicPropPump(; name::Symbol,
     
     # Define the pump-level parameters for inheritance
     pars = @parameters begin
-        N = N
         D = D
         g = g
         ψ₀ = ψ₀
@@ -2113,7 +2114,6 @@ function DynamicPropPump(; name::Symbol,
     
     # Create the pump component
     @named pump = Pump(
-        N = N,
         D = D,
         g = g,
         ψ₀ = ψ₀,
@@ -2133,7 +2133,7 @@ function DynamicPropPump(; name::Symbol,
     connect_eqs = [
         # Connect fluid properties to pump
         pump.ρ ~ props.ρ,
-        pump.cp ~ props.cp  # Optional: for thermal calculations if needed
+        #pump.cp ~ props.cp  # Optional: for thermal calculations if needed
     ]
     
     # Create the parent system with connected components
@@ -2182,7 +2182,7 @@ function DynamicPropBasicPump(; name::Symbol,
     # Create pump with calculated parameters and fluid properties
     return DynamicPropPump(
         name = name,
-        N = ppars.N,         
+        #N = ppars.N,         
         D = ppars.D,        
         g = g,       
         ψ₀ = ppars.ψ₀,        
@@ -2242,6 +2242,39 @@ function test_dynamic_prop_pump()
     return (head > 0) && (power > 0) && (efficiency > 0) && (density > 900)
 end
 
+# ╔═╡ 12b98c45-6b61-4ea0-bfb5-4fa152be4ab1
+"""
+Test function that demonstrates parameter inheritance with remake
+"""
+function test_pump()
+    # Create the base model with a standard pump
+    @named pump_base = DynamicPropBasicPump(
+        H_shutoff = 12,
+        Q_max = 13/3600,
+        fluid = "MEA"
+    )
+    
+    # Set up the initial system with base conditions
+    @named constrained_sys = compose(NonlinearSystem([
+                                         pump_base.props.T ~ 293.15,  # 20°C
+                                         pump_base.pump.V̇ ~ 0.001,     # 1 L/s
+                                         pump_base.pump.H ~ 6     # 1 L/s
+                                     ], [], [], name=:constrained_sys), [pump_base])
+    
+    # Simplify and create the initial problem
+    simpl_sys = structural_simplify(constrained_sys)
+    base_problem = NonlinearProblem(simpl_sys, [])
+    
+	# Solve the modified problem
+	sol = solve(base_problem)
+	display(sol[pump_base.pump.N])
+	display(sol[pump_base.pump.Δp])
+    sol
+end
+
+# ╔═╡ de4cfe89-bc6c-4cbf-96c8-345df5fa6041
+sol_pump = test_pump()
+
 # ╔═╡ 0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
 """
 Test function that demonstrates parameter inheritance with remake
@@ -2257,7 +2290,8 @@ function test_pump_parametric()
     # Set up the initial system with base conditions
     @named constrained_sys = compose(NonlinearSystem([
                                          pump_base.props.T ~ 293.15,  # 20°C
-                                         pump_base.pump.V̇ ~ 0.001     # 1 L/s
+                                         pump_base.pump.V̇ ~ 0.001,     # 1 L/s
+                                         pump_base.pump.N ~ 1.     # 1 L/s
                                      ], [], [], name=:constrained_sys), [pump_base])
     
     # Simplify and create the initial problem
@@ -2584,6 +2618,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 1adad638-3111-446e-9bbd-085bde79a763
+# ╠═╡ disabled = true
 #=╠═╡
 results = analyze_pump_speed_vs_consumption()
   ╠═╡ =#
@@ -2676,7 +2711,7 @@ function PlateHeatExchanger(; name::Symbol,
         dh ~ 2 * b / ϕ,
         
         # Flow area
-        S ~ b * W * np / 2,
+        S ~ b * W * (np-1) / 2,
         
         # Flow velocity
         v ~ V̇ / S,
@@ -2773,10 +2808,10 @@ Test function for the DynamicPropPlateHeatExchanger model
 function test_phx_heat_exchanger()
     # Create the model
     @named phx = DynamicPropPlateHeatExchanger(
-        L = 0.3,
-        W = 0.2,
-        b = 2e-3,
-        np = 20,
+        L = 0.38,
+        W = 0.07,
+        b = 1.2e-3,
+        np = 15,
         ϕ = 1.118,
         β = 30*π/180,
         fluid = "MEA"
@@ -2842,17 +2877,19 @@ Test function that demonstrates parameter inheritance with remake for PHX
 function test_phx_parametric()
     # Create the base model
     @named phx_base = DynamicPropPlateHeatExchanger(
-        L = 0.3,
-        W = 0.2, 
-        b = 2e-3,
-        np = 20,
+        L = 0.38,
+        W = 0.07,
+        b = 1.2e-3,
+        np = 15,
+        ϕ = 1.118,
+        β = 30*π/180,
         fluid = "MEA"
     )
     
     # Set up the initial system with base conditions
     @named constrained_sys = compose(NonlinearSystem([
                                         phx_base.props.T ~ 293.15,  # 20°C
-                                        phx_base.phx.V̇ ~ 0.01     # 1 L/s
+                                        phx_base.phx.V̇ ~ 0.001     # 1 L/s
                                     ], [], [], name=:constrained_sys), [phx_base])
     
     # Simplify and create the initial problem
@@ -5561,6 +5598,8 @@ version = "1.8.1+0"
 # ╠═4f21cf92-9f70-46e5-9f2e-1ccecbf2d0a6
 # ╠═e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
 # ╠═165e8538-776f-4c46-86c2-d43f3bb302e2
+# ╠═de4cfe89-bc6c-4cbf-96c8-345df5fa6041
+# ╠═12b98c45-6b61-4ea0-bfb5-4fa152be4ab1
 # ╠═0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
 # ╠═75a9b1e0-6b75-4442-8a32-f0e692d1989b
 # ╟─cecce7db-5dc5-4c47-a666-af62bfe707a2
