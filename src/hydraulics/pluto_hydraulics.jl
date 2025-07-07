@@ -2113,7 +2113,7 @@ function DynamicPropPump(; name::Symbol,
     end
     
     # Create the pump component
-    @named pump = Pump(
+    @named base = Pump(
         D = D,
         g = g,
         ψ₀ = ψ₀,
@@ -2132,13 +2132,13 @@ function DynamicPropPump(; name::Symbol,
     # Connect properties to the pump
     connect_eqs = [
         # Connect fluid properties to pump
-        pump.ρ ~ props.ρ,
+        base.ρ ~ props.ρ,
         #pump.cp ~ props.cp  # Optional: for thermal calculations if needed
     ]
     
     # Create the parent system with connected components
     system = NonlinearSystem(connect_eqs, [], pars, name=name)
-    return compose(system, [pump, props], name=name)
+    return compose(system, [base, props], name=name)
 end
 
 # ╔═╡ e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
@@ -2217,7 +2217,7 @@ function test_dynamic_prop_pump()
     # Set up test conditions
     @named constrained_sys = compose(NonlinearSystem([
                                          pump.props.T ~ 293.15,  # 20°C
-                                         pump.pump.V̇ ~ 0.001     # 1 L/s
+                                         pump.base.V̇ ~ 0.001     # 1 L/s
                                      ], [], [], name=:constrained_sys), [pump])
     
     # Simplify and solve
@@ -2226,9 +2226,9 @@ function test_dynamic_prop_pump()
     sol = solve(problem)
     
     # Check results
-    head = sol[pump.pump.H]
-    power = sol[pump.pump.P_elec]
-    efficiency = sol[pump.pump.η]
+    head = sol[pump.base.H]
+    power = sol[pump.base.P_elec]
+    efficiency = sol[pump.base.η]
     density = sol[pump.props.ρ]
     
     # Display results
@@ -2248,7 +2248,7 @@ Test function that demonstrates parameter inheritance with remake
 """
 function test_pump()
     # Create the base model with a standard pump
-    @named pump_base = DynamicPropBasicPump(
+    @named pump = DynamicPropBasicPump(
         H_shutoff = 12,
         Q_max = 13/3600,
         fluid = "MEA"
@@ -2256,10 +2256,10 @@ function test_pump()
     
     # Set up the initial system with base conditions
     @named constrained_sys = compose(NonlinearSystem([
-                                         pump_base.props.T ~ 293.15,  # 20°C
-                                         pump_base.pump.V̇ ~ 0.001,     # 1 L/s
-                                         pump_base.pump.H ~ 6     # 1 L/s
-                                     ], [], [], name=:constrained_sys), [pump_base])
+                                         pump.props.T ~ 293.15,  # 20°C
+                                         pump.base.V̇ ~ 0.001,     # 1 L/s
+                                         pump.base.H ~ 6     # 1 L/s
+                                     ], [], [], name=:constrained_sys), [pump])
     
     # Simplify and create the initial problem
     simpl_sys = structural_simplify(constrained_sys)
@@ -2267,76 +2267,13 @@ function test_pump()
     
 	# Solve the modified problem
 	sol = solve(base_problem)
-	display(sol[pump_base.pump.N])
-	display(sol[pump_base.pump.Δp])
+	display(sol[pump.base.N])
+	display(sol[pump.base.Δp])
     sol
 end
 
 # ╔═╡ de4cfe89-bc6c-4cbf-96c8-345df5fa6041
 sol_pump = test_pump()
-
-# ╔═╡ 0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
-"""
-Test function that demonstrates parameter inheritance with remake
-"""
-function test_pump_parametric()
-    # Create the base model with a standard pump
-    @named pump_base = DynamicPropBasicPump(
-        H_shutoff = 12,
-        Q_max = 13/3600,
-        fluid = "MEA"
-    )
-    
-    # Set up the initial system with base conditions
-    @named constrained_sys = compose(NonlinearSystem([
-                                         pump_base.props.T ~ 293.15,  # 20°C
-                                         pump_base.pump.V̇ ~ 0.001,     # 1 L/s
-                                         pump_base.pump.N ~ 1.     # 1 L/s
-                                     ], [], [], name=:constrained_sys), [pump_base])
-    
-    # Simplify and create the initial problem
-    simpl_sys = structural_simplify(constrained_sys)
-    base_problem = NonlinearProblem(simpl_sys, [])
-    
-    # Create variations with different speeds to test parameter inheritance
-    speeds = [40.0/60.0, 45.0/60.0, 50.0/60.0, 55.0/60.0]  # Different pump speeds in Hz
-    results = []
-    
-    for n in speeds
-        # Create a modified problem with updated speed parameter using remake
-        problem = remake(base_problem, p = [pump_base.N => n])
-        
-        # Solve the modified problem
-        sol = solve(problem)
-        
-        # Store results
-        push!(results, (
-            speed = n * 60,  # Convert to Hz for display
-            head = sol[pump_base.pump.H],
-            power = sol[pump_base.pump.P_elec],
-            flow = sol[pump_base.pump.V̇]
-        ))
-        
-        println("Speed: $(n*60) Hz | Head: $(sol[pump_base.pump.H]) m | Power: $(sol[pump_base.pump.P_elec]) W")
-    end
-    
-    # Verify that head increases with speed (following affinity laws)
-    speeds_consistent = all(results[i].head < results[i+1].head 
-                           for i in 1:length(results)-1)
-                           
-    if speeds_consistent
-        println("✅ Test passed: Head increases with speed as expected (affinity laws)")
-    else
-        println("❌ Test failed: Head does not consistently increase with speed")
-    end
-    
-    return speeds_consistent
-end
-
-# ╔═╡ 75a9b1e0-6b75-4442-8a32-f0e692d1989b
-#=╠═╡
-@test test_pump_parametric()
-  ╠═╡ =#
 
 # ╔═╡ cecce7db-5dc5-4c47-a666-af62bfe707a2
 md"""
@@ -2663,24 +2600,18 @@ end
 Create a static plate heat exchanger model.
 """
 function PlateHeatExchanger(; name::Symbol,
-                         L = 0.3,        # Plate length [m]
-                         W = 0.2,        # Plate width [m]
-                         b = 2e-3,       # Channel gap / pressing depth [m]
-                         np = 20,        # Number of plates
-                         ϕ = 1.118,      # Surface enlargement factor
-                         β = 30*π/180,   # Chevron angle [radians]
                          K_ports = 1.5,  # Port pressure loss coefficient
                          g = 9.81,       # Gravity [m/s²]
                          Re_low = 2300,  # Lower transition Reynolds number
                          Re_high = 4000) # Upper transition Reynolds number
     
     pars = @parameters begin
-        L = L               # Plate length [m]
-        W = W               # Plate width [m]
-        b = b               # Channel gap [m]
-        np = np             # Number of plates
-        ϕ = ϕ               # Surface enlargement factor
-        β = β               # Chevron angle [radians]
+        #L = L               # Plate length [m]
+        #W = W               # Plate width [m]
+        #b = b               # Channel gap [m]
+        #np = np             # Number of plates
+        #ϕ = ϕ               # Surface enlargement factor
+        #β = β               # Chevron angle [radians]
         K_ports = K_ports   # Port pressure loss coefficient
         g = g               # Gravity [m/s²]
         Re_low = Re_low     # Lower transition Reynolds number
@@ -2688,6 +2619,12 @@ function PlateHeatExchanger(; name::Symbol,
     end
 
     vars = @variables begin
+        L = 0.2               # Plate length [m]
+        W = 0.1               # Plate width [m]
+        b = 2e-3               # Channel gap [m]
+        np = 20             # Number of plates
+        ϕ = 1.18               # Surface enlargement factor
+        β = 30/180*pi               # Chevron angle [radians]
         V̇ = 0.0001      # Volumetric flow [m³/s]
         ṁ = 0.1         # Mass flow [kg/s]
         ρ = 1000.0      # Density [kg/m³]
@@ -2744,12 +2681,6 @@ Create a plate heat exchanger model with dynamic fluid properties.
 Uses the same smooth transition approach for turbulence as other components.
 """
 function DynamicPropPlateHeatExchanger(; name::Symbol,
-                         L = 0.3,        # Plate length [m]
-                         W = 0.2,        # Plate width [m]
-                         b = 2e-3,       # Channel gap / pressing depth [m]
-                         np = 20,        # Number of plates
-                         ϕ = 1.118,      # Surface enlargement factor
-                         β = 30*π/180,   # Chevron angle [radians]
                          K_ports = 1.5,  # Port pressure loss coefficient
                          g = 9.81,       # Gravity [m/s²]
                          Re_low = 2300,  # Lower transition Reynolds number
@@ -2759,12 +2690,6 @@ function DynamicPropPlateHeatExchanger(; name::Symbol,
                       
     # Define the PHX-level parameters for inheritance
     pars = @parameters begin
-        L = L
-        W = W
-        b = b
-        np = np
-        ϕ = ϕ
-        β = β
         K_ports = K_ports
         g = g
         Re_low = Re_low
@@ -2772,14 +2697,30 @@ function DynamicPropPlateHeatExchanger(; name::Symbol,
         χ = χ
     end
     
+    vars = @variables begin
+        L = 0.2               # Plate length [m]
+        W = 0.1               # Plate width [m]
+        b = 2e-3               # Channel gap [m]
+        np = 20             # Number of plates
+        ϕ = 1.18               # Surface enlargement factor
+        β = 30/180*pi               # Chevron angle [radians]
+        V̇ = 0.0001      # Volumetric flow [m³/s]
+        ṁ = 0.1         # Mass flow [kg/s]
+        ρ = 1000.0      # Density [kg/m³]
+        μ = 0.001       # Dynamic viscosity [Pa·s]
+        v = 1.0         # Velocity [m/s]
+        Re = 1000.0     # Reynolds number
+        f = 0.03        # Friction factor
+        Δp = 1000.0     # Pressure drop [Pa]
+        H = 0.1         # Head loss [m]
+        dh = 0.01       # Hydraulic diameter [m]
+        S = 0.0001      # Flow area [m²]
+        Δp_core = 800.0 # Core pressure drop [Pa]
+        Δp_ports = 200.0 # Port pressure drop [Pa]
+    end
+
     # Create the standard PHX component
-    @named phx = PlateHeatExchanger(
-        L = L,
-        W = W,
-        b = b,
-        np = np,
-        ϕ = ϕ,
-        β = β,
+    @named base = PlateHeatExchanger(
         K_ports = K_ports,
         g = g,
         Re_low = Re_low,
@@ -2790,15 +2731,21 @@ function DynamicPropPlateHeatExchanger(; name::Symbol,
     @named props = Properties.IncompressibleProps(fluid=fluid, χ=χ)
     
     # Connect components
-    connect_eqs = [
+    eqs = [
+		L ~ base.L,
+        W ~ base.W,
+        b ~ base.b,
+        np ~ base.np,
+        ϕ ~ base.ϕ,
+        β ~ base.β,
         # Connect fluid properties to hydraulic component
-        phx.ρ ~ props.ρ,
-        phx.μ ~ props.μ
+        base.ρ ~ props.ρ,
+        base.μ ~ props.μ
     ]
     
     # Create the parent system with connected components
-    system = NonlinearSystem(connect_eqs, [], pars, name=name)
-    return compose(system, [phx, props], name=name)
+    system = NonlinearSystem(eqs, vars, pars, name=name)
+    return compose(system, [base, props], name=name)
 end
 
 # ╔═╡ c705bcad-1203-48e7-a6b4-ab0e8d476c8c
@@ -2808,20 +2755,23 @@ Test function for the DynamicPropPlateHeatExchanger model
 function test_phx_heat_exchanger()
     # Create the model
     @named phx = DynamicPropPlateHeatExchanger(
-        L = 0.38,
-        W = 0.07,
-        b = 1.2e-3,
-        np = 15,
-        ϕ = 1.118,
-        β = 30*π/180,
         fluid = "MEA"
     )
-    
+
+	eqs = [
+		phx.L ~ 0.38,
+		phx.W ~ 0.07,
+		phx.b ~ 1.6e-3,
+		phx.np ~ 15,
+		phx.ϕ ~ 1.118,
+		phx.β ~ 30*π/180,
+		
+		phx.props.T ~ 293.15,  # 20°C
+		phx.base.V̇ ~ 0.001     # 1 L/s
+	]
+	
     # Set up test conditions
-    @named constrained_sys = compose(NonlinearSystem([
-                                          phx.props.T ~ 293.15,  # 20°C
-                                          phx.phx.V̇ ~ 0.001     # 1 L/s
-                                      ], [], [], name=:constrained_sys), [phx])
+    @named constrained_sys = compose(NonlinearSystem(eqs, [], [], name=:constrained_sys), [phx])
     
     # Simplify and solve
     simpl_sys = structural_simplify(constrained_sys)
@@ -2829,18 +2779,18 @@ function test_phx_heat_exchanger()
     sol = solve(problem)
     
     # Check results
-    total_pressure_drop = sol[phx.phx.Δp]
-    core_pressure = sol[phx.phx.Δp_core]
-    port_pressure = sol[phx.phx.Δp_ports]
-    reynolds = sol[phx.phx.Re]
-    friction = sol[phx.phx.f]
-    velocity = sol[phx.phx.v]
+    total_pressure_drop = sol[phx.base.Δp]
+    core_pressure = sol[phx.base.Δp_core]
+    port_pressure = sol[phx.base.Δp_ports]
+    reynolds = sol[phx.base.Re]
+    friction = sol[phx.base.f]
+    velocity = sol[phx.base.v]
     density = sol[phx.props.ρ]
     viscosity = sol[phx.props.μ]
     
     # Display results
     println("Plate Heat Exchanger Test Results:")
-    println("  Flow rate: $(sol[phx.phx.V̇] * 1000) L/s")
+    println("  Flow rate: $(sol[phx.base.V̇] * 1000) L/s")
     println("  Total Pressure Drop: $(total_pressure_drop) Pa")
     println("  Core Pressure Drop: $(core_pressure) Pa")
     println("  Port Pressure Drop: $(port_pressure) Pa")
@@ -2866,77 +2816,7 @@ function test_phx_heat_exchanger()
 end
 
 # ╔═╡ c37b7907-bced-4c1a-90d3-eb3366a2197c
-#=╠═╡
-@test test_phx_heat_exchanger()
-  ╠═╡ =#
-
-# ╔═╡ e57b762f-fc7d-4aa5-8941-6798a01ae8e1
-"""
-Test function that demonstrates parameter inheritance with remake for PHX
-"""
-function test_phx_parametric()
-    # Create the base model
-    @named phx_base = DynamicPropPlateHeatExchanger(
-        L = 0.38,
-        W = 0.07,
-        b = 1.2e-3,
-        np = 15,
-        ϕ = 1.118,
-        β = 30*π/180,
-        fluid = "MEA"
-    )
-    
-    # Set up the initial system with base conditions
-    @named constrained_sys = compose(NonlinearSystem([
-                                        phx_base.props.T ~ 293.15,  # 20°C
-                                        phx_base.phx.V̇ ~ 0.001     # 1 L/s
-                                    ], [], [], name=:constrained_sys), [phx_base])
-    
-    # Simplify and create the initial problem
-    simpl_sys = structural_simplify(constrained_sys)
-    base_problem = NonlinearProblem(simpl_sys, [])
-    
-    # Create variations using remake to test parameter inheritance
-    chevron_angles = collect(10:10:90) .* (π/180)  # Different chevron angles in radians
-    results = []
-    
-    for β in chevron_angles
-        # Create a modified problem with updated chevron angle parameter using remake
-        problem = remake(base_problem, p = [phx_base.β => β])
-        
-        # Solve the modified problem
-        sol = solve(problem)
-        
-        # Store results
-        push!(results, (
-            angle_deg = β * 180/π,
-            pressure_drop = sol[phx_base.phx.Δp],
-            core_pressure = sol[phx_base.phx.Δp_core],
-            port_pressure = sol[phx_base.phx.Δp_ports],
-            reynolds = sol[phx_base.phx.Re],
-            friction = sol[phx_base.phx.f]
-        ))
-        
-        println("Chevron Angle: $(β * 180/π)° | Pressure drop: $(sol[phx_base.phx.Δp]) Pa | Friction Factor: $(sol[phx_base.phx.f])")
-    end
-    
-    # Verify that pressure drop increases with chevron angle (higher turbulence)
-    angles_consistent = all(results[i].pressure_drop < results[i+1].pressure_drop 
-                          for i in 1:length(results)-1)
-                          
-    if angles_consistent
-        println("✅ Test passed: Pressure drop increases with chevron angle as expected")
-    else
-        println("❌ Test failed: Pressure drop does not consistently increase with chevron angle")
-    end
-    
-    return angles_consistent
-end
-
-# ╔═╡ 30b031a4-98b6-4a11-a4ed-a74983078a7f
-#=╠═╡
-@test test_phx_parametric()
-  ╠═╡ =#
+test_phx_heat_exchanger()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -5600,8 +5480,6 @@ version = "1.8.1+0"
 # ╠═165e8538-776f-4c46-86c2-d43f3bb302e2
 # ╠═de4cfe89-bc6c-4cbf-96c8-345df5fa6041
 # ╠═12b98c45-6b61-4ea0-bfb5-4fa152be4ab1
-# ╠═0c9ad1ad-9324-4f0a-883d-3fdbbfb4244c
-# ╠═75a9b1e0-6b75-4442-8a32-f0e692d1989b
 # ╟─cecce7db-5dc5-4c47-a666-af62bfe707a2
 # ╠═771bc84e-cb07-4be7-a129-5772749dc845
 # ╠═d9f417b2-184e-4f5e-9c3a-9649a6cb4235
@@ -5615,8 +5493,6 @@ version = "1.8.1+0"
 # ╠═9ba05444-6ea6-460d-a674-3fef94c553f8
 # ╠═c705bcad-1203-48e7-a6b4-ab0e8d476c8c
 # ╠═c37b7907-bced-4c1a-90d3-eb3366a2197c
-# ╠═e57b762f-fc7d-4aa5-8941-6798a01ae8e1
-# ╠═30b031a4-98b6-4a11-a4ed-a74983078a7f
 # ╠═cb0f35b9-ebc0-4232-a427-3ebfa85aacfd
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

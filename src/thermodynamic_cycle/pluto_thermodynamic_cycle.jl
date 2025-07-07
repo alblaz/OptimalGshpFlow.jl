@@ -1717,7 +1717,7 @@ function ThermodynamicCycle(; name,
     end
 
     # ——— Property components ———
-    @named evaporator  = Evaporator()
+    @named evaporator  = Evaporator(sec_fluid=fluid, χ=χ, refrigerant = refrigerant)
     @named compressor = Compressor(fluid = refrigerant)
 	@named inlet_exp  = Properties.RefrigerantProps(fluid = refrigerant)
 	@named inlet_cond  = Properties.RefrigerantProps(fluid = refrigerant)
@@ -1885,17 +1885,24 @@ function GSHP(; name,
     # ——— State variables ———
     sts = @variables begin
 		T_i_b = 9+273.15
+		T_o_b = 9+273.15
+		h_i_r = 200e3
+		h_o_r = 200e3
 		ΔTb = 3
 		ΔTSH = 7
+		ṁ_sf = 0.1
+		ṁ_ref = 0.1
 		#T_cond = 45
 		#p_cond = 2e5
 		p_l = 1e5
 		p_h = 10e5
 
 		W_comp = 1000
+		P_elec_pump = 1000
 		Q_evap = 2000
 		Q_cond = -3000
 		COP1 = 5
+		COP2 = 5
     end
 
     # ——— Property components ———
@@ -1915,39 +1922,49 @@ function GSHP(; name,
 
 
 
-    #@named phx = Hydraulics.DynamicPropPlateHeatExchanger(
-    #    L = 0.3,
-    #    W = 0.1,
-    #    b = 1.5e-3,
-    #    np = 20,
-    #    ϕ = 1.18,
-    #    β = 30*π/180,
-    #    fluid = "MEA"
-    #)
+    @named phx = Hydraulics.DynamicPropPlateHeatExchanger(
+        fluid = "MEA"
+    )
     
     # ——— Governing equations ———
 	
     eqs = [
+
+        T_i_b ~ cycle.T_i_b,
+        T_o_b ~ cycle.T_o_b,
+        h_i_r ~ cycle.h_i_r,
+        h_o_r ~ cycle.h_o_r,
+        ΔTb ~ cycle.ΔTb,
+        ΔTSH ~ cycle.ΔTSH,
+        ṁ_sf ~ cycle.ṁ_sf,
+        ṁ_ref ~ cycle.ṁ_ref,
+        p_l ~ cycle.p_l,
+        p_h ~ cycle.p_h,
+        W_comp ~ cycle.W_comp,
+        P_elec_pump ~ pump.base.P_elec,
+        Q_evap ~ cycle.Q_evap,
+        Q_cond ~ cycle.Q_cond,
+        COP1 ~ cycle.COP1,
+        COP2 ~ -Q_cond/(W_comp+P_elec_pump),
+		
 		bhe.T_2 ~ cycle.evaporator.T_in_1,
 		cycle.evaporator.T_out_1 ~ bhe.T_1,
 		cycle.ṁ_sf ~ bhe.ṁ,
 		pump.props.T ~ bhe.T_1,
-		pump.pump.ṁ ~ bhe.ṁ,
-		#phx.phx.ṁ ~ bhe.ṁ,
-		pump.pump.Δp ~ 1e5,#phx.phx.Δp,
-		#phx.props.T ~ bhe.T_1,
+		pump.base.ṁ ~ bhe.ṁ,
+		phx.base.ṁ ~ bhe.ṁ,
+		pump.base.Δp ~ 1e5,#phx.phx.Δp,
+		phx.props.T ~ bhe.T_1,
     ]
 
     # ——— Assemble system ———
     sys = NonlinearSystem(eqs, sts, ps, name = name)
     return ModelingToolkit.compose(sys,
-        [cycle, bhe, pump], name = name)
-
-    # ——— Assemble system ———
-    #sys = NonlinearSystem(eqs, sts, ps, name = name)
-    #return ModelingToolkit.compose(sys,
-    #    [cycle, bhe, pump, phx], name = name)
+        [cycle, bhe, pump, phx], name = name)
 end
+
+# ╔═╡ 47e9be09-5525-440c-923b-1a5fb3b30c6e
+
 
 # ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
 """
@@ -1955,7 +1972,7 @@ Test routine for the GSHP model
 """
 function test_GSHP()
     
-    @named hp = GSHP();
+    @named hp = GSHP(χ=0.280);
     eqs = [
         
         hp.cycle.evaporator.b ~ 1.5e-3,
@@ -1968,13 +1985,21 @@ function test_GSHP()
         hp.cycle.evaporator.λ_pitch ~ 4e-3,
         hp.cycle.evaporator.χ ~ 0.28,
         hp.cycle.evaporator.L ~ 0.3,
-        
+
+		
+		hp.phx.L ~ 0.3,
+		hp.phx.W ~ 0.10,
+		hp.phx.b ~ 1.5e-3,
+		hp.phx.np ~ 20,
+		hp.phx.ϕ ~ 1.18,
+		hp.phx.β ~ π/6,
+		
         hp.cycle.compressor.f ~ 50,
         hp.cycle.ΔTb ~ 3,
         hp.cycle.ΔTSH ~ 7,
         hp.cycle.p_h ~ 14e5,
-        #hp.cycle.p_l ~ 2.4e5,
-        hp.cycle.inlet_cond.h ~ hp.cycle.inlet_cond.hd,
+        hp.cycle.p_l ~ 2.4e5,
+        #hp.cycle.inlet_cond.h ~ hp.cycle.inlet_cond.hd,
     ]
 
     @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
@@ -1998,7 +2023,7 @@ function test_GSHP()
     println()
 	
     # Mass flow rates
-    println("  • Pump speed    = ", round(sol[hp.pump.pump.N], digits=4), " Hz")
+    println("  • Pump speed    = ", round(sol[hp.pump.base.N], digits=4), " Hz")
     println("  • Refrigerant ṁ_ref       = ", round(sol[hp.cycle.ṁ_ref], digits=4), " kg/s")
     println()
     
@@ -2084,7 +2109,9 @@ function test_GSHP()
     println("  • Evaporator heat Q_evap  = ", round(sol[hp.cycle.Q_evap]/1000, digits=2), " kW")
     println("  • Condenser heat Q_cond   = ", round(sol[hp.cycle.Q_cond]/1000, digits=2), " kW")
     println("  • Compressor power W_comp = ", round(sol[hp.cycle.W_comp]/1000, digits=2), " kW")
-    println("  • COP                     = ", round(sol[hp.cycle.COP1], digits=2))
+    println("  • Pumping power = ", round(sol[hp.P_elec_pump]/1000, digits=2), " kW")
+    println("  • COP1                     = ", round(sol[hp.cycle.COP1], digits=2))
+    println("  • COP2                     = ", round(sol[hp.COP2], digits=2))
     println()
     
     # Evaporator details
@@ -2180,7 +2207,8 @@ function test_pump_phx()
         phx.props.T       ~ 273.15 + 10,
 
         # fix pump speed to 50 Hz
-        pump.pump.N       ~ 50.0,
+        #pump.pump.N       ~ 50.0,
+        ṁ   ~ 1.5,
 
         # tie the flow through both devices to the same ṁ
         pump.pump.ṁ      ~ ṁ,
@@ -2203,10 +2231,11 @@ function test_pump_phx()
 
     # ——— Report ———
     println("=== Pump–HX Steady–State ===")
-    println("Converged: ", sol.retcode == :Converged)
+    println("Converged: ", sol.retcode)
     println("Mass flow rate ṁ = ", round(sol[ṁ], digits=4), " kg/s")
     println("Pump Δp = ", round(sol[pump.pump.Δp], digits=2), " Pa")
     println("HX   Δp = ", round(sol[phx.phx.Δp], digits=2), " Pa")
+    println("Power = ", round(sol[pump.pump.P_elec], digits=2), " W")
 end
 
 # run the test
@@ -4250,6 +4279,7 @@ version = "17.4.0+2"
 # ╠═ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
 # ╠═da834208-8f98-4527-924b-28ceb7587fdb
 # ╠═819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+# ╠═47e9be09-5525-440c-923b-1a5fb3b30c6e
 # ╠═80885b7b-9ab2-4010-a954-ed4790c277f0
 # ╠═b618a262-9856-465c-bbbc-7fa9597da28b
 # ╠═d56e6679-1745-4efe-8205-aab080a2c0b8
