@@ -509,6 +509,7 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
     
     # Variables with reasonable starting points
     vars = @variables begin
+		logp = log(1e5)
         # Basic thermodynamic state
         T = 300.0     # [K] - temperature
         Tsat = 300.0   # [K] - saturation temperature at pressure p
@@ -599,6 +600,7 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
     σ0, nσ = fit_sigma_GK(fluid)
 	# Equations
     eqs = [
+		p ~ exp(logp),
         # Material properties
         Mw ~ Clapeyron.SingleFluid(fluid).properties.Mw/1000,
         Tc ~ Clapeyron.SingleFluid(fluid).properties.Tc,
