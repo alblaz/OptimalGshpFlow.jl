@@ -25,6 +25,9 @@ using ModelingToolkit
 # ╔═╡ 3ef17b0f-7ba5-4cef-98fe-2abf3711c907
 using NonlinearSolve
 
+# ╔═╡ 00996e13-d7a2-4f9e-be84-4eec83428486
+using Printf
+
 # ╔═╡ 734d74db-7b19-42fd-89ad-78816a939565
 @fromparent begin
 	using ..Properties
@@ -32,8 +35,11 @@ using NonlinearSolve
 	using ..Hydraulics
 end
 
-# ╔═╡ 00996e13-d7a2-4f9e-be84-4eec83428486
-using Printf
+# ╔═╡ 1cd23922-87fb-4ea0-88bc-7d1224911868
+# ╠═╡ disabled = true
+#=╠═╡
+using Clapeyron
+  ╠═╡ =#
 
 # ╔═╡ e9a4105f-abec-47ca-9170-ca6aef7a9c49
 using MonteCarloMeasurements
@@ -148,9 +154,6 @@ function h_evap_plate(ṁ,
     return (1 - tf)*h_lam + tf*h_turb
 end
   ╠═╡ =#
-
-# ╔═╡ e31c8c25-3ca9-43cd-a865-5c1500677c24
-
 
 # ╔═╡ 917d72da-5985-42b2-a079-9dd14b97a791
 
@@ -1112,6 +1115,24 @@ function blend_weight(Re, Re_low, Re_high)
     return 0.5*(1 + erf((Re - Re_mid)/σ))
 end
 
+# ╔═╡ 07f01adf-8cc7-4a40-aa14-a90cef491b95
+"""
+    soft_clamp(x, x_low, x_high; tol=0.01)
+
+Smoothly constrain `x` into `[x_low, x_high]` in a C^∞ way with no branching.
+- `tol` is the *fraction* of `(x_high - x_low)` over which each edge transition occurs.
+  e.g. `tol=0.01` means each “ramp” is 1% of the full width.
+"""
+function soft_clamp(x::Real, x_low::Real, x_high::Real; tol::Real=0.01)
+    # transition half-width
+    δ = tol * (x_high - x_low)
+    # logistic‐style bumps at the low & high edges:
+    s_low  = 1 / (1 + exp(-(x_low + δ - x)  / δ))
+    s_high = 1 / (1 + exp(-(x       - (x_high - δ)) / δ))
+    # blend:    identity + (x_low - x)·s_low + (x_high - x)·s_high
+    return x + (x_low  - x)*s_low  + (x_high - x)*s_high
+end
+
 # ╔═╡ e31e4221-54e9-4049-b80e-eca118e9bb00
 """
     h_boiling_Amalfi(m, x, D_h, ρ_l, ρ_g, μ_l, μ_g,
@@ -1130,7 +1151,7 @@ for a plate-and-frame exchanger (Amalfi correlation).
 - `H_vap` : latent heat of vaporization [J/kg]
 - `σ` : surface tension [N/m]
 - `q` : heat flux [W/m²]
-- `A_ch` : channel flow area [m²]
+- `S_ch` : channel flow area [m²]
 - `θ_ch` : chevron angle [°] (default 45)
 - `θ_max` : reference max angle [°] (default 45)
 
@@ -1146,7 +1167,8 @@ function h_boiling_Amalfi(m, x, D_h,
 
     # 1. Mass flux, homogeneous density
     G   = m / S_ch
-    ρ_m = x*ρ_g + (1-x)*ρ_g
+	ρ_m = 1 / ( x/ρ_g + (1 - x)/ρ_l )
+    #ρ_m = x*ρ_g + (1-x)*ρ_g
 
     # 2. Dimensionless groups
     Bo   = q̇ / (G * H_vap)               # Boiling number
@@ -1158,7 +1180,7 @@ function h_boiling_Amalfi(m, x, D_h,
 	
     Re_lo    = G * D_h / μ_l
     Re_g     = G * x * D_h / μ_g
-    h_macro = 18.495 * λ_l / D_h * (β/β_max)^0.248 * Re_g^0.135 * Re_lo^0.351 * (ρ_l / ρ_g)^(-0.223) * Bd^0.235 * Bo^0.198
+    h_macro = 18.495 * λ_l / D_h * (β/β_max)^0.248 * Re_g^0.135 * Re_lo^0.351 * (ρ_g / ρ_l)^(-0.223) * Bd^0.235 * Bo^0.198
     # 4. Smooth blend around Bd ≈ 4 (e.g. from 3.5 to 4.5)
     w  = blend_weight(Bd, 3.9, 4.1)
     h = (1 - w)*h_tiny + w*h_macro
@@ -1170,67 +1192,59 @@ end
 # ╔═╡ eacfb867-b8fe-4166-84df-038848a9d837
 function sanity_check_real()
     ### ——— Geometry & Flow from your MTK test ———
-    b        = 0.002         # plate half‐channel height [m]
-    np       = 25     # number of plates × pass‐factor (25⟶250)
-    W        = 0.10          # plate width [m]
-    ϕ        = 1.2           # corrugation apex angle factor
-    β        = π/6           # chevron angle [rad]
-    λ_pitch  = 4e-3          # corrugation pitch [m]
-    D_h      = 2*b/ϕ         # hydraulic diameter [m]
-    A_ch     = np * b * W    # total flow area [m²]
-    m        = 0.025         # refrigerant mass‐flow [kg/s]
-	L = .1
-	S_ch = np*W*ϕ*L
-	
-    ### ——— R-134a properties @ Tsat = 0 °C ———
-    # (Either hard-code typical values or fetch from CoolProp/REFPROP)
-    ρ_l   = 1207.0    # kg/m³, liquid density @ 0 °C
-    ρ_g   =   17.7    # kg/m³, vapor density @ 0 °C
-    μ_l   = 0.00026   # Pa·s, liquid viscosity @ 0 °C
-    μ_g   = 0.000013  # Pa·s, vapor viscosity @ 0 °C
-    κ_l   =   0.08    # W/(m·K), liquid conductivity @ 0 °C
-    H_vap = 206000.0  # J/kg, latent heat @ 0 °C
-    σ     =   0.0083  # N/m, surface tension @ 0 °C
+    b        = 0.002        # plate spacing [m] (1.5 mm)
+    np       = 15            # number of plates
+    W        = 0.05          # plate width [m] (10.0 cm)
+    L        = 0.2          # plate length [m] (20.0 cm)
+    ϕ        = 1.2           # enlargement factor
+    β        = π/6           # chevron angle [rad] (30°)
+    D_h      = 2*b/ϕ         # hydraulic diameter [m] = 2.5 mm
+    CS       = np * b * W    # cross-sectional area [m²] = 3750 mm²
+    ṁ        = 0.0174        # refrigerant mass flow [kg/s]
+    S_ch     = np*W*ϕ*L      # heat transfer area [m²] = 0.6 m²
+    q_flux   = 5810.0        # heat flux [W/m²]
+    
+    ### ——— R-134a properties @ Tsat = 0°C (from your test) ———
+    ρ_l   = 1294.8      # kg/m³, liquid density
+    ρ_g   = 14.43       # kg/m³, vapor density
+    μ_l   = 281.7e-6    # Pa·s, liquid viscosity (281.7 μPa·s)
+    μ_g   = 10.54e-6    # Pa·s, vapor viscosity (10.54 μPa·s)
+    κ_l   = 93.4e-3     # W/(m·K), liquid thermal conductivity (93.4 mW/m·K)
+    H_vap = 398.6e3     # J/kg, vapor enthalpy (398.6 kJ/kg)
+    σ     = 11.428e-3   # N/m, surface tension (11.428 mN/m)
 
     println("Real‐Case Sanity‐Check: h_boiling_Amalfi")
-    println("  D_h = $(round(D_h*1e3,digits=2)) mm, A_ch = $(round(A_ch*1e4,digits=1)) cm²")
-    println("  m = $(m*1e3) g/s")
+    println("Geometry:")
+    println("  D_h = $(round(D_h*1e3,digits=2)) mm, CS = $(round(CS*1e6,digits=1)) mm²")
+    println("  S_ch = $(round(S_ch,digits=2)) m², q″ = $(round(q_flux,digits=0)) W/m²")
+    println("  ṁ = $(round(ṁ*1e3,digits=1)) g/s")
+    println()
+    println("R134A Properties @ 0°C:")
+    println("  ρₗ = $(ρ_l) kg/m³, ρᵥ = $(ρ_g) kg/m³")
+    println("  μₗ = $(round(μ_l*1e6,digits=1)) μPa·s, μᵥ = $(round(μ_g*1e6,digits=1)) μPa·s")
+    println("  κₗ = $(round(κ_l*1e3,digits=1)) mW/m·K, σ = $(round(σ*1e3,digits=3)) mN/m")
     println()
 
-    @printf("%6s | %8s\n", " x   ", "h [kW/m²·K]")
-    println("------+-------------")
-    for x in (0.1, 0.3, 0.5, 0.7, 0.9)
+    @printf("%6s | %8s | %12s\n", " x   ", "h [W/m²·K]", "h [kW/m²·K]")
+    println("------+----------+--------------")
+    for x in (0.2, 0.4, 0.6, 0.8, 1.0)
         h = h_boiling_Amalfi(
-            m, x, D_h,
+            ṁ, x, D_h,
             ρ_l, ρ_g,
             μ_l, μ_g,
             κ_l, H_vap,
-            σ, abs(9000.0)/S_ch,
-            A_ch, pi/4
+            σ, q_flux,
+            CS, β
         )
-        @printf("  %.1f  |   %6.2f\n", x, h/1e3)
+        @printf("  %.1f  |   %6.0f   |     %6.2f\n", x, h, h/1e3)
     end
+    
 end
 
 # ╔═╡ 2ab2c592-3e29-4031-8d19-8856f3cdbc6e
 sanity_check_real()
 
-# ╔═╡ 07f01adf-8cc7-4a40-aa14-a90cef491b95
-"""
-    soft_clamp(x, x_low, x_high; tol=0.01)
-
-Smoothly constrain x into [x_low, x_high]:
-- tol: fraction of (x_high - x_low) over which transition occurs (default 1%)  
-"""
-function soft_clamp(x, x_low, x_high; tol=0.01)
-    # transition width Δ = tol * (range)
-    Δ = tol * (x_high - x_low)
-    # first, softly lift below x_low
-    y1 = x_low .+ (x .- x_low) .* 0.5 .* (1 .+ erf.((x .- x_low)./Δ))
-    # then, softly cap above x_high
-    y2 = y1 .- (y1 .- x_high) .* 0.5 .* (1 .+ erf.((y1 .- x_high)./Δ))
-    return y2
-end
+# ╔═╡ 9c973317-fb75-4949-b50d-558df127bc2e
 
 
 # ╔═╡ 11823168-8288-49db-88e8-319df4535273
@@ -1249,10 +1263,10 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     # ——— State variables ———
     vars = @variables begin
 		
-		b = 2e-3
-		np = 30
-		W = 10e-2
-		ϕ = 1.138
+		b = 1.5e-3
+		np = 15
+		W = 5e-2
+		ϕ = 1.118
 		β = pi/6
 		th = 5e-4
 		λ_pl = 16
@@ -1263,12 +1277,14 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
         L = 1.0
         γṁ_2 = 0.0          # log mass flow for refrigerant
         γṁ_1 = 0.0          # log mass flow for incompressible fluid
-        h_2 = 600.0         # film coefficients (init)
+        h_2 = 600.0         # 
+        h_2_raw = 600.0         # 
         h_1 = 600.0
         T_in_1 = 280.0
         T_out_1 = 280.0
         T_2    = 300.0      # refrigerant bulk T
-        p_2    = 1e5        # refrigerant pressure
+        logp_2    = 1e5        # refrigerant pressure
+        X_in    = 0.5
         h2i    = 300e3
         h2o    = 300e3
         Q      = 1000.0
@@ -1283,6 +1299,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     # ——— Derived expressions ———
     ṁ_1 = exp(γṁ_1)
     ṁ_2 = exp(γṁ_2)
+	p_2 = exp(logp_2)
 	D_h = 2b/ϕ
 	CS = np*b*W
 
@@ -1305,22 +1322,22 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
         # capacity rates (incompressible only)
         base.C_1     ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
 
-
+		X_in ~ soft_clamp(propref.X, 0.0, 1.0),#ifelse(propref.X<1.0, ifelse(propref.X>0.0, propref.X, -1.0), 2.0),
+		h_2_raw ~ mean(map(x->h_boiling_Amalfi(
+           ṁ_2,                                       # mass‐flow [kg/s]
+           x,                                       # fixed quality
+           D_h,                                     # D_h [m]
+           propref.ρb, propref.ρd,                              # ρₗ, ρᵥ [kg/m³]
+           propref.ηb, propref.ηd,                         # μₗ, μᵥ [Pa·s]
+           propref.λb,                                      # κₗ [W/(m·K)]
+           propref.hd,                                  # H_vap [J/kg]
+           propref.σ,                                    # σ [N/m]
+           abs(Q)/base.A,                             # q″ [W/m²]
+           CS,
+			β,
+		), range(0.0, 1.0, length = 10))),####
 		
-		
-		h_2 ~  soft_clamp(h_boiling_Amalfi(
-           0.05,                                       # mass‐flow [kg/s]
-           0.5,                                       # fixed quality
-           4e-3,                                     # D_h [m]
-           1207.0, 17.7,                              # ρₗ, ρᵥ [kg/m³]
-           0.00026, 0.000013,                         # μₗ, μᵥ [Pa·s]
-           0.08,                                      # κₗ [W/(m·K)]
-           206000.0,                                  # H_vap [J/kg]
-           0.0083,                                    # σ [N/m]
-           9000,#abs(Q)/base.A,                             # q″ [W/m²]
-           25*2e-3*0.1,
-			pi/3,
-		), 1000, 10000),
+		h_2 ~  soft_clamp(h_2_raw, 1000, 20000),
 		
         h_1 ~ h_plate(
             ṁ_1,
@@ -1362,8 +1379,8 @@ function test_pcpwp_simple()
     # drive the model
     eqs = [
 		
-		hx.b ~ 0.0015,
-		hx.np ~ 25,#*factor,
+		hx.b ~ 0.002,
+		hx.np ~ 20,#*factor,
 		hx.W ~ 0.10,
 		hx.ϕ ~1.2,
 		hx.β ~ π/6,
@@ -1374,17 +1391,15 @@ function test_pcpwp_simple()
         hx.L          ~ 0.2,              # plate length [m]
         
 		
-		hx.γṁ_1       ~ log(0.9),         # brine flow [kg/s]
-        #hx.γṁ_2       ~ log(0.025),         # refrigerant flow [kg/s]
+		#hx.γṁ_1       ~ log(0.9),         # brine flow [kg/s]
+        hx.γṁ_2       ~ log(0.025),         # refrigerant flow [kg/s]
         hx.T_in_1     ~ 273.15 + 10.0,            # brine inlet [K]
-        #hx.T_out_1     ~ 273.15 + 7.0,            # brine outlet [K]
-        hx.h2i        ~ 250e3,    #
-        #hx.h2i        ~ hx.propref.hd,    # 
-
-		
-        hx.h2o        ~  hx.h2i + 200e3,    # start evaporator at bubble‐point enthalpy
+        hx.T_out_1     ~ 273.15 + 7.0,            # brine outlet [K]
+        #hx.h2i        ~ 250e3,    #
+        hx.h2i        ~ hx.propref.hb,    # 
+        hx.h2o        ~  hx.propref.hd,    # start evaporator at bubble‐point enthalpy
         #hx.propref.p  ~ 2.8e5               # refrigerant pressure [Pa]
-        hx.propref.Tsat  ~ hx.T_in_1 - 10,               # refrigerant evaporation temperature
+        #hx.propref.Tsat  ~ hx.T_in_1 - 10,               # refrigerant evaporation temperature
     ]
 
     @named sys = ModelingToolkit.compose(
@@ -1398,79 +1413,138 @@ function test_pcpwp_simple()
 
 	solver = NewtonRaphson(; 
 		linesearch = BackTracking(; maxstep=20), 
-		autodiff = AutoFiniteDiff()
+	#	autodiff = AutoFiniteDiff()
 	)
 
 	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
 	#sol = NonlinearSolve.solve(prob, abstol = 1e-6)
 	
-    # pull out scalars
-    b       = sol[hx.b]
-    np      = sol[hx.np]
-    W       = sol[hx.W]
-    ϕ       = sol[hx.ϕ]
-    β_deg   = sol[hx.β] * 180/π
-    th      = sol[hx.th]
-    Re_low  = sol.ps[hx.Re_low]
-    Re_high = sol.ps[hx.Re_high]
+    # Extract geometry
+    b = sol[hx.b]
+    np = sol[hx.np]
+    W = sol[hx.W]
+    ϕ = sol[hx.ϕ]
+    β_deg = sol[hx.β] * 180/π
+    th = sol[hx.th]
+    
+    # Extract flows and heat transfer
+    ṁ1 = exp(sol[hx.γṁ_1])
+    ṁ2 = exp(sol[hx.γṁ_2])
+    A = sol[hx.base.A]
+    Q = sol[hx.base.Q]
+    ho = sol[hx.h2o] 
+    hi = sol[hx.h2i] 
+    Δh = ho - hi 
+    
+    # Extract temperatures
+    T_in_1 = sol[hx.T_in_1] - 273.15      # brine inlet °C
+    T_out_1 = sol[hx.T_out_1] - 273.15    # brine outlet °C
+    T_sat = sol[hx.propref.Tsat] - 273.15 # evaporation temperature °C
+    
+    # Extract pressure
+    pev = sol[hx.propref.p]/1e5
+    
+    # Extract HTCs
+    h1 = sol[hx.h_1]
+    h2 = sol[hx.h_2]
+    h2_raw = sol[hx.h_2_raw]
 
-    ṁ1   = exp(sol[hx.γṁ_1])
-    ṁ2   = exp(sol[hx.γṁ_2])
-    A    = sol[hx.base.A]
-    Q    = sol[hx.base.Q]
+    # ===== EXTRACT ALL REFRIGERANT PROPERTIES USED IN h2_raw =====
+    ρb = sol[hx.propref.ρb]        # bubble point density [kg/m³]
+    ρd = sol[hx.propref.ρd]        # dew point density [kg/m³] 
+    ηb = sol[hx.propref.ηb]        # bubble point viscosity [Pa·s]
+    ηd = sol[hx.propref.ηd]        # dew point viscosity [Pa·s]
+    λb = sol[hx.propref.λb]        # bubble point thermal conductivity [W/(m·K)]
+    hd = sol[hx.propref.hd]        # dew point enthalpy [J/kg]
+    σ = sol[hx.propref.σ]          # surface tension [N/m]
+    
+    # Additional useful properties
+    Tsat_K = sol[hx.propref.Tsat]  # saturation temperature [K]
+    p_ref = sol[hx.propref.p]      # refrigerant pressure [Pa]
+    
+    # Derived quantities used in h2_raw calculation
+    D_h = 2 * b / ϕ               # hydraulic diameter [m]
+    CS = np * b * W               # cross-sectional area [m²]
+    q_flux = abs(Q) / A           # heat flux [W/m²]
 
-	ho = sol[hx.h2o] 
-	hi = sol[hx.h2i] 
-	Δh = ho-hi 
-    # temperatures
-    T_in_1   = sol[hx.T_in_1]      - 273.15  # brine inlet °C
-    T_out_1  = sol[hx.T_out_1]     - 273.15  # brine outlet °C
-    T_sat    = sol[hx.propref.Tsat] - 273.15  # evaporation temperature °C
-
-	pev = sol[hx.propref.p]/1e5
-    # HTCs
-    h1   = sol[hx.h_1]
-    h2   = sol[hx.h_2]
-
-    # print everything
-    println("=== PhaseChangePlateHX Test ===")
-    println("Geometry:")
-    println("  b       = ", b, " m")
-    println("  np      = ", np)
-    println("  W       = ", W, " m")
-    println("  ϕ       = ", ϕ)
-    println("  β       = ", β_deg, "°")
-    println("  th      = ", th, " m")
+    # ===== COMPREHENSIVE OUTPUT =====
+    println("=== Enhanced PhaseChangePlateHX Test ===")
     println()
-    println("Solver limits:")
-    println("  Re_low  = ", Re_low)
-    println("  Re_high = ", Re_high)
+    println("GEOMETRY:")
+    println("  b       = ", round(b*1000, digits=2), " mm (plate spacing)")
+    println("  np      = ", round(Int, np), " (number of plates)")
+    println("  W       = ", round(W*100, digits=1), " cm (plate width)")
+    println("  L       = ", round(sol[hx.L]*100, digits=1), " cm (plate length)")
+    println("  ϕ       = ", round(ϕ, digits=3), " (enlargement factor)")
+    println("  β       = ", round(β_deg, digits=1), "° (chevron angle)")
+    println("  th      = ", round(th*1000, digits=2), " mm (plate thickness)")
+    println("  D_h     = ", round(D_h*1000, digits=2), " mm (hydraulic diameter)")
+    println("  CS      = ", round(CS*1e6, digits=2), " mm² (cross-sectional area)")
+    println("  A       = ", round(A, digits=3), " m² (heat transfer area)")
     println()
-    println("Flows & Area:")
-    println("  ṁ₁       = ", ṁ1, " kg/s")
-    println("  ṁ₂       = ", ṁ2, " kg/s")
-    println("  A        = ", A, " m²")
-    println("Heat Transfer:")
-    println("  Q        = ", Q, " W")
-    println("  Δh        = ", Δh, " J/kg")
+    
+    println("FLOWS & OPERATING CONDITIONS:")
+    println("  ṁ₁ (brine)     = ", round(ṁ1, digits=3), " kg/s")
+    println("  ṁ₂ (refrig)    = ", round(ṁ2, digits=4), " kg/s")
+    println("  Q              = ", round(Q, digits=0), " W")
+    println("  q″             = ", round(q_flux, digits=0), " W/m² (heat flux)")
+    println("  Δh (refrig)    = ", round(Δh/1000, digits=1), " kJ/kg")
+    println("  p_evap         = ", round(pev, digits=2), " bar")
     println()
-    println("Pressure (bar):")
-    println(" Evap      = ", pev)
+    
+    println("TEMPERATURES:")
+    println("  T_brine_in     = ", round(T_in_1, digits=2), " °C")
+    println("  T_brine_out    = ", round(T_out_1, digits=2), " °C")
+    println("  T_evaporation  = ", round(T_sat, digits=4), " °C")
+    println("  p_evaporation  = ", round(p_ref/1e5, digits=4), " bar")
+    println("  X  = ", round(sol[hx.X_in]/1e2, digits=4) , " %")
+    println("  X  = ", round(sol[hx.propref.X]/1e2, digits=4) , " %")
+	
+    println("  ΔT_approach    = ", round(T_in_1 - T_sat, digits=2), " K")
     println()
-    println("Temperatures (°C):")
-    println("  brine in       = ", T_in_1)
-    println("  brine out      = ", T_out_1)
-    println("  evaporation T  = ", T_sat)
+    
+    println("=== REFRIGERANT PROPERTIES (inputs to h2_raw calculation) ===")
     println()
-    println("HTCs (W/m²·K):")
-    println("  h₁ (brine)      = ", h1)
-    println("  h₂ (two phase) = ", h2)
+    println("BUBBLE POINT (liquid) PROPERTIES:")
+    println("  ρₗ = ", round(ρb, digits=1), " kg/m³ (liquid density)")
+    println("  ηₗ = ", round(ηb*1e6, digits=1), " μPa·s (liquid viscosity)")
+    println("  λₗ = ", round(λb*1000, digits=1), " mW/(m·K) (liquid thermal conductivity)")
+    println()
+    
+    println("DEW POINT (vapor) PROPERTIES:")
+    println("  ρᵥ = ", round(ρd, digits=2), " kg/m³ (vapor density)")
+    println("  ηᵥ = ", round(ηd*1e6, digits=2), " μPa·s (vapor viscosity)")
+    println("  hᵥ = ", round(hd/1000, digits=1), " kJ/kg (vapor enthalpy)")
+    println()
+    
+    println("INTERFACE PROPERTIES:")
+    println("  σ = ", round(σ*1000, digits=3), " mN/m (surface tension)")
+    println()
+    
+    println("HEAT TRANSFER COEFFICIENTS:")
+    println("  h₁ (brine)      = ", round(h1, digits=0), " W/(m²·K)")
+    println("  h₂_raw (calc)   = ", round(h2_raw, digits=0), " W/(m²·K) [unclamped]")
+    println("  h₂ (final)      = ", round(h2, digits=0), " W/(m²·K) [clamped]")
+    println("  Clamp effect    = ", round((h2_raw-h2)/h2_raw*100, digits=1), "% reduction")
+    println()
+    
+    println("QUALITY RANGE FOR h2_raw (0.2 to 1.0):")
+    for x in [0.2, 0.4, 0.6, 0.8, 1.0]
+        h_x = h_boiling_Amalfi(ṁ2, x, D_h, ρb, ρd, ηb, ηd, λb, hd, σ, q_flux, CS, sol[hx.β])
+        println("  x = ", x, " → h = ", round(h_x, digits=0), " W/(m²·K)")
+    end
 
     return sol, simplified
 end
 
 # ╔═╡ 86eeb20e-7da2-489d-84af-317f31f63ef4
 sol_pcpwp, simp_pcpwd = test_pcpwp_simple();
+
+# ╔═╡ fcfeffb2-35aa-4209-a495-ce79949d08e0
+sol_pcpwp.retcode
+
+# ╔═╡ 93114c1c-393c-4569-bcad-936ad8938e44
+sol_pcpwp.resid
 
 # ╔═╡ 9418798c-4603-498a-ab7a-a45d509aa67f
 sol_pcpwp.retcode
@@ -1517,7 +1591,7 @@ function Evaporator(; name,
         T_out_2 = 280.0
         T_evap = 280.0
         
-		p_2 = 300.0
+		p_2 = 1e5
 
 		Q = 3000
     end
@@ -1629,7 +1703,7 @@ function test_ev()
         #hx.h2i ~ hx.ev.propref.hd,
         hx.h2i ~ 220.0e3,
         hx.T_out_2 ~ hx.T_evap + 7,
-		#hx.p_2 ~ 2.8e5,
+		#hx.log_p_2 ~ 2.8e5,
     ]
 
     @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], []; name=:test_plate), [hx])
@@ -1666,24 +1740,38 @@ function test_ev()
     println("SH h1 = ", sol[hx.sh.h_1], " W/m2/K")
     println("SH h2 = ", sol[hx.sh.h_2], " W/m2/K")
     println("=== Flow ===")
+    println("p2 = ", exp(sol[hx.p_2]), " Pa")
+    println("p2 = ", exp(sol[hx.sh.propref.p]), " Pa")
+	
     println("ṁ 1 = ", exp(sol[hx.γṁ_1]), " kg/s")
     println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
 
 # ╔═╡ 6e831997-cf76-4ea4-815f-8f5ffd48d3e1
+# ╠═╡ disabled = true
+#=╠═╡
 sol_evap = test_ev()
+  ╠═╡ =#
 
 # ╔═╡ e8abe6ea-9eda-4f83-abdc-da2bd91dd26a
+#=╠═╡
 sol_evap.retcode
+  ╠═╡ =#
 
 # ╔═╡ 6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
+#=╠═╡
 sol_evap.resid
+  ╠═╡ =#
 
 # ╔═╡ c81e49af-a294-45d2-b2fd-c605dad70ef3
+#=╠═╡
 sol_evap.stats
+  ╠═╡ =#
 
 # ╔═╡ 9b628eb9-cc22-496e-b0f9-0327e52fb0d1
+# ╠═╡ disabled = true
+#=╠═╡
 """
 
 """
@@ -1777,8 +1865,10 @@ function ThermodynamicCycle(; name,
     return ModelingToolkit.compose(sys,
         [evaporator, compressor, inlet_exp, inlet_cond], name = name)
 end
+  ╠═╡ =#
 
 # ╔═╡ da834208-8f98-4527-924b-28ceb7587fdb
+#=╠═╡
 """
 Test routine for the Evaporator model
 """
@@ -1863,14 +1953,20 @@ function test_thermodynamic_cycle()
     return sol
 end
 
+  ╠═╡ =#
 
 # ╔═╡ ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
+#=╠═╡
 sol_cycle = test_thermodynamic_cycle()
+  ╠═╡ =#
 
 # ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
+#=╠═╡
 sol_cycle.retcode
+  ╠═╡ =#
 
 # ╔═╡ 819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+#=╠═╡
 """
 
 """
@@ -1962,11 +2058,13 @@ function GSHP(; name,
     return ModelingToolkit.compose(sys,
         [cycle, bhe, pump, phx], name = name)
 end
+  ╠═╡ =#
 
 # ╔═╡ 47e9be09-5525-440c-923b-1a5fb3b30c6e
 
 
 # ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
+#=╠═╡
 """
 Test routine for the GSHP model
 """
@@ -2175,9 +2273,12 @@ function test_GSHP()
     
     return sol.retcode
 end
+  ╠═╡ =#
 
 # ╔═╡ b618a262-9856-465c-bbbc-7fa9597da28b
+#=╠═╡
 test_GSHP()
+  ╠═╡ =#
 
 # ╔═╡ d56e6679-1745-4efe-8205-aab080a2c0b8
 function test_pump_phx()
@@ -2318,6 +2419,7 @@ candidate_solvers = [
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -2330,10 +2432,11 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
+Clapeyron = "~0.6.14"
 DataFrames = "~1.7.0"
 Distributions = "~0.25.120"
-ModelingToolkit = "~10.2.0"
-MonteCarloMeasurements = "~1.4.6"
+ModelingToolkit = "~10.8.0"
+MonteCarloMeasurements = "~1.4.7"
 NonlinearSolve = "~4.9.0"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
@@ -2346,12 +2449,12 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "ee05c01710892559714c7b4af1a7c779c2168abc"
+project_hash = "1a323edebe3fd9bbc69e19bb24c19517a5cb5fe6"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
+git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.14.0"
+version = "1.15.0"
 weakdeps = ["ChainRulesCore", "ConstructionBase", "EnzymeCore"]
 
     [deps.ADTypes.extensions]
@@ -2476,6 +2579,19 @@ git-tree-sha1 = "f21cfd4950cb9f0587d5067e69405ad2acd27b87"
 uuid = "62783981-4cbd-42fc-bca8-16325de8dc4b"
 version = "0.1.6"
 
+[[deps.BlackBoxOptim]]
+deps = ["CPUTime", "Compat", "Distributed", "Distributions", "JSON", "LinearAlgebra", "Printf", "Random", "Requires", "SpatialIndexing", "StatsBase"]
+git-tree-sha1 = "9c203a2515b5eeab8f2987614d2b1db83ef03542"
+uuid = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
+version = "0.6.3"
+
+    [deps.BlackBoxOptim.extensions]
+    BlackBoxOptimRealtimePlotServerExt = ["HTTP", "Sockets"]
+
+    [deps.BlackBoxOptim.weakdeps]
+    HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+    Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
+
 [[deps.BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
 git-tree-sha1 = "a8c0f363186263d75e97a41878d10dd842797561"
@@ -2507,15 +2623,50 @@ git-tree-sha1 = "5a97e67919535d6841172016c9530fd69494e5ec"
 uuid = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
 version = "0.2.6"
 
+[[deps.CPUTime]]
+git-tree-sha1 = "2dcc50ea6a0a1ef6440d6eecd0fe3813e5671f45"
+uuid = "a9c8d775-2e2e-55fc-8582-045d282d599e"
+version = "1.0.0"
+
+[[deps.CSV]]
+deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
+git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
+uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+version = "0.10.15"
+
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
-git-tree-sha1 = "1713c74e00545bfe14605d2a2be1712de8fbcb58"
+git-tree-sha1 = "06ee8d1aa558d2833aa799f6f0b31b30cada405f"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.25.1"
+version = "1.25.2"
 weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.Clapeyron]]
+deps = ["BlackBoxOptim", "CSV", "DiffResults", "Downloads", "FillArrays", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "NLSolvers", "OrderedCollections", "PackedVectorsOfVectors", "PositiveFactorizations", "PrecompileTools", "Preferences", "Roots", "Scratch", "SparseArrays", "StableTasks", "StaticArrays", "Tables", "UUIDs"]
+git-tree-sha1 = "0d56a8934e5c15c2db23fd0074dc060ba26f7aeb"
+uuid = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+version = "0.6.14"
+
+    [deps.Clapeyron.extensions]
+    ClapeyronCoolPropExt = "CoolProp"
+    ClapeyronJutulDarcyExt = "JutulDarcy"
+    ClapeyronMetaheuristicsExt = "Metaheuristics"
+    ClapeyronMultiComponentFlashExt = "MultiComponentFlash"
+    ClapeyronSuperancillaries = "EoSSuperancillaries"
+    ClapeyronSymbolicsExt = "Symbolics"
+    ClapeyronUnitfulExt = "Unitful"
+
+    [deps.Clapeyron.weakdeps]
+    CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
+    EoSSuperancillaries = "c1bf003f-4e47-49d9-bdfd-5a4051db3c04"
+    JutulDarcy = "82210473-ab04-4dce-b31b-11573c4f8e0a"
+    Metaheuristics = "bcdb8e00-2c21-11e9-3065-2b553b22f898"
+    MultiComponentFlash = "35e5bd01-9722-4017-9deb-64a5d32478ff"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.CloseOpenIntervals]]
 deps = ["Static", "StaticArrayInterface"]
@@ -2528,6 +2679,12 @@ deps = ["InteractiveUtils", "UUIDs"]
 git-tree-sha1 = "062c5e1a5bf6ada13db96a4ae4749a4c2234f521"
 uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
 version = "1.3.9"
+
+[[deps.CodecZlib]]
+deps = ["TranscodingStreams", "Zlib_jll"]
+git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
+uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
+version = "0.7.8"
 
 [[deps.Combinatorics]]
 git-tree-sha1 = "8010b6bb3388abe68d95743dcbea77650bb2eddf"
@@ -2558,9 +2715,9 @@ version = "1.0.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
-git-tree-sha1 = "8ae8d32e09f0dcf42a36b90d4e17f5dd2e4c4215"
+git-tree-sha1 = "3a3dfb30697e96a440e4149c8c51bf32f818c0f3"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "4.16.0"
+version = "4.17.0"
 weakdeps = ["Dates", "LinearAlgebra"]
 
     [deps.Compat.extensions]
@@ -2641,9 +2798,9 @@ version = "1.11.0"
 
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
-git-tree-sha1 = "2d87d7bd165c1ca0d11923a9fabe90a9d71e88a6"
+git-tree-sha1 = "e263203658fe1ad956c0e343c419e8d54bdbb2fc"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.176.0"
+version = "6.177.1"
 
     [deps.DiffEqBase.extensions]
     DiffEqBaseCUDAExt = "CUDA"
@@ -2681,9 +2838,9 @@ version = "6.176.0"
 
 [[deps.DiffEqCallbacks]]
 deps = ["ConcreteStructs", "DataStructures", "DiffEqBase", "DifferentiationInterface", "Functors", "LinearAlgebra", "Markdown", "RecipesBase", "RecursiveArrayTools", "SciMLBase", "StaticArraysCore"]
-git-tree-sha1 = "76292e889472e810d40a844b714743c0ffb1c53b"
+git-tree-sha1 = "80a782f3e65d4900dcf5f2cb71f5e19d9459c04a"
 uuid = "459566f4-90b8-5000-8ac3-15dfb0a30def"
-version = "4.6.0"
+version = "4.8.0"
 
 [[deps.DiffEqNoiseProcess]]
 deps = ["DiffEqBase", "Distributions", "GPUArraysCore", "LinearAlgebra", "Markdown", "Optim", "PoissonRandom", "QuadGK", "Random", "Random123", "RandomNumbers", "RecipesBase", "RecursiveArrayTools", "ResettableStacks", "SciMLBase", "StaticArraysCore", "Statistics"]
@@ -2711,9 +2868,9 @@ version = "1.15.1"
 
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
-git-tree-sha1 = "c8d85ecfcbaef899308706bebdd8b00107f3fb43"
+git-tree-sha1 = "210933c93f39f832d92f9efbbe69a49c453db36d"
 uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
-version = "0.6.54"
+version = "0.7.1"
 
     [deps.DifferentiationInterface.extensions]
     DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
@@ -2761,9 +2918,9 @@ version = "0.6.54"
 
 [[deps.DispatchDoctor]]
 deps = ["MacroTools", "Preferences"]
-git-tree-sha1 = "f311fe66bfe4e38b2f1c8d1081f06920092b57aa"
+git-tree-sha1 = "fc34127e78323c49984e1a146d577d0f890dd2b4"
 uuid = "8d63f2c5-f18a-4cf2-ba9d-b3f60fc568c8"
-version = "0.4.19"
+version = "0.4.26"
 weakdeps = ["ChainRulesCore", "EnzymeCore"]
 
     [deps.DispatchDoctor.extensions]
@@ -2873,15 +3030,16 @@ uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 version = "0.3.2"
 
 [[deps.FastPower]]
-git-tree-sha1 = "df32f07f373f06260cd6af5371385b5ef85dd762"
+git-tree-sha1 = "5f7afd4b1a3969dc34d692da2ed856047325b06e"
 uuid = "a4df4552-cc26-4903-aec0-212e50a0e84b"
-version = "1.1.2"
+version = "1.1.3"
 
     [deps.FastPower.extensions]
     FastPowerEnzymeExt = "Enzyme"
     FastPowerForwardDiffExt = "ForwardDiff"
     FastPowerMeasurementsExt = "Measurements"
     FastPowerMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    FastPowerMooncakeExt = "Mooncake"
     FastPowerReverseDiffExt = "ReverseDiff"
     FastPowerTrackerExt = "Tracker"
 
@@ -2890,8 +3048,20 @@ version = "1.1.2"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
     MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
+[[deps.FilePathsBase]]
+deps = ["Compat", "Dates"]
+git-tree-sha1 = "3bab2c5aa25e7840a4b065805c0cdfc01f3068d2"
+uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
+version = "0.9.24"
+weakdeps = ["Mmap", "Test"]
+
+    [deps.FilePathsBase.extensions]
+    FilePathsBaseMmapExt = "Mmap"
+    FilePathsBaseTestExt = "Test"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -3040,9 +3210,9 @@ version = "1.4.4"
     Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [[deps.IntegerMathUtils]]
-git-tree-sha1 = "b8ffb903da9f7b8cf695a8bead8e01814aa24b30"
+git-tree-sha1 = "4c1acff2dc6b6967e7e750633c50bc3b8d83e617"
 uuid = "18e54dd8-cb9d-406c-a71d-865a43cbb235"
-version = "0.1.2"
+version = "0.1.3"
 
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
@@ -3086,6 +3256,12 @@ git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.2.4"
 
+[[deps.IterativeSolvers]]
+deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
+git-tree-sha1 = "59545b0a2b27208b0650df0a46b8e3019f85055b"
+uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
+version = "0.9.4"
+
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
@@ -3096,6 +3272,24 @@ deps = ["Artifacts", "Preferences"]
 git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.0"
+
+[[deps.JSON]]
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+version = "0.21.4"
+
+[[deps.JSON3]]
+deps = ["Dates", "Mmap", "Parsers", "PrecompileTools", "StructTypes", "UUIDs"]
+git-tree-sha1 = "411eccfe8aba0814ffa0fdf4860913ed09c34975"
+uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+version = "1.14.3"
+
+    [deps.JSON3.extensions]
+    JSON3ArrowExt = ["ArrowTypes"]
+
+    [deps.JSON3.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
 
 [[deps.Jieko]]
 deps = ["ExproniconLite"]
@@ -3121,10 +3315,10 @@ uuid = "70703baa-626e-46a2-a12c-08ffd08c73b4"
 version = "0.4.10"
 
 [[deps.JumpProcesses]]
-deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
-git-tree-sha1 = "fb7fd516de38db80f50fe15e57d44da2836365e7"
+deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RecursiveArrayTools", "Reexport", "SciMLBase", "Setfield", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
+git-tree-sha1 = "f8da88993c914357031daf0023f18748ff473924"
 uuid = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
-version = "9.16.0"
+version = "9.16.1"
 weakdeps = ["FastBroadcast"]
 
 [[deps.Krylov]]
@@ -3237,9 +3431,9 @@ version = "1.11.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
-git-tree-sha1 = "c0d1a91a50af6778863d320761f807f641f74935"
+git-tree-sha1 = "062c11f1d84ffc80d00fddaa515f7e37e8e9f9d5"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.17.0"
+version = "3.18.2"
 
     [deps.LinearSolve.extensions]
     LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -3249,6 +3443,7 @@ version = "3.17.0"
     LinearSolveEnzymeExt = "EnzymeCore"
     LinearSolveFastAlmostBandedMatricesExt = "FastAlmostBandedMatrices"
     LinearSolveFastLapackInterfaceExt = "FastLapackInterface"
+    LinearSolveForwardDiffExt = "ForwardDiff"
     LinearSolveHYPREExt = "HYPRE"
     LinearSolveIterativeSolversExt = "IterativeSolvers"
     LinearSolveKernelAbstractionsExt = "KernelAbstractions"
@@ -3267,6 +3462,7 @@ version = "3.17.0"
     EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
     FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
     FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
     IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
     KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
@@ -3350,9 +3546,9 @@ version = "1.11.0"
 
 [[deps.ModelingToolkit]]
 deps = ["ADTypes", "AbstractTrees", "ArrayInterface", "BlockArrays", "ChainRulesCore", "Combinatorics", "CommonSolve", "Compat", "ConstructionBase", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DiffEqNoiseProcess", "DiffRules", "DifferentiationInterface", "Distributed", "Distributions", "DocStringExtensions", "DomainSets", "DynamicQuantities", "EnumX", "ExprTools", "FindFirstFunctions", "ForwardDiff", "FunctionWrappers", "FunctionWrappersWrappers", "Graphs", "ImplicitDiscreteSolve", "InteractiveUtils", "JuliaFormatter", "JumpProcesses", "Latexify", "Libdl", "LinearAlgebra", "MLStyle", "Moshi", "NaNMath", "NonlinearSolve", "OffsetArrays", "OrderedCollections", "OrdinaryDiffEqCore", "PrecompileTools", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SCCNonlinearSolve", "SciMLBase", "SciMLPublic", "SciMLStructures", "Serialization", "Setfield", "SimpleNonlinearSolve", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "SymbolicUtils", "Symbolics", "URIs", "UnPack", "Unitful"]
-git-tree-sha1 = "2c61ddac64df1c7a629b8b222c144e9cbb064453"
+git-tree-sha1 = "b08ce77612d4f32f08a77f7d00cc8e512a0ef153"
 uuid = "961ee093-0014-501f-94e3-6117800e7a78"
-version = "10.2.0"
+version = "10.8.0"
 
     [deps.ModelingToolkit.extensions]
     MTKBifurcationKitExt = "BifurcationKit"
@@ -3361,6 +3557,7 @@ version = "10.2.0"
     MTKFMIExt = "FMI"
     MTKInfiniteOptExt = "InfiniteOpt"
     MTKLabelledArraysExt = "LabelledArrays"
+    MTKPyomoDynamicOptExt = "Pyomo"
 
     [deps.ModelingToolkit.weakdeps]
     BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
@@ -3369,12 +3566,13 @@ version = "10.2.0"
     FMI = "14a09403-18e3-468f-ad8a-74f8dda2d9ac"
     InfiniteOpt = "20393b10-9daf-11e9-18c9-8db751c92c57"
     LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
+    Pyomo = "0e8e1daf-01b5-4eba-a626-3897743a3816"
 
 [[deps.MonteCarloMeasurements]]
 deps = ["Distributions", "GenericSchur", "LinearAlgebra", "MacroTools", "Random", "SLEEFPirates", "StaticArrays", "Statistics", "StatsBase"]
-git-tree-sha1 = "e9f946f013632de7ba4f399bbdc339bbb28cc4ec"
+git-tree-sha1 = "de98932a1016cbd6c926ed76b3e740a46b153c70"
 uuid = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
-version = "1.4.6"
+version = "1.4.7"
 
     [deps.MonteCarloMeasurements.extensions]
     ForwardDiffExt = "ForwardDiff"
@@ -3392,9 +3590,9 @@ version = "1.4.6"
 
 [[deps.Moshi]]
 deps = ["ExproniconLite", "Jieko"]
-git-tree-sha1 = "453de0fc2be3d11b9b93ca4d0fddd91196dcf1ed"
+git-tree-sha1 = "53f817d3e84537d84545e0ad749e483412dd6b2a"
 uuid = "2e0e35c7-a2e4-4343-998d-7ef72827ed2d"
-version = "0.3.5"
+version = "0.3.7"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
@@ -3416,6 +3614,12 @@ deps = ["LinearAlgebra", "SparseArrays", "Test"]
 git-tree-sha1 = "491bdcdc943fcbc4c005900d7463c9f216aabf4c"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
 version = "1.6.4"
+
+[[deps.NLSolvers]]
+deps = ["IterativeSolvers", "LinearAlgebra", "PositiveFactorizations", "Printf", "Statistics"]
+git-tree-sha1 = "78a8c11e01b159a546495dae68aa7f787547b75f"
+uuid = "337daf1e-9722-11e9-073e-8b9effe078ba"
+version = "0.5.0"
 
 [[deps.NLSolversBase]]
 deps = ["ADTypes", "DifferentiationInterface", "Distributed", "FiniteDiff", "ForwardDiff"]
@@ -3559,13 +3763,17 @@ version = "1.8.1"
 
 [[deps.OrdinaryDiffEqCore]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "EnumX", "FastBroadcast", "FastClosures", "FastPower", "FillArrays", "FunctionWrappersWrappers", "InteractiveUtils", "LinearAlgebra", "Logging", "MacroTools", "MuladdMacro", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleUnPack", "Static", "StaticArrayInterface", "StaticArraysCore", "SymbolicIndexingInterface", "TruncatedStacktraces"]
-git-tree-sha1 = "08dac9c6672a4548439048089bac293759a897fd"
+git-tree-sha1 = "1bd20b621e8dee5f2d170ae31631bf573ab77eec"
 uuid = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
-version = "1.26.1"
-weakdeps = ["EnzymeCore"]
+version = "1.26.2"
 
     [deps.OrdinaryDiffEqCore.extensions]
     OrdinaryDiffEqCoreEnzymeCoreExt = "EnzymeCore"
+    OrdinaryDiffEqCoreMooncakeExt = "Mooncake"
+
+    [deps.OrdinaryDiffEqCore.weakdeps]
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -3573,11 +3781,22 @@ git-tree-sha1 = "f07c06228a1c670ae4c87d1276b92c7c597fdda0"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
 version = "0.11.35"
 
+[[deps.PackedVectorsOfVectors]]
+git-tree-sha1 = "78a46960967e9e37f81dbf7f61b45b0159637afe"
+uuid = "7713531c-48ef-4bdd-9821-9ff7a8736089"
+version = "0.1.2"
+
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
 uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 version = "0.12.3"
+
+[[deps.Parsers]]
+deps = ["Dates", "PrecompileTools", "UUIDs"]
+git-tree-sha1 = "7d2f8f21da5db6a806faf7b9b292296da42b2810"
+uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+version = "2.8.3"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
@@ -3703,13 +3922,14 @@ version = "1.3.4"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "2e154f7d7e38db1af0a14ec751aba33360c3bef9"
+git-tree-sha1 = "efc718978d97745c58e69c5115a35c51a080e45e"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "3.33.0"
+version = "3.34.1"
 
     [deps.RecursiveArrayTools.extensions]
     RecursiveArrayToolsFastBroadcastExt = "FastBroadcast"
     RecursiveArrayToolsForwardDiffExt = "ForwardDiff"
+    RecursiveArrayToolsKernelAbstractionsExt = "KernelAbstractions"
     RecursiveArrayToolsMeasurementsExt = "Measurements"
     RecursiveArrayToolsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
     RecursiveArrayToolsReverseDiffExt = ["ReverseDiff", "Zygote"]
@@ -3721,6 +3941,7 @@ version = "3.33.0"
     [deps.RecursiveArrayTools.weakdeps]
     FastBroadcast = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
     MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
@@ -3758,6 +3979,26 @@ git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
 uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
 version = "0.5.1+0"
 
+[[deps.Roots]]
+deps = ["Accessors", "CommonSolve", "Printf"]
+git-tree-sha1 = "668e411c0616a70860249b4c96e5d35296631a1d"
+uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+version = "2.2.8"
+
+    [deps.Roots.extensions]
+    RootsChainRulesCoreExt = "ChainRulesCore"
+    RootsForwardDiffExt = "ForwardDiff"
+    RootsIntervalRootFindingExt = "IntervalRootFinding"
+    RootsSymPyExt = "SymPy"
+    RootsSymPyPythonCallExt = "SymPyPythonCall"
+
+    [deps.Roots.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    IntervalRootFinding = "d2bf35a9-74e0-55ec-b149-d360ff49b807"
+    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+    SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
+
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
 git-tree-sha1 = "86a8a8b783481e1ea6b9c91dd949cb32191f8ab4"
@@ -3766,9 +4007,9 @@ version = "0.5.15"
 
 [[deps.SCCNonlinearSolve]]
 deps = ["CommonSolve", "PrecompileTools", "Reexport", "SciMLBase", "SymbolicIndexingInterface"]
-git-tree-sha1 = "5e67b56af8615d1b47720fdc04e34482279c4559"
+git-tree-sha1 = "80d305585f80e7a3a93816495a7825b3a0bd699f"
 uuid = "9dfe8606-65a1-4bb3-9748-cb89d1561431"
-version = "1.2.0"
+version = "1.3.1"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -3787,9 +4028,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "04bbcdc8d1f7d6f667f75fbcc68728231e21fabe"
+git-tree-sha1 = "31587e20cdea9fba3a689033313e658dfc9aae78"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.101.0"
+version = "2.102.1"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -3839,6 +4080,12 @@ deps = ["ArrayInterface"]
 git-tree-sha1 = "566c4ed301ccb2a44cbd5a27da5f885e0ed1d5df"
 uuid = "53ae85a6-f571-4167-b2af-e1d143709226"
 version = "1.7.0"
+
+[[deps.Scratch]]
+deps = ["Dates"]
+git-tree-sha1 = "9b81b8393e50b7d4e6d0a9f14e192294d3b7c109"
+uuid = "6c6a2e73-6563-6170-7368-637461726353"
+version = "1.3.0"
 
 [[deps.SentinelArrays]]
 deps = ["Dates", "Random"]
@@ -3907,17 +4154,24 @@ version = "1.11.0"
 
 [[deps.SparseMatrixColorings]]
 deps = ["ADTypes", "DocStringExtensions", "LinearAlgebra", "PrecompileTools", "Random", "SparseArrays"]
-git-tree-sha1 = "ab958b4fec46d1f1d057bb8e2a99bfdb90744646"
+git-tree-sha1 = "9de43e0b9b976f1019bf7a879a686c4514520078"
 uuid = "0a514795-09f3-496d-8182-132a7b665d35"
-version = "0.4.20"
+version = "0.4.21"
 
     [deps.SparseMatrixColorings.extensions]
+    SparseMatrixColoringsCUDAExt = "CUDA"
     SparseMatrixColoringsCliqueTreesExt = "CliqueTrees"
     SparseMatrixColoringsColorsExt = "Colors"
 
     [deps.SparseMatrixColorings.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
     Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+
+[[deps.SpatialIndexing]]
+git-tree-sha1 = "84efe17c77e1f2156a7a0d8a7c163c1e1c7bdaed"
+uuid = "d4ead438-fe20-5cc5-a293-4fd39a41b74c"
+version = "0.1.6"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
@@ -3928,6 +4182,11 @@ weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
     SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
+
+[[deps.StableTasks]]
+git-tree-sha1 = "c4f6610f85cb965bee5bfafa64cbeeda55a4e0b2"
+uuid = "91464d47-22a1-43fe-8b7f-2d57ee82463f"
+version = "0.1.7"
 
 [[deps.Static]]
 deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools"]
@@ -4007,6 +4266,12 @@ git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
 uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
 version = "0.4.1"
 
+[[deps.StructTypes]]
+deps = ["Dates", "UUIDs"]
+git-tree-sha1 = "159331b30e94d7b11379037feeb9b690950cace8"
+uuid = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
+version = "1.11.0"
+
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
@@ -4018,9 +4283,9 @@ version = "7.7.0+0"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "PrettyTables", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "b6a641e38efa01355aa721246dd246e10c7dcd4d"
+git-tree-sha1 = "658f6d01bfe68d6bf47915bf5d868228138c7d71"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.40"
+version = "0.3.41"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils"]
@@ -4044,9 +4309,9 @@ version = "3.29.0"
 
 [[deps.Symbolics]]
 deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "LaTeXStrings", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "OffsetArrays", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
-git-tree-sha1 = "3d9551301d9ecdb8c193aac2ed0a3efc303494ca"
+git-tree-sha1 = "df665535546bb07078ee42e0972527b5d6bd3f69"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "6.41.0"
+version = "6.43.0"
 
     [deps.Symbolics.extensions]
     SymbolicsForwardDiffExt = "ForwardDiff"
@@ -4124,6 +4389,11 @@ version = "0.5.29"
     [deps.TimerOutputs.weakdeps]
     FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 
+[[deps.TranscodingStreams]]
+git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.11.3"
+
 [[deps.Tricks]]
 git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
@@ -4136,9 +4406,9 @@ uuid = "781d530d-4396-4725-bb49-402e4bee1e77"
 version = "1.4.0"
 
 [[deps.URIs]]
-git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
+git-tree-sha1 = "bef26fb046d031353ef97a82e3fdb6afe7f21b1a"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.5.2"
+version = "1.6.1"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
@@ -4179,10 +4449,21 @@ git-tree-sha1 = "4ab62a49f1d8d9548a1c8d1a75e5f55cf196f64e"
 uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 version = "0.21.71"
 
+[[deps.WeakRefStrings]]
+deps = ["DataAPI", "InlineStrings", "Parsers"]
+git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
+uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
+version = "1.4.2"
+
 [[deps.WeakValueDicts]]
 git-tree-sha1 = "98528c2610a5479f091d470967a25becfd83edd0"
 uuid = "897b6980-f191-5a31-bcb0-bf3c4585e0c1"
 version = "0.1.0"
+
+[[deps.WorkerUtilities]]
+git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"
+uuid = "76eceee3-57b5-4d4a-8e66-0e911cebbf60"
+version = "1.6.1"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
@@ -4218,16 +4499,12 @@ version = "17.4.0+2"
 # ╠═1499b12a-8a87-4354-b4b5-d181ffd63f1b
 # ╠═fa83b49d-d4ad-470a-88f8-524ae0e3191f
 # ╠═3ef17b0f-7ba5-4cef-98fe-2abf3711c907
+# ╠═00996e13-d7a2-4f9e-be84-4eec83428486
 # ╠═734d74db-7b19-42fd-89ad-78816a939565
 # ╠═004dd778-a212-4147-a9c0-ad60f1eb539b
-# ╠═e31e4221-54e9-4049-b80e-eca118e9bb00
-# ╠═00996e13-d7a2-4f9e-be84-4eec83428486
-# ╠═eacfb867-b8fe-4166-84df-038848a9d837
-# ╠═2ab2c592-3e29-4031-8d19-8856f3cdbc6e
 # ╟─63cf7ccc-e17f-48d7-bbf9-2419a6ebe336
 # ╟─6d536fb0-e23f-4d51-8839-8d9dc2422cbd
 # ╠═96465cb7-82db-4287-bdb7-9260d39e12ef
-# ╠═e31c8c25-3ca9-43cd-a865-5c1500677c24
 # ╠═917d72da-5985-42b2-a079-9dd14b97a791
 # ╠═b2fdf520-379d-426a-8271-7170ee7c7ea5
 # ╠═1e443538-f5b0-4de7-8ec1-df8737e5ba70
@@ -4263,13 +4540,20 @@ version = "17.4.0+2"
 # ╠═5cf6a034-9868-448e-9a6b-0c607d49194e
 # ╠═eb386e80-6a11-4b38-b55a-50bbad670474
 # ╠═07f01adf-8cc7-4a40-aa14-a90cef491b95
+# ╠═e31e4221-54e9-4049-b80e-eca118e9bb00
+# ╠═eacfb867-b8fe-4166-84df-038848a9d837
+# ╠═2ab2c592-3e29-4031-8d19-8856f3cdbc6e
+# ╠═9c973317-fb75-4949-b50d-558df127bc2e
 # ╠═11823168-8288-49db-88e8-319df4535273
-# ╠═d01db8eb-17dc-405e-b566-63fa0e86682b
+# ╠═fcfeffb2-35aa-4209-a495-ce79949d08e0
+# ╠═93114c1c-393c-4569-bcad-936ad8938e44
 # ╠═86eeb20e-7da2-489d-84af-317f31f63ef4
+# ╠═d01db8eb-17dc-405e-b566-63fa0e86682b
 # ╠═9418798c-4603-498a-ab7a-a45d509aa67f
 # ╠═42bda7b4-ea1c-4717-a514-a6d97aa68f93
 # ╠═1bd62dd3-e84e-4e0b-8731-890cc33286b8
 # ╠═2d05d7cf-fa80-4552-a2ca-a5ceac3939f1
+# ╠═1cd23922-87fb-4ea0-88bc-7d1224911868
 # ╠═6e831997-cf76-4ea4-815f-8f5ffd48d3e1
 # ╠═e8abe6ea-9eda-4f83-abdc-da2bd91dd26a
 # ╠═6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
