@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.8
+# v0.20.13
 
 using Markdown
 using InteractiveUtils
@@ -193,16 +193,16 @@ function ExpansionValve(; name,
 	ps = @parameters begin
 	end
 	sts = @variables begin
-		p_i = 3e5
-		p_o = 1e5
+		logp_i = log(3e5)
+		logp_o = log(1e5)
 	end
 	
 	@named i = Properties.RefrigerantProps(fluid = fluid)
 	@named o = Properties.RefrigerantProps(fluid = fluid)
 	
 	eqs = [
-		p_i ~ i.p,
-		p_o ~ o.p,
+		logp_i ~ i.logp,
+		logp_o ~ o.logp,
 		i.h ~ o.h, # isenthalpic
 	    ];
 	
@@ -219,8 +219,8 @@ function test_expansion()
 
 	eqs=[
 		exp.i.h ~ 400e3,
-		exp.i.p ~ 5e5,
-		exp.o.p ~ 1e5,
+		exp.i.logp ~ log(5e5),
+		exp.o.logp ~ log(1e5),
     ]
 
     
@@ -261,6 +261,8 @@ function Compressor(; name,
 		W = 0.0
 		V̇ = 1.0
 		ṁ = 1.0
+		logp_i = log(1e5)
+		logp_o = log(10e5)
 	end
 	
 	@named i = Properties.RefrigerantProps(fluid = fluid)
@@ -275,7 +277,9 @@ function Compressor(; name,
 		
 		# Efficiency definition: ratio of the isentropic enthalpy change to the actual enthalpy change.
 		η_is*(o.h - i.h) ~ (o_is.h - i.h),
-	
+
+		logp_i ~ i.logp,
+		
 		ṁ ~ V̇ * i.ρ,
 		
 		V̇ ~ f*V,
@@ -283,7 +287,9 @@ function Compressor(; name,
 		W ~ ṁ*(o.h-i.h),
 
 		# Enforce the isentropic condition:
-		o_is.p ~ o.p,		
+		logp_o ~ o.logp,
+		
+		o_is.logp ~ o.logp,		
 		o_is.s ~ i.s,
 	    ];
 	
@@ -302,8 +308,8 @@ function test_compressor()
 		compressor.ṁ ~ 0.03,
 		#compressor.f ~ 50,
 		compressor.i.h ~ 400e3,
-		compressor.i.p ~ 2.8e5,
-		compressor.o.p ~ 7e5,
+		compressor.logp_i ~ log(2.8e5),
+		compressor.logp_o ~ log(10e5),
     ]
 
     
@@ -863,7 +869,7 @@ function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
         # refrigerant inlet/outlet enthalpies
         h2i = 300e3
         h2o = 300e3
-        logpref = 1e5
+        logpref = log(1e5)
     end
 
     # ——— Subsystems ———
@@ -875,7 +881,6 @@ function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
     # ——— Derived expressions ———
     ṁ_1 = exp(γṁ_1)
     ṁ_2 = exp(γṁ_2)
-	pref = exp(logpref)
     dh   = 2*b
 
 
@@ -885,7 +890,7 @@ function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
         A           ~ L*np*W*ϕ,
         A           ~ base.A,
 
-		propref.p ~ pref,
+		propref.logp ~ logpref,
 		propref.h ~ h2i,
 		
         # property temperatures mapping
@@ -1286,7 +1291,6 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     ṁ_1 = exp(γṁ_1)
     ṁ_2 = exp(γṁ_2)
 	D_h = 2b/ϕ
-	p_2 = exp(logp_2)
 	CS = np*b*W
 
     # ——— Equations ———
@@ -1304,7 +1308,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
         base.T_2     ~ propref.Tsat,     # refrigerant bulk = saturation T
         T_2          ~ base.T_2,
         propref.h       ~ h2i,           # set to inlet enthalpy for sat props
-        propref.p       ~ p_2,           # 
+        propref.logp       ~ logp_2,           # 
 
         # capacity rates (incompressible only)
         base.C_1     ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
@@ -1578,7 +1582,7 @@ function Evaporator(; name,
         T_out_2 = 280.0
         T_evap = 280.0
         
-		logp_2 = 1e5
+		logp_2 = log(1e5)
 
 		Q = 3000
     end
@@ -1697,11 +1701,11 @@ function test_ev()
     prob = NonlinearProblem(simplified, [])
 
 	solver = NewtonRaphson(; 
-		#linesearch = BackTracking(; maxstep=20), 
+		linesearch = BackTracking(; maxstep=20), 
 	#	autodiff = AutoFiniteDiff()
 	)
 
-	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
+	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-5)
 	#sol = NonlinearSolve.solve(prob, abstol = 1e-6)
 
     println("=== Plate HX with Properties Test ===")
@@ -1748,6 +1752,179 @@ sol_evap.resid
 # ╔═╡ c81e49af-a294-45d2-b2fd-c605dad70ef3
 sol_evap.stats
 
+# ╔═╡ ce1878e3-470d-432b-a624-495ad5c22dcd
+function test_evaporator_plus_compressor_step1()
+    @named hx = Evaporator()
+    @named compressor = Compressor()
+
+    eqs = [
+        # ===== EXACT WORKING EVAPORATOR SETUP =====
+        hx.b ~ 0.002,
+        hx.np ~ 25,
+        hx.W ~ 0.10,
+        hx.ϕ ~ 1.2,
+        hx.β ~ π/6,
+        hx.th ~ 0.5e-3,
+        hx.λ_pl ~ 16,
+        hx.λ_pitch ~ 4e-3,
+        hx.χ ~ 0.28,
+        hx.L ~ 0.2,
+        
+        # Working evaporator constraints
+        hx.γṁ_2 ~ log(0.025),
+        hx.T_in_1 ~ 273.15 + 10,
+        hx.T_out_1 ~ hx.T_in_1 - 3,
+        hx.h2i ~ hx.ev.propref.hb,
+        hx.T_out_2 ~ hx.T_evap + 7,
+        
+        # ===== SIMPLIFIED COMPRESSOR CONNECTION =====
+        # Instead of complex connections, set compressor independently first
+        compressor.ṁ ~ 0.025,                    # Match evaporator mass flow directly
+        compressor.logp_i ~ hx.logp_2,          # Pressure connection only
+        compressor.i.h ~ hx.h2o,                # Enthalpy connection
+        compressor.logp_o ~ log(10e5),          # Outlet pressure
+    ]
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], []; name=:test_step1), [hx, compressor])
+    simplified = structural_simplify(sys)
+    prob = NonlinearProblem(simplified, [])
+
+    # Use VERY conservative solver - no line search, no aggressive AD
+    solver = NewtonRaphson(; 
+        linesearch = BackTracking(; maxstep=20), 
+        #autodiff = AutoFiniteDiff()  # Use finite diff instead of ForwardDiff
+    )
+
+    sol = NonlinearSolve.solve(prob, solver, abstol = 1e-5)
+
+    println("=== Step 1 Conservative: Evaporator + Compressor ===")
+    println("Return code: ", sol.retcode)
+    
+    return sol
+end
+
+# ╔═╡ 6e1ba7bc-2911-410f-aa26-abef8f7a61c8
+test_evaporator_plus_compressor_step1()
+
+# ╔═╡ 26076121-f686-4574-92f5-a001b34ce8da
+function test_evaporator_plus_compressor_log_coupling()
+    @named hx = Evaporator()
+    @named compressor = Compressor()
+
+    eqs = [
+        # ===== EXACT WORKING EVAPORATOR SETUP =====
+        hx.b ~ 0.002,
+        hx.np ~ 25,
+        hx.W ~ 0.10,
+        hx.ϕ ~ 1.2,
+        hx.β ~ π/6,
+        hx.th ~ 0.5e-3,
+        hx.λ_pl ~ 16,
+        hx.λ_pitch ~ 4e-3,
+        hx.χ ~ 0.28,
+        hx.L ~ 0.2,
+        
+        # Working evaporator constraints
+        hx.γṁ_2 ~ log(0.025),
+        hx.T_in_1 ~ 273.15 + 10,
+        hx.T_out_1 ~ hx.T_in_1 - 3,
+        hx.h2i ~ hx.ev.propref.hb,
+        hx.T_out_2 ~ hx.T_evap + 7,
+        
+        # ===== LOG-BASED MASS FLOW COUPLING =====
+        # Connect in log space (no exp operations in equations)
+        hx.γṁ_2 ~ log(compressor.ṁ),           # Mass flow coupling
+        compressor.logp_i ~ hx.logp_2,         # Pressure connection
+        compressor.i.h ~ hx.h2o,               # Enthalpy connection
+        compressor.logp_o ~ log(10e5),         # Outlet pressure
+    ]
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], []; name=:test_log), [hx, compressor])
+    simplified = structural_simplify(sys)
+    prob = NonlinearProblem(simplified, [])
+
+    solver = NewtonRaphson(; 
+        autodiff = AutoFiniteDiff()
+    )
+
+    sol = NonlinearSolve.solve(prob, solver, abstol = 1e-5)
+    
+    println("=== Log Coupling Test ===")
+    println("Return code: ", sol.retcode)
+    if SciMLBase.successful_retcode(sol)
+        println("✓ SUCCESS with log coupling!")
+        println("Mass flow: ", exp(sol[hx.γṁ_2]), " kg/s")
+        println("Compressor freq: ", sol[compressor.f], " Hz")
+    end
+    
+    return sol
+end
+
+# ╔═╡ 9b977aac-6eb7-42d5-8bae-ec847bde767b
+test_evaporator_plus_compressor_log_coupling()
+
+# ╔═╡ 3ad2a111-67a2-49ae-926c-b379dea54df4
+function test_evaporator_plus_compressor_direct_coupling_fixed()
+    @named hx = Evaporator()
+    @named compressor = Compressor()
+
+    eqs = [
+        # ===== EVAPORATOR SETUP =====
+        hx.b ~ 0.002,
+        hx.np ~ 25,
+        hx.W ~ 0.10,
+        hx.ϕ ~ 1.2,
+        hx.β ~ π/6,
+        hx.th ~ 0.5e-3,
+        hx.λ_pl ~ 16,
+        hx.λ_pitch ~ 4e-3,
+        hx.χ ~ 0.28,
+        hx.L ~ 0.2,
+        
+        # Fix evaporator mass flow (like the working test_ev)
+        hx.γṁ_2 ~ log(0.025),
+        hx.T_in_1 ~ 273.15 + 10,
+        hx.T_out_1 ~ hx.T_in_1 - 3,
+        hx.h2i ~ hx.ev.propref.hb,
+        hx.T_out_2 ~ hx.T_evap + 7,
+        
+        # ===== COUPLING =====
+        exp(hx.γṁ_2) ~ compressor.ṁ,           # Mass flow coupling
+        compressor.logp_i ~ hx.logp_2,         # Pressure connection
+        compressor.i.h ~ hx.h2o,               # Enthalpy connection
+        compressor.logp_o ~ log(10e5),         # Outlet pressure
+        # compressor.f ~ 50,                   # REMOVED - let frequency be solved
+    ]
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], []; name=:test_direct_fixed), [hx, compressor])
+    simplified = structural_simplify(sys)
+    prob = NonlinearProblem(simplified, [])
+
+    solver = NewtonRaphson(; 
+        autodiff = AutoFiniteDiff()
+    )
+
+    sol = NonlinearSolve.solve(prob, solver, abstol = 1e-5)
+    
+    println("=== Fixed Direct Coupling Test ===")
+    println("Return code: ", sol.retcode)
+    if SciMLBase.successful_retcode(sol)
+        println("✓ SUCCESS!")
+        println("Mass flow: ", sol[compressor.ṁ], " kg/s")
+        println("Compressor freq: ", sol[compressor.f], " Hz")
+        println("Evap Q: ", sol[hx.Q], " W")
+        println("Comp W: ", sol[compressor.W], " W")
+    end
+    
+    return sol
+end
+
+# ╔═╡ 2cbeeedd-8961-4aa4-9cbf-6c7db1c19343
+test_evaporator_plus_compressor_direct_coupling_fixed()
+
+# ╔═╡ 16f97f97-0d54-42f8-8241-a8993afe16d5
+
+
 # ╔═╡ 9b628eb9-cc22-496e-b0f9-0327e52fb0d1
 """
 
@@ -1763,7 +1940,7 @@ function ThermodynamicCycle(; name,
     # ——— State variables ———
     sts = @variables begin
 		T_i_b = 9+273.15
-		T_o_b = 9+273.15
+		T_o_b = 6+273.15
 		h_i_r = 200e3
 		h_o_r = 300e3
 		ΔTb = 3
@@ -1796,7 +1973,7 @@ function ThermodynamicCycle(; name,
         evaporator.T_in_1 ~ T_i_b,
         evaporator.T_out_1 ~ T_o_b,
         #evaporator.T_out_1 ~ evaporator.T_in_1 - ΔTb,
-        evaporator.h2i ~ evaporator.ev.propref.hd,
+        #evaporator.h2i ~ evaporator.ev.propref.hb,
         #hx.h2i ~ 300.0e3,
         evaporator.T_out_2 ~ evaporator.T_evap + ΔTSH,
 		#evaporator.p_2 ~ 2.8e5,
@@ -1805,11 +1982,11 @@ function ThermodynamicCycle(; name,
 		
 		#evaporator <-> compressor
 		logp_l ~ evaporator.logp_2,
-		logp_l ~ compressor.i.logp,
+		logp_l ~ compressor.logp_i,
 		evaporator.h2o ~ compressor.i.h,
 		
 		#compressor <-> condenser
-		logp_h ~ compressor.o.logp,
+		logp_h ~ compressor.logp_o,
 		logp_h ~ inlet_cond.logp,
 		compressor.o.h ~ inlet_cond.h,
 
@@ -1817,17 +1994,18 @@ function ThermodynamicCycle(; name,
 
 		#exp valve <-> evaporator
 		logp_h ~ inlet_exp.logp,
+		inlet_exp.T ~ inlet_exp.Tsat-7,
 		evaporator.h2i ~ inlet_exp.h,
 
-        exp(evaporator.γṁ_2)  ~ compressor.ṁ,
+        evaporator.γṁ_2  ~ log(compressor.ṁ),
 		ṁ_ref ~ compressor.ṁ,
 
 		W_comp ~ compressor.W,
 		Q_cond ~ compressor.ṁ*(inlet_exp.h - inlet_cond.h),
 		Q_evap ~ evaporator.Q,
 
-		
-		ṁ_sf ~ exp(evaporator.γṁ_1),
+		evaporator.γṁ_1 ~ log(ṁ_sf),
+		#log(ṁ_sf) ~ evaporator.γṁ_1,
 		
 		COP1 ~ -Q_cond/W_comp,
 
@@ -1864,9 +2042,9 @@ function test_thermodynamic_cycle()
 		cycle.T_i_b ~ 273.15+10,
 		cycle.ΔTb ~ 3,
 		cycle.ΔTSH ~ 7,
-		cycle.logp_h ~ (10e5),
-		#cycle.logp_l ~ log(2.8e5),
-		cycle.inlet_cond.h ~ 240e3,
+		cycle.logp_h ~ log(10e5),
+		cycle.logp_l ~ log(2.8e5),
+		#cycle.inlet_cond.h ~ 240e3,
     ]
 
     @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [cycle])
@@ -1874,9 +2052,10 @@ function test_thermodynamic_cycle()
     prob        = NonlinearProblem(simpl, [])
     #sol         = NonlinearSolve.solve(prob, abstol = 1e-6)
 	solver = NewtonRaphson(; 
-            linesearch = BackTracking(; maxstep=20), 
+            #linesearch = BackTracking(; maxstep=20), 
             autodiff = AutoFiniteDiff()
         )
+	solver = TrustRegion(autodiff = AutoFiniteDiff())
     sol         = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
 
     # ——— Debug prints ———
@@ -1898,17 +2077,20 @@ function test_thermodynamic_cycle()
     println("  • T_out_1 (liquid side exit)            = ", sol[cycle.evaporator.T_out_1], " K")
     println("  • T_evap (evaporating temp)             = ", sol[cycle.evaporator.T_evap], " K")
     println("  • T_out_2 (vapour side exit)            = ", sol[cycle.evaporator.T_out_2], " K")
-    println("  • evaporator.p_2 (evap outlet P)        = ", sol[cycle.evaporator.p_2], " Pa")
+    println("  • evaporator.p_2 (evap outlet P)        = ", exp(sol[cycle.evaporator.logp_2]), " Pa")
     println("  • evaporator.h2i (vapor enthalpy in)   = ", sol[cycle.evaporator.h2i], " J/kg")
     println("  • evaporator.h2i (vapor enthalpy dew)   = ", sol[cycle.evaporator.h2mid], " J/kg")
     println("  • evaporator.h2o (vapor enthalpy out)   = ", sol[cycle.evaporator.h2o], " J/kg")
     println("  • evaporator.ṁ_1 (log mass‐flow)       = ", exp(sol[cycle.evaporator.γṁ_2]), "kg/s")
     println("  • evaporator.ṁ_2 (log mass‐flow)       = ", exp(sol[cycle.evaporator.γṁ_1]), "kg/s")
     # — compressor ports & flow
-    println("  • compressor.i.p (inlet P)              = ", sol[cycle.compressor.i.p], " Pa")
     println("  • compressor.i.h (inlet h)              = ", sol[cycle.compressor.i.h], " J/kg")
-    println("  • compressor.o.p (outlet P)             = ", sol[cycle.compressor.o.p], " Pa")
     println("  • compressor.o.h (outlet h)             = ", sol[cycle.compressor.o.h], " J/kg")
+
+	
+	# Should be:
+	println("  • compressor.i.p (inlet P)              = ", exp(sol[cycle.compressor.i.logp]), " Pa")
+	println("  • compressor.o.p (outlet P)             = ", exp(sol[cycle.compressor.o.logp]), " Pa")
     println("  • ṁ_compressor (mass flow)              = ", sol[cycle.compressor.ṁ], " kg/s")
     println("  • compressor.f (speed)                  = ", sol[cycle.compressor.f])
     # — condenser (refrigerant‐props) inlet
@@ -1930,6 +2112,9 @@ sol_cycle = test_thermodynamic_cycle()
 
 # ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
 sol_cycle.retcode
+
+# ╔═╡ 52e455ca-09f5-4db3-82b6-c4bcee0a00a2
+sol_cycle.resid
 
 # ╔═╡ 819264a6-e4b7-406c-9d97-8ac0f36c3ea8
 """
@@ -4348,8 +4533,16 @@ version = "17.4.0+2"
 # ╠═e8abe6ea-9eda-4f83-abdc-da2bd91dd26a
 # ╠═6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
 # ╠═c81e49af-a294-45d2-b2fd-c605dad70ef3
+# ╠═6e1ba7bc-2911-410f-aa26-abef8f7a61c8
+# ╠═ce1878e3-470d-432b-a624-495ad5c22dcd
+# ╠═9b977aac-6eb7-42d5-8bae-ec847bde767b
+# ╠═26076121-f686-4574-92f5-a001b34ce8da
+# ╠═2cbeeedd-8961-4aa4-9cbf-6c7db1c19343
+# ╠═3ad2a111-67a2-49ae-926c-b379dea54df4
+# ╠═16f97f97-0d54-42f8-8241-a8993afe16d5
 # ╠═9b628eb9-cc22-496e-b0f9-0327e52fb0d1
 # ╠═e09caba7-c987-4c7b-af32-beec786c2504
+# ╠═52e455ca-09f5-4db3-82b6-c4bcee0a00a2
 # ╠═ba5d7f7e-d8ab-4852-a7e3-ad7e9c0e1329
 # ╠═da834208-8f98-4527-924b-28ceb7587fdb
 # ╠═819264a6-e4b7-406c-9d97-8ac0f36c3ea8
