@@ -1792,39 +1792,12 @@ function make_evap_comp_prob()
     NonlinearProblem(simp, [])            # <-- no u0/p here yet
 end
 
-# ╔═╡ fddf235e-b540-4bc9-99d6-b75a7c49bdf6
-"""
-    solve_with_cache(prob; solver=TrustRegion(autodiff=AutoFiniteDiff()),
-                          sol=nothing,
-                          kwargs...)
-
-Solve `prob` with `solver`, passing through any `kwargs` to `solve`.  
-If you pass a previous `sol` (a `NonlinearSolution`), its `.u` is used as the new `u0` for a warm start.
-"""
-function solve_with_cache(prob;
-                          solver = TrustRegion(autodiff = AutoFiniteDiff()),
-                          sol    = nothing,
-                          kwargs...)
-    # pick up last solution vector if given
-    u0 = isnothing(sol) ? nothing : sol.u
-
-    # delegate to NonlinearSolve.solve
-    return solve(prob, solver; u0 = u0, kwargs...)
-end
-
-
 # ╔═╡ 6466aac2-8c05-4bea-a0bc-d2c4723529e0
 prob_1 = make_evap_comp_prob()
 
 # ╔═╡ 192d94f7-1dba-4ccf-8a14-7f1e090e84f5
 solver_1 = TrustRegion(autodiff = AutoFiniteDiff())
 
-
-# ╔═╡ e4f83718-32dd-4170-bfae-36c5edd28997
-sol_5 = NonlinearSolve.solve(prob_1, solver_1)
-
-# ╔═╡ e5614c61-6260-414f-b100-3a3683de0524
-sol_5.u
 
 # ╔═╡ 832139e7-83e3-496e-8e84-3499c4b9c04b
 function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
@@ -1843,13 +1816,23 @@ function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
 		χ = 0.28
         
         # Boundary/state variables
-        T_in_1 = 283.15   # 10°C
+        T_i_b = 283.15   # 10°C
+		T_o_b = T_i_b - 3
         logp_l = log(2e5)
         logp_h = log(10e5)
-        γṁ_2 = log(0.025) # Log-mass flow rate
+		γṁ_sf = log(0.4)
+		γṁ_ref = (0.04)
         f = 28.81         # Compressor frequency
-        h2i = 200e3       # Refrigerant inlet enthalpy
+        h_i_r = 200e3       # Refrigerant inlet enthalpy
+        h_o_r = 300e3       # Refrigerant inlet enthalpy
 
+		
+        #T_i_b ~ cycle.T_i_b,
+        #T_m_b ~ cycle.T_o_b,
+        #T_o_b ~ cycle.T_o_b,
+        #h_i_r ~ cycle.h_i_r,
+        #h_o_r ~ cycle.h_o_r,
+			
 		log_ΔTSH = log(7)
 		log_ΔTSC = log(3)
 		log_ΔTSF = log(3)
@@ -1884,27 +1867,31 @@ function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
         evaporator.χ ~ χ,
         
         # Evaporator boundary conditions
-        evaporator.T_in_1 ~ T_in_1,
-        evaporator.T_out_1 ~ T_in_1 - exp(log_ΔTSF),   # Fixed temperature drop
-        evaporator.h2i ~ h2i,
+        evaporator.T_in_1 ~ T_i_b,
+        evaporator.T_out_1 ~ T_o_b,
+		
+        evaporator.T_out_1 ~ T_i_b - exp(log_ΔTSF),   # Fixed temperature drop
+        evaporator.h2i ~ h_i_r,
+        evaporator.h2o ~ h_o_r,
         evaporator.T_out_2 ~ evaporator.T_evap + exp(log_ΔTSH),  # Superheat
         
         # Component coupling
-        exp(γṁ_2) ~ compressor.ṁ,           # Mass flow connection
+        exp(γṁ_ref) ~ compressor.ṁ,           # Mass flow connection
 		logp_l ~ compressor.logp_i,
         compressor.logp_i ~ evaporator.logp_2, # Pressure connection
         compressor.i.h ~ evaporator.h2o,       # Enthalpy connection
         compressor.logp_o ~ logp_h,           # Outlet pressure
         
-        h2i ~ outlet_cond.h,
+        h_i_r ~ outlet_cond.h,
 		
         # Compressor control
         compressor.f ~ f,
         
         # Connect to evaporator's mass flow
-        evaporator.γṁ_2 ~ γṁ_2,
+        evaporator.γṁ_2 ~ γṁ_ref,
+        evaporator.γṁ_1 ~ γṁ_sf,
 
-		inlet_evap.h ~ h2i,
+		inlet_evap.h ~ h_i_r,
 		inlet_evap.logp ~ logp_h,
 
 		inlet_comp.h ~ compressor.i.h,
@@ -1918,11 +1905,13 @@ function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
 
 		
 		
-		Q_evap ~ exp(γṁ_2) * (inlet_comp.h - inlet_evap.h),
-		W_comp ~ exp(γṁ_2) * (outlet_comp.h - inlet_comp.h),
-		Q_cond ~ exp(γṁ_2) * (outlet_cond.h - outlet_comp.h),
+		Q_evap ~ exp(γṁ_ref) * (inlet_comp.h - inlet_evap.h),
+		W_comp ~ exp(γṁ_ref) * (outlet_comp.h - inlet_comp.h),
+		Q_cond ~ exp(γṁ_ref) * (outlet_cond.h - outlet_comp.h),
 			
 		COP1 ~ -Q_cond/W_comp,
+
+
     ]
 
     # —— Assemble system ——
@@ -1949,7 +1938,7 @@ function test_thermodynamic_cycle()
         cycle.λ_pitch ~ 4e-3,
         cycle.χ ~ 0.28,
         cycle.L ~ 0.2,
-        cycle.T_in_1 ~ 283.15,
+        cycle.T_i_b ~ 283.15,
         cycle.logp_h ~ log(20e5),
 		
 		cycle.log_ΔTSH ~ log(7),
@@ -1963,7 +1952,7 @@ function test_thermodynamic_cycle()
     
     # Create proper initial guess for second system
     u0_second = [
-        cycle.γṁ_2 => log(0.043)  # Previous mass flow as initial guess
+        cycle.γṁ_ref => log(0.043)  # Previous mass flow as initial guess
         # Other variables will use default initial conditions
     ]
 
@@ -1981,13 +1970,13 @@ function test_thermodynamic_cycle()
     println(sol[cycle.COP1])
     println("Refrigerant")
 	
-    println(exp(sol[cycle.γṁ_2]))
+    println(exp(sol[cycle.γṁ_ref]))
     println(sol[cycle.inlet_comp.h])
     println(sol[cycle.inlet_evap.h])
     println(sol[cycle.outlet_comp.h])
     println(sol[cycle.outlet_cond.h])
     println("brine")
-    println(exp(sol[cycle.evaporator.γṁ_1]), " kg/s")
+    println(exp(sol[cycle.γṁ_sf]), " kg/s")
     println(sol[cycle.evaporator.T_in_1]-273.15, " C")
     println(sol[cycle.evaporator.T_mid_1]-273.15, " C")
     println(sol[cycle.evaporator.T_out_1]-273.15, " C")
@@ -2012,8 +2001,69 @@ sol_cycle.stats
 # ╔═╡ b12af1c4-53f5-49ed-94f9-dd9f8434bcf0
 sol_cycle.retcode
 
-# ╔═╡ fba39609-94ab-4a0d-bf40-4d995d6b7059
+# ╔═╡ f66a54da-5889-4dfb-a093-5a8eb8964b42
+# 1) Factor out your problem‐construction into its own function:
+function make_thermodynamic_cycle_prob()
+    refrigerant = "R134A"
+    fluid = "MEA"
 
+    @named cycle = ThermodynamicCycle(refrigerant=refrigerant, fluid=fluid)
+
+    # Second solve: Fixed frequency
+    eqs2 = [
+        cycle.b ~ 0.002,
+        cycle.np ~ 25,
+        cycle.W ~ 0.10,
+        cycle.ϕ ~ 1.2,
+        cycle.β ~ π/6,
+        cycle.th ~ 0.5e-3,
+        cycle.λ_pl ~ 16,
+        cycle.λ_pitch ~ 4e-3,
+        cycle.χ ~ 0.28,
+        cycle.L ~ 0.2,
+        cycle.T_i_b ~ 283.15,
+        cycle.logp_h ~ log(20e5),
+		
+		cycle.log_ΔTSH ~ log(7),
+		cycle.log_ΔTSC ~ log(3),
+		cycle.log_ΔTSF ~ log(3),
+        cycle.f ~ 50,  # Fix frequency to found value
+    ]
+
+    sys2 = ModelingToolkit.compose(NonlinearSystem(eqs2, [], [], name=:sys2), [cycle])
+    @time simplified2 = structural_simplify(sys2)
+    
+    # Create proper initial guess for second system
+    u0_second = [
+        cycle.γṁ_ref => log(0.043)  # Previous mass flow as initial guess
+        # Other variables will use default initial conditions
+    ]
+
+	
+    solver       = NewtonRaphson(
+                      linesearch = BackTracking(maxstep=20),
+                      autodiff    = AutoFiniteDiff()
+                   )
+    prob2 = NonlinearProblem(simplified2, u0_second)
+end
+
+# ╔═╡ d2b14ef0-9b53-4846-a169-27de59cb9f0f
+prob_cycle = make_thermodynamic_cycle_prob()
+
+# ╔═╡ d3cc6b23-4a6d-451c-8a6e-81bf1b71abfb
+solver3       = NewtonRaphson(
+                      linesearch = BackTracking(maxstep=20),
+                      autodiff    = AutoFiniteDiff()
+                   )
+
+# ╔═╡ d930fddf-92b8-468c-a556-f0126a93eb43
+sol_4 = NonlinearSolve.solve(prob_cycle, solver3)
+
+# ╔═╡ b5d46480-3583-4eff-aeec-861e2b1bd1cb
+sol_4.retcode
+
+# ╔═╡ e5614c61-6260-414f-b100-3a3683de0524
+sol_5.u
 
 # ╔═╡ e1c53c82-3ede-40a7-ae3f-e848fc763372
 
@@ -2042,14 +2092,15 @@ function GSHP(; name,
 		T_o_b = 9+273.15
 		h_i_r = 200e3
 		h_o_r = 200e3
-		ΔTb = 3
-		ΔTSH = 7
-		ṁ_sf = 0.1
-		ṁ_ref = 0.1
+		log_ΔTSF = 3
+		log_ΔTSH = 7
+		log_ΔTSC = 5
+		γṁ_sf = 0.1
+		γṁ_ref = 0.1
 		#T_cond = 45
 		#p_cond = 2e5
-		p_l = 1e5
-		p_h = 10e5
+		logp_l = 1e5
+		logp_h = 10e5
 
 		W_comp = 1000
 		P_elec_pump = 1000
@@ -2088,12 +2139,15 @@ function GSHP(; name,
         T_o_b ~ cycle.T_o_b,
         h_i_r ~ cycle.h_i_r,
         h_o_r ~ cycle.h_o_r,
-        ΔTb ~ cycle.ΔTb,
-        ΔTSH ~ cycle.ΔTSH,
-        ṁ_sf ~ cycle.ṁ_sf,
-        ṁ_ref ~ cycle.ṁ_ref,
-        p_l ~ cycle.p_l,
-        p_h ~ cycle.p_h,
+        
+		log_ΔTSF ~ cycle.log_ΔTSF,
+        log_ΔTSH ~ cycle.log_ΔTSH,
+        log_ΔTSC ~ cycle.log_ΔTSC,
+		
+        γṁ_sf ~ cycle.γṁ_sf,
+        γṁ_ref ~ cycle.γṁ_ref,
+        logp_l ~ cycle.logp_l,
+        logp_h ~ cycle.logp_h,
         W_comp ~ cycle.W_comp,
         P_elec_pump ~ pump.base.P_elec,
         Q_evap ~ cycle.Q_evap,
@@ -2101,9 +2155,9 @@ function GSHP(; name,
         COP1 ~ cycle.COP1,
         COP2 ~ -Q_cond/(W_comp+P_elec_pump),
 		
-		bhe.T_2 ~ cycle.evaporator.T_in_1,
-		cycle.evaporator.T_out_1 ~ bhe.T_1,
-		cycle.ṁ_sf ~ bhe.ṁ,
+		bhe.T_2 ~ cycle.T_i_b,
+		cycle.T_o_b ~ bhe.T_1,
+		exp(cycle.γṁ_sf) ~ bhe.ṁ,
 		pump.props.T ~ bhe.T_1,
 		pump.base.ṁ ~ bhe.ṁ,
 		phx.base.ṁ ~ bhe.ṁ,
@@ -2148,12 +2202,11 @@ function test_GSHP()
 		hp.phx.ϕ ~ 1.18,
 		hp.phx.β ~ π/6,
 		
-        hp.cycle.compressor.f ~ 50,
-        hp.cycle.ΔTb ~ 3,
-        hp.cycle.ΔTSH ~ 7,
+        hp.cycle.f ~ 50,
+        hp.cycle.log_ΔTSF ~ log(3),
+        hp.cycle.log_ΔTSH ~ log(7),
+        hp.cycle.log_ΔTSC ~ log(5),
         hp.cycle.logp_h ~ log(14e5),
-        #hp.cycle.logp_l ~ log(2.4e5),
-        #hp.cycle.inlet_cond.h ~ hp.cycle.inlet_cond.hd,
     ]
 
     @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
@@ -2165,6 +2218,49 @@ function test_GSHP()
     )
     sol = NonlinearSolve.solve(prob, solver; abstol = 1e-6)
 
+    # Pick out the symbols you care about:
+    vars = (
+      # refrigerant side enthalpies
+      h_in  = hp.cycle.inlet_evap.h,
+      h_out = hp.cycle.outlet_comp.h,
+      # borehole fluid temperatures
+      T_in  = hp.cycle.T_i_b,
+      T_out = hp.cycle.T_o_b,
+      # mass‐flows
+      m_sf  = hp.cycle.γṁ_sf,
+      m_ref = hp.cycle.γṁ_ref,
+      # pressures
+      p_low = hp.cycle.logp_l,
+      p_high= hp.cycle.logp_h,
+      # loads & COP
+      Q_ev  = hp.cycle.Q_evap,
+      Q_co  = hp.cycle.Q_cond,
+      COP1  = hp.cycle.COP1,
+      COP2  = hp.COP2,
+    )
+
+    println("=== GSHP Steady‑State Results (retcode=$(sol.retcode)) ===\n")
+
+    for (name, sym) in pairs(vars)
+        val = sol[sym]                    # raw value
+        # some sensible unit conversions:
+        display = begin
+          if name in (:h_in, :h_out)
+            round(val/1e3, digits=2) , "kJ/kg"
+          elseif name in (:T_in, :T_out)
+            round(val - 273.15, digits=2) , "°C"
+          elseif name in (:p_low, :p_high)
+            round(exp(sol[sym]) / 1e5, digits=3) , "bar"
+          elseif name in (:m_sf, :m_ref)
+            round(exp(val), digits=4) , "kg/s"
+          elseif name in (:Q_ev, :Q_co)
+            round(val/1e3, digits=2) , "kW"
+          else
+            round(val, digits=3)
+          end
+        end
+        println(rpad(string(name),12), ": ", display...)
+    end
     return sol.retcode
 end
 
@@ -2306,6 +2402,59 @@ candidate_solvers = [
     #PETScSNES(),
 	];
   ╠═╡ =#
+
+# ╔═╡ b9a9a9a0-dca2-45ee-8250-24bb680d839e
+# ╠═╡ disabled = true
+#=╠═╡
+"""
+    solve_with_cache(prob; solver=TrustRegion(autodiff=AutoFiniteDiff()),
+                          sol=nothing,
+                          kwargs...)
+
+Solve `prob` with `solver`, passing through any `kwargs` to `solve`.  
+If you pass a previous `sol` (a `NonlinearSolution`), its `.u` is used as the new `u0` for a warm start.
+"""
+function solve_with_cache(prob;
+                          solver = TrustRegion(autodiff = AutoFiniteDiff()),
+                          sol    = nothing,
+                          kwargs...)
+    # pick up last solution vector if given
+    u0 = isnothing(sol) ? nothing : sol.u
+
+    # delegate to NonlinearSolve.solve
+    return solve(prob, solver; u0 = u0, kwargs...)
+end
+  ╠═╡ =#
+
+# ╔═╡ e4f83718-32dd-4170-bfae-36c5edd28997
+# ╠═╡ disabled = true
+#=╠═╡
+sol_5 = NonlinearSolve.solve(prob_1, solver_1)
+  ╠═╡ =#
+
+# ╔═╡ fddf235e-b540-4bc9-99d6-b75a7c49bdf6
+"""
+    solve_with_cache(prob; solver=TrustRegion(autodiff=AutoFiniteDiff()),
+                          sol=nothing,
+                          kwargs...)
+
+Solve `prob` with `solver`, passing through any `kwargs` to `solve`.  
+If you pass a previous `sol` (a `NonlinearSolution`), its `.u` is used as the new `u0` for a warm start.
+"""
+function solve_with_cache(prob;
+                          solver = TrustRegion(autodiff = AutoFiniteDiff()),
+                          sol    = nothing,
+                          kwargs...)
+    # pick up last solution vector if given
+    u0 = isnothing(sol) ? nothing : sol.u
+
+    # delegate to NonlinearSolve.solve
+    return solve(prob, solver; u0 = u0, kwargs...)
+end
+
+
+# ╔═╡ 757853b5-e844-432a-9538-b7afab10bb72
+sol_5 = solve_with_cache(prob_cycle, solver = solver3, sol=sol_cycle)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -4293,7 +4442,13 @@ version = "17.4.0+2"
 # ╠═7ac5bbd6-d4a9-4b17-bd0e-b473d97c8a57
 # ╠═b12af1c4-53f5-49ed-94f9-dd9f8434bcf0
 # ╠═5eae6b7f-ee19-4f7e-8943-e8828ef027fb
-# ╠═fba39609-94ab-4a0d-bf40-4d995d6b7059
+# ╠═f66a54da-5889-4dfb-a093-5a8eb8964b42
+# ╠═d2b14ef0-9b53-4846-a169-27de59cb9f0f
+# ╠═d3cc6b23-4a6d-451c-8a6e-81bf1b71abfb
+# ╠═d930fddf-92b8-468c-a556-f0126a93eb43
+# ╠═b5d46480-3583-4eff-aeec-861e2b1bd1cb
+# ╠═757853b5-e844-432a-9538-b7afab10bb72
+# ╠═b9a9a9a0-dca2-45ee-8250-24bb680d839e
 # ╠═e1c53c82-3ede-40a7-ae3f-e848fc763372
 # ╠═f60e1452-e13c-472d-85bb-fbb64c3e1311
 # ╠═364eaab7-4812-4467-8319-777f0b12d1c7
