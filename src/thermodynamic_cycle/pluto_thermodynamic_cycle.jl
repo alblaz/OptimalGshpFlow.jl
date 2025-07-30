@@ -648,6 +648,8 @@ md"""
 """
 
 # ╔═╡ 62cea410-f0af-4219-a7df-92a0e574d74d
+# ╠═╡ disabled = true
+#=╠═╡
 """
     nusselt_plate(Re, Pr, β)
 
@@ -662,11 +664,11 @@ function nusselt_plate(Re::Real, Pr::Real, β::Real)
     # blending
     return (Nul^3 + Nut^3)^(1/3)
 end
-
-# ╔═╡ deee4a30-20ae-49b1-b5e5-21546d923dbe
-
+  ╠═╡ =#
 
 # ╔═╡ 2ed52c9e-a7ec-4793-a4c4-4a1a1611636f
+# ╠═╡ disabled = true
+#=╠═╡
 """
     h_plate(ṁ, ρ, cp, μ, λ, b, np, W, ϕ, β)
 
@@ -677,376 +679,51 @@ Compute heat‐transfer coefficient in a plate channel.
 - np, W, ϕ: plate geometry
 - β: chevron angle (rad)
 """
-function h_plate(ṁ, ρ, cp, μ, λ, b, np, W, ϕ, β)
-    # 1) Flow area: (np-1) channels, each W × 2b, times surface enlargement
-    A_ch = (np - 1) * W * (2b) * ϕ  # [m²]
-
-    # 2) Volumetric velocity
-    v = abs(ṁ) / (ρ * A_ch)         # [m/s]
-
-    # 3) Dimensionless numbers
-    dh = 2b                         # hydraulic diameter [m]
-    Re = v * dh / μ
-    Pr = cp * μ / λ
-
-    # 4) Nusselt number (your chevron correlation)
-    Nu = nusselt_plate(Re, Pr, β)
-
-    # 5) Heat‐transfer coefficient
-    return Nu * λ / dh              # [W/m²·K]
+function h_plate(ṁ, ρ, cp, μ, λ, b, np, W, ϕ, β, Re_low=2300, Re_high=4000)
+    # 1) Calculate channels for ONE fluid circuit
+    n_channels = (np - 1) / 2  # Channels per fluid
+    
+    # 2) Flow area for ONE fluid (not entire PHE)
+    A_ch_fluid = n_channels * W * (2b)  # ϕ NOT included! [m²]
+    
+    # 3) Velocity and dimensionless numbers
+    v = abs(ṁ) / (ρ * A_ch_fluid)
+    dh = 4b / ϕ  # Correct hydraulic diameter [m]
+    Re = (ρ * v * dh) / μ
+    Pr = (cp * μ) / λ
+    
+    # 4) Calculate blend weights for transition region
+    blend = blend_weight(Re, Re_low, Re_high)
+    
+    # 5) Nusselt numbers for different regimes
+    Nu_lam = 3.65 / (β^-0.455 * Re^0.339)  # Laminar
+    Nu_turb = 12.6 / (β^-1.142 * Re^(0.642 + 0.00111*β)) # Turbulent
+    
+    # 6) Blended Nusselt number
+    Nu = (1 - blend) * Nu_lam + blend * Nu_turb
+    
+    return Nu * λ / dh  # [W/m²·K]
 end
+  ╠═╡ =#
 
+# ╔═╡ 70ca56b4-dcde-44a2-aa6c-cd5b84c28c16
+# Define ranges for ṁ and β, fix everything else
+ranges = Dict(
+  :ṁ => range(0.01, .9, length=20),
+  :β  => deg2rad.(range(25, 60, length=5))
+)
 
-# ╔═╡ bda9cb58-5812-4e94-bfbf-920ae312ef2e
-
-
-# ╔═╡ e438b966-15eb-42e4-a610-0fc426385bc7
-
-"""
-SinglePhasePlateHX_WithProperties: NTU-based counterflow HX with fluid properties
-and plate-channel correlations for film coefficients.
-
-Arguments:
-  name: system name
-  Per: heat-transfer area per length (m²/m)
-  b: half-channel depth (m)
-  np: number of plates
-  W: plate width (m)
-  ϕ: surface enlargement factor
-  β: chevron angle (rad)
-  th: wall thickness (m)
-  λ_Cu: wall conductivity (W/m·K)
-"""
-function SinglePhasePlateHX_WithProperties(; name, fluid1 = "MEA", fluid2 = "MEA")
-    # ——— Parameters ———
-    pars = @parameters begin
-	end
-
-    # ——— State variables ———
-    vars = @variables begin
-		# parameters but variables in order to solve sizing problems
-		b = 2e-3
-		np = 30
-		W = 10e-2
-		ϕ = 1.138
-		β = pi/6
-		th = 5e-4
-		λ_pl = 16
-
-		χ1 = 0.28
-		χ2 = 0.28
-		
-    	L = 1.0                    # plate length (m)
-	    γṁ_1 = 0.0
-		γṁ_2 = 0.0             # log mass flows (water, MEA)
-	    T_in_1 = 300
-		T_out_1 = 300        # hot-side temps
-	    T_in_2 = 300
-		T_out_2 = 300        # cold-side temps
-	    Q = 1e4                     # heat transfer rate (W)
-	    h_1 = 600
-		h_2 = 600
-		U =300
-		A = 1.0
-    end
-
-    # ——— Subsystems ———
-    @named base    = SinglePhaseHX()
-    @named prop1i  = Properties.IncompressibleProps(fluid=fluid1, χ=χ1)
-    @named prop1o  = Properties.IncompressibleProps(fluid=fluid1, χ=χ1)
-    @named prop2i  = Properties.IncompressibleProps(fluid=fluid2, χ=χ2)
-    @named prop2o  = Properties.IncompressibleProps(fluid=fluid2, χ=χ2)
-
-    # ——— Derived expressions ———
-    ṁ_1     = exp(γṁ_1)
-    ṁ_2     = exp(γṁ_2)
-    dh       = 2*b
-	
-    # ——— Equations ———
-    eqs = [
-        # geometry mapping
-        A           ~ L*np*W*ϕ,
-        A           ~ base.A,
-        # property temperatures
-        prop1i.T    ~ T_in_1,  prop1i.T    ~ base.T_in_1,
-        prop1o.T    ~ T_out_1, prop1o.T    ~ base.T_out_1,
-        prop2i.T    ~ T_in_2,  prop2i.T    ~ base.T_in_2,
-        prop2o.T    ~ T_out_2, prop2o.T    ~ base.T_out_2,
-        # capacity rates
-        base.C_1         ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
-        base.C_2         ~ ṁ_2 * 0.5*(prop2i.cp + prop2o.cp),
-        # film coefficients
-        h_1         ~ h_plate(ṁ_1,
-							  0.5*(prop1i.ρ+prop1o.ρ),
-							  0.5*(prop1i.cp+prop1o.cp),
-							  0.5*(prop1i.μ+prop1o.μ),
-							  0.5*(prop1i.λ+prop1o.λ),
-							  b, np, W, ϕ, β),
-        h_2         ~ h_plate(ṁ_2,
-							  0.5*(prop2i.ρ+prop2o.ρ),
-							  0.5*(prop2i.cp+prop2o.cp),
-							  0.5*(prop2i.μ+prop2o.μ),
-							  0.5*(prop2i.λ+prop2o.λ),
-							  b, np, W, ϕ, β),
-        # overall coefficient
-        U           ~ 1/(1/h_1 + th/λ_pl + 1/h_2),
-        U           ~ base.U,
-        # heat transfer
-        Q           ~ base.Q,
-    ]
-
-    sys = NonlinearSystem(eqs, vars, pars, name = name)
-
-    return ModelingToolkit.compose(sys, [base, prop1i, prop1o, prop2i, prop2o], name = name)
-end
-
-# ╔═╡ 96966964-d666-4dc2-a554-8c359e3db528
-
-"""
-Test function for SinglePhasePlateHX_WithProperties
-"""
-function test_single_phase_plate_hx()
-    @named hx = SinglePhasePlateHX_WithProperties(fluid1 = "MEA", fluid2 = "MEA")
-
-    eqs = [
-		hx.b ~ 0.001,
-		hx.np ~ 12,
-		hx.W ~ 0.05,
-		hx.ϕ ~1.0,
-		hx.β ~ π/6,
-		hx.th ~ 0.0005,
-		hx.λ_pl ~ 26,
-        # geometry
-        hx.L ~ 0.2,
-        # mass flows
-        hx.γṁ_1 ~ log(0.5),    # 0.1 kg/s water
-        hx.γṁ_2 ~ log(0.5),   # 0.15 kg/s MEA
-        # inlet temps
-        hx.T_in_1 ~ 320.0,
-        #hx.T_out_1 ~ 300.0,
-        hx.T_in_2 ~ 290.0
-    ]
-
-    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name=:test), [hx])
-    simpl = structural_simplify(sys)
-    prob = NonlinearProblem(simpl, [])
-    sol = NonlinearSolve.solve(prob, NewtonRaphson())
-
-    println("=== Plate HX with Properties Test ===")
-    println("Q = ", sol[hx.Q], " W")
-	
-    Q1 = sol[hx.base.C_1] * (sol[hx.base.T_in_1] - sol[hx.base.T_out_1])
-    Q2 = sol[hx.base.C_2] * (sol[hx.base.T_out_2] - sol[hx.base.T_in_2])
-    println("\nEnergy Balance Verification:")
-    println("  Q from side 1 = ", Q1, " W")
-    println("  Q from side 2 = ", Q2, " W")
-    println("  Difference = ", abs(Q1 - Q2), " W")
-	
-    println("m1 = ", exp(sol[hx.γṁ_1]), " kg/s")
-    println("m2 = ", exp(sol[hx.γṁ_2]), " kg/s")
-    println("C1 = ", sol[hx.base.C_1], " ")
-    println("C2 = ", sol[hx.base.C_2], " ")
-    println("h1 = ", sol[hx.h_1], " W/m2/K")
-    println("h2 = ", sol[hx.h_2], " W/m2/K")
-    println("U = ", sol[hx.U], " W")
-    println("A = ", sol[hx.A], " m2")
-    println("eff = ", sol[hx.base.NTU], " %")
-    println("eff = ", sol[hx.base.ε], " %")
-    println("T_in_1 = ", sol[hx.T_in_1]-273.15, " C")
-    println("T_out_1 = ", sol[hx.T_out_1]-273.15, " C")
-    println("T_in_2 = ", sol[hx.T_in_2]-273.15, " C")
-    println("T_out_2 = ", sol[hx.T_out_2]-273.15, " C")
-    return sol
-end
-
-
-# ╔═╡ b41466ba-fcff-4def-957b-2b96032643aa
-simp = test_single_phase_plate_hx()
-
-# ╔═╡ 9b117e8b-7a38-49ba-9586-f3aacaafa0f3
-function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
-                         Re_low=3000,        # blender limits
-                         Re_high=8000)
-    # ——— Parameters ———
-    pars = @parameters begin
-        Re_low = Re_low
-        Re_high = Re_high
-    end
-
-    # ——— State variables ———
-    vars = @variables begin
-		
-		b = 2e-3
-		np = 25
-		W = 10e-2
-		ϕ = 1.138
-		β = pi/6
-		th = 5e-4
-		λ_pl = 16
-        λ_pitch = 4e-3
-
-		χ = 0.28
-		
-        L = 1.0                # plate length (m)
-        γṁ_1 = 0.0
-        γṁ_2 = 0.0             # log mass flows
-        T_in_1 = 300
-        T_out_1 = 300          # hot side temps
-        T_in_2 = 300
-        T_out_2 = 300          # cold/refrig side temps
-        Q = 1e4                # heat transfer rate (W)
-        h_1 = 600
-        h_2 = 600
-        U = 300
-        A = 1.0
-        # refrigerant inlet/outlet enthalpies
-        h2i = 300e3
-        h2o = 300e3
-        logpref = log(1e5)
-    end
-
-    # ——— Subsystems ———
-    @named base    = SinglePhaseHX()
-    @named prop1i  = Properties.IncompressibleProps(fluid=sec_fluid, χ=χ)
-    @named prop1o  = Properties.IncompressibleProps(fluid=sec_fluid, χ=χ)
-    @named propref = Properties.RefrigerantProps(fluid = refrigerant)
-
-    # ——— Derived expressions ———
-    ṁ_1 = exp(γṁ_1)
-    ṁ_2 = exp(γṁ_2)
-    dh   = 2*b
-
-
-    # ——— Equations ———
-    eqs = [
-        # geometry mapping
-        A           ~ L*np*W*ϕ,
-        A           ~ base.A,
-
-		propref.logp ~ logpref,
-		propref.h ~ h2i,
-		
-        # property temperatures mapping
-        prop1i.T    ~ T_in_1,
-        prop1o.T    ~ T_out_1,
-        T_in_2      ~ base.T_in_2,
-        T_in_2      ~ propref.T,
-        T_out_2     ~ base.T_out_2,
-        T_in_1      ~ base.T_in_1,
-        T_out_1     ~ base.T_out_1,
-
-        # capacity rates
-        base.C_1    ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
-        base.C_2    ~ ṁ_2 * propref.cpd,
-
-        # film coefficients
-        h_1 ~ h_plate(
-            ṁ_1,
-            0.5*(prop1i.ρ+prop1o.ρ),
-            0.5*(prop1i.cp+prop1o.cp),
-            0.5*(prop1i.μ+prop1o.μ),
-            0.5*(prop1i.λ+prop1o.λ),
-            b, np, W, ϕ, β
-        ),
-
-        h_2 ~ h_plate(
-            ṁ_2,
-            propref.ρ,
-            propref.cp,
-            propref.η,
-            propref.λ,
-            b, np, W, ϕ, β
-        ),
-
-        # overall U‐value
-        U ~ 1/(1/h_1 + th/λ_pl + 1/h_2),
-        U ~ base.U,
-
-        # heat‐transfer balances
-        Q       ~ base.Q,
-        Q       ~ ṁ_2*(h2o - h2i),
-    ]
-
-    sys = NonlinearSystem(eqs, vars, pars, name = name)
-    return ModelingToolkit.compose(sys, [base, prop1i, prop1o, propref], name = name)
-end
-
-
-# ╔═╡ 98c20212-3447-481c-b0d4-326a1703997c
-"""
-Test function for PHX_Superheater
-"""
-function test_PHX_Superheater()
-    # — instantiate with 2 plates, small width for a quick solve
-    @named hx = PHX_Superheater(
-        Re_low = 3000,
-        Re_high= 8000
-    )
-
-    # — build a tiny set of boundary conditions to fully specify the superheater
-    eqs = [
-		
-		hx.b ~ 0.001,
-		hx.np ~ 12,
-		hx.W ~ 0.05,
-		hx.ϕ ~1.0,
-		hx.β ~ π/6,
-		hx.th ~ 0.0005,
-		hx.λ_pl ~ 16,
-		hx.λ_pitch ~ 26,
-		hx.χ ~ 0.28,
-        # geometry
-        hx.L         ~ 0.2,
-
-        # mass flows (0.5 kg/s each side)
-        hx.γṁ_1      ~ log(0.5),
-        hx.γṁ_2      ~ log(0.5),
-
-        # hot‐side temps (MEA side)
-        hx.T_in_1    ~ 293.15,
-
-        # refrigerant pressure and enthalpies
-        hx.logpref      ~ log(2e5),       # 2 bar
-        hx.h2i       ~ 200e3,     # inlet enthalpy [J/kg]
-        #hx.h2o       ~ 250e3,     # outlet enthalpy [J/kg]
-    ]
-
-    # compose and solve
-    @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name=:test), [hx])
-    simpl        = structural_simplify(sys)
-    prob         = NonlinearProblem(simpl, [])
-    solver       = NewtonRaphson(
-                      linesearch = BackTracking(maxstep=20),
-                      autodiff    = AutoFiniteDiff()
-                   )
-    sol = NonlinearSolve.solve(prob, solver; abstol=1e-6)
-
-    # print key results
-    println("=== PHX Superheater Test ===")
-    println("Q     = ", sol[hx.Q],        " W")
-    println("A     = ", sol[hx.A],        " m²")
-    println("U     = ", sol[hx.U],        " W/m²·K")
-    println("h1     = ", sol[hx.h_1],        " W/m²·K")
-    println("h2     = ", sol[hx.h_2],        " W/m²·K")
-    println("NTU   = ", sol[hx.base.NTU])
-    println("ε     = ", sol[hx.base.ε])
-    println("T₁,in = ", sol[hx.T_in_1]-273.15, " °C")
-    println("T₁,out= ", sol[hx.T_out_1]-273.15, " °C")
-    println("T₂,in = ", sol[hx.T_in_2]-273.15, " °C")
-    println("T₂,out= ", sol[hx.T_out_2]-273.15, " °C")
-    println("h2i   = ", sol[hx.h2i],       " J/kg")
-    println("h2o   = ", sol[hx.h2o],       " J/kg")
-    println("p_ref = ", exp(sol[hx.logpref])/1e5,  " bar")
-    println("T_sat = ", sol[hx.propref.Tsat]-273.15, " °C")
-    println("ρ_b   = ", sol[hx.propref.ρb], " kg/m³")
-    println("ρ_d   = ", sol[hx.propref.ρd], " kg/m³")
-    println("h_fg  = ", sol[hx.propref.hd - hx.propref.hb], " J/kg")
-    return sol
-end
-
-
-# ╔═╡ 143ccb02-56b0-4b50-a1e5-0d06b53f1b46
-test_PHX_Superheater()
+# ╔═╡ ce7c4e4d-e0ef-4b49-8ae8-0f63acfe4dc4
+fixed = Dict(
+  :ρ  => 1000.0,
+  :cp => 4180.0,
+  :μ  => 1e-3,
+  :λ  => 0.6,
+  :b  => 0.002,
+  :np => 12,
+  :W  => 0.07,
+  :ϕ  => 1.18
+)
 
 # ╔═╡ f7eeabcd-23e6-4733-81aa-a6bbde82837e
 md"""
@@ -1271,6 +948,507 @@ function soft_clamp(x::Real, x_low::Real, x_high::Real; tol::Real=0.01)
     return x + (x_low  - x)*s_low  + (x_high - x)*s_high
 end
 
+# ╔═╡ a1eec254-6b86-440d-a2a4-2151d588dc23
+"""
+    phx_friction_factor(Re, β; Re_low = 1800, Re_high = 2200)
+
+Smoothed **Fanning** friction factor for a chevron‑plate channel following
+Holger Martin’s VDI‑Heat‑Atlas (2010) correlations.  Martin provides separate
+Darcy (
+    fᴰₗₐₘ = 64/Re⋅(1 + 0.22/ sinβ)
+    fᴰₜᵤʳ = 0.316 Re^–0.25⋅(1 + 2.8/ sinβ)
+) with a hard switch at *Re≈2000*.  We blend them over a user‑set window so the
+function is smooth.
+
+**Arguments**
+* `Re`  – Reynolds number based on hydraulic diameter.
+* `β`   – chevron angle [rad].
+* `Re_low`, `Re_high` – start/end of the blend window (defaults 1800→2200).
+
+Returns the **Fanning** friction factor 𝑓.
+"""
+function phx_friction_factor(Re, β, Re_low = 1800, Re_high = 2200)
+    β = soft_clamp(β, deg2rad(30), deg2rad(60); tol = 0.02)
+    G = sin(β)                      # Martin’s geometry factor
+    # Darcy branches (VDI equations N6‑28 & N6‑30)
+    fD_lam  = 64 / Re * (1 + 0.22 / G)
+    fD_turb = 0.316 * Re^(-0.25) * (1 + 2.8 / G)
+    # Smooth blend
+    w = blend_weight(Re, Re_low, Re_high)
+    fD = (1 - w) * fD_lam + w * fD_turb
+    return fD / 4                   # convert to Fanning
+end
+
+# ╔═╡ e51c75dc-07f3-4682-9ce2-ed2e72977ea5
+"""
+    phx_nusselt(Re, Pr, β; Re_low = 1800, Re_high = 2200)
+
+Nusselt number for a chevron plate using Martin’s analogy:
+
+    Nu = 0.205 Pr^{1/3} [ fᴰ Re² sin(2β) ]^{0.374}
+
+The same Darcy friction factor produced by `phx_friction_factor` is used,
+ensuring thermo‑hydraulic consistency.
+"""
+function phx_nusselt(Re, Pr, β, Re_low = 1800, Re_high = 2200)
+    fF = phx_friction_factor(Re, β, Re_low, Re_high)
+    fD = 4fF
+    return 0.205 * Pr^(1/3) * (fD * Re^2 * sin(2β))^0.374
+end
+
+
+# ╔═╡ d31ad2dc-528d-46f6-a19f-90658a1615d0
+
+"""
+    h_plate(ṁ, ρ, cp, μ, λ, b, np, W, β; φ = 1.18,
+            Re_low = 1800, Re_high = 2200)
+
+Overall single‑phase heat‑transfer coefficient (one side) for a brazed / welded
+plate heat exchanger using the Martin correlations.
+
+**Geometry**
+* `b`   – half‑gap [m] (one corrugation valley ↔ plate)
+* `W`   – plate width [m]
+* `np`  – number of plates (=> (np−1)/2 channels per side)
+* `φ`   – surface enlargement factor (defaults 1.18)
+
+**Flow / fluid**
+* `ṁ`   – mass flow rate [kg s⁻¹]
+* `ρ`, `μ`, `cp`, `λ` – liquid properties.
+* `β`   – chevron angle [rad]
+
+Returns h [W m⁻² K].
+"""
+function h_plate(ṁ, ρ, cp, μ, λ, b, np, W, φ, β, Re_low = 1800, Re_high = 2200)
+    n_channels = (np - 1) / 2
+    A_flow     = n_channels * W * (2b)
+    v          = abs(ṁ) / (ρ * A_flow)
+    dh         = 2b / φ
+    Re         = ρ * v * dh / μ
+    Pr         = cp * μ / λ
+
+    Nu = phx_nusselt(Re, Pr, β, Re_low, Re_high)
+    return Nu * λ / dh
+end
+
+
+# ╔═╡ 19a9664b-cfa8-4a1a-b2bb-ed3f8c357100
+#=╠═╡
+"""
+    sweep_h_plate(ranges; fixed=Dict(), kwargs...)
+
+Perform a parameter sweep of `h_plate` over the named `ranges`, 
+while keeping any other parameters fixed via `fixed`.
+
+# Arguments
+- `ranges::Dict{Symbol,AbstractVector}`  
+  Each key is a positional argument name of `h_plate`, and its
+  value is a vector of values you want to try.
+- `fixed::Dict{Symbol,Real}`  (optional)  
+  Any other positional arguments you wish to hold constant.
+- `kwargs...`  
+  Passed through to `h_plate` (e.g. `Re_low`, `Re_high`).
+
+# Returns
+A `DataFrame` with one column per input and one column `h` for
+the computed heat‑transfer coefficient.
+"""
+function sweep_h_plate(ranges;
+                       fixed=Dict{Symbol,Real}(), kwargs...)
+    # positional argument order
+    argnames = (:ṁ, :ρ, :cp, :μ, :λ, :b, :np, :W, :ϕ, :β)
+    
+    # build vectors for each arg in order
+    vals = Vector{AbstractVector}(undef, length(argnames))
+    for (i,name) in enumerate(argnames)
+        if haskey(ranges, name)
+            vals[i] = ranges[name]
+        elseif haskey(fixed, name)
+            vals[i] = [fixed[name]]
+        else
+            error("You must supply values for $name either in ranges or fixed.")
+        end
+    end
+    
+    # prepare output DataFrame
+    df = DataFrame()
+    for name in argnames
+        df[!, Symbol(name)] = Any[]  # placeholder
+    end
+    df.h = Float64[]
+    
+    # loop over all combinations
+    for combo in Iterators.product(vals...)
+        args = Tuple(combo)
+        # call h_plate with positional args and any kwargs
+        hval = h_plate(args...; kwargs...)
+        push!(df, (; 
+            ṁ=args[1], ρ=args[2], cp=args[3], μ=args[4], λ=args[5],
+            b=args[6], np=args[7], W=args[8], ϕ=args[9], β=args[10],
+            h=hval
+        ))
+    end
+    
+    return df
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 6be93b5a-be7d-47ad-81ef-72e3d7350fd6
+#=╠═╡
+df = sweep_h_plate(ranges; fixed)
+  ╠═╡ =#
+
+# ╔═╡ e438b966-15eb-42e4-a610-0fc426385bc7
+
+"""
+SinglePhasePlateHX_WithProperties: NTU-based counterflow HX with fluid properties
+and plate-channel correlations for film coefficients.
+
+Arguments:
+  name: system name
+  Per: heat-transfer area per length (m²/m)
+  b: half-channel depth (m)
+  np: number of plates
+  W: plate width (m)
+  ϕ: surface enlargement factor
+  β: chevron angle (rad)
+  th: wall thickness (m)
+  λ_Cu: wall conductivity (W/m·K)
+"""
+function SinglePhasePlateHX_WithProperties(; name, fluid1 = "MEA", fluid2 = "MEA")
+    # ——— Parameters ———
+    pars = @parameters begin
+	end
+
+    # ——— State variables ———
+    vars = @variables begin
+		# parameters but variables in order to solve sizing problems
+		b = 2e-3
+		np = 30
+		W = 10e-2
+		ϕ = 1.138
+		β = pi/6
+		th = 5e-4
+		λ_pl = 16
+
+		χ1 = 0.28
+		χ2 = 0.28
+		
+    	L = 1.0                    # plate length (m)
+	    γṁ_1 = 0.0
+		γṁ_2 = 0.0             # log mass flows (water, MEA)
+	    T_in_1 = 300
+		T_out_1 = 300        # hot-side temps
+	    T_in_2 = 300
+		T_out_2 = 300        # cold-side temps
+	    Q = 1e4                     # heat transfer rate (W)
+	    h_1 = 600
+		h_2 = 600
+		U =300
+		A = 1.0
+    end
+
+    # ——— Subsystems ———
+    @named base    = SinglePhaseHX()
+    @named prop1i  = Properties.IncompressibleProps(fluid=fluid1, χ=χ1)
+    @named prop1o  = Properties.IncompressibleProps(fluid=fluid1, χ=χ1)
+    @named prop2i  = Properties.IncompressibleProps(fluid=fluid2, χ=χ2)
+    @named prop2o  = Properties.IncompressibleProps(fluid=fluid2, χ=χ2)
+
+    # ——— Derived expressions ———
+    ṁ_1     = exp(γṁ_1)
+    ṁ_2     = exp(γṁ_2)
+    dh       = 2*b
+	
+    # ——— Equations ———
+    eqs = [
+        # geometry mapping
+        A           ~ L*np*W*ϕ,
+        A           ~ base.A,
+        # property temperatures
+        prop1i.T    ~ T_in_1,  prop1i.T    ~ base.T_in_1,
+        prop1o.T    ~ T_out_1, prop1o.T    ~ base.T_out_1,
+        prop2i.T    ~ T_in_2,  prop2i.T    ~ base.T_in_2,
+        prop2o.T    ~ T_out_2, prop2o.T    ~ base.T_out_2,
+        # capacity rates
+        base.C_1         ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
+        base.C_2         ~ ṁ_2 * 0.5*(prop2i.cp + prop2o.cp),
+        # film coefficients
+        h_1         ~ h_plate(ṁ_1,
+							  0.5*(prop1i.ρ+prop1o.ρ),
+							  0.5*(prop1i.cp+prop1o.cp),
+							  0.5*(prop1i.μ+prop1o.μ),
+							  0.5*(prop1i.λ+prop1o.λ),
+							  b, np, W, ϕ, β, 1000, 2000),
+        h_2         ~ h_plate(ṁ_2,
+							  0.5*(prop2i.ρ+prop2o.ρ),
+							  0.5*(prop2i.cp+prop2o.cp),
+							  0.5*(prop2i.μ+prop2o.μ),
+							  0.5*(prop2i.λ+prop2o.λ),
+							  b, np, W, ϕ, β, 1000, 2000),
+        # overall coefficient
+        U           ~ 1/(1/h_1 + th/λ_pl + 1/h_2),
+        U           ~ base.U,
+        # heat transfer
+        Q           ~ base.Q,
+    ]
+
+    sys = NonlinearSystem(eqs, vars, pars, name = name)
+
+    return ModelingToolkit.compose(sys, [base, prop1i, prop1o, prop2i, prop2o], name = name)
+end
+
+# ╔═╡ 96966964-d666-4dc2-a554-8c359e3db528
+
+"""
+Test function for SinglePhasePlateHX_WithProperties
+"""
+function test_single_phase_plate_hx()
+    @named hx = SinglePhasePlateHX_WithProperties(fluid1 = "MEA", fluid2 = "MEA")
+
+    eqs = [
+		hx.b ~ 0.001,
+		hx.np ~ 12,
+		hx.W ~ 0.05,
+		hx.ϕ ~1.0,
+		hx.β ~ π/6,
+		hx.th ~ 0.0005,
+		hx.λ_pl ~ 26,
+        # geometry
+        hx.L ~ 0.2,
+        # mass flows
+        hx.γṁ_1 ~ log(0.5),    # 0.1 kg/s water
+        hx.γṁ_2 ~ log(0.5),   # 0.15 kg/s MEA
+        # inlet temps
+        hx.T_in_1 ~ 320.0,
+        #hx.T_out_1 ~ 300.0,
+        hx.T_in_2 ~ 290.0
+    ]
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name=:test), [hx])
+    simpl = structural_simplify(sys)
+    prob = NonlinearProblem(simpl, [])
+    sol = NonlinearSolve.solve(prob, NewtonRaphson())
+
+    println("=== Plate HX with Properties Test ===")
+    println("Q = ", sol[hx.Q], " W")
+	
+    Q1 = sol[hx.base.C_1] * (sol[hx.base.T_in_1] - sol[hx.base.T_out_1])
+    Q2 = sol[hx.base.C_2] * (sol[hx.base.T_out_2] - sol[hx.base.T_in_2])
+    println("\nEnergy Balance Verification:")
+    println("  Q from side 1 = ", Q1, " W")
+    println("  Q from side 2 = ", Q2, " W")
+    println("  Difference = ", abs(Q1 - Q2), " W")
+	
+    println("m1 = ", exp(sol[hx.γṁ_1]), " kg/s")
+    println("m2 = ", exp(sol[hx.γṁ_2]), " kg/s")
+    println("C1 = ", sol[hx.base.C_1], " ")
+    println("C2 = ", sol[hx.base.C_2], " ")
+    println("h1 = ", sol[hx.h_1], " W/m2/K")
+    println("h2 = ", sol[hx.h_2], " W/m2/K")
+    println("U = ", sol[hx.U], " W")
+    println("A = ", sol[hx.A], " m2")
+    println("eff = ", sol[hx.base.NTU], " %")
+    println("eff = ", sol[hx.base.ε], " %")
+    println("T_in_1 = ", sol[hx.T_in_1]-273.15, " C")
+    println("T_out_1 = ", sol[hx.T_out_1]-273.15, " C")
+    println("T_in_2 = ", sol[hx.T_in_2]-273.15, " C")
+    println("T_out_2 = ", sol[hx.T_out_2]-273.15, " C")
+    return sol
+end
+
+
+# ╔═╡ b41466ba-fcff-4def-957b-2b96032643aa
+simp = test_single_phase_plate_hx()
+
+# ╔═╡ 9b117e8b-7a38-49ba-9586-f3aacaafa0f3
+function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
+                         Re_low=3000,        # blender limits
+                         Re_high=8000)
+    # ——— Parameters ———
+    pars = @parameters begin
+        Re_low = Re_low
+        Re_high = Re_high
+    end
+
+    # ——— State variables ———
+    vars = @variables begin
+		
+		b = 2e-3
+		np = 25
+		W = 10e-2
+		ϕ = 1.138
+		β = pi/6
+		th = 5e-4
+		λ_pl = 16
+        λ_pitch = 4e-3
+
+		χ = 0.28
+		
+        L = 1.0                # plate length (m)
+        γṁ_1 = 0.0
+        γṁ_2 = 0.0             # log mass flows
+        T_in_1 = 300
+        T_out_1 = 300          # hot side temps
+        T_in_2 = 300
+        T_out_2 = 300          # cold/refrig side temps
+        Q = 1e4                # heat transfer rate (W)
+        h_1 = 600
+        h_2 = 600
+        U = 300
+        A = 1.0
+        # refrigerant inlet/outlet enthalpies
+        h2i = 300e3
+        h2o = 300e3
+        logpref = log(1e5)
+    end
+
+    # ——— Subsystems ———
+    @named base    = SinglePhaseHX()
+    @named prop1i  = Properties.IncompressibleProps(fluid=sec_fluid, χ=χ)
+    @named prop1o  = Properties.IncompressibleProps(fluid=sec_fluid, χ=χ)
+    @named propref = Properties.RefrigerantProps(fluid = refrigerant)
+
+    # ——— Derived expressions ———
+    ṁ_1 = exp(γṁ_1)
+    ṁ_2 = exp(γṁ_2)
+    dh   = 2*b
+
+
+    # ——— Equationss ———
+    eqs = [
+        # geometry mapping
+        A           ~ L*(np-1)/2*W*ϕ,
+        A           ~ base.A,
+
+		propref.logp ~ logpref,
+		propref.h ~ h2i,
+		
+        # property temperatures mapping
+        prop1i.T    ~ T_in_1,
+        prop1o.T    ~ T_out_1,
+        T_in_2      ~ base.T_in_2,
+        T_in_2      ~ propref.T,
+        T_out_2     ~ base.T_out_2,
+        T_in_1      ~ base.T_in_1,
+        T_out_1     ~ base.T_out_1,
+
+        # capacity rates
+        base.C_1    ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
+        base.C_2    ~ ṁ_2 * propref.cpd,
+
+        # film coefficients
+        h_1 ~ h_plate(
+            ṁ_1,
+            0.5*(prop1i.ρ+prop1o.ρ),
+            0.5*(prop1i.cp+prop1o.cp),
+            0.5*(prop1i.μ+prop1o.μ),
+            0.5*(prop1i.λ+prop1o.λ),
+            b, np, W, ϕ, β, 1000, 2000
+        ),
+
+        h_2 ~ h_plate(
+            ṁ_2,
+            propref.ρ,
+            propref.cp,
+            propref.η,
+            propref.λ,
+            b, np, W, ϕ, β, 1000, 2000
+        ),
+
+
+		
+        # overall U‐value
+        U ~ 1/(1/h_1 + th/λ_pl + 1/h_2),
+        U ~ base.U,
+
+        # heat‐transfer balances
+        Q       ~ base.Q,
+        Q       ~ ṁ_2*(h2o - h2i),
+    ]
+
+    sys = NonlinearSystem(eqs, vars, pars, name = name)
+    return ModelingToolkit.compose(sys, [base, prop1i, prop1o, propref], name = name)
+end
+
+
+# ╔═╡ 98c20212-3447-481c-b0d4-326a1703997c
+"""
+Test function for PHX_Superheater
+"""
+function test_PHX_Superheater()
+    # — instantiate with 2 plates, small width for a quick solve
+    @named hx = PHX_Superheater(
+        Re_low = 3000,
+        Re_high= 8000
+    )
+
+    # — build a tiny set of boundary conditions to fully specify the superheater
+    eqs = [
+		
+		hx.b ~ 0.001,
+		hx.np ~ 25,
+		hx.W ~ 0.05,
+		hx.ϕ ~1.0,
+		hx.β ~ π/6,
+		hx.th ~ 0.0005,
+		hx.λ_pl ~ 16,
+		hx.λ_pitch ~ 26,
+		hx.χ ~ 0.28,
+        # geometry
+        hx.L         ~ 0.2,
+
+        # mass flows (0.5 kg/s each side)
+        hx.γṁ_1      ~ log(0.5),
+        hx.γṁ_2      ~ log(0.5),
+
+        # hot‐side temps (MEA side)
+        hx.T_in_1    ~ 293.15,
+
+        # refrigerant pressure and enthalpies
+        hx.logpref      ~ log(2e5),       # 2 bar
+        hx.h2i       ~ 400e3,     # inlet enthalpy [J/kg]
+        #hx.h2o       ~ 250e3,     # outlet enthalpy [J/kg]
+    ]
+
+    # compose and solve
+    @named sys   = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name=:test), [hx])
+    simpl        = structural_simplify(sys)
+    prob         = NonlinearProblem(simpl, [])
+    solver       = NewtonRaphson(
+                      linesearch = BackTracking(maxstep=20),
+                      autodiff    = AutoFiniteDiff()
+                   )
+    sol = NonlinearSolve.solve(prob, solver; abstol=1e-6)
+
+    # print key results
+    println("=== PHX Superheater Test ===")
+    println("Q     = ", sol[hx.Q],        " W")
+    println("A     = ", sol[hx.A],        " m²")
+    println("U     = ", sol[hx.U],        " W/m²·K")
+    println("h1     = ", sol[hx.h_1],        " W/m²·K")
+    println("h2     = ", sol[hx.h_2],        " W/m²·K")
+    println("NTU   = ", sol[hx.base.NTU])
+    println("ε     = ", sol[hx.base.ε])
+    println("T₁,in = ", sol[hx.T_in_1]-273.15, " °C")
+    println("T₁,out= ", sol[hx.T_out_1]-273.15, " °C")
+    println("T₂,in = ", sol[hx.T_in_2]-273.15, " °C")
+    println("T₂,out= ", sol[hx.T_out_2]-273.15, " °C")
+    println("h2i   = ", sol[hx.h2i],       " J/kg")
+    println("h2o   = ", sol[hx.h2o],       " J/kg")
+    println("p_ref = ", exp(sol[hx.logpref])/1e5,  " bar")
+    println("T_sat = ", sol[hx.propref.Tsat]-273.15, " °C")
+    println("ρ_b   = ", sol[hx.propref.ρb], " kg/m³")
+    println("ρ_d   = ", sol[hx.propref.ρd], " kg/m³")
+    println("h_fg  = ", sol[hx.propref.hd - hx.propref.hb], " J/kg")
+    return sol
+end
+
+
+# ╔═╡ 143ccb02-56b0-4b50-a1e5-0d06b53f1b46
+test_PHX_Superheater()
+
 # ╔═╡ 11823168-8288-49db-88e8-319df4535273
 function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigerant = "R134A",
                          Re_low=2000,        # blender limits
@@ -1287,9 +1465,9 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     # ——— State variables ———
     vars = @variables begin
 		
-		b = 1.5e-3
-		np = 15
-		W = 5e-2
+		b = 2e-3
+		np = 30
+		W = 7e-2
 		ϕ = 1.118
 		β = pi/6
 		th = 5e-4
@@ -1301,22 +1479,22 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
         L = 1.0
         γṁ_2 = 0.0          # log mass flow for refrigerant
         γṁ_1 = 0.0          # log mass flow for incompressible fluid
-        h_2 = 600.0         # 
-        h_2_raw = 600.0         # 
-        h_1 = 600.0
+        h_2 = 7000.0         # 
+        h_2_raw = 7000.0         # 
+        h_1 = 2000.0
         T_in_1 = 280.0
         T_out_1 = 280.0
         T_2    = 300.0      # refrigerant bulk T
-        logp_2    = log(1e5)        # refrigerant pressure
-        X_in    = 0.5
+        logp_2    = log(2.5e5)        # refrigerant pressure
+        #X_in    = 0.5
         h2i    = 300e3
-        h2o    = 300e3
+        h2o    = 310e3
         Q      = 1000.0
     end
 
     # ——— Subsystems ———
     @named base   = PhaseChangeHX()
-    @named propref   = Properties.RefrigerantProps(fluid = refrigerant)
+    @named propref= Properties.RefrigerantProps(fluid = refrigerant)
     @named prop1i = Properties.IncompressibleProps(fluid = sec_fluid, χ = χ)
     @named prop1o = Properties.IncompressibleProps(fluid = sec_fluid, χ = χ)
 
@@ -1324,7 +1502,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     ṁ_1 = exp(γṁ_1)
     ṁ_2 = exp(γṁ_2)
 	D_h = 2b/ϕ
-	CS = np*b*W
+	CS = (np-1)/2*b*W
 
     # ——— Equations ———
     eqs = [
@@ -1346,7 +1524,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
         # capacity rates (incompressible only)
         base.C_1     ~ ṁ_1 * 0.5*(prop1i.cp + prop1o.cp),
 
-		X_in ~ soft_clamp(propref.X, 0.0, 1.0),#ifelse(propref.X<1.0, ifelse(propref.X>0.0, propref.X, -1.0), 2.0),
+		#X_in ~ soft_clamp(propref.X, 0.0, 1.0),#ifelse(propref.X<1.0, ifelse(propref.X>0.0, propref.X, -1.0), 2.0),
 		h_2_raw ~ mean(map(x->h_boiling_Amalfi(
            ṁ_2,                                       # mass‐flow [kg/s]
            x,                                       # fixed quality
@@ -1359,7 +1537,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
            abs(Q)/base.A,                             # q″ [W/m²]
            CS,
 			β,
-		), range(0.0, 1.0, length = 10))),####
+		), range(0.2, 1.0, length = 10))),####FIXME
 		
 		h_2 ~  soft_clamp(h_2_raw, 1000, 20000),
 		
@@ -1369,7 +1547,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
             0.5*(prop1i.cp + prop1o.cp),
             0.5*(prop1i.μ + prop1o.μ),
             0.5*(prop1i.λ + prop1o.λ),
-            b, np, W, ϕ, β
+            b, np, W, ϕ, β, Re_low, Re_high
         ),
 
         # overall U linking
@@ -1385,7 +1563,83 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
 end
 
 
+# ╔═╡ 409aa2af-c6b7-451c-8557-ced24eccc9c1
+"""
+Test function for PhaseChangePlateHX_WithProperties:
+prints geometry, flows, HTCs –and now all the temperatures in °C – for quick debugging.
+"""
+function size_pcpwp_simple()
+    @named hx = PhaseChangePlateHX_WithProperties(
+        Re_low  = 2000.0,
+        Re_high = 2100.0
+    )
+
+	vars = @variables begin
+		
+	end
+	
+    eqs = [
+		
+		hx.b ~ 0.002,
+		hx.np ~ 20,#*factor,
+		hx.W ~ 0.10,
+		hx.ϕ ~1.18,
+		hx.β ~ π/6,
+		hx.th ~ 0.5e-3,
+		hx.λ_pl ~ 16,
+		hx.λ_pitch ~ 4e-3,
+		hx.χ ~ 0.28,
+        #hx.L          ~ 0.2,              # plate length [m]
+		
+		hx.γṁ_1       ~ log(0.4),         # brine flow [kg/s]
+        hx.γṁ_2       ~ log(0.025),         # refrigerant flow [kg/s]
+        hx.T_in_1     ~ 273.15 + 10.0,            # brine inlet [K]
+        hx.T_out_1     ~ 273.15 + 7.0,            # brine outlet [K]
+        #hx.h2i        ~ 250e3,    #
+        hx.h2i        ~ hx.propref.hb,    # 
+        hx.h2o        ~  hx.propref.hd,    # start evaporator at bubble‐point enthalpy
+    ]
+
+    @named sys = ModelingToolkit.compose(
+        NonlinearSystem(eqs, vars, []; name=:test_plate),
+        [hx]
+    )
+    simplified = structural_simplify(sys)
+
+	
+    prob = NonlinearProblem(simplified, [])
+	
+	solver = RobustMultiNewton(autodiff=AutoFiniteDiff());
+	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
+end
+
+# ╔═╡ 51de15da-535e-4908-b346-d69d34e2ce01
+# ╠═╡ disabled = true
+#=╠═╡
+size_pcpwp_simple()
+  ╠═╡ =#
+
+# ╔═╡ fcfeffb2-35aa-4209-a495-ce79949d08e0
+#=╠═╡
+sol_pcpwp.retcode
+  ╠═╡ =#
+
+# ╔═╡ 93114c1c-393c-4569-bcad-936ad8938e44
+#=╠═╡
+sol_pcpwp.resid
+  ╠═╡ =#
+
+# ╔═╡ 86eeb20e-7da2-489d-84af-317f31f63ef4
+#=╠═╡
+sol_pcpwp, simp_pcpwd = test_pcpwp_simple();
+  ╠═╡ =#
+
+# ╔═╡ 7d1b4554-571a-4113-afdd-243a24260b7c
+
+
 # ╔═╡ d01db8eb-17dc-405e-b566-63fa0e86682b
+# ╠═╡ disabled = true
+#=╠═╡
 """
 Test function for PhaseChangePlateHX_WithProperties:
 prints geometry, flows, HTCs –and now all the temperatures in °C – for quick debugging.
@@ -1434,14 +1688,10 @@ function test_pcpwp_simple()
 
 	
     prob = NonlinearProblem(simplified, [])
-
-	solver = NewtonRaphson(; 
-		linesearch = BackTracking(; maxstep=20), 
-	#	autodiff = AutoFiniteDiff()
-	)
-
-	#sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
-	sol = NonlinearSolve.solve(prob, abstol = 1e-6)
+	
+	solver = RobustMultiNewton(autodiff=AutoFiniteDiff());
+	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
+	#sol = NonlinearSolve.solve(prob, abstol = 1e-6)
 	
     # Extract geometry
     b = sol[hx.b]
@@ -1560,23 +1810,20 @@ function test_pcpwp_simple()
 
     return sol, simplified
 end
-
-# ╔═╡ 86eeb20e-7da2-489d-84af-317f31f63ef4
-sol_pcpwp, simp_pcpwd = test_pcpwp_simple();
-
-# ╔═╡ fcfeffb2-35aa-4209-a495-ce79949d08e0
-sol_pcpwp.retcode
-
-# ╔═╡ 93114c1c-393c-4569-bcad-936ad8938e44
-sol_pcpwp.resid
+  ╠═╡ =#
 
 # ╔═╡ 9418798c-4603-498a-ab7a-a45d509aa67f
+#=╠═╡
 sol_pcpwp.retcode
+  ╠═╡ =#
 
 # ╔═╡ 42bda7b4-ea1c-4717-a514-a6d97aa68f93
+#=╠═╡
 sol_pcpwp.resid
+  ╠═╡ =#
 
 # ╔═╡ 1bd62dd3-e84e-4e0b-8731-890cc33286b8
+#=╠═╡
 function Evaporator(; name,
         sec_fluid="MEA", χ=0.28, refrigerant = "R134A")
     # ——— Parameters ———
@@ -1697,8 +1944,10 @@ function Evaporator(; name,
     return ModelingToolkit.compose(sys, [ev, sh]; name=name)
 end
 
+  ╠═╡ =#
 
 # ╔═╡ 2d05d7cf-fa80-4552-a2ca-a5ceac3939f1
+#=╠═╡
 """
 Test function for SinglePhasePlateHX_WithProperties
 """
@@ -1772,20 +2021,30 @@ function test_ev()
     println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
+  ╠═╡ =#
 
 # ╔═╡ 6e831997-cf76-4ea4-815f-8f5ffd48d3e1
+#=╠═╡
 sol_evap = test_ev()
+  ╠═╡ =#
 
 # ╔═╡ e8abe6ea-9eda-4f83-abdc-da2bd91dd26a
+#=╠═╡
 sol_evap.retcode
+  ╠═╡ =#
 
 # ╔═╡ 6e3b84d1-afe1-4c56-98ba-50b2f13cfc46
+#=╠═╡
 sol_evap.resid
+  ╠═╡ =#
 
 # ╔═╡ c81e49af-a294-45d2-b2fd-c605dad70ef3
+#=╠═╡
 sol_evap.stats
+  ╠═╡ =#
 
 # ╔═╡ 1adba409-b8cb-430d-9ab6-c29aad55035f
+#=╠═╡
 
 # 1) Factor out your problem‐construction into its own function:
 function make_evap_comp_prob()
@@ -1824,6 +2083,7 @@ function make_evap_comp_prob()
     simp  = structural_simplify(sys)
     NonlinearProblem(simp, [])            # <-- no u0/p here yet
 end
+  ╠═╡ =#
 
 # ╔═╡ fddf235e-b540-4bc9-99d6-b75a7c49bdf6
 """
@@ -1847,7 +2107,9 @@ end
 
 
 # ╔═╡ 6466aac2-8c05-4bea-a0bc-d2c4723529e0
+#=╠═╡
 prob_1 = make_evap_comp_prob()
+  ╠═╡ =#
 
 # ╔═╡ 192d94f7-1dba-4ccf-8a14-7f1e090e84f5
 solver_1 = TrustRegion(autodiff = AutoFiniteDiff())
@@ -1865,6 +2127,7 @@ sol_5.u
   ╠═╡ =#
 
 # ╔═╡ 832139e7-83e3-496e-8e84-3499c4b9c04b
+#=╠═╡
 function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
     # —— Variables with initial guesses ——
     vars = @variables begin
@@ -1983,6 +2246,7 @@ function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
     sys = NonlinearSystem(eqs, vars, [], systems=[evaporator, compressor, inlet_evap, outlet_cond, outlet_comp, inlet_comp], name=name)
     return sys
 end
+  ╠═╡ =#
 
 # ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
 #=╠═╡
@@ -2016,6 +2280,7 @@ sol_cycle.retcode
   ╠═╡ =#
 
 # ╔═╡ 5eae6b7f-ee19-4f7e-8943-e8828ef027fb
+#=╠═╡
 function test_thermodynamic_cycle()
     refrigerant = "R134A"
     fluid = "MEA"
@@ -2078,8 +2343,10 @@ function test_thermodynamic_cycle()
     println(sol[cycle.evaporator.T_out_1]-273.15, " C")
     return sol
 end
+  ╠═╡ =#
 
 # ╔═╡ f66a54da-5889-4dfb-a093-5a8eb8964b42
+#=╠═╡
 # 1) Factor out your problem‐construction into its own function:
 function make_thermodynamic_cycle_prob()
     refrigerant = "R134A"
@@ -2124,9 +2391,12 @@ function make_thermodynamic_cycle_prob()
                    )
     prob2 = NonlinearProblem(simplified2, u0_second)
 end
+  ╠═╡ =#
 
 # ╔═╡ d2b14ef0-9b53-4846-a169-27de59cb9f0f
+#=╠═╡
 prob_cycle = make_thermodynamic_cycle_prob()
+  ╠═╡ =#
 
 # ╔═╡ d3cc6b23-4a6d-451c-8a6e-81bf1b71abfb
 # ╠═╡ disabled = true
@@ -2187,6 +2457,7 @@ end
 
 
 # ╔═╡ 819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+#=╠═╡
 """
 
 """
@@ -2282,8 +2553,10 @@ function GSHP(; name,
     return ModelingToolkit.compose(sys,
         [cycle, bhe, pump, phx], name = name)
 end
+  ╠═╡ =#
 
 # ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
+#=╠═╡
 """
 Test routine for the GSHP model
 """
@@ -2377,6 +2650,7 @@ function test_GSHP()
 	println(hp.phx.Δp)
     return sol.retcode
 end
+  ╠═╡ =#
 
 # ╔═╡ 94ae6b58-139f-4236-945a-1afc3a661056
 # ╠═╡ disabled = true
@@ -2684,6 +2958,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 2a4c04e6-875e-453a-9be5-6194a5530c06
+#=╠═╡
 function GSHP_thermal(; name,
                      refrigerant = "R134A",
                      fluid       = "MEA",
@@ -2814,6 +3089,7 @@ function GSHP_thermal(; name,
     sys = NonlinearSystem(eqs, sts, ps, name=name)
     return ModelingToolkit.compose(sys, [cycle, bhe_thermal])
 end
+  ╠═╡ =#
 
 # ╔═╡ b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
 """
@@ -2917,7 +3193,59 @@ function GSHP_hydraulics(; name::Symbol, fluid::String="MEA")
     return compose(parent_system, [pump, bhe, phx])
 end
 
+# ╔═╡ 6e243cf3-1f76-4648-b709-e1f8d7fd4c15
+#=╠═╡
+solh.retcode
+  ╠═╡ =#
+
+# ╔═╡ bd9e4d44-4b7b-4b54-8680-20c932e8ea75
+#=╠═╡
+solh[sys_h.pump.base.exceeding_max_speed]
+  ╠═╡ =#
+
+# ╔═╡ 4374a31a-5161-47ae-883a-00dbbbbbe579
+#=╠═╡
+solh[sys_h.pump.base.P_elec]
+  ╠═╡ =#
+
+# ╔═╡ 5c35dd43-12de-475a-96bf-fb5614074415
+#=╠═╡
+pie([solh[sys_h.pump.base.Δp]; solh[sys_h.phx.base.Δp]])
+  ╠═╡ =#
+
+# ╔═╡ 40c8dc3c-87f8-46e8-a70e-6acc354d5020
+#=╠═╡
+begin    
+	
+	# 1a) Build the system
+	@named sys_h = GSHP_hydraulics()               # uses your defaults dict internally
+	
+	# 1b) Simplify/compile
+	ssys_h = structural_simplify(sys_h)
+	
+	# 1c) Define your baseline parameters as a NamedTuple
+	p3 = [
+	  :b       => 2.0e-3,
+	  :np      => 20.0,
+	  :W       => 0.14,
+	  :ϕ       => 1.18,
+	  :β       => π/6,
+	  :th      => 0.5e-3,
+	  :λ_pl    => 16.0,
+	  :λ_pitch => 4e-3,
+	  :χ       => 0.28,
+	  :L       => 0.32,
+	]
+	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
+	probh = NonlinearProblem(ssys_h, nothing, p3)
+	
+	# 1e) Solve it
+	solh = solve(probh, solver1, abstol = 1e-6)
+end
+  ╠═╡ =#
+
 # ╔═╡ 8d3a070d-682b-47f4-bfd6-9feb53ce9ccc
+#=╠═╡
 begin    
 	
 	solver1 = RobustMultiNewton(
@@ -2950,47 +3278,7 @@ begin
 	# 1e) Solve it
 	sol = solve(prob1, solver1, abstol = 1e-6)
 end
-
-# ╔═╡ 40c8dc3c-87f8-46e8-a70e-6acc354d5020
-begin    
-	
-	# 1a) Build the system
-	@named sys_h = GSHP_hydraulics()               # uses your defaults dict internally
-	
-	# 1b) Simplify/compile
-	ssys_h = structural_simplify(sys_h)
-	
-	# 1c) Define your baseline parameters as a NamedTuple
-	p3 = [
-	  :b       => 2.0e-3,
-	  :np      => 20.0,
-	  :W       => 0.14,
-	  :ϕ       => 1.18,
-	  :β       => π/6,
-	  :th      => 0.5e-3,
-	  :λ_pl    => 16.0,
-	  :λ_pitch => 4e-3,
-	  :χ       => 0.28,
-	  :L       => 0.32,
-	]
-	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
-	probh = NonlinearProblem(ssys_h, nothing, p3)
-	
-	# 1e) Solve it
-	solh = solve(probh, solver1, abstol = 1e-6)
-end
-
-# ╔═╡ 6e243cf3-1f76-4648-b709-e1f8d7fd4c15
-solh.retcode
-
-# ╔═╡ bd9e4d44-4b7b-4b54-8680-20c932e8ea75
-solh[sys_h.pump.base.exceeding_max_speed]
-
-# ╔═╡ 4374a31a-5161-47ae-883a-00dbbbbbe579
-solh[sys_h.pump.base.P_elec]
-
-# ╔═╡ 5c35dd43-12de-475a-96bf-fb5614074415
-pie([solh[sys_h.pump.base.Δp]; solh[sys_h.phx.base.Δp]])
+  ╠═╡ =#
 
 # ╔═╡ ed8fd1d6-c51b-4130-8f7c-795231d68ed4
 	p1 = [
@@ -3014,15 +3302,21 @@ typeof(p1)
 solver3 = FastShortcutNLLSPolyalg(autodiff = AutoFiniteDiff());
 
 # ╔═╡ 68c8ec06-1e1e-425f-b872-29634be28c3f
+#=╠═╡
 
 	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
 	prob2 = remake(prob1, u0 = sol.u, p=p1)
+  ╠═╡ =#
 
 # ╔═╡ 06a0d9eb-486f-4839-b949-c0a80f6859fa
+#=╠═╡
 sol2 = NonlinearSolve.solve(prob2, solver3; abstol = 1e-6)
+  ╠═╡ =#
 
 # ╔═╡ ffc2b597-b234-407d-b0cc-76a0bf114535
+#=╠═╡
 sol2.retcode
+  ╠═╡ =#
 
 # ╔═╡ 25ad6ddd-1836-4d04-a10d-136f68308347
 
@@ -3177,6 +3471,7 @@ end
 # 7. Helper function to create problems
 
 # ╔═╡ 76cc998b-9a7f-4b1c-8403-c16bccbda74e
+#=╠═╡
 function prepare_problems()
     # Build thermal system
     @named sys_thermal = GSHP_thermal()
@@ -3191,6 +3486,7 @@ function prepare_problems()
     return thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic
 end
 
+  ╠═╡ =#
 
 # ╔═╡ d7090f5b-50f6-4198-9237-8447ae442789
 solver_fast = FastShortcutNLLSPolyalg(autodiff=AutoFiniteDiff());
@@ -3205,7 +3501,9 @@ solver_fallback = NewtonRaphson(autodiff=AutoForwardDiff());
 solvers = [solver_fast, solver_robust, solver_fallback];
 
 # ╔═╡ a4b78e57-3f4a-4bd1-a4fd-344aed782596
+#=╠═╡
 thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems();
+  ╠═╡ =#
 
 # ╔═╡ 58a5d982-5d07-4a63-950a-ca5639cff43f
 base_params = [
@@ -3223,16 +3521,21 @@ base_params = [
 ]
 
 # ╔═╡ ceb2b429-90ae-4bc5-b346-e65e5727d441
+#=╠═╡
 sol_start_thermal = NonlinearSolve.solve(thermal_prob, solver_robust; abstol = 1e-6)
+  ╠═╡ =#
 
 # ╔═╡ 6ac1ecbf-4833-449f-9933-c782a8566fb0
+#=╠═╡
 sol_start_hydraulic = NonlinearSolve.solve(hydraulic_prob, solver_robust; abstol = 1e-6)
+  ╠═╡ =#
 
 # ╔═╡ 8b6e0e2e-ecc5-475e-bd31-1f23893dcb38
 W_vals = 0.1:0.02:0.16
 
 # ╔═╡ 892ef213-3229-4d91-9ba7-742127f366c8
 # ╠═╡ show_logs = false
+#=╠═╡
 results_thermal_init, results_hydraulic_init = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3243,6 +3546,7 @@ results_thermal_init, results_hydraulic_init = parameter_sweep(
     solvers,
 	 previous_sol_thermal=sol_start_thermal, previous_sol_hydraulic=sol_start_hydraulic
 )
+  ╠═╡ =#
 
 # ╔═╡ 0ddc1362-ee46-452b-a5d7-6d03df36e31d
 params_np = [
@@ -3264,6 +3568,7 @@ np_vals = 25:5:60
 
 # ╔═╡ 19556fe1-b85d-4da1-ac62-a56b5a72618b
 # ╠═╡ show_logs = false
+#=╠═╡
 results_thermal_init_np, results_hydraulic_init_np = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3274,6 +3579,7 @@ results_thermal_init_np, results_hydraulic_init_np = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init[end], previous_sol_hydraulic=results_hydraulic_init[end]
 )
+  ╠═╡ =#
 
 # ╔═╡ af94b9d0-44ca-42e4-9e8c-96f5864bc80d
 params_b = [
@@ -3295,6 +3601,7 @@ b_vals = 1.5e-3:0.25e-3:2e-3
 
 # ╔═╡ 670cd198-239a-4240-be5d-2def55383a36
 # ╠═╡ show_logs = false
+#=╠═╡
 results_thermal_init_b, results_hydraulic_init_b = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3305,6 +3612,7 @@ results_thermal_init_b, results_hydraulic_init_b = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init[end], previous_sol_hydraulic=results_hydraulic_init[end]
 )
+  ╠═╡ =#
 
 # ╔═╡ a208968e-8f31-4a82-b8f3-9db4a8d27e8b
 params_ΔT = [
@@ -3335,6 +3643,7 @@ length(ΔT_SF_vals)
 
 # ╔═╡ 0f6b83f7-167a-4e3f-9fd5-d4f4695fbaea
 # ╠═╡ show_logs = false
+#=╠═╡
 results_thermal, results_hydraulic = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3345,12 +3654,14 @@ results_thermal, results_hydraulic = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init_b[end], previous_sol_hydraulic=results_hydraulic_init_b[end]
 )
+  ╠═╡ =#
 
 # ╔═╡ bfe4471c-7033-4ca5-beb1-530a8be5b757
 ΔT_SF_vals_down = log.(3.5:-1.5:1)
 
 # ╔═╡ 798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═╡ show_logs = false
+#=╠═╡
 results_thermal_down, results_hydraulic_down = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3361,12 +3672,17 @@ results_thermal_down, results_hydraulic_down = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init_b[end], previous_sol_hydraulic=results_hydraulic_init_b[end]
 )
+  ╠═╡ =#
 
 # ╔═╡ 05bbe96e-023c-413b-a347-d37e74fad7fe
+#=╠═╡
 res_thermal_overall = [results_thermal; results_thermal_down];
+  ╠═╡ =#
 
 # ╔═╡ fecd7f3d-bf0b-464e-a1ad-238e508b0f38
+#=╠═╡
 res_hydraulic_overall = [results_hydraulic; results_hydraulic_down];
+  ╠═╡ =#
 
 # ╔═╡ 0fe18091-e8f6-42d4-9961-5783452ddefd
 #=╠═╡
@@ -3868,6 +4184,7 @@ sol_size = size_ev()
   ╠═╡ =#
 
 # ╔═╡ ab30e6b5-8ac9-4ae0-a855-299eee9e9543
+#=╠═╡
 """
 Test function for SinglePhasePlateHX_WithProperties
 """
@@ -3943,6 +4260,7 @@ function size_ev()
     println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
+  ╠═╡ =#
 
 # ╔═╡ e563b30e-38b6-46db-9a74-184dd0a9117c
 md" # Quick analysis: parametric study"
@@ -6911,15 +7229,20 @@ version = "4.1.0+0"
 # ╟─d70ebc3d-7082-4043-925d-220f0ac753f7
 # ╟─65e682c7-af7f-43ec-aa70-e12553026888
 # ╠═62cea410-f0af-4219-a7df-92a0e574d74d
-# ╠═deee4a30-20ae-49b1-b5e5-21546d923dbe
 # ╠═2ed52c9e-a7ec-4793-a4c4-4a1a1611636f
-# ╠═bda9cb58-5812-4e94-bfbf-920ae312ef2e
-# ╟─e438b966-15eb-42e4-a610-0fc426385bc7
-# ╟─96966964-d666-4dc2-a554-8c359e3db528
+# ╠═a1eec254-6b86-440d-a2a4-2151d588dc23
+# ╠═e51c75dc-07f3-4682-9ce2-ed2e72977ea5
+# ╠═d31ad2dc-528d-46f6-a19f-90658a1615d0
+# ╠═19a9664b-cfa8-4a1a-b2bb-ed3f8c357100
+# ╠═70ca56b4-dcde-44a2-aa6c-cd5b84c28c16
+# ╠═ce7c4e4d-e0ef-4b49-8ae8-0f63acfe4dc4
+# ╠═6be93b5a-be7d-47ad-81ef-72e3d7350fd6
+# ╠═e438b966-15eb-42e4-a610-0fc426385bc7
+# ╠═96966964-d666-4dc2-a554-8c359e3db528
 # ╠═b41466ba-fcff-4def-957b-2b96032643aa
 # ╠═9b117e8b-7a38-49ba-9586-f3aacaafa0f3
 # ╠═143ccb02-56b0-4b50-a1e5-0d06b53f1b46
-# ╟─98c20212-3447-481c-b0d4-326a1703997c
+# ╠═98c20212-3447-481c-b0d4-326a1703997c
 # ╟─f7eeabcd-23e6-4733-81aa-a6bbde82837e
 # ╠═9d502c24-7e38-4c3f-96ed-0e18425d82d9
 # ╟─0907ee2b-5ce8-4789-936a-ec14a4c3c059
@@ -6927,13 +7250,16 @@ version = "4.1.0+0"
 # ╠═eb386e80-6a11-4b38-b55a-50bbad670474
 # ╠═07f01adf-8cc7-4a40-aa14-a90cef491b95
 # ╠═11823168-8288-49db-88e8-319df4535273
+# ╠═409aa2af-c6b7-451c-8557-ced24eccc9c1
+# ╠═51de15da-535e-4908-b346-d69d34e2ce01
 # ╠═fcfeffb2-35aa-4209-a495-ce79949d08e0
 # ╠═93114c1c-393c-4569-bcad-936ad8938e44
 # ╠═86eeb20e-7da2-489d-84af-317f31f63ef4
+# ╠═7d1b4554-571a-4113-afdd-243a24260b7c
 # ╠═d01db8eb-17dc-405e-b566-63fa0e86682b
 # ╠═9418798c-4603-498a-ab7a-a45d509aa67f
 # ╠═42bda7b4-ea1c-4717-a514-a6d97aa68f93
-# ╟─1bd62dd3-e84e-4e0b-8731-890cc33286b8
+# ╠═1bd62dd3-e84e-4e0b-8731-890cc33286b8
 # ╠═2d05d7cf-fa80-4552-a2ca-a5ceac3939f1
 # ╠═6e831997-cf76-4ea4-815f-8f5ffd48d3e1
 # ╠═e8abe6ea-9eda-4f83-abdc-da2bd91dd26a
