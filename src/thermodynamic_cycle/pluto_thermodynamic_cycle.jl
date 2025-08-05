@@ -37,12 +37,30 @@ using AlgebraOfGraphics
 # ╔═╡ fe20b40a-ce2a-408d-89c4-3bd17255ad62
 using LaTeXStrings
 
+# ╔═╡ f0fa9e95-4369-480d-a6d4-d6b545504686
+using ProgressMeter
+
+# ╔═╡ 68df8cdc-5652-4fd7-9391-b9de65722f10
+using SharedArrays
+
+# ╔═╡ 6e948a61-d8bb-4d93-b6e6-da19256cb24f
+using Base.Threads
+
 # ╔═╡ 734d74db-7b19-42fd-89ad-78816a939565
 @fromparent begin
 	using ..Properties
 	using ..Thermal
 	using ..Hydraulics
 end
+
+# ╔═╡ 8527ed5d-3ff6-435d-a93d-548c824dee78
+using Interpolations
+
+# ╔═╡ eadd49a1-7bca-40a2-abdb-064a0fb710e6
+using Roots
+
+# ╔═╡ 6f32ff1e-5faa-4551-a898-01167021e4a4
+using AlgebraOfGraphics: VLines, color
 
 # ╔═╡ e9a4105f-abec-47ca-9170-ca6aef7a9c49
 using MonteCarloMeasurements
@@ -52,6 +70,9 @@ using Distributions
 
 # ╔═╡ 5870e251-b3da-42b7-b72f-211e74c669fc
 using LinearAlgebra
+
+# ╔═╡ a2cd3b4a-713b-4d5d-8739-139d0a64214c
+println("Threads available: ", nthreads())
 
 # ╔═╡ f3070a9a-d98b-49b8-b300-631a4065211e
 set_theme!(
@@ -70,6 +91,12 @@ set_theme!(
     )
 )
 
+
+# ╔═╡ 2ab2c592-3e29-4031-8d19-8856f3cdbc6e
+# ╠═╡ disabled = true
+#=╠═╡
+sanity_check_real()
+  ╠═╡ =#
 
 # ╔═╡ 004dd778-a212-4147-a9c0-ad60f1eb539b
 """
@@ -359,7 +386,10 @@ function test_compressor()
 end
 
 # ╔═╡ 18475dd7-225b-48d5-b88a-81f4223b8dd8
+# ╠═╡ disabled = true
+#=╠═╡
 test_compressor()
+  ╠═╡ =#
 
 # ╔═╡ e9829f7f-cfd0-4a4a-ae4c-00ff405cca42
 function htc(ρ, ṁ, dh, μ, β, b, np)
@@ -631,16 +661,25 @@ function test_single_phase_hx_temps()
 end
 
 # ╔═╡ 5818a465-6685-40da-b0eb-a7e035c0170c
+# ╠═╡ disabled = true
+#=╠═╡
 test_sys,simple = test_single_phase_hx_temps();
+  ╠═╡ =#
 
 # ╔═╡ 87178d51-5926-4ae4-aea4-cbfc211d7200
+#=╠═╡
 unknowns(simple)
+  ╠═╡ =#
 
 # ╔═╡ 010a0e27-2e68-427b-9fef-569a32590d87
+#=╠═╡
 full_equations(simple)
+  ╠═╡ =#
 
 # ╔═╡ 11df4133-c9f6-436a-9b2b-ada02f872bf0
+#=╠═╡
 equations(simple)
+  ╠═╡ =#
 
 # ╔═╡ 65e682c7-af7f-43ec-aa70-e12553026888
 md"""
@@ -725,6 +764,18 @@ fixed = Dict(
   :ϕ  => 1.18
 )
 
+# ╔═╡ 6be93b5a-be7d-47ad-81ef-72e3d7350fd6
+# ╠═╡ disabled = true
+#=╠═╡
+df = sweep_h_plate(ranges; fixed)
+  ╠═╡ =#
+
+# ╔═╡ 143ccb02-56b0-4b50-a1e5-0d06b53f1b46
+# ╠═╡ disabled = true
+#=╠═╡
+test_PHX_Superheater()
+  ╠═╡ =#
+
 # ╔═╡ f7eeabcd-23e6-4733-81aa-a6bbde82837e
 md"""
 ## Base problem for the Phase change NTU
@@ -805,7 +856,10 @@ end
 # run test
 
 # ╔═╡ 039f80ce-620b-4863-aa98-1f0f2ed49a7e
+# ╠═╡ disabled = true
+#=╠═╡
 test_phase_change_hx()
+  ╠═╡ =#
 
 # ╔═╡ eb386e80-6a11-4b38-b55a-50bbad670474
 """
@@ -926,9 +980,6 @@ function sanity_check_real()
     end
     
 end
-
-# ╔═╡ 2ab2c592-3e29-4031-8d19-8856f3cdbc6e
-sanity_check_real()
 
 # ╔═╡ 07f01adf-8cc7-4a40-aa14-a90cef491b95
 """
@@ -1094,11 +1145,6 @@ end
 
   ╠═╡ =#
 
-# ╔═╡ 6be93b5a-be7d-47ad-81ef-72e3d7350fd6
-#=╠═╡
-df = sweep_h_plate(ranges; fixed)
-  ╠═╡ =#
-
 # ╔═╡ e438b966-15eb-42e4-a610-0fc426385bc7
 
 """
@@ -1260,7 +1306,10 @@ end
 
 
 # ╔═╡ b41466ba-fcff-4def-957b-2b96032643aa
+# ╠═╡ disabled = true
+#=╠═╡
 simp = test_single_phase_plate_hx()
+  ╠═╡ =#
 
 # ╔═╡ 9b117e8b-7a38-49ba-9586-f3aacaafa0f3
 function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
@@ -1319,7 +1368,7 @@ function PHX_Superheater(; name, sec_fluid = "MEA", refrigerant = "R134A",
     # ——— Equationss ———
     eqs = [
         # geometry mapping
-        A           ~ L*(np-1)/2*W*ϕ,
+        A           ~ L*(np-1)*W*ϕ,
         A           ~ base.A,
 
 		propref.logp ~ logpref,
@@ -1446,13 +1495,10 @@ function test_PHX_Superheater()
 end
 
 
-# ╔═╡ 143ccb02-56b0-4b50-a1e5-0d06b53f1b46
-test_PHX_Superheater()
-
 # ╔═╡ 11823168-8288-49db-88e8-319df4535273
 function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigerant = "R134A",
-                         Re_low=2000,        # blender limits
-                         Re_high=2100)
+                         Re_low=1000,        # blender limits
+                         Re_high=2000)
 
 
 		
@@ -1507,7 +1553,7 @@ function PhaseChangePlateHX_WithProperties(; name, sec_fluid = "MEA", refrigeran
     # ——— Equations ———
     eqs = [
         # geometry
-        base.A       ~ L * np * W * ϕ,
+        base.A       ~ L * (np-1) * W * ϕ,
 
         # incompressible side mapping
         T_in_1       ~ base.T_in_1,
@@ -1570,8 +1616,8 @@ prints geometry, flows, HTCs –and now all the temperatures in °C – for quic
 """
 function size_pcpwp_simple()
     @named hx = PhaseChangePlateHX_WithProperties(
-        Re_low  = 2000.0,
-        Re_high = 2100.0
+        Re_low  = 1000.0,
+        Re_high = 2000.0
     )
 
 	vars = @variables begin
@@ -1582,7 +1628,7 @@ function size_pcpwp_simple()
 		
 		hx.b ~ 0.002,
 		hx.np ~ 20,#*factor,
-		hx.W ~ 0.10,
+		hx.W ~ 0.07,
 		hx.ϕ ~1.18,
 		hx.β ~ π/6,
 		hx.th ~ 0.5e-3,
@@ -1610,13 +1656,21 @@ function size_pcpwp_simple()
     prob = NonlinearProblem(simplified, [])
 	
 	solver = RobustMultiNewton(autodiff=AutoFiniteDiff());
+	
 	sol = NonlinearSolve.solve(prob, solver, abstol = 1e-6)
+	println(sol[sys.hx.L])
+	return sol
 end
 
 # ╔═╡ 51de15da-535e-4908-b346-d69d34e2ce01
 # ╠═╡ disabled = true
 #=╠═╡
-size_pcpwp_simple()
+sol_size = size_pcpwp_simple()
+  ╠═╡ =#
+
+# ╔═╡ 9b9c3b3b-6e9e-49c0-8498-99217be15b2e
+#=╠═╡
+sol_size.retcode
   ╠═╡ =#
 
 # ╔═╡ fcfeffb2-35aa-4209-a495-ce79949d08e0
@@ -1630,6 +1684,7 @@ sol_pcpwp.resid
   ╠═╡ =#
 
 # ╔═╡ 86eeb20e-7da2-489d-84af-317f31f63ef4
+# ╠═╡ disabled = true
 #=╠═╡
 sol_pcpwp, simp_pcpwd = test_pcpwp_simple();
   ╠═╡ =#
@@ -1638,8 +1693,6 @@ sol_pcpwp, simp_pcpwd = test_pcpwp_simple();
 
 
 # ╔═╡ d01db8eb-17dc-405e-b566-63fa0e86682b
-# ╠═╡ disabled = true
-#=╠═╡
 """
 Test function for PhaseChangePlateHX_WithProperties:
 prints geometry, flows, HTCs –and now all the temperatures in °C – for quick debugging.
@@ -1771,7 +1824,6 @@ function test_pcpwp_simple()
     println("  T_brine_out    = ", round(T_out_1, digits=2), " °C")
     println("  T_evaporation  = ", round(T_sat, digits=4), " °C")
     println("  p_evaporation  = ", round(p_ref/1e5, digits=4), " bar")
-    println("  X  = ", round(sol[hx.X_in]/1e2, digits=4) , " %")
     println("  X  = ", round(sol[hx.propref.X]/1e2, digits=4) , " %")
 	
     println("  ΔT_approach    = ", round(T_in_1 - T_sat, digits=2), " K")
@@ -1810,7 +1862,6 @@ function test_pcpwp_simple()
 
     return sol, simplified
 end
-  ╠═╡ =#
 
 # ╔═╡ 9418798c-4603-498a-ab7a-a45d509aa67f
 #=╠═╡
@@ -1823,7 +1874,6 @@ sol_pcpwp.resid
   ╠═╡ =#
 
 # ╔═╡ 1bd62dd3-e84e-4e0b-8731-890cc33286b8
-#=╠═╡
 function Evaporator(; name,
         sec_fluid="MEA", χ=0.28, refrigerant = "R134A")
     # ——— Parameters ———
@@ -1944,10 +1994,8 @@ function Evaporator(; name,
     return ModelingToolkit.compose(sys, [ev, sh]; name=name)
 end
 
-  ╠═╡ =#
 
 # ╔═╡ 2d05d7cf-fa80-4552-a2ca-a5ceac3939f1
-#=╠═╡
 """
 Test function for SinglePhasePlateHX_WithProperties
 """
@@ -2021,9 +2069,9 @@ function test_ev()
     println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
-  ╠═╡ =#
 
 # ╔═╡ 6e831997-cf76-4ea4-815f-8f5ffd48d3e1
+# ╠═╡ disabled = true
 #=╠═╡
 sol_evap = test_ev()
   ╠═╡ =#
@@ -2044,7 +2092,6 @@ sol_evap.stats
   ╠═╡ =#
 
 # ╔═╡ 1adba409-b8cb-430d-9ab6-c29aad55035f
-#=╠═╡
 
 # 1) Factor out your problem‐construction into its own function:
 function make_evap_comp_prob()
@@ -2083,7 +2130,6 @@ function make_evap_comp_prob()
     simp  = structural_simplify(sys)
     NonlinearProblem(simp, [])            # <-- no u0/p here yet
 end
-  ╠═╡ =#
 
 # ╔═╡ fddf235e-b540-4bc9-99d6-b75a7c49bdf6
 """
@@ -2107,12 +2153,10 @@ end
 
 
 # ╔═╡ 6466aac2-8c05-4bea-a0bc-d2c4723529e0
-#=╠═╡
-prob_1 = make_evap_comp_prob()
-  ╠═╡ =#
+prob_1 = make_evap_comp_prob();
 
 # ╔═╡ 192d94f7-1dba-4ccf-8a14-7f1e090e84f5
-solver_1 = TrustRegion(autodiff = AutoFiniteDiff())
+solver_1 = TrustRegion(autodiff = AutoFiniteDiff());
 
 
 # ╔═╡ e4f83718-32dd-4170-bfae-36c5edd28997
@@ -2127,7 +2171,6 @@ sol_5.u
   ╠═╡ =#
 
 # ╔═╡ 832139e7-83e3-496e-8e84-3499c4b9c04b
-#=╠═╡
 function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
     # —— Variables with initial guesses ——
     vars = @variables begin
@@ -2246,7 +2289,6 @@ function ThermodynamicCycle(; name, refrigerant="R134A", fluid="MEA")
     sys = NonlinearSystem(eqs, vars, [], systems=[evaporator, compressor, inlet_evap, outlet_cond, outlet_comp, inlet_comp], name=name)
     return sys
 end
-  ╠═╡ =#
 
 # ╔═╡ e09caba7-c987-4c7b-af32-beec786c2504
 #=╠═╡
@@ -2280,7 +2322,6 @@ sol_cycle.retcode
   ╠═╡ =#
 
 # ╔═╡ 5eae6b7f-ee19-4f7e-8943-e8828ef027fb
-#=╠═╡
 function test_thermodynamic_cycle()
     refrigerant = "R134A"
     fluid = "MEA"
@@ -2343,10 +2384,8 @@ function test_thermodynamic_cycle()
     println(sol[cycle.evaporator.T_out_1]-273.15, " C")
     return sol
 end
-  ╠═╡ =#
 
 # ╔═╡ f66a54da-5889-4dfb-a093-5a8eb8964b42
-#=╠═╡
 # 1) Factor out your problem‐construction into its own function:
 function make_thermodynamic_cycle_prob()
     refrigerant = "R134A"
@@ -2391,12 +2430,9 @@ function make_thermodynamic_cycle_prob()
                    )
     prob2 = NonlinearProblem(simplified2, u0_second)
 end
-  ╠═╡ =#
 
 # ╔═╡ d2b14ef0-9b53-4846-a169-27de59cb9f0f
-#=╠═╡
 prob_cycle = make_thermodynamic_cycle_prob()
-  ╠═╡ =#
 
 # ╔═╡ d3cc6b23-4a6d-451c-8a6e-81bf1b71abfb
 # ╠═╡ disabled = true
@@ -2408,13 +2444,11 @@ solver3       = NewtonRaphson(
   ╠═╡ =#
 
 # ╔═╡ d930fddf-92b8-468c-a556-f0126a93eb43
-# ╠═╡ disabled = true
 #=╠═╡
 sol_4 = NonlinearSolve.solve(prob_cycle, solver3)
   ╠═╡ =#
 
 # ╔═╡ b5d46480-3583-4eff-aeec-861e2b1bd1cb
-# ╠═╡ disabled = true
 #=╠═╡
 sol_4.retcode
   ╠═╡ =#
@@ -2457,7 +2491,6 @@ end
 
 
 # ╔═╡ 819264a6-e4b7-406c-9d97-8ac0f36c3ea8
-#=╠═╡
 """
 
 """
@@ -2553,10 +2586,8 @@ function GSHP(; name,
     return ModelingToolkit.compose(sys,
         [cycle, bhe, pump, phx], name = name)
 end
-  ╠═╡ =#
 
 # ╔═╡ 80885b7b-9ab2-4010-a954-ed4790c277f0
-#=╠═╡
 """
 Test routine for the GSHP model
 """
@@ -2650,36 +2681,23 @@ function test_GSHP()
 	println(hp.phx.Δp)
     return sol.retcode
 end
-  ╠═╡ =#
 
-# ╔═╡ 94ae6b58-139f-4236-945a-1afc3a661056
+# ╔═╡ 3ad72686-9a35-4486-a71c-180cba7d46a2
 # ╠═╡ disabled = true
 #=╠═╡
+test_GSHP()
+  ╠═╡ =#
+
+# ╔═╡ 241265f4-f66f-4158-855f-89f002f23d4e
 """
 
 """
-function GSHP_pars(; name,
+function GSHP_stripped(; name,
                      refrigerant = "R134A",
                      fluid       = "MEA",
                      χ           = 0.28,)
     # ——— Parameters ———
     ps = @parameters begin
-		b =  1.5e-3
-        np = 20
-        W = 0.10
-        ϕ = 1.18
-        β = π/6
-        th = 0.5e-3
-        λ_pl = 16
-        λ_pitch = 4e-3
-        χ = 0.28
-        L = 0.32
-
-        f = 50
-        #log_ΔTSF = log(3.5)
-        #log_ΔTSH = log(7)
-        #log_ΔTSC = log(5)
-        #logp_h = log(14e5)
     end
 
     # ——— State variables ———
@@ -2699,11 +2717,9 @@ function GSHP_pars(; name,
 		logp_h = 10e5
 
 		W_comp = 1000
-		P_elec_pump = 1000
 		Q_evap = 2000
 		Q_cond = -3000
 		COP1 = 5
-		COP2 = 5
     end
 
     # ——— Property components ———
@@ -2714,47 +2730,10 @@ function GSHP_pars(; name,
                                   λ_grout=1.5, λ_soil=2.0,
                                   T_wall=273.15 + 10, s=0.075, χ=0.23)
 
-    # Create the base model with a standard pump
-    @named pump = Hydraulics.DynamicPropBasicPump(
-        H_shutoff = 12,
-        Q_max = 13/3600,
-        fluid = fluid
-    )
-
-
-
-    @named phx = Hydraulics.DynamicPropPlateHeatExchanger(
-        fluid = "MEA"
-    )
     
     # ——— Governing equations ———
 	
     eqs = [
-		
-        cycle.evaporator.b ~ b,
-        cycle.evaporator.np ~ np,
-        cycle.evaporator.W ~ W,
-        cycle.evaporator.ϕ ~ ϕ,
-        cycle.evaporator.β ~ β,
-        cycle.evaporator.th ~ th,
-        cycle.evaporator.λ_pl ~ λ_pl,
-        cycle.evaporator.λ_pitch ~ λ_pitch,
-        cycle.evaporator.χ ~ χ,
-        cycle.evaporator.L ~ L,
-
-		
-		phx.L ~ L,
-		phx.W ~ W,
-		phx.b ~ b,
-		phx.np ~ np,
-		phx.ϕ ~ ϕ,
-		phx.β ~ β,
-		
-        cycle.f ~ f,
-        #cycle.log_ΔTSF ~ log_ΔTSF,
-        #cycle.log_ΔTSH ~ log_ΔTSH,
-        #cycle.log_ΔTSC ~ log_ΔTSC,
-        #cycle.logp_h ~ logp_h,
 
         T_i_b ~ cycle.T_i_b,
         T_o_b ~ cycle.T_o_b,
@@ -2770,200 +2749,43 @@ function GSHP_pars(; name,
         logp_l ~ cycle.logp_l,
         logp_h ~ cycle.logp_h,
         W_comp ~ cycle.W_comp,
-        P_elec_pump ~ pump.base.P_elec,
         Q_evap ~ cycle.Q_evap,
         Q_cond ~ cycle.Q_cond,
         COP1 ~ cycle.COP1,
-        COP2 ~ -Q_cond/(W_comp+P_elec_pump),
 		
 		bhe.T_2 ~ cycle.T_i_b,
 		cycle.T_o_b ~ bhe.T_1,
 		exp(cycle.γṁ_sf) ~ bhe.ṁ,
-		pump.props.T ~ bhe.T_1,
-		pump.base.ṁ ~ bhe.ṁ,
-		phx.base.ṁ ~ bhe.ṁ,
-		pump.base.Δp ~ 1e5,#phx.phx.Δp,
-		phx.props.T ~ bhe.T_1,
-    ]
-
-    # ——— Assemble system ———
-    #sys = NonlinearSystem(eqs, sts, ps, name = name)
-	sys = NonlinearSystem(
-	  eqs, sts, ps;
-	  name     = name,
-	  defaults = Dict(
-        cycle.evaporator.b => b,
-        cycle.evaporator.np => np,
-        cycle.evaporator.W => W,
-        cycle.evaporator.ϕ => ϕ,
-        cycle.evaporator.β => β,
-        cycle.evaporator.th => th,
-        cycle.evaporator.λ_pl => λ_pl,
-        cycle.evaporator.λ_pitch => λ_pitch,
-        cycle.evaporator.χ => χ,
-        cycle.evaporator.L => L,
-		phx.L => L,
-		phx.W => W,
-		phx.b => b,
-		phx.np => np,
-		phx.ϕ => ϕ,
-		phx.β => β,
-        cycle.f => f,
-	    cycle.log_ΔTSF => log_ΔTSF,
-	    cycle.log_ΔTSH => log_ΔTSH,
-	    cycle.log_ΔTSC => log_ΔTSC,
-	    cycle.logp_h   => logp_h,
-	  )
-	)
-    return ModelingToolkit.compose(sys,
-        [cycle, bhe, pump, phx], name = name)
-end
-  ╠═╡ =#
-
-# ╔═╡ 62354dc1-b439-4146-8271-744c2370a08b
-# ╠═╡ disabled = true
-#=╠═╡
-"""
-
-"""
-function GSHP_pars(; name,
-                     refrigerant = "R134A",
-                     fluid       = "MEA",
-                     χ           = 0.28,)
-    # ——— Parameters ———
-    ps = @parameters begin
-		b =  1.5e-3
-        np = 20
-        W = 0.10
-        ϕ = 1.18
-        β = π/6
-        th = 0.5e-3
-        λ_pl = 16
-        λ_pitch = 4e-3
-        χ = 0.28
-        L = 0.32
-
-        f = 50
-        log_ΔTSF = log(3.5)
-        log_ΔTSH = log(7)
-        log_ΔTSC = log(5)
-        logp_h = log(14e5)
-    end
-
-    # ——— State variables ———
-    sts = @variables begin
-		T_i_b = 9+273.15
-		T_o_b = 9+273.15
-		h_i_r = 200e3
-		h_o_r = 200e3
-		#log_ΔTSF = 3
-		#log_ΔTSH = 7
-		#log_ΔTSC = 5
-		γṁ_sf = 0.1
-		γṁ_ref = 0.1
-		#T_cond = 45
-		#p_cond = 2e5
-		logp_l = 1e5
-		#logp_h = 10e5
-
-		W_comp = 1000
-		#P_elec_pump = 1000
-		Q_evap = 2000
-		Q_cond = -3000
-		COP1 = 5
-		#COP2 = 5
-    end
-
-    # ——— Property components ———
-    @named cycle  = ThermodynamicCycle(fluid = fluid, refrigerant = refrigerant)
-    @named bhe = Thermal.UTubeGrouted(depth=250.0, D_p1_o=32e-3, D_p1_i=28.24e-3, 
-                                  D_p2_o=32e-3, D_p2_i=28.24e-3,
-                                  D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
-                                  λ_grout=1.5, λ_soil=2.0,
-                                  T_wall=273.15 + 10, s=0.075, χ=0.23)
-
-    # Create the base model with a standard pump
-    #@named pump = Hydraulics.DynamicPropBasicPump(
-    #    H_shutoff = 12,
-    #    Q_max = 13/3600,
-    #    fluid = fluid
-    #)
-
-
-
-    @named phx = Hydraulics.DynamicPropPlateHeatExchanger(
-        fluid = "MEA"
-    )
-    
-    # ——— Governing equations ———
-	
-    eqs = [
-		
-        cycle.evaporator.b ~ b,
-        cycle.evaporator.np ~ np,
-        cycle.evaporator.W ~ W,
-        cycle.evaporator.ϕ ~ ϕ,
-        cycle.evaporator.β ~ β,
-        cycle.evaporator.th ~ th,
-        cycle.evaporator.λ_pl ~ λ_pl,
-        cycle.evaporator.λ_pitch ~ λ_pitch,
-        cycle.evaporator.χ ~ χ,
-        cycle.evaporator.L ~ L,
-
-		
-		phx.L ~ L,
-		phx.W ~ W,
-		phx.b ~ b,
-		phx.np ~ np,
-		phx.ϕ ~ ϕ,
-		phx.β ~ β,
-		
-        cycle.f ~ f,
-
-        T_i_b ~ cycle.T_i_b,
-        T_o_b ~ cycle.T_o_b,
-        h_i_r ~ cycle.h_i_r,
-        h_o_r ~ cycle.h_o_r,
-        
-		log_ΔTSF ~ cycle.log_ΔTSF,
-        log_ΔTSH ~ cycle.log_ΔTSH,
-        log_ΔTSC ~ cycle.log_ΔTSC,
-		
-        γṁ_sf ~ cycle.γṁ_sf,
-        γṁ_ref ~ cycle.γṁ_ref,
-        logp_l ~ cycle.logp_l,
-        logp_h ~ cycle.logp_h,
-        W_comp ~ cycle.W_comp,
-        #P_elec_pump ~ pump.base.P_elec,
-        Q_evap ~ cycle.Q_evap,
-        Q_cond ~ cycle.Q_cond,
-        COP1 ~ cycle.COP1,
-        #COP2 ~ -Q_cond/(W_comp+P_elec_pump),
-		
-		bhe.T_2 ~ cycle.T_i_b,
-		cycle.T_o_b ~ bhe.T_1,
-		exp(cycle.γṁ_sf) ~ bhe.ṁ,
-		#pump.props.T ~ bhe.T_1,
-		#pump.base.ṁ ~ bhe.ṁ,
-		phx.base.ṁ ~ bhe.ṁ,
-		#pump.base.Δp ~ 1e5,#phx.phx.Δp,
-		phx.props.T ~ bhe.T_1,
     ]
 
     # ——— Assemble system ———
     sys = NonlinearSystem(eqs, sts, ps, name = name)
     return ModelingToolkit.compose(sys,
-        [cycle, bhe, phx], name = name)
+        [cycle, bhe], name = name)
 end
+
+# ╔═╡ 9aa6b70a-9464-4f48-a340-61030ca9310b
+# ╠═╡ disabled = true
+#=╠═╡
+# 1. Get stripped solution
+sol_test_GSHP = test_GSHP_stripped()
+
+# 2. Build thermal system
+  ╠═╡ =#
+
+# ╔═╡ 5f7f03fb-20e2-4bd2-8bb7-f09a8c2d94e6
+#=╠═╡
+sol_test_GSHP.u
   ╠═╡ =#
 
 # ╔═╡ 2a4c04e6-875e-453a-9be5-6194a5530c06
-#=╠═╡
 function GSHP_thermal(; name,
                      refrigerant = "R134A",
-                     fluid       = "MEA",
-                     χ           = 0.28,)
+                     fluid       = "MEA",)
     # ——— Parameters ———
+
+
+	
     ps = @parameters begin
         # Heat exchanger parameters
         b = 1.5e-3
@@ -2988,7 +2810,7 @@ function GSHP_thermal(; name,
         λ_pipe_1 = 0.4
         λ_pipe_2 = 0.4
         λ_grout = 1.5
-        λ_soil = 3.5
+        λ_soil = 2.0
         s = 0.075
         ε = 1.5e-6
         U_radius = 0.064
@@ -2996,12 +2818,13 @@ function GSHP_thermal(; name,
         Re_high = 4000
         g = 9.81
 
+		
         # Cycle parameters
-        f = 50
-        log_ΔTSF = log(3.5)
-        log_ΔTSH = log(7)
-        log_ΔTSC = log(5)
-        logp_h = log(14e5)
+        f_ = 50
+        log_ΔTSF_ = log(3.5)
+        log_ΔTSH_ = log(7)
+        log_ΔTSC_ = log(5)
+        logp_h_ = log(14e5)
     end
 
     # ——— State variables ———
@@ -3020,6 +2843,12 @@ function GSHP_thermal(; name,
         Q_evap = 2000
         Q_cond = -3000
         COP1 = 5
+        # Cycle parameters
+        f = 50
+        log_ΔTSF = log(3.5)
+        log_ΔTSH = log(7)
+        log_ΔTSC = log(5)
+        logp_h = log(14e5)
         
     end
 
@@ -3082,6 +2911,13 @@ function GSHP_thermal(; name,
         bhe_thermal.T_2 ~ cycle.T_i_b,
         cycle.T_o_b ~ bhe_thermal.T_1,
         bhe_thermal.ṁ ~ exp(γṁ_sf),
+
+		
+        f ~ f_,
+        log_ΔTSF ~ log_ΔTSF_,
+        log_ΔTSH ~ log_ΔTSH_,
+        log_ΔTSC ~ log_ΔTSC_,
+        logp_h ~ logp_h_,
         
     ]
 
@@ -3089,6 +2925,66 @@ function GSHP_thermal(; name,
     sys = NonlinearSystem(eqs, sts, ps, name=name)
     return ModelingToolkit.compose(sys, [cycle, bhe_thermal])
 end
+
+# ╔═╡ 8d3a070d-682b-47f4-bfd6-9feb53ce9ccc
+# ╠═╡ disabled = true
+#=╠═╡
+begin    
+	
+	solver1 = RobustMultiNewton(
+        autodiff = AutoFiniteDiff())
+	
+	# 1a) Build the system
+	@named sys = GSHP_thermal()               # uses your defaults dict internally
+	
+	# 1b) Simplify/compile
+	simp1 = structural_simplify(sys)
+	
+	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
+	prob1 = NonlinearProblem(simp1, nothing, [])
+	
+	# 1e) Solve it
+	solth = solve(prob1, solver_robust, abstol = 1e-6)
+end
+  ╠═╡ =#
+
+# ╔═╡ 1ac95f91-934a-4dc7-97a8-f6cc13ecb864
+#=╠═╡
+solth.retcode
+  ╠═╡ =#
+
+# ╔═╡ df4eb258-955d-4f9e-bfdd-6d202c5b8d90
+# ╠═╡ disabled = true
+#=╠═╡
+p01 = [
+	  #:b       => 1.5e-3,
+	  #:np      => 20.0,
+	  #:W       => 0.10,
+	  #:ϕ       => 1.18,
+	  #:β       => π/6,
+	  #:th      => 0.5e-3,
+	  #:λ_pl    => 16.0,
+	  #:λ_pitch => 4e-3,
+	  #:χ       => 0.28,
+	  :log_ΔTSF_       => log(5.55),
+	  #:f       => 45.0
+	]
+  ╠═╡ =#
+
+# ╔═╡ 79b5e151-be4a-4d38-ae46-c975b4bf557e
+#=╠═╡
+# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
+	prob01 = remake(prob1, u0 = solth.u, p=p01)
+  ╠═╡ =#
+
+# ╔═╡ 04ec6d0d-d812-464e-b244-8458207283da
+#=╠═╡
+solth01 = solve(prob01, solver_robust, abstol = 1e-6)
+  ╠═╡ =#
+
+# ╔═╡ a0e018cb-a75a-4844-8716-98492b29b6d9
+#=╠═╡
+solth01.retcode
   ╠═╡ =#
 
 # ╔═╡ b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
@@ -3170,7 +3066,7 @@ function GSHP_hydraulics(; name::Symbol, fluid::String="MEA")
 
 		bhe.ṁ ~ ṁ,
 		
-		phx.L ~ L_BHE,
+		phx.L ~ L,
         phx.W ~ W,
         phx.b ~ b,
         phx.np ~ np,
@@ -3183,7 +3079,7 @@ function GSHP_hydraulics(; name::Symbol, fluid::String="MEA")
 		pump.props.T ~ T_leg2,
         
 		pump.base.ṁ ~ ṁ,
-        pump.base.H ~ bhe.H_total + phx.base.H,
+        pump.base.Δp ~ bhe.Δp + phx.base.Δp,
     ]
 
     
@@ -3208,12 +3104,8 @@ solh[sys_h.pump.base.exceeding_max_speed]
 solh[sys_h.pump.base.P_elec]
   ╠═╡ =#
 
-# ╔═╡ 5c35dd43-12de-475a-96bf-fb5614074415
-#=╠═╡
-pie([solh[sys_h.pump.base.Δp]; solh[sys_h.phx.base.Δp]])
-  ╠═╡ =#
-
 # ╔═╡ 40c8dc3c-87f8-46e8-a70e-6acc354d5020
+# ╠═╡ disabled = true
 #=╠═╡
 begin    
 	
@@ -3223,60 +3115,11 @@ begin
 	# 1b) Simplify/compile
 	ssys_h = structural_simplify(sys_h)
 	
-	# 1c) Define your baseline parameters as a NamedTuple
-	p3 = [
-	  :b       => 2.0e-3,
-	  :np      => 20.0,
-	  :W       => 0.14,
-	  :ϕ       => 1.18,
-	  :β       => π/6,
-	  :th      => 0.5e-3,
-	  :λ_pl    => 16.0,
-	  :λ_pitch => 4e-3,
-	  :χ       => 0.28,
-	  :L       => 0.32,
-	]
 	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
-	probh = NonlinearProblem(ssys_h, nothing, p3)
+	probh = NonlinearProblem(ssys_h, nothing, [])
 	
 	# 1e) Solve it
-	solh = solve(probh, solver1, abstol = 1e-6)
-end
-  ╠═╡ =#
-
-# ╔═╡ 8d3a070d-682b-47f4-bfd6-9feb53ce9ccc
-#=╠═╡
-begin    
-	
-	solver1 = RobustMultiNewton(
-        autodiff = AutoFiniteDiff())
-	
-	# 1a) Build the system
-	@named sys = GSHP_thermal()               # uses your defaults dict internally
-	
-	# 1b) Simplify/compile
-	simp1 = structural_simplify(sys)
-	
-	# 1c) Define your baseline parameters as a NamedTuple
-	p0 = [
-	  :b       => 1.5e-3,
-	  :np      => 20.0,
-	  :W       => 0.10,
-	  :ϕ       => 1.18,
-	  :β       => π/6,
-	  :th      => 0.5e-3,
-	  :λ_pl    => 16.0,
-	  :λ_pitch => 4e-3,
-	  :χ       => 0.28,
-	  :L       => 0.32,
-	  :f       => 50.0
-	]
-	
-	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
-	prob1 = NonlinearProblem(simp1, nothing, p0)
-	
-	# 1e) Solve it
-	sol = solve(prob1, solver1, abstol = 1e-6)
+	solh = solve(probh, solver_robust, abstol = 1e-6)
 end
   ╠═╡ =#
 
@@ -3294,32 +3137,6 @@ end
 	  :log_ΔTSF       => log(2.55),
 	  #:f       => 45.0
 	]
-
-# ╔═╡ da9be1ad-b570-4270-b9a1-4f034bc57da6
-typeof(p1)
-
-# ╔═╡ 75a9cda4-159a-4b78-a32c-0f8f2fb0c14e
-solver3 = FastShortcutNLLSPolyalg(autodiff = AutoFiniteDiff());
-
-# ╔═╡ 68c8ec06-1e1e-425f-b872-29634be28c3f
-#=╠═╡
-
-	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
-	prob2 = remake(prob1, u0 = sol.u, p=p1)
-  ╠═╡ =#
-
-# ╔═╡ 06a0d9eb-486f-4839-b949-c0a80f6859fa
-#=╠═╡
-sol2 = NonlinearSolve.solve(prob2, solver3; abstol = 1e-6)
-  ╠═╡ =#
-
-# ╔═╡ ffc2b597-b234-407d-b0cc-76a0bf114535
-#=╠═╡
-sol2.retcode
-  ╠═╡ =#
-
-# ╔═╡ 25ad6ddd-1836-4d04-a10d-136f68308347
-
 
 # ╔═╡ fbc3e326-5684-4029-ba49-6c0f065d151b
 function solve_with_fallback(prob, solvers; abstol=1e-6, max_retries=1, u0=nothing)
@@ -3471,22 +3288,20 @@ end
 # 7. Helper function to create problems
 
 # ╔═╡ 76cc998b-9a7f-4b1c-8403-c16bccbda74e
-#=╠═╡
-function prepare_problems()
+function prepare_problems(pars)
     # Build thermal system
     @named sys_thermal = GSHP_thermal()
     sys_thermal_simp = structural_simplify(sys_thermal)
-    thermal_prob = NonlinearProblem(sys_thermal_simp, [], [])
+    thermal_prob = NonlinearProblem(sys_thermal_simp, [], pars)
     
     # Build hydraulic system
     @named sys_hydraulic = GSHP_hydraulics()
     sys_hydraulic_simp = structural_simplify(sys_hydraulic)
-    hydraulic_prob = NonlinearProblem(sys_hydraulic_simp, [], [])
+    hydraulic_prob = NonlinearProblem(sys_hydraulic_simp, [], pars)
     
     return thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic
 end
 
-  ╠═╡ =#
 
 # ╔═╡ d7090f5b-50f6-4198-9237-8447ae442789
 solver_fast = FastShortcutNLLSPolyalg(autodiff=AutoFiniteDiff());
@@ -3494,22 +3309,112 @@ solver_fast = FastShortcutNLLSPolyalg(autodiff=AutoFiniteDiff());
 # ╔═╡ fdddfe24-f560-4a52-9756-ee1d1d6946d3
 solver_robust = RobustMultiNewton(autodiff=AutoFiniteDiff());
 
+# ╔═╡ 52e4fb9f-6e5e-4c7e-b34e-9f0bace4db63
+"""
+Test routine for the GSHP model
+"""
+function test_GSHP_stripped()
+    
+    @named hp = GSHP_stripped(χ=0.280);
+    eqs = [
+        
+        hp.cycle.evaporator.b ~ 1.5e-3,
+        hp.cycle.evaporator.np ~ 20,
+        hp.cycle.evaporator.W ~ 0.10,
+        hp.cycle.evaporator.ϕ ~ 1.18,
+        hp.cycle.evaporator.β ~ π/6,
+        hp.cycle.evaporator.th ~ 0.5e-3,
+        hp.cycle.evaporator.λ_pl ~ 16,
+        hp.cycle.evaporator.λ_pitch ~ 4e-3,
+        hp.cycle.evaporator.χ ~ 0.28,
+        hp.cycle.evaporator.L ~ 0.32,
+
+		
+        hp.cycle.f ~ 50,
+        hp.cycle.log_ΔTSF ~ log(3.5),
+        hp.cycle.log_ΔTSH ~ log(7),
+        hp.cycle.log_ΔTSC ~ log(5),
+        hp.cycle.logp_h ~ log(14e5),
+    ]
+
+    @named sys = ModelingToolkit.compose(NonlinearSystem(eqs, [], [], name = :test), [hp])
+    simpl = structural_simplify(sys)
+    prob = NonlinearProblem(simpl, [])
+    solver = NewtonRaphson(; 
+        linesearch = BackTracking(; maxstep=20), 
+        autodiff = AutoFiniteDiff()
+    )
+	
+    sol = NonlinearSolve.solve(prob, solver_robust; abstol = 1e-6)
+
+    return sol
+end
+
 # ╔═╡ 104492fc-1c63-4571-80e4-2df35b6abdcf
 solver_fallback = NewtonRaphson(autodiff=AutoForwardDiff());
 
 # ╔═╡ 0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 solvers = [solver_fast, solver_robust, solver_fallback];
 
-# ╔═╡ a4b78e57-3f4a-4bd1-a4fd-344aed782596
-#=╠═╡
-thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems();
-  ╠═╡ =#
+# ╔═╡ 5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
+"""
+    continuation_solve(
+      thermal_prob, hydraulic_prob, sys_thermal,
+      base_params::Dict{Symbol,Real},
+      param::Symbol,
+      target_vals::AbstractVector{<:Real},
+      solver;
+      abstol = 1e-6
+    ) -> (sol_th, sol_hy)
+
+Start at `base_params[param] = first(target_vals)`, solve thermal+hydraulic from scratch,
+then loop over the rest of `target_vals`, each time
+
+  • setting `base_params[param] = v`  
+  • calling `solve(...; p=base_params, u0=previous_sol.u, abstol=abstol)`  
+
+and at the end returning the final `(sol_th, sol_hy)`.  
+"""
+function continuation_solve(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params::Dict{Symbol,Real},
+    param::Symbol,
+    target_vals::AbstractVector{<:Real},
+    solver;
+    abstol = 1e-6
+)
+    # 1) Kick off at the first value (solve from scratch)
+    base_params[param] = first(target_vals)
+    sol_th = NonlinearSolve.solve(thermal_prob, solver;
+                                  p = base_params,
+                                  abstol = abstol)
+    sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
+                                  p = base_params,
+                                  abstol = abstol)
+
+    # 2) March toward the end, re-using prev sol as u0
+    for v in Iterators.rest(target_vals)
+        base_params[param] = v
+        sol_th = NonlinearSolve.solve(thermal_prob, solver;
+                                      p  = base_params,
+                                      u0 = sol_th.u,    # <-- warm start
+                                      abstol = abstol)
+        sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
+                                      p  = base_params,
+                                      u0 = sol_hy.u,    # <-- warm start
+                                      abstol = abstol)
+    end
+
+    # 3) return only the terminal solutions
+    return sol_th, sol_hy
+end
+
 
 # ╔═╡ 58a5d982-5d07-4a63-950a-ca5639cff43f
 base_params = [
     :b => 1.5e-3,
     :np => 20.0,
-    :W => 0.1,
+    :W => 0.07,
     :ϕ => 1.18,
     :β => π/6,
     :th => 0.5e-3,
@@ -3517,25 +3422,25 @@ base_params = [
     :λ_pitch => 4e-3,
     :χ => 0.28,
     :L => 0.30,
-    :f => 50.0
+    :L_BHE => 150.0,
+    :f => 50.0,
+	:log_ΔTSF_ => log(3),
 ]
 
+# ╔═╡ a4b78e57-3f4a-4bd1-a4fd-344aed782596
+thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems(base_params);
+
 # ╔═╡ ceb2b429-90ae-4bc5-b346-e65e5727d441
-#=╠═╡
 sol_start_thermal = NonlinearSolve.solve(thermal_prob, solver_robust; abstol = 1e-6)
-  ╠═╡ =#
 
 # ╔═╡ 6ac1ecbf-4833-449f-9933-c782a8566fb0
-#=╠═╡
 sol_start_hydraulic = NonlinearSolve.solve(hydraulic_prob, solver_robust; abstol = 1e-6)
-  ╠═╡ =#
 
 # ╔═╡ 8b6e0e2e-ecc5-475e-bd31-1f23893dcb38
-W_vals = 0.1:0.02:0.16
+W_vals = 0.07:0.01:0.10
 
 # ╔═╡ 892ef213-3229-4d91-9ba7-742127f366c8
 # ╠═╡ show_logs = false
-#=╠═╡
 results_thermal_init, results_hydraulic_init = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3546,7 +3451,6 @@ results_thermal_init, results_hydraulic_init = parameter_sweep(
     solvers,
 	 previous_sol_thermal=sol_start_thermal, previous_sol_hydraulic=sol_start_hydraulic
 )
-  ╠═╡ =#
 
 # ╔═╡ 0ddc1362-ee46-452b-a5d7-6d03df36e31d
 params_np = [
@@ -3559,16 +3463,16 @@ params_np = [
     :λ_pl => 16.0,
     :λ_pitch => 4e-3,
     :χ => 0.28,
-    :L => 0.30,
+    :L => 0.3,
+    :L_BHE => 150.0,
     :f => 50.0
 ]
 
 # ╔═╡ 30d6e371-c921-4fc2-8d8f-a6c5d7c34385
-np_vals = 25:5:60
+np_vals = 25:5:25
 
 # ╔═╡ 19556fe1-b85d-4da1-ac62-a56b5a72618b
 # ╠═╡ show_logs = false
-#=╠═╡
 results_thermal_init_np, results_hydraulic_init_np = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3579,7 +3483,6 @@ results_thermal_init_np, results_hydraulic_init_np = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init[end], previous_sol_hydraulic=results_hydraulic_init[end]
 )
-  ╠═╡ =#
 
 # ╔═╡ af94b9d0-44ca-42e4-9e8c-96f5864bc80d
 params_b = [
@@ -3592,16 +3495,16 @@ params_b = [
     :λ_pl => 16.0,
     :λ_pitch => 4e-3,
     :χ => 0.28,
-    :L => 0.30,
+    :L => 0.3,
+    :L_BHE => 150.0,
     :f => 50.0
 ]
 
 # ╔═╡ 8a4bc20a-195f-49f5-8379-ca6be9bdb1a1
-b_vals = 1.5e-3:0.25e-3:2e-3
+b_vals = 1.5e-3:.1e-3:2.5e-3
 
 # ╔═╡ 670cd198-239a-4240-be5d-2def55383a36
 # ╠═╡ show_logs = false
-#=╠═╡
 results_thermal_init_b, results_hydraulic_init_b = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
@@ -3612,7 +3515,6 @@ results_thermal_init_b, results_hydraulic_init_b = parameter_sweep(
     solvers,
 	 previous_sol_thermal=results_thermal_init[end], previous_sol_hydraulic=results_hydraulic_init[end]
 )
-  ╠═╡ =#
 
 # ╔═╡ a208968e-8f31-4a82-b8f3-9db4a8d27e8b
 params_ΔT = [
@@ -3625,64 +3527,54 @@ params_ΔT = [
     :λ_pl => 16.0,
     :λ_pitch => 4e-3,
     :χ => 0.28,
-    :L => 0.30,
+    :L => 0.3,
+    :L_BHE => 150.0,
     :f => 50.0
 ]
 
-# ╔═╡ 69da634a-6492-41fc-bf5c-8158c27df9fb
-1650/4
-
-# ╔═╡ 31de0764-c34a-46cd-976e-04930addb74c
-np_vals[end]*b_vals[end]
+# ╔═╡ b48efffc-d19c-4b66-936b-6fd9c9de5a88
+res_ΔT = 0.5
 
 # ╔═╡ 37d9352d-2357-4f36-b651-5dc73246fd42
-ΔT_SF_vals = log.(3.5:1.5:6)
+ΔT_SF_vals = log.(3.5:res_ΔT:8)
 
 # ╔═╡ 4b47374a-f1a3-402c-a4ba-bae8edcedc01
 length(ΔT_SF_vals)
 
 # ╔═╡ 0f6b83f7-167a-4e3f-9fd5-d4f4695fbaea
 # ╠═╡ show_logs = false
-#=╠═╡
 results_thermal, results_hydraulic = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
     sys_thermal,
     params_ΔT,
-    :log_ΔTSF,
+    :log_ΔTSF_,
     ΔT_SF_vals,
     solvers,
 	 previous_sol_thermal=results_thermal_init_b[end], previous_sol_hydraulic=results_hydraulic_init_b[end]
 )
-  ╠═╡ =#
 
 # ╔═╡ bfe4471c-7033-4ca5-beb1-530a8be5b757
-ΔT_SF_vals_down = log.(3.5:-1.5:1)
+ΔT_SF_vals_down = log.(3.5:-res_ΔT:1)
 
 # ╔═╡ 798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═╡ show_logs = false
-#=╠═╡
 results_thermal_down, results_hydraulic_down = parameter_sweep(
     thermal_prob,
     hydraulic_prob,
     sys_thermal,
     params_ΔT,
-    :log_ΔTSF,
+    :log_ΔTSF_,
     ΔT_SF_vals_down,
     solvers,
 	 previous_sol_thermal=results_thermal_init_b[end], previous_sol_hydraulic=results_hydraulic_init_b[end]
 )
-  ╠═╡ =#
 
 # ╔═╡ 05bbe96e-023c-413b-a347-d37e74fad7fe
-#=╠═╡
 res_thermal_overall = [results_thermal; results_thermal_down];
-  ╠═╡ =#
 
 # ╔═╡ fecd7f3d-bf0b-464e-a1ad-238e508b0f38
-#=╠═╡
 res_hydraulic_overall = [results_hydraulic; results_hydraulic_down];
-  ╠═╡ =#
 
 # ╔═╡ 0fe18091-e8f6-42d4-9961-5783452ddefd
 #=╠═╡
@@ -3695,8 +3587,12 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
         T_in = therm[sys_thermal.cycle.T_i_b] .- 273.15
         T_mid = therm[sys_thermal.cycle.evaporator.T_mid_1] .- 273.15
         T_out = therm[sys_thermal.cycle.T_o_b] .- 273.15
+        T_comp_in = therm[sys_thermal.cycle.evaporator.T_out_2] .- 273.15
         #T_wall = therm[sys_thermal.bhe.T_wall] .- 273.15
 		ΔT = T_in - T_out
+
+		fr_sh = zip(therm[sys_thermal.cycle.evaporator.uz_fr_sh])
+		
         T_evap = therm[sys_thermal.cycle.evaporator.sh.propref.Tsat] .- 273.15
         Q_evap = therm[sys_thermal.Q_evap]
         Q_cond = -therm[sys_thermal.Q_cond]
@@ -3705,8 +3601,8 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
 
 		U_EV = therm[sys_thermal.cycle.evaporator.ev.base.U]
 		U_SH = therm[sys_thermal.cycle.evaporator.sh.base.U]
-		L_EV = (1-zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh]))
-		L_SH = (zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh]))
+		fr_EV = (1-zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh]))
+		fr_SH = (zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh]))
 		
         # Hydraulic results
         Δp_bhe = hyd[sys_hydraulic.bhe.Δp]/1e5
@@ -3716,10 +3612,57 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
         
         # System performance
         COP_2 = Q_cond / (W_comp + P_pump)
+
+
+
+		#temporary fix
+
+        # Calculate Reynolds numbers from flow properties
+        # Extract properties from hydraulic solution
+        # For PHX
+        ρ_phx = hyd[sys_hydraulic.phx.props.ρ]
+        μ_phx = hyd[sys_hydraulic.phx.props.μ]
+        ṁ_phx = hyd[sys_hydraulic.phx.base.ṁ]
         
+        # PHX geometry (you'll need to extract these or use fixed values)
+        b_phx = hyd[sys_hydraulic.phx.b]  # or use a fixed value like 1.5e-3
+        W_phx = hyd[sys_hydraulic.phx.W]  # or use a fixed value like 0.07
+        np_phx = hyd[sys_hydraulic.phx.np]  # or use a fixed value like 20
+        ϕ_phx = hyd[sys_hydraulic.phx.ϕ]  # or use a fixed value like 1.18
+        
+        # Calculate PHX Reynolds number
+        n_channels = (np_phx - 1) / 2
+        A_flow_phx = n_channels * W_phx * (2*b_phx)
+        v_phx = abs(ṁ_phx) / (ρ_phx * A_flow_phx)
+        dh_phx = 2*b_phx / ϕ_phx
+        Re_phx = ρ_phx * v_phx * dh_phx / μ_phx
+        
+        # For BHE leg 1
+        ρ_bhe = hyd[sys_hydraulic.bhe.leg1.props.ρ]  # or similar path
+        μ_bhe = hyd[sys_hydraulic.bhe.leg1.props.μ]
+        ṁ_bhe = hyd[sys_hydraulic.bhe.ṁ]
+        # BHE geometry (extract or use fixed values)
+        D_i = hyd[sys_hydraulic.bhe.leg1.Di]  # inner diameter or extract from system
+        A_pipe = π * (D_i/2)^2
+        v_bhe = abs(ṁ_bhe) / (ρ_bhe * A_pipe)
+        Re_bhe_leg1 = ρ_bhe * v_bhe * D_i / μ_bhe
+        
+		# For BHE leg 2
+        ρ_bhe = hyd[sys_hydraulic.bhe.leg2.props.ρ]  # or similar path
+        μ_bhe = hyd[sys_hydraulic.bhe.leg2.props.μ]
+        ṁ_bhe = hyd[sys_hydraulic.bhe.ṁ]
+        # BHE geometry (extract or use fixed values)
+        D_i = hyd[sys_hydraulic.bhe.leg2.Di]  # inner diameter or extract from system
+        A_pipe = π * (D_i/2)^2
+        v_bhe = abs(ṁ_bhe) / (ρ_bhe * A_pipe)
+        Re_bhe_leg2 = ρ_bhe * v_bhe * D_i / μ_bhe
+
+
+
+
+		
         push!(data, (;
-            ṁ, T_in, T_out, T_evap, T_mid, ΔT, Q_evap, Q_cond, W_comp, Δp_tot, Δp_phx, Δp_bhe, P_pump,
-            COP_1, COP_2
+            ṁ, T_in, T_out, T_evap, T_mid, T_comp_in, ΔT, Q_evap, Q_cond, W_comp, Δp_tot, Δp_phx, Δp_bhe, P_pump,Re_bhe_leg1, Re_bhe_leg2, Re_phx, COP_1, COP_2, U_EV, U_SH, fr_EV, fr_SH
         ))
     end
 	df = sort(DataFrame(data), :ΔT)
@@ -3808,74 +3751,167 @@ end
 
 # ╔═╡ 4982df2c-016a-4136-a074-b39c1befffb7
 #=╠═╡
-function create_plots_by_dT(df::DataFrame; smooth_degree::Int=1, y_zero::Bool=false)
-    # Compute ΔT column
-    df2 = df
+function create_plots_by_dT(df::DataFrame;
+                               smooth_degree::Int=1,
+                               y_zero::Bool=false,
+                               re_thresholds::Dict{String, Tuple{Float64, Float64}} = Dict(
+                                 "Re_bhe_leg1" => (2300, 4000),
+                                 "Re_bhe_leg2" => (2300, 4000),
+                                 "Re_phx"      => (100, 2000)
+                               ))
+    # Prepare data and theme
+    df2 = copy(df)
     set_aog_theme!()
+    sort!(df2, :ΔT)  # ensure monotonic ΔT for interpolation
 
-    # 1. Temperature vs ΔT - FIXED VERSION
-    # Create a long-format DataFrame for temperatures
-    temp_long = stack(df2, [:T_in, :T_mid, :T_out, :T_evap], 
-                     variable_name=:temp_type, 
-                     value_name=:temperature)
-    
-    # Rename for better legend labels
-    rename_dict = Dict(
-        "T_in" => "Inlet Temperature",
+    # 1) Compute transition points for each Reynolds column
+    transition_points = Dict{String, NamedTuple}()
+    re_cols   = ["Re_bhe_leg1", "Re_bhe_leg2", "Re_phx"]
+    re_labels = Dict(
+        "Re_bhe_leg1" => "BHE Leg1",
+        "Re_bhe_leg2" => "BHE Leg2",
+        "Re_phx"      => "Evaporator"
+    )
+
+    for col in re_cols
+        col ∈ names(df2) || continue
+        x = df2.ΔT
+        y = df2[!, col]
+
+        length(x) < 2 && error("Need ≥2 points for interpolation in $col")
+        itp = interpolate((x,), y, Gridded(Linear()))
+
+        # Use custom thresholds from re_thresholds dict
+        thresholds = get(re_thresholds, col, ())
+        for thresh in thresholds
+            f(dt) = itp(dt) - thresh
+            idx = findfirst(i -> f(x[i]) * f(x[i+1]) ≤ 0, 1:length(x)-1)
+            isnothing(idx) && continue
+            a, b = x[idx], x[idx+1]
+            root  = find_zero(f, (a, b))
+
+            key = "$col-$(thresh)"
+            transition_points[key] = (
+                dT        = root,
+                label     = "$(re_labels[col]) Re=$(thresh)",
+                threshold = thresh
+            )
+        end
+    end
+
+    # 2) Transition DF for vertical lines
+    trans_df = DataFrame(
+        ΔT   = [t.dT for t in values(transition_points)],
+        label= [t.label for t in values(transition_points)]
+    )
+    vline_layer = data(trans_df) *
+                  mapping(:ΔT, color = :label => nonnumeric) *
+                  visual(VLines, linestyle = :dash)
+
+    figures = []
+
+    # 3) Temperature plot
+    temp_long = stack(df2, [:T_in, :T_mid, :T_out, :T_evap],
+                      variable_name = :temp_type,
+                      value_name    = :temperature)
+    map_temp = Dict(
+        "T_in"  => "Inlet Temperature",
         "T_mid" => "Mid Temperature",
         "T_out" => "Outlet Temperature",
-        "T_evap" => "Evaporation Temperature"
+        "T_evap"=> "Evaporation Temperature"
     )
-    temp_long.temp_type = [rename_dict[s] for s in temp_long.temp_type]
-    
-    plt_temp = data(temp_long) * mapping(
-        :ΔT => "ΔT (K)",
-        :temperature => "Temperature (°C)",
-        color = :temp_type => nonnumeric
-    ) * visual(Lines)
-    
-    temp_fig = draw(plt_temp; axis=(
-        xlabel = "ΔT (K)",
-        ylabel = "Temperature (°C)",
-        title = ""
-    ))
+    temp_long.temp_type .= map(s -> map_temp[s], temp_long.temp_type)
 
-    # 2. COP vs ΔT
-    layer_th = data(df2) * mapping(:ΔT, :COP_1 => "Thermal COP") * visual(Lines)
-    layer_ov = data(df2) * mapping(:ΔT, :COP_2 => "Overall COP")  * visual(Lines)
-    layer_3 = data(df2) * mapping(:ΔT, :COP_3 => "Overall COP + heating")  * visual(Lines)
-    plt_cop = layer_th + layer_ov + layer_3
-    cop_fig = draw(plt_cop; axis=(
-        xlabel = "ΔT (K)",
-        ylabel = "Coefficient of Performance",
-        title = "COP vs ΔT",
-        limits = (y = (y_zero ? 0 : nothing, nothing))
-    ))
+    temp_plt = data(temp_long) *
+               mapping(:ΔT, :temperature, color = :temp_type => nonnumeric) *
+               visual(Lines)
+    fig_temp, _ = draw(temp_plt + vline_layer;
+                       axis = (; title = "Temperature vs ΔT"))
+    push!(figures, fig_temp)
 
-    # 3. Power vs ΔT
-    power_long2 = stack(df2, [:Q_evap, :Q_cond, :W_comp, :P_pump, :P_aux_heating], variable_name=:component, value_name=:power)
-    plt_power = data(power_long2) * mapping(
-        :ΔT => "ΔT (K)",
-        :power => "Power (W)",
-        color = :component => nonnumeric
-    ) * visual(Lines)
-    power_fig = draw(plt_power; axis=(
-        xlabel = "ΔT (K)",
-        ylabel = "Power (W)",
-        title = "Energy Components vs ΔT"
-    ))
+    # 4) COP vs ΔT
+    cop_long = stack(df2, [:COP_1, :COP_2, :COP_3],
+                     variable_name = :cop_type,
+                     value_name    = :cop_value)
+    map_cop = Dict(
+        "COP_1" => "Thermal COP",
+        "COP_2" => "Overall COP",
+        "COP_3" => "Overall COP + heating"
+    )
+    cop_long.cop_type .= map(s -> map_cop[s], cop_long.cop_type)
 
-    # 4. Pressure Drop vs ΔT
-    plt_pressure = data(df2) * mapping(:ΔT, :Δp_tot => "Pressure Drop (Pa)")  * visual(Lines)
-    pressure_fig = draw(plt_pressure; axis=(
-        xlabel = "ΔT (K)",
-        ylabel = L"Pressure Drop $\Delta p$ (Pa)",
-        title = "Hydraulic Resistance vs ΔT",
-        limits = (y = (y_zero ? 0 : nothing, nothing))
-    ))
+    base_cop = data(cop_long) *
+               mapping(:ΔT => "ΔT (K)",
+                       :cop_value => "COP";
+                       color = :cop_type => nonnumeric) *
+               visual(Lines, linewidth = 2)
+    fig_cop, _ = draw(base_cop + vline_layer;
+                      axis = (
+                        xlabel = "ΔT (K)",
+                        ylabel = "COP",
+                        title  = "COP vs ΔT",
+                        limits = (y = (y_zero ? 0 : nothing, nothing))
+                      ),
+                      legend = (position = :right,))
+    push!(figures, fig_cop)
 
-    return [temp_fig, cop_fig, power_fig, pressure_fig]
+    # 5) Power vs ΔT
+    power_long = stack(df2, [:Q_evap, :Q_cond, :W_comp, :P_pump, :P_aux_heating],
+                       variable_name = :component,
+                       value_name    = :power)
+    base_power = data(power_long) *
+                 mapping(:ΔT => "ΔT (K)",
+                         :power => "Power (W)";
+                         color = :component => nonnumeric) *
+                 visual(Lines)
+    fig_power, _ = draw(base_power + vline_layer;
+                         axis = (
+                           xlabel = "ΔT (K)",
+                           ylabel = "Power (W)",
+                           title  = "Energy Components vs ΔT"
+                         ),
+                         legend = (position = :right,))
+    push!(figures, fig_power)
+
+    # 6) Pressure Drop vs ΔT
+    base_pres = data(df2) *
+                mapping(:ΔT => "ΔT (K)",
+                        :Δp_tot => "Pressure Drop (Pa)");
+                visual(Lines)
+    fig_pres, _ = draw(base_pres + vline_layer;
+                        axis = (
+                          xlabel = "ΔT (K)",
+                          ylabel = L"Pressure Drop $Δp$ (Pa)",
+                          title  = "Hydraulic Resistance vs ΔT",
+                          limits = (y = (y_zero ? 0 : nothing, nothing))
+                        ),
+                        legend = (position = :right,))
+    push!(figures, fig_pres)
+
+
+    # 6) U-values vs ΔT
+    u_long = stack(df2, [:U_EV, :U_SH], variable_name=:u_type, value_name=:u_value)
+    map_u = Dict("U_EV"=>"U Evaporator", "U_SH"=>"U Superheat")
+    u_long.u_type .= map(s->map_u[s], u_long.u_type)
+    u_layer = data(u_long) * mapping(:ΔT => "ΔT (K)", :u_value => "U (W/m²K)", color=:u_type=>nonnumeric) * visual(Lines)
+    fig_u, _ = draw(u_layer+vline_layer;
+                     axis=(; xlabel="ΔT (K)", ylabel="U (W/m²K)", title="Heat Transfer Coefficients vs ΔT"),
+                     legend=(position=:right,))
+    push!(figures, fig_u)
+
+    # 7) Section Lengths vs ΔT
+    l_long = stack(df2, [:fr_EV, :fr_SH], variable_name=:l_type, value_name=:length)
+    map_l = Dict("fr_EV"=>"Evaporator Length", "fr_SH"=>"Superheat Length")
+    l_long.l_type .= map(s->map_l[s], l_long.l_type)
+    l_layer = data(l_long) * mapping(:ΔT => "ΔT (K)", :length => "Length (m)", color=:l_type=>nonnumeric) * visual(Lines)
+    fig_l, _ = draw(l_layer+vline_layer;
+                     axis=(; xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
+                     legend=(position=:right,))
+    push!(figures, fig_l)
+
+    return figures
 end
+
   ╠═╡ =#
 
 # ╔═╡ c18c39fe-6896-433e-90d4-4a8149ae9b5b
@@ -3883,14 +3919,17 @@ end
 df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sys_hydraulic)
   ╠═╡ =#
 
-# ╔═╡ 2ee846b2-beaf-4db5-a5a5-01e48c8ed344
+# ╔═╡ 5ad658d3-19f3-4907-bc2d-308a83aae97c
 #=╠═╡
-plot_A, plot_B, plot_C, plot_D = create_plots(df)
+print(df)
   ╠═╡ =#
+
+# ╔═╡ ce0ce754-c26a-4b8d-81d9-8234a165a0c6
+new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.), "Re_phx"=>(100., 2000.))
 
 # ╔═╡ bed552fa-1a51-492b-8552-81186c96c6a1
 #=╠═╡
-plot_A_ΔT, plot_B_ΔT, plot_C_ΔT, plot_D_ΔT = create_plots_by_dT(df)
+plot_A_ΔT, plot_B_ΔT, plot_C_ΔT, plot_D_ΔT, plot_E_ΔT, plot_F_ΔT = create_plots_by_dT(df; re_thresholds=new_thresh)
   ╠═╡ =#
 
 # ╔═╡ 473f4d2b-92a3-495c-975d-38738f714fb9
@@ -3908,17 +3947,20 @@ plot_B_ΔT
 plot_C_ΔT
   ╠═╡ =#
 
-# ╔═╡ c7a127c5-0c1a-45d3-985c-8c52afcd4ba8
-
-
 # ╔═╡ bdbf26be-8a8b-4c4d-be59-a67ea68226ef
-
+#=╠═╡
+plot_D_ΔT
+  ╠═╡ =#
 
 # ╔═╡ 85978ad5-c80a-4eed-b04f-72b57afcc13e
-
+#=╠═╡
+plot_E_ΔT
+  ╠═╡ =#
 
 # ╔═╡ 2ce9d158-4156-47db-97bc-efa0e18618b3
-
+#=╠═╡
+plot_F_ΔT
+  ╠═╡ =#
 
 # ╔═╡ aa8498ba-14aa-421d-abb8-67ac1286bd41
 
@@ -3927,169 +3969,165 @@ plot_C_ΔT
 
 
 # ╔═╡ b92cc8df-5884-4129-99fe-d22038b4eb0c
+"""
+    param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
+Return a Vector of N linearly-spaced `sym => value` pairs from `a` to `b`.
+"""
+function param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
+    values = range(a, stop=b, length=N)
+    return [ sym => v for v in values ]
+end
 
 
-# ╔═╡ 2f2c7201-39ec-4d48-903d-ba9b725bfffb
+# ╔═╡ 1e116b39-5019-4e87-80eb-13b1a9d9ae58
+thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
+
+# ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
+L_values = 200:10:220
+
+# ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
+f_values = 50:-2.5:45  # Borehole diameter
+
+# Run grid sweep
+
+# ╔═╡ 1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+#sols_thermal2, sols_hydraulic2 = multithreaded_grid_sweep(
+#    thermal_prob, hydraulic_prob, sys_thermal,
+#    base_params, :L_BHE, L_values, :f, f_values, solvers;
+#    previous_sol_thermal=nothing,
+#    previous_sol_hydraulic=nothing
+#)
+
+# ╔═╡ cedbf94b-e85d-4662-a64e-16fba9ef2ed4
+import Base: lock, unlock
+
 
 
 # ╔═╡ fff91fa6-8ffb-458a-946d-244b5b13c3cd
-function grid_sweep(prob_base, start_sol, param1, values1, param2, values2;
-                    solvers=[solver1, solver2, solver3], abstol=1e-6)
-    # Create solution grid
-    sol_grid = Matrix{Any}(undef, length(values1), length(values2))
-    converged_grid = falses(size(sol_grid))
+function multithreaded_grid_sweep(thermal_prob, hydraulic_prob, sys_thermal, 
+                                  base_params, param_sym1, values1, param_sym2, values2, solvers;
+                                  previous_sol_thermal=nothing, previous_sol_hydraulic=nothing)
+    n1 = length(values1)
+    n2 = length(values2)
     
-    # Find center indices
-    i0 = ceil(Int, length(values1)/2)
-    j0 = ceil(Int, length(values2)/2)
+    # Preallocate solution arrays
+    sols_thermal = Matrix{Any}(undef, n1, n2)
+    sols_hydraulic = Matrix{Any}(undef, n1, n2)
+    
+    # Calculate Manhattan distances
+    center_i = ceil(Int, n1/2)
+    center_j = ceil(Int, n2/2)
+    distances = [abs(i - center_i) + abs(j - center_j) for i in 1:n1, j in 1:n2]
+    max_distance = maximum(distances)
     
     # Solve center point first
-    center_updates = Dict(param1 => values1[i0], param2 => values2[j0])
-    center_prob = remake(prob_base; u0=start_sol.u, p=center_updates)
-    sol_grid[i0, j0] = solve_with_fallback(center_prob, solvers; abstol)
-    converged_grid[i0, j0] = successful_retcode(sol_grid[i0, j0])
+    center_params = [
+        base_params...,
+        param_sym1 => values1[center_i],
+        param_sym2 => values2[center_j]
+    ]
     
-    # Directions for propagation: right, down, left, up
-    directions = [(1,0), (0,1), (-1,0), (0,-1)]
-    
-    # Function to process a point
-    function process_point(i, j)
-        # Skip if already processed or out of bounds
-        if !checkbounds(Bool, converged_grid, i, j) || converged_grid[i,j]
-            return nothing
-        end
-        
-        # Find best neighbor to use as initial guess
-        best_u = nothing
-        best_dist = Inf
-        for (di, dj) in directions
-            ni, nj = i-di, j-dj
-            if checkbounds(Bool, converged_grid, ni, nj) && converged_grid[ni, nj]
-                dist = abs(i-i0) + abs(j-j0)  # Manhattan distance
-                if dist < best_dist
-                    best_dist = dist
-                    best_u = sol_grid[ni, nj].u
-                end
-            end
-        end
-        
-        # If no good neighbor found, use center
-        if best_u === nothing
-            best_u = sol_grid[i0, j0].u
-        end
-        
-        # Solve the point
-        updates = Dict(param1 => values1[i], param2 => values2[j])
-        prob_ij = remake(prob_base; u0=best_u, p=updates)
-        sol_ij = solve_with_fallback(prob_ij, solvers; abstol)
-        
-        # Store solution
-        sol_grid[i,j] = sol_ij
-        converged = successful_retcode(sol_ij)
-        converged_grid[i,j] = converged
-        
-        return converged
-    end
-    
-    # Propagate solutions outward in layers
-    max_distance = max(length(values1), length(values2))
-    for dist in 1:max_distance
-        # Get all points at this Manhattan distance
-        points = []
-        for i in 1:size(converged_grid,1), j in 1:size(converged_grid,2)
-            if abs(i-i0) + abs(j-j0) == dist
-                push!(points, (i,j))
-            end
-        end
-        
-        # Process points in parallel
-        @sync for p in points
-            @async begin
-                try
-                    process_point(p...)
-                catch e
-                    @warn "Error processing point $p: $(sprint(showerror, e))"
-                end
-            end
-        end
-    end
-    
-    return sol_grid, converged_grid
-end
-
-# Fallback solver with multiple attempts
-function solve_with_fallback(prob, solvers; abstol=1e-6, max_attempts=3)
-    last_error = nothing
-    
-    for solver in solvers
-        try
-            sol = solve(prob, solver; abstol)
-            if successful_retcode(sol)
-                return sol
-            end
-        catch e
-            last_error = e
-        end
-    end
-    
-    # Final attempt with first solver
-    try
-        return solve(prob, first(solvers); abstol)
-    catch
-        return last_error === nothing ? 
-            FailedSolution(prob, "All solvers failed") :
-            FailedSolution(prob, "All solvers failed. Last error: $(sprint(showerror, last_error))")
-    end
-end
-
-# Structure for failed solutions
-struct FailedSolution
-    prob
-    message
-end
-
-# Safe value extraction
-function get_safe_value(sol, var, default=NaN)
-    if sol isa FailedSolution || !successful_retcode(sol)
-        return default
-    else
-        return sol[var]
-    end
-end
-
-# ╔═╡ 0f8a3b7f-9e2a-4b3e-a0f4-566640533633
-# Define parameter ranges
-comp_freqs = 40:5:60    # Compressor frequencies [Hz]
-pump_speeds = 0.8:0.1:1.2  # Pump speed factors
-
-# Perform grid sweep
-sol_grid, converged = grid_sweep(prob1, sol, :comp_freq, comp_freqs, :pump_factor, pump_speeds)
-
-# Collect results
-results = map(sol_grid) do s
-    (
-        comp_freq = get_safe_value(s, :comp_freq, NaN),
-        pump_speed = get_safe_value(s, :pump_factor, NaN),
-        COP = get_safe_value(s, :COP2, NaN),
-        power = get_safe_value(s, :total_power, NaN)
+    sols_thermal[center_i, center_j] = solve_thermal_problem(
+        thermal_prob, previous_sol_thermal, center_params, solvers
     )
+    sols_hydraulic[center_i, center_j] = solve_hydraulic_problem(
+        hydraulic_prob, previous_sol_hydraulic, center_params,
+        sols_thermal[center_i, center_j], sys_thermal, solvers
+    )
+    
+    # Create wavefronts (points grouped by distance from center)
+    wavefronts = [Tuple{Int,Int}[] for _ in 0:max_distance]
+    for i in 1:n1, j in 1:n2
+        d = distances[i, j]
+        if d > 0  # Skip center point
+            push!(wavefronts[d], (i, j))
+        end
+    end
+    
+    # Create locks for thread safety
+    thermal_lock = ReentrantLock()
+    hydraulic_lock = ReentrantLock()
+    
+    # Progress bar
+    total_points = n1 * n2 - 1  # Minus center point
+    p = Progress(total_points, 1, "Multithreaded grid sweep: ")
+    
+    # Process wavefronts in order
+    for d in 1:max_distance
+        points = wavefronts[d]
+        isempty(points) && continue
+        
+        # Process all points in current wavefront in parallel
+        @threads for idx in 1:length(points)
+            i, j = points[idx]
+            
+            # Find nearest solved neighbor
+            neighbors = [
+                (i-1, j), (i+1, j), (i, j-1), (i, j+1),
+                (i-1, j-1), (i-1, j+1), (i+1, j-1), (i+1, j+1)
+            ]
+            
+            best_thermal = nothing
+            best_hydraulic = nothing
+            min_param_dist = Inf
+            
+            # Thread-safe neighbor search
+            lock(thermal_lock)
+            try
+                for (ni, nj) in neighbors
+                    if 1 ≤ ni ≤ n1 && 1 ≤ nj ≤ n2 && isassigned(sols_thermal, ni, nj) && sols_thermal[ni, nj] !== nothing
+                        param_dist = sqrt(
+                            (values1[i] - values1[ni])^2 + 
+                            (values2[j] - values2[nj])^2
+                        )
+                        if param_dist < min_param_dist
+                            min_param_dist = param_dist
+                            best_thermal = sols_thermal[ni, nj]
+                            best_hydraulic = sols_hydraulic[ni, nj]
+                        end
+                    end
+                end
+            finally
+                unlock(thermal_lock)
+            end
+            
+            # Fallback to center solution
+            if best_thermal === nothing
+                best_thermal = sols_thermal[center_i, center_j]
+                best_hydraulic = sols_hydraulic[center_i, center_j]
+            end
+            
+            # Solve systems
+            current_params = [
+                base_params...,
+                param_sym1 => values1[i],
+                param_sym2 => values2[j]
+            ]
+            
+            sol_thermal = solve_thermal_problem(
+                thermal_prob, best_thermal, current_params, solvers
+            )
+            sol_hydraulic = solve_hydraulic_problem(
+                hydraulic_prob, best_hydraulic, current_params,
+                sol_thermal, sys_thermal, solvers
+            )
+            
+            # Thread-safe storage
+            lock(thermal_lock)
+            try
+                sols_thermal[i, j] = sol_thermal
+                sols_hydraulic[i, j] = sol_hydraulic
+            finally
+                unlock(thermal_lock)
+                next!(p)
+            end
+        end
+    end
+    
+    return sols_thermal, sols_hydraulic
 end
 
-# Find best operating point
-valid_results = filter(r -> !isnan(r.COP), results)
-best_idx = argmax([r.COP for r in valid_results])
-best_point = valid_results[best_idx]
-
-println("Optimal operating point:")
-println("- Compressor freq: $(best_point.comp_freq) Hz")
-println("- Pump speed: $(best_point.pump_speed)")
-println("- COP: $(round(best_point.COP, digits=2))")
-println("- Power: $(round(best_point.power, digits=1)) kW")
-
-# ╔═╡ 81743f72-5d1d-4ec0-830d-94e764cdad82
-
-
-# ╔═╡ b2dc10f4-5af7-4d5a-a17c-71509fbcdffb
+# ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
 
 
 # ╔═╡ d56e6679-1745-4efe-8205-aab080a2c0b8
@@ -4184,7 +4222,6 @@ sol_size = size_ev()
   ╠═╡ =#
 
 # ╔═╡ ab30e6b5-8ac9-4ae0-a855-299eee9e9543
-#=╠═╡
 """
 Test function for SinglePhasePlateHX_WithProperties
 """
@@ -4260,7 +4297,6 @@ function size_ev()
     println("ṁ 2 = ", exp(sol[hx.γṁ_2]), " kg/s")
     return sol
 end
-  ╠═╡ =#
 
 # ╔═╡ e563b30e-38b6-46db-9a74-184dd0a9117c
 md" # Quick analysis: parametric study"
@@ -4284,46 +4320,6 @@ fig_study = Makie.lines(XX, m_Y)
 end
   ╠═╡ =#
 
-# ╔═╡ f10ce6fe-b32c-44a6-860f-77a10405b764
-md" # Temperature profiles"
-
-# ╔═╡ dbf11406-e5be-441d-baed-ccd0a0e94d6b
-md"# Utilities"
-
-# ╔═╡ b6e75d0b-ba51-4513-acb1-26b61a5d66c7
-md" # Other"
-
-# ╔═╡ 4aa25799-ffec-425a-ba91-d577b7f8b2f7
-# ╠═╡ disabled = true
-#=╠═╡
-candidate_solvers = [
-    NewtonRaphson(),
-    NonlinearSolve.TrustRegion(),
-    LevenbergMarquardt(),
-    PseudoTransient(),
-    RobustMultiNewton(),
-    FastShortcutNonlinearPolyalg(),
-    Broyden(),
-    Klement(),
-    LimitedMemoryBroyden(),
-    SimpleNewtonRaphson(),
-    SimpleBroyden(),
-    SimpleLimitedMemoryBroyden(),
-    SimpleKlement(),
-    SimpleTrustRegion(),
-    SimpleDFSane(),
-    SimpleHalley(),
-    DynamicSS(),
-    SSRootfind(),#
-    NLsolveJL(),#
-    CMINPACK(),
-    KINSOL(),
-    SIAMFANLEquationsJL(),
-    #NLSolversJL(),
-    #PETScSNES(),
-	];
-  ╠═╡ =#
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -4331,6 +4327,7 @@ AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
@@ -4339,6 +4336,9 @@ NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
@@ -4346,12 +4346,15 @@ AlgebraOfGraphics = "~0.10.8"
 CairoMakie = "~0.13.10"
 DataFrames = "~1.7.0"
 Distributions = "~0.25.120"
+Interpolations = "~0.15.1"
 LaTeXStrings = "~1.4.0"
-ModelingToolkit = "~10.8.0"
+ModelingToolkit = "~10.13.0"
 MonteCarloMeasurements = "~1.4.7"
-NonlinearSolve = "~4.9.0"
-PlutoDevMacros = "~0.9.0"
+NonlinearSolve = "~4.10.0"
+PlutoDevMacros = "~0.9.1"
 PlutoTest = "~0.2.2"
+ProgressMeter = "~1.10.4"
+Roots = "~2.2.8"
 SpecialFunctions = "~2.5.1"
 """
 
@@ -4361,7 +4364,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "99b9dbcc674a9bd995936ce1b8f296a1e612ce94"
+project_hash = "866c06679de98285cd2717f66e2fc99cbdb68177"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -4496,10 +4499,10 @@ version = "7.19.0"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
 
 [[deps.ArrayLayouts]]
-deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "4e25216b8fea1908a0ce0f5d87368587899f75be"
+deps = ["FillArrays", "LinearAlgebra", "StaticArrays"]
+git-tree-sha1 = "120e392af69350960b1d3b89d41dcc1d66543858"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "1.11.1"
+version = "1.11.2"
 weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
@@ -4549,9 +4552,9 @@ version = "0.1.6"
 
 [[deps.BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "a8c0f363186263d75e97a41878d10dd842797561"
+git-tree-sha1 = "291532989f81db780e435452ccb2a5f902ff665f"
 uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
-version = "1.6.3"
+version = "1.7.0"
 
     [deps.BlockArrays.extensions]
     BlockArraysAdaptExt = "Adapt"
@@ -4812,9 +4815,9 @@ version = "0.4.5"
 
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
-git-tree-sha1 = "e263203658fe1ad956c0e343c419e8d54bdbb2fc"
+git-tree-sha1 = "52af5ee5af4eb6ca03b3782bf65c1e5fc3024c86"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.177.1"
+version = "6.178.0"
 
     [deps.DiffEqBase.extensions]
     DiffEqBaseCUDAExt = "CUDA"
@@ -4882,9 +4885,9 @@ version = "1.15.1"
 
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
-git-tree-sha1 = "210933c93f39f832d92f9efbbe69a49c453db36d"
+git-tree-sha1 = "f620da805b82bec64ab4d5f881c7592c82dbc08a"
 uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
-version = "0.7.1"
+version = "0.7.3"
 
     [deps.DifferentiationInterface.extensions]
     DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
@@ -5454,9 +5457,9 @@ version = "0.1.3"
 
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "0f14a5456bdc6b9731a5682f439a672750a09e48"
+git-tree-sha1 = "ec1debd61c300961f98064cfb21287613ad7f303"
 uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
-version = "2025.0.4+0"
+version = "2025.2.0+0"
 
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
@@ -5582,9 +5585,9 @@ version = "2.1.2"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "c47892541d03e5dc63467f8964c9f2b415dfe718"
+git-tree-sha1 = "6ac9e4acc417a5b534ace12690bc6973c25b862f"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.9.46"
+version = "0.10.3"
 
 [[deps.JuliaSyntax]]
 git-tree-sha1 = "937da4713526b96ac9a178e2035019d3b78ead4a"
@@ -5665,9 +5668,9 @@ version = "0.1.17"
 
 [[deps.LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "SparseArrays"]
-git-tree-sha1 = "866ce84b15e54d758c11946aacd4e5df0e60b7a3"
+git-tree-sha1 = "76627adb8c542c6b73f68d4bfd0aa71c9893a079"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "2.6.1"
+version = "2.6.2"
 
     [deps.LazyArrays.extensions]
     LazyArraysBandedMatricesExt = "BandedMatrices"
@@ -5779,9 +5782,9 @@ version = "1.11.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
-git-tree-sha1 = "062c11f1d84ffc80d00fddaa515f7e37e8e9f9d5"
+git-tree-sha1 = "22e90c33c5297d6162ee54e2383584849379aa53"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.18.2"
+version = "3.23.0"
 
     [deps.LinearSolve.extensions]
     LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -5849,9 +5852,9 @@ version = "1.11.0"
 
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
-git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
+git-tree-sha1 = "282cadc186e7b2ae0eeadbd7a4dffed4196ae2aa"
 uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
-version = "2025.0.1+1"
+version = "2025.2.0+0"
 
 [[deps.MLStyle]]
 git-tree-sha1 = "bc38dff0548128765760c79eb7388a4b37fae2c8"
@@ -5923,9 +5926,9 @@ version = "1.11.0"
 
 [[deps.ModelingToolkit]]
 deps = ["ADTypes", "AbstractTrees", "ArrayInterface", "BlockArrays", "ChainRulesCore", "Combinatorics", "CommonSolve", "Compat", "ConstructionBase", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "DiffEqNoiseProcess", "DiffRules", "DifferentiationInterface", "Distributed", "Distributions", "DocStringExtensions", "DomainSets", "DynamicQuantities", "EnumX", "ExprTools", "FindFirstFunctions", "ForwardDiff", "FunctionWrappers", "FunctionWrappersWrappers", "Graphs", "ImplicitDiscreteSolve", "InteractiveUtils", "JuliaFormatter", "JumpProcesses", "Latexify", "Libdl", "LinearAlgebra", "MLStyle", "Moshi", "NaNMath", "NonlinearSolve", "OffsetArrays", "OrderedCollections", "OrdinaryDiffEqCore", "PrecompileTools", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SCCNonlinearSolve", "SciMLBase", "SciMLPublic", "SciMLStructures", "Serialization", "Setfield", "SimpleNonlinearSolve", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "SymbolicUtils", "Symbolics", "URIs", "UnPack", "Unitful"]
-git-tree-sha1 = "b08ce77612d4f32f08a77f7d00cc8e512a0ef153"
+git-tree-sha1 = "5ce144bf0123106d559522a8ecdbb9bb39e73bfb"
 uuid = "961ee093-0014-501f-94e3-6117800e7a78"
-version = "10.8.0"
+version = "10.13.0"
 
     [deps.ModelingToolkit.extensions]
     MTKBifurcationKitExt = "BifurcationKit"
@@ -6027,9 +6030,9 @@ version = "1.2.0"
 
 [[deps.NonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DiffEqBase", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "NonlinearSolveBase", "NonlinearSolveFirstOrder", "NonlinearSolveQuasiNewton", "NonlinearSolveSpectralMethods", "PrecompileTools", "Preferences", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SparseArrays", "SparseMatrixColorings", "StaticArraysCore", "SymbolicIndexingInterface"]
-git-tree-sha1 = "aeb6fb02e63b4d4f90337ed90ce54ceb4c0efe77"
+git-tree-sha1 = "d2ec18c1e4eccbb70b64be2435fc3b06fbcdc0a1"
 uuid = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
-version = "4.9.0"
+version = "4.10.0"
 
     [deps.NonlinearSolve.extensions]
     NonlinearSolveFastLevenbergMarquardtExt = "FastLevenbergMarquardt"
@@ -6059,9 +6062,9 @@ version = "4.9.0"
 
 [[deps.NonlinearSolveBase]]
 deps = ["ADTypes", "Adapt", "ArrayInterface", "CommonSolve", "Compat", "ConcreteStructs", "DifferentiationInterface", "EnzymeCore", "FastClosures", "LinearAlgebra", "Markdown", "MaybeInplace", "Preferences", "Printf", "RecursiveArrayTools", "SciMLBase", "SciMLJacobianOperators", "SciMLOperators", "StaticArraysCore", "SymbolicIndexingInterface", "TimerOutputs"]
-git-tree-sha1 = "404d71dd057759f4d590191a643113485c4a482a"
+git-tree-sha1 = "ee395563ae6ffaecbdf86d430440fddc779253a4"
 uuid = "be0214bd-f91f-a760-ac4e-3421ce2b2da0"
-version = "1.12.0"
+version = "1.13.0"
 
     [deps.NonlinearSolveBase.extensions]
     NonlinearSolveBaseBandedMatricesExt = "BandedMatrices"
@@ -6083,15 +6086,15 @@ version = "1.12.0"
 
 [[deps.NonlinearSolveFirstOrder]]
 deps = ["ADTypes", "ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLJacobianOperators", "Setfield", "StaticArraysCore"]
-git-tree-sha1 = "9c8cd0a986518ba317af263549b48e34ac8f776d"
+git-tree-sha1 = "65101a20b135616a13625ae6f84b052ef5780363"
 uuid = "5959db7a-ea39-4486-b5fe-2dd0bf03d60d"
-version = "1.5.0"
+version = "1.6.0"
 
 [[deps.NonlinearSolveQuasiNewton]]
 deps = ["ArrayInterface", "CommonSolve", "ConcreteStructs", "DiffEqBase", "LinearAlgebra", "LinearSolve", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "SciMLOperators", "StaticArraysCore"]
-git-tree-sha1 = "e3888bdbab6e0bfadbc3164ef4595e40e7b7e954"
+git-tree-sha1 = "3e04c917d4e3cd48b2a5091b6f76c720bb3f7362"
 uuid = "9a2c21bd-3a47-402d-9113-8faf9a0ee114"
-version = "1.6.0"
+version = "1.7.0"
 weakdeps = ["ForwardDiff"]
 
     [deps.NonlinearSolveQuasiNewton.extensions]
@@ -6280,9 +6283,9 @@ version = "1.4.3"
 
 [[deps.PlutoDevMacros]]
 deps = ["JuliaInterpreter", "Logging", "MacroTools", "Pkg", "TOML"]
-git-tree-sha1 = "72f65885168722413c7b9a9debc504c7e7df7709"
+git-tree-sha1 = "1cb861c9295d79dc6e23170d4b33bce013f69643"
 uuid = "a0499f29-c39b-4c5c-807c-88074221b949"
-version = "0.9.0"
+version = "0.9.1"
 
 [[deps.PlutoTest]]
 deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
@@ -6291,10 +6294,10 @@ uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 version = "0.2.2"
 
 [[deps.PoissonRandom]]
-deps = ["Random"]
-git-tree-sha1 = "a0f1159c33f846aa77c3f30ebbc69795e5327152"
+deps = ["LogExpFunctions", "Random"]
+git-tree-sha1 = "bb178012780b34046c6d1600a315d8dbee89d83d"
 uuid = "e409e4f3-bfea-5376-8464-e040bb5c01ab"
-version = "0.4.4"
+version = "0.4.5"
 
 [[deps.Polyester]]
 deps = ["ArrayInterface", "BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "ManualMemory", "PolyesterWeave", "Static", "StaticArrayInterface", "StrideArraysCore", "ThreadingUtilities"]
@@ -6428,9 +6431,9 @@ version = "1.3.4"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "efc718978d97745c58e69c5115a35c51a080e45e"
+git-tree-sha1 = "4dd1a95cc16d5abdccc4eac5faf6bc73904be1a2"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "3.34.1"
+version = "3.35.0"
 
     [deps.RecursiveArrayTools.extensions]
     RecursiveArrayToolsFastBroadcastExt = "FastBroadcast"
@@ -6491,6 +6494,26 @@ git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
 uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
 version = "0.5.1+0"
 
+[[deps.Roots]]
+deps = ["Accessors", "CommonSolve", "Printf"]
+git-tree-sha1 = "668e411c0616a70860249b4c96e5d35296631a1d"
+uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+version = "2.2.8"
+
+    [deps.Roots.extensions]
+    RootsChainRulesCoreExt = "ChainRulesCore"
+    RootsForwardDiffExt = "ForwardDiff"
+    RootsIntervalRootFindingExt = "IntervalRootFinding"
+    RootsSymPyExt = "SymPy"
+    RootsSymPyPythonCallExt = "SymPyPythonCall"
+
+    [deps.Roots.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    IntervalRootFinding = "d2bf35a9-74e0-55ec-b149-d360ff49b807"
+    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+    SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
+
 [[deps.RoundingEmulator]]
 git-tree-sha1 = "40b9edad2e5287e05bd413a38f61a8ff55b9557b"
 uuid = "5eaf0fd0-dfba-4ccb-bf02-d820a40db705"
@@ -6504,9 +6527,9 @@ version = "0.5.15"
 
 [[deps.SCCNonlinearSolve]]
 deps = ["CommonSolve", "PrecompileTools", "Reexport", "SciMLBase", "SymbolicIndexingInterface"]
-git-tree-sha1 = "80d305585f80e7a3a93816495a7825b3a0bd699f"
+git-tree-sha1 = "5595105cef621942aceb1aa546b883c79ccbfa8f"
 uuid = "9dfe8606-65a1-4bb3-9748-cb89d1561431"
-version = "1.3.1"
+version = "1.4.0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -6531,9 +6554,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "31587e20cdea9fba3a689033313e658dfc9aae78"
+git-tree-sha1 = "c9dc4c04bcb0146a35dd6af726073c5738b80e3b"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.102.1"
+version = "2.104.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -6558,9 +6581,9 @@ version = "2.102.1"
 
 [[deps.SciMLJacobianOperators]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "ConstructionBase", "DifferentiationInterface", "FastClosures", "LinearAlgebra", "SciMLBase", "SciMLOperators"]
-git-tree-sha1 = "7da1216346ad79499d08d7e2a3dbf297dc80c829"
+git-tree-sha1 = "3414071e3458f3065de7fa5aed55283b236b4907"
 uuid = "19f34311-ddf3-4b8b-af20-060888a46c0e"
-version = "0.1.6"
+version = "0.1.8"
 
 [[deps.SciMLOperators]]
 deps = ["Accessors", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "MacroTools"]
@@ -6636,9 +6659,9 @@ version = "0.4.0"
 
 [[deps.SimpleNonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "BracketingNonlinearSolve", "CommonSolve", "ConcreteStructs", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LineSearch", "LinearAlgebra", "MaybeInplace", "NonlinearSolveBase", "PrecompileTools", "Reexport", "SciMLBase", "Setfield", "StaticArraysCore"]
-git-tree-sha1 = "7aaa5fe4617271b64fce0466d187f2a72edbd81a"
+git-tree-sha1 = "09d986e27a606f172c5b6cffbd8b8b2f10bf1c75"
 uuid = "727e6d20-b764-4bd8-a329-72de5adea6c7"
-version = "2.5.0"
+version = "2.7.0"
 
     [deps.SimpleNonlinearSolve.extensions]
     SimpleNonlinearSolveChainRulesCoreExt = "ChainRulesCore"
@@ -6741,9 +6764,9 @@ weakdeps = ["OffsetArrays", "StaticArrays"]
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
-git-tree-sha1 = "0feb6b9031bd5c51f9072393eb5ab3efd31bf9e4"
+git-tree-sha1 = "cbea8a6bd7bed51b1619658dec70035e07b8502f"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.9.13"
+version = "1.9.14"
 weakdeps = ["ChainRulesCore", "Statistics"]
 
     [deps.StaticArrays.extensions]
@@ -6842,9 +6865,9 @@ version = "7.7.0+0"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "PrettyTables", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "658f6d01bfe68d6bf47915bf5d868228138c7d71"
+git-tree-sha1 = "59ca6eddaaa9849e7de9fd1153b6faf0b1db7b80"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.41"
+version = "0.3.42"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils"]
@@ -6868,9 +6891,9 @@ version = "3.29.0"
 
 [[deps.Symbolics]]
 deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "LaTeXStrings", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "OffsetArrays", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
-git-tree-sha1 = "df665535546bb07078ee42e0972527b5d6bd3f69"
+git-tree-sha1 = "8922f50f13eac24583a445968d3cfbdcc0c621ac"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "6.43.0"
+version = "6.45.0"
 
     [deps.Symbolics.extensions]
     SymbolicsForwardDiffExt = "ForwardDiff"
@@ -6911,9 +6934,9 @@ uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 version = "1.10.0"
 
 [[deps.TaskLocalValues]]
-git-tree-sha1 = "d155450e6dff2a8bc2fcb81dcb194bd98b0aeb46"
+git-tree-sha1 = "67e469338d9ce74fc578f7db1736a74d93a49eb8"
 uuid = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
-version = "0.1.2"
+version = "0.1.3"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -7200,6 +7223,10 @@ version = "4.1.0+0"
 # ╠═2aa4e5cf-f6d9-4608-8000-ec078c7ae7b9
 # ╠═bbaed5c6-445a-43ed-82f2-c7b4b17fbf19
 # ╠═fe20b40a-ce2a-408d-89c4-3bd17255ad62
+# ╠═f0fa9e95-4369-480d-a6d4-d6b545504686
+# ╠═68df8cdc-5652-4fd7-9391-b9de65722f10
+# ╠═6e948a61-d8bb-4d93-b6e6-da19256cb24f
+# ╠═a2cd3b4a-713b-4d5d-8739-139d0a64214c
 # ╠═f3070a9a-d98b-49b8-b300-631a4065211e
 # ╠═734d74db-7b19-42fd-89ad-78816a939565
 # ╠═e31e4221-54e9-4049-b80e-eca118e9bb00
@@ -7252,6 +7279,7 @@ version = "4.1.0+0"
 # ╠═11823168-8288-49db-88e8-319df4535273
 # ╠═409aa2af-c6b7-451c-8557-ced24eccc9c1
 # ╠═51de15da-535e-4908-b346-d69d34e2ce01
+# ╠═9b9c3b3b-6e9e-49c0-8498-99217be15b2e
 # ╠═fcfeffb2-35aa-4209-a495-ce79949d08e0
 # ╠═93114c1c-393c-4569-bcad-936ad8938e44
 # ╠═86eeb20e-7da2-489d-84af-317f31f63ef4
@@ -7289,37 +7317,39 @@ version = "4.1.0+0"
 # ╠═e1c53c82-3ede-40a7-ae3f-e848fc763372
 # ╠═f60e1452-e13c-472d-85bb-fbb64c3e1311
 # ╠═364eaab7-4812-4467-8319-777f0b12d1c7
-# ╟─819264a6-e4b7-406c-9d97-8ac0f36c3ea8
-# ╟─80885b7b-9ab2-4010-a954-ed4790c277f0
-# ╟─94ae6b58-139f-4236-945a-1afc3a661056
-# ╟─62354dc1-b439-4146-8271-744c2370a08b
-# ╠═2a4c04e6-875e-453a-9be5-6194a5530c06
+# ╠═819264a6-e4b7-406c-9d97-8ac0f36c3ea8
+# ╠═80885b7b-9ab2-4010-a954-ed4790c277f0
+# ╠═3ad72686-9a35-4486-a71c-180cba7d46a2
+# ╠═241265f4-f66f-4158-855f-89f002f23d4e
+# ╠═52e4fb9f-6e5e-4c7e-b34e-9f0bace4db63
+# ╠═9aa6b70a-9464-4f48-a340-61030ca9310b
+# ╠═5f7f03fb-20e2-4bd2-8bb7-f09a8c2d94e6
+# ╟─2a4c04e6-875e-453a-9be5-6194a5530c06
+# ╠═8d3a070d-682b-47f4-bfd6-9feb53ce9ccc
+# ╠═1ac95f91-934a-4dc7-97a8-f6cc13ecb864
+# ╠═df4eb258-955d-4f9e-bfdd-6d202c5b8d90
+# ╠═79b5e151-be4a-4d38-ae46-c975b4bf557e
+# ╠═04ec6d0d-d812-464e-b244-8458207283da
+# ╠═a0e018cb-a75a-4844-8716-98492b29b6d9
 # ╠═b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
 # ╠═6e243cf3-1f76-4648-b709-e1f8d7fd4c15
 # ╠═bd9e4d44-4b7b-4b54-8680-20c932e8ea75
 # ╠═4374a31a-5161-47ae-883a-00dbbbbbe579
-# ╠═5c35dd43-12de-475a-96bf-fb5614074415
 # ╠═40c8dc3c-87f8-46e8-a70e-6acc354d5020
-# ╠═8d3a070d-682b-47f4-bfd6-9feb53ce9ccc
 # ╠═ed8fd1d6-c51b-4130-8f7c-795231d68ed4
-# ╠═da9be1ad-b570-4270-b9a1-4f034bc57da6
-# ╠═75a9cda4-159a-4b78-a32c-0f8f2fb0c14e
-# ╠═68c8ec06-1e1e-425f-b872-29634be28c3f
-# ╠═06a0d9eb-486f-4839-b949-c0a80f6859fa
-# ╠═ffc2b597-b234-407d-b0cc-76a0bf114535
-# ╠═25ad6ddd-1836-4d04-a10d-136f68308347
 # ╠═fbc3e326-5684-4029-ba49-6c0f065d151b
 # ╠═7ef1715e-2fd3-4deb-853d-233496735474
 # ╠═88624925-6092-44c8-9539-28527aa43a7c
 # ╠═526d0dad-939f-48af-a09f-c1cae30d6770
 # ╠═f6aed83e-02a5-4d62-874e-55f333266b42
-# ╠═34d568ce-25d5-4a0b-b1db-0ca3b8e8607a
-# ╠═76cc998b-9a7f-4b1c-8403-c16bccbda74e
+# ╟─34d568ce-25d5-4a0b-b1db-0ca3b8e8607a
+# ╟─76cc998b-9a7f-4b1c-8403-c16bccbda74e
 # ╠═d7090f5b-50f6-4198-9237-8447ae442789
 # ╠═fdddfe24-f560-4a52-9756-ee1d1d6946d3
 # ╠═104492fc-1c63-4571-80e4-2df35b6abdcf
 # ╠═0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 # ╠═a4b78e57-3f4a-4bd1-a4fd-344aed782596
+# ╟─5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
 # ╠═58a5d982-5d07-4a63-950a-ca5639cff43f
 # ╠═ceb2b429-90ae-4bc5-b346-e65e5727d441
 # ╠═6ac1ecbf-4833-449f-9933-c782a8566fb0
@@ -7332,36 +7362,40 @@ version = "4.1.0+0"
 # ╠═8a4bc20a-195f-49f5-8379-ca6be9bdb1a1
 # ╠═670cd198-239a-4240-be5d-2def55383a36
 # ╠═a208968e-8f31-4a82-b8f3-9db4a8d27e8b
-# ╠═69da634a-6492-41fc-bf5c-8158c27df9fb
-# ╠═31de0764-c34a-46cd-976e-04930addb74c
 # ╠═37d9352d-2357-4f36-b651-5dc73246fd42
 # ╠═4b47374a-f1a3-402c-a4ba-bae8edcedc01
 # ╠═0f6b83f7-167a-4e3f-9fd5-d4f4695fbaea
+# ╠═b48efffc-d19c-4b66-936b-6fd9c9de5a88
 # ╠═bfe4471c-7033-4ca5-beb1-530a8be5b757
 # ╠═798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═05bbe96e-023c-413b-a347-d37e74fad7fe
 # ╠═fecd7f3d-bf0b-464e-a1ad-238e508b0f38
+# ╠═8527ed5d-3ff6-435d-a93d-548c824dee78
+# ╠═eadd49a1-7bca-40a2-abdb-064a0fb710e6
 # ╠═0fe18091-e8f6-42d4-9961-5783452ddefd
 # ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
 # ╠═4982df2c-016a-4136-a074-b39c1befffb7
 # ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
-# ╠═2ee846b2-beaf-4db5-a5a5-01e48c8ed344
+# ╠═5ad658d3-19f3-4907-bc2d-308a83aae97c
+# ╠═6f32ff1e-5faa-4551-a898-01167021e4a4
+# ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
 # ╠═bed552fa-1a51-492b-8552-81186c96c6a1
-# ╠═473f4d2b-92a3-495c-975d-38738f714fb9
+# ╟─473f4d2b-92a3-495c-975d-38738f714fb9
 # ╠═c2755bcf-548b-47ff-be58-b6cbfda319f7
 # ╠═afba0093-bdb2-4ee9-95da-0f4d1933d22c
-# ╠═c7a127c5-0c1a-45d3-985c-8c52afcd4ba8
 # ╠═bdbf26be-8a8b-4c4d-be59-a67ea68226ef
 # ╠═85978ad5-c80a-4eed-b04f-72b57afcc13e
 # ╠═2ce9d158-4156-47db-97bc-efa0e18618b3
 # ╠═aa8498ba-14aa-421d-abb8-67ac1286bd41
 # ╠═0761ab79-e4d9-43c2-b772-fe6df8f333b7
 # ╠═b92cc8df-5884-4129-99fe-d22038b4eb0c
-# ╠═2f2c7201-39ec-4d48-903d-ba9b725bfffb
+# ╠═1e116b39-5019-4e87-80eb-13b1a9d9ae58
+# ╠═acbfba23-bbb5-4d9e-93b7-1120677332bd
+# ╠═870d81bf-2254-427b-8471-3c9d23b13a72
+# ╠═1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+# ╠═cedbf94b-e85d-4662-a64e-16fba9ef2ed4
 # ╠═fff91fa6-8ffb-458a-946d-244b5b13c3cd
-# ╠═0f8a3b7f-9e2a-4b3e-a0f4-566640533633
-# ╠═81743f72-5d1d-4ec0-830d-94e764cdad82
-# ╠═b2dc10f4-5af7-4d5a-a17c-71509fbcdffb
+# ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
 # ╠═d56e6679-1745-4efe-8205-aab080a2c0b8
 # ╠═de9faed9-2f88-44e7-94da-098238b99f09
 # ╠═7960a423-b601-4aec-b0ba-b35eebce82c5
@@ -7375,9 +7409,5 @@ version = "4.1.0+0"
 # ╠═e9a4105f-abec-47ca-9170-ca6aef7a9c49
 # ╠═4bbe463f-7e79-44f8-8abe-5f104b346e45
 # ╠═5870e251-b3da-42b7-b72f-211e74c669fc
-# ╠═f10ce6fe-b32c-44a6-860f-77a10405b764
-# ╠═dbf11406-e5be-441d-baed-ccd0a0e94d6b
-# ╠═b6e75d0b-ba51-4513-acb1-26b61a5d66c7
-# ╠═4aa25799-ffec-425a-ba91-d577b7f8b2f7
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
