@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.8
+# v0.20.13
 
 using Markdown
 using InteractiveUtils
@@ -1302,7 +1302,7 @@ function UTubeGrouted(; name::Symbol,
 					  fluid = "MEA",
                        depth=100.0, D_p1_o=0.032, D_p1_i=0.026, D_p2_o=0.032, D_p2_i=0.026,
                        D_b=0.11, λ_pipe_1=0.4, λ_pipe_2=0.4, λ_grout=1.5, λ_soil=2.0,
-                       T_wall=283.15, s=0.075, χ=0.0)
+                       T_wall=283.15, α=0.5, χ=0.0)
     # Define top-level parameters
     ps = @parameters begin
         depth = depth          # Borehole length [m]
@@ -1316,7 +1316,7 @@ function UTubeGrouted(; name::Symbol,
         λ_grout = λ_grout          # Thermal conductivity of grout [W/(m·K)]
         λ_soil = λ_soil           # Thermal conductivity of soil [W/(m·K)]
         T_wall = T_wall        # Borehole wall temperature [K]
-        s = s              # Shank spacing (center-to-center distance) [m]
+        α = α              # Shank spacing (center-to-center distance) [m]
         χ = χ                # Glycol mass fraction
     end
     
@@ -1351,8 +1351,6 @@ function UTubeGrouted(; name::Symbol,
     r_b = D_b/2
     # Calculate pipe radius (assuming same for both pipes)
     r_p = (D_p1_o + D_p2_o)/4
-    # Calculate alpha parameter from shank spacing
-    α = s/(2*r_b)
     
     @named annular_res = GroutedBoreholeThermalResistance(λ_ground=λ_soil, 
                                                         λ_grout=λ_grout,
@@ -1431,7 +1429,7 @@ function test_utube_grouted()
                                   D_p2_o=32e-3, D_p2_i=28.24e-3,
                                   D_b=0.115, λ_pipe_1=0.4, λ_pipe_2=0.4, 
                                   λ_grout=1.5, λ_soil=2.0,
-                                  T_wall=273.15 + 10, s=0.075, χ=0.23)
+                                  T_wall=273.15 + 10, α=0.5, χ=0.23)
 
 
 	
@@ -1454,6 +1452,8 @@ function test_utube_grouted()
     display(sol[collector.Q])
     display(sol[collector.Q_1])
     display(sol[collector.Q_2])
+    display(sol[collector.utube_res.R_t1_t2])
+
     
     # Return solution success status
     return sol.retcode == ModelingToolkit.ReturnCode.Success
@@ -5305,11 +5305,11 @@ version = "1.9.2+0"
 # ╟─6053e72f-a71f-4d66-bdec-825bfc71f3ff
 # ╟─ac31a014-260e-427a-a12e-507d08bcf69e
 # ╟─e5f237e2-9a05-4526-9cee-8cfab38c5b8b
-# ╟─dfb5326f-ffdf-485b-a237-01f3c33d378c
-# ╟─d75c03e6-6f55-4933-88fc-88428fc22869
+# ╠═dfb5326f-ffdf-485b-a237-01f3c33d378c
+# ╠═d75c03e6-6f55-4933-88fc-88428fc22869
 # ╟─529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
 # ╟─37d8b287-5446-4cfe-bb13-6d24f3f5ace3
-# ╟─7f108fec-1aa8-437a-88b4-1933694eb22b
+# ╠═7f108fec-1aa8-437a-88b4-1933694eb22b
 # ╠═303c4cac-c9b9-42f7-8fc7-85239423b0e4
 # ╟─2d42a7e9-c756-4053-858e-5659e069470a
 # ╠═ed6d7ff7-7c72-4445-9627-d9141c5031dc
