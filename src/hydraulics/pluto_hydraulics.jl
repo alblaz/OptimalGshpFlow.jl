@@ -902,6 +902,7 @@ function AnnularBend180(; name::Symbol,
 end
 
 # ╔═╡ 9ea17444-965d-4aec-885a-c3b7065dbdea
+# ╠═╡ skip_as_script = true
 #=╠═╡
 function generate_pressure_drop_curve(component_type, component_params; 
                                      flow_range=(0.0001, 0.002), 
@@ -2428,7 +2429,6 @@ end
   ╠═╡ =#
 
 # ╔═╡ e9fecb1f-357f-47c0-a90d-f7b8a677b55e
-#=╠═╡
 """
 Analyze the impact of pump speed on power consumption for a geothermal loop.
 Returns a DataFrame with pump speeds, mass flow rates, and power consumption.
@@ -2495,9 +2495,10 @@ function analyze_pump_speed_vs_consumption(;
     
     return df
 end
-  ╠═╡ =#
 
 # ╔═╡ 5a3b2bdc-b1be-491b-8339-b597338a58b3
+# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 """
 Plot the results from analyze_pump_speed_vs_consumption
@@ -2552,11 +2553,14 @@ end
 
 # ╔═╡ 1adad638-3111-446e-9bbd-085bde79a763
 # ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 results = analyze_pump_speed_vs_consumption()
   ╠═╡ =#
 
 # ╔═╡ 2009d02d-d2c0-44ea-96f2-b0bc4889fef1
+# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 plot_pump_speed_analysis(results)
   ╠═╡ =#
@@ -5477,8 +5481,8 @@ version = "1.9.2+0"
 # ╟─884fae8d-2455-4aab-8780-8837bdd92e51
 # ╟─70ff62fc-73b3-4020-bf18-6da05b5498b3
 # ╠═39be2637-45e9-4790-98c1-5815c20428e2
-# ╟─42cf47b7-6bab-4d93-8db4-5c69e11d88fc
-# ╟─d6c2510d-cfbb-42e0-aefa-62289832c789
+# ╠═42cf47b7-6bab-4d93-8db4-5c69e11d88fc
+# ╠═d6c2510d-cfbb-42e0-aefa-62289832c789
 # ╠═8160473b-7a6f-475a-afc8-c61f50290f44
 # ╠═9beb3f23-8110-4867-9b19-b9ddeeb711b0
 # ╠═3320cb17-a8ac-4f9e-ace1-29f8a4ba7906
@@ -5497,7 +5501,7 @@ version = "1.9.2+0"
 # ╟─ef44e372-38f1-4e50-b474-8088eb6ae1a3
 # ╠═be8c1638-1b97-4787-b9f6-9727e85ba21f
 # ╠═15d54952-e218-4c14-b950-288b26cfc9fe
-# ╟─9ea17444-965d-4aec-885a-c3b7065dbdea
+# ╠═9ea17444-965d-4aec-885a-c3b7065dbdea
 # ╟─bc35b49e-b666-49a5-8a39-102164d1ce63
 # ╠═19969f54-9c4c-4b4c-bacb-54db49381bc9
 # ╠═8b331638-8121-4b4e-9818-4ba4529addb1

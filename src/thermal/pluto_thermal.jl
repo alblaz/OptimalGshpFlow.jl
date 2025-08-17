@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.13
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -101,6 +101,9 @@ using Nemo
 #=╠═╡
 using PlutoExtras
   ╠═╡ =#
+
+# ╔═╡ 43de6ce6-067c-4208-bef7-6adb2b2f289c
+using SpecialFunctions: erf, erfinv
 
 # ╔═╡ 4e432eee-7c1e-4a89-8a06-3ba874f55e2b
 # ╠═╡ disabled = true
@@ -696,7 +699,8 @@ function friction_factor_smooth(Re, ε_D=0.0; Re_lam=2300, Re_turb=4000)
     f_turb = 0.25 / (log10(ε_D/3.7 + 5.74/Re^0.9))^2
     
     # Smooth transition using error function
-    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
+    #transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
+	transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_turb - Re_lam)) * (Re - (Re_lam + Re_turb)/2)))
     
     # Combined friction factor with smooth transition
     f = (1 - transition_factor) * f_lam + transition_factor * f_turb
@@ -735,8 +739,9 @@ function nusselt_pipe_flow(Re, Pr, f=nothing; Re_lam=2300, Re_turb=4000)
     Nu_turb = max(Nu_turb, 3.66)  # Safety to ensure positive value
     
     # Smooth transition using the same approach as for friction factor
-    transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
+    #transition_factor = 0.5 * (1 + tanh((2 * log10(Re / Re_lam)) / log10(Re_turb / Re_lam)))
     
+	transition_factor = 0.5 * (1 + erf((2 * erfinv(0.98) / (Re_turb - Re_lam)) * (Re - (Re_lam + Re_turb)/2)))
     # Combined Nusselt number with smooth transition
     Nu = (1 - transition_factor) * Nu_lam + transition_factor * Nu_turb
     
@@ -2003,6 +2008,7 @@ PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SIAMFANLEquations = "084e46ad-d928-497d-ad5e-07fa361a48c4"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
@@ -2023,6 +2029,7 @@ PlutoExtras = "~0.7.15"
 PlutoTest = "~0.2.2"
 PlutoUI = "~0.7.68"
 SIAMFANLEquations = "~1.0.2"
+SpecialFunctions = "~2.5.1"
 SteadyStateDiffEq = "~2.5.0"
 Sundials = "~4.28.0"
 Unitful = "~1.23.1"
@@ -2033,9 +2040,9 @@ WGLMakie = "~0.13.4"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "b3d1f5ce13e3f97aae750ea65d3277bc0edd9567"
+project_hash = "c714b2938eee33baccbb3a8b2d52a4315afd98d6"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -5306,6 +5313,7 @@ version = "1.9.2+0"
 # ╟─ac31a014-260e-427a-a12e-507d08bcf69e
 # ╟─e5f237e2-9a05-4526-9cee-8cfab38c5b8b
 # ╠═dfb5326f-ffdf-485b-a237-01f3c33d378c
+# ╠═43de6ce6-067c-4208-bef7-6adb2b2f289c
 # ╠═d75c03e6-6f55-4933-88fc-88428fc22869
 # ╟─529ee48f-4fcd-4de5-bc4f-9eb003cdf1ad
 # ╟─37d8b287-5446-4cfe-bb13-6d24f3f5ace3

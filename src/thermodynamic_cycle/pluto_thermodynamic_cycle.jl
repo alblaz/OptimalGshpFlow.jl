@@ -1,8 +1,24 @@
 ### A Pluto.jl notebook ###
-# v0.20.13
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
+
+# ╔═╡ 6f32ff1e-5faa-4551-a898-01167021e4a4
+using AlgebraOfGraphics: VLines, color
+
+# ╔═╡ f5ba6b5c-9f00-43a2-ae87-4d86444c4b3f
+
+using Colors: RGBA, red, green, blue
+
+# ╔═╡ 9539a581-42e3-43dc-996d-4d9316aa9c92
+using AlgebraOfGraphics: filled_contours, contours
+
+# ╔═╡ 8527ed5d-3ff6-435d-a93d-548c824dee78
+using Interpolations
+
+# ╔═╡ eadd49a1-7bca-40a2-abdb-064a0fb710e6
+using Roots
 
 # ╔═╡ d47bf527-6960-4e14-b9e5-a422f8888e66
 using PlutoDevMacros
@@ -53,15 +69,6 @@ using Base.Threads
 	using ..Hydraulics
 end
 
-# ╔═╡ 8527ed5d-3ff6-435d-a93d-548c824dee78
-using Interpolations
-
-# ╔═╡ eadd49a1-7bca-40a2-abdb-064a0fb710e6
-using Roots
-
-# ╔═╡ 6f32ff1e-5faa-4551-a898-01167021e4a4
-using AlgebraOfGraphics: VLines, color
-
 # ╔═╡ e9a4105f-abec-47ca-9170-ca6aef7a9c49
 using MonteCarloMeasurements
 
@@ -70,6 +77,11 @@ using Distributions
 
 # ╔═╡ 5870e251-b3da-42b7-b72f-211e74c669fc
 using LinearAlgebra
+
+# ╔═╡ cedbf94b-e85d-4662-a64e-16fba9ef2ed4
+import Base: lock, unlock
+
+
 
 # ╔═╡ a2cd3b4a-713b-4d5d-8739-139d0a64214c
 println("Threads available: ", nthreads())
@@ -3034,6 +3046,7 @@ function GSHP_hydraulics(; name::Symbol, fluid::String="MEA")
         H_shutoff = H_shutoff,
         Q_max = Q_max,
         fluid = fluid,
+		N_max = 4980/60,
         χ = χ
     )
     
@@ -3164,7 +3177,7 @@ function solve_with_fallback(prob, solvers; abstol=1e-6, max_retries=1, u0=nothi
     # Final attempt with increased iterations
     @warn "Trying final fallback with increased iterations"
     try
-        return solve(current_prob, last(solvers); abstol, maxiters=200)
+        return solve(current_prob, last(solvers); abstol=abstol, maxiters=200)
     catch
         error("Complete failure after all attempts")
     end
@@ -3423,7 +3436,7 @@ base_params = [
     :χ => 0.28,
     :L => 0.60,
     :L_BHE => 150.0,
-    :f => 50.0,
+    :f_ => 50.0,
 	:log_ΔTSF_ => log(3),
 ]
 
@@ -3432,6 +3445,26 @@ thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems(base
 
 # ╔═╡ ceb2b429-90ae-4bc5-b346-e65e5727d441
 sol_start_thermal = NonlinearSolve.solve(thermal_prob, solver_robust; abstol = 1e-6)
+
+# ╔═╡ 80898f01-7945-48d9-abd5-15de3c76d465
+f_params = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+    :χ => 0.28,
+    :L => 0.60,
+    :L_BHE => 150.0,
+    :f_ => 25.0,
+	:log_ΔTSF_ => log(3),
+]
+
+# ╔═╡ b3bb8c8b-3825-4a21-94f7-a2d0d00fbb09
+solve_thermal_problem(thermal_prob, sol_start_thermal, f_params, solvers)
 
 # ╔═╡ 6ac1ecbf-4833-449f-9933-c782a8566fb0
 sol_start_hydraulic = NonlinearSolve.solve(hydraulic_prob, solver_robust; abstol = 1e-6)
@@ -3465,7 +3498,7 @@ params_np = [
     :χ => 0.28,
     :L => 0.6,
     :L_BHE => 150.0,
-    :f => 50.0
+    :f_ => 50.0
 ]
 
 # ╔═╡ 30d6e371-c921-4fc2-8d8f-a6c5d7c34385
@@ -3497,7 +3530,7 @@ params_b = [
     :χ => 0.28,
     :L => 0.6,
     :L_BHE => 150.0,
-    :f => 50.0
+    :f_ => 50.0
 ]
 
 # ╔═╡ 8a4bc20a-195f-49f5-8379-ca6be9bdb1a1
@@ -3516,7 +3549,7 @@ params_ΔT = [
     :χ => 0.28,
     :L => 0.6,
     :L_BHE => 150.0,
-    :f => 50.0
+    :f_ => 50.0
 ]
 
 # ╔═╡ b48efffc-d19c-4b66-936b-6fd9c9de5a88
@@ -3612,7 +3645,7 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
         Δp_phx = hyd[sys_hydraulic.phx.base.Δp]/1e5
         Δp_tot = hyd[sys_hydraulic.pump.base.Δp]/1e5
         P_pump = hyd[sys_hydraulic.pump.base.P_elec]
-        
+        N_pump = hyd[sys_hydraulic.pump.base.N]
         # System performance
         COP_2 = Q_cond / (W_comp + P_pump)
 
@@ -3670,7 +3703,7 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
 		R_f1f2 = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
 		
         push!(data, (;
-            ṁ_sf, ṁ_ref, T_wall, T_in, T_out, T_bot, T_evap, T_mid, T_comp_in, ΔT, Q_evap, Q_cond, W_comp, Δp_tot, Δp_phx, Δp_bhe, P_pump,Re_bhe_leg1, Re_bhe_leg2, Re_phx, COP_1, COP_2, U_EV, U_SH, fr_EV, fr_SH, η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2
+            ṁ_sf, ṁ_ref, T_wall, T_in, T_out, T_bot, T_evap, T_mid, T_comp_in, ΔT, Q_evap, Q_cond, W_comp, Δp_tot, Δp_phx, Δp_bhe, P_pump, N_pump, Re_bhe_leg1, Re_bhe_leg2, Re_phx, COP_1, COP_2, U_EV, U_SH, fr_EV, fr_SH, η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2
         ))
     end
 	df = sort(DataFrame(data), :ΔT)
@@ -4019,37 +4052,214 @@ end
 thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
 
 # ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
-χ_values = 0.28:-0.04:0.0
+log_ΔTSF_values = log.(1:0.5:8.0)
 
 # ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
-f_values = 50:-2.5:20
+f_values = 50:-5:20
 
-# ╔═╡ cedbf94b-e85d-4662-a64e-16fba9ef2ed4
-import Base: lock, unlock
+# ╔═╡ 24b94de6-1d03-4225-8fdd-95cac5beb33c
+250+708+7634-1400
+
+# ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
 
 
+# ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+#=╠═╡
+# --------- 1) rectangular grid (orientation Contour.jl expects) ---------
+# size(Z) == (length(X), length(Y))  with X strictly increasing
+function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+                       invx = identity, agg = first)
+    df2 = combine(groupby(df, [ycol, xcol]), zcol => agg => :_z)
+
+    xs = sort(unique(df2[!, xcol]))
+    ys = sort(unique(df2[!, ycol]))
+    x2i = Dict(x => i for (i,x) in enumerate(xs))
+    y2j = Dict(y => j for (j,y) in enumerate(ys))
+
+    Z = fill(NaN, length(xs), length(ys))  # (nx, ny): first dim = X, second = Y
+    @inbounds for r in eachrow(df2)
+        Z[x2i[r[xcol]], y2j[r[ycol]]] = Float64(r._z)
+    end
+
+    # prune fully-empty X or Y lines (keeps a solid rectangle)
+    keep_x = vec(any(isfinite, Z; dims=2))
+    keep_y = vec(any(isfinite, Z; dims=1))
+    Z = Z[keep_x, keep_y]
+    xs = xs[keep_x]; ys = ys[keep_y]
+
+    X = Float64.(invx.(xs))
+    Y = Float64.(ys)
+
+    @assert length(X) ≥ 2 && length(Y) ≥ 2
+    @assert size(Z) == (length(X), length(Y))
+    @assert all(diff(X) .> 0) && all(diff(Y) .> 0)
+    return X, Y, Z
+end
+
+# --------- 2) overlay iso-lines with Makie on an existing Axis ---------
+  ╠═╡ =#
+
+# ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
+#=╠═╡
+
+function _add_isolines!(ax::Makie.Axis, df, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+                        xlogbase::Symbol = :log10, levels = [], color = :black,
+                        linestyle = :solid, linewidth = 1.5,
+                        # labeling
+                        labels::Bool = false,
+                        labelformatter::Function = l -> @sprintf("%.3g", l),
+                        labelsize::Int = 10,
+                        labelcolor = Makie.automatic,   # <- not `nothing`
+                        labelfont  = Makie.automatic)   # <- not `nothing`
+
+    invx = xlogbase === :log10 ? exp10 :
+           xlogbase === :log   ? exp   : identity
+    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
+    levs = levels isa AbstractVector ? Float64.(levels) : Float64[levels]
+
+    if labels
+        contour!(ax, X, Y, Z;
+                 levels=levs, color=color, linestyle=linestyle, linewidth=linewidth,
+                 labels=true, labelformatter=labelformatter,
+                 labelsize=labelsize, labelcolor=labelcolor, labelfont=labelfont)
+    else
+        # Important: don't pass any label kwargs when labels=false
+        contour!(ax, X, Y, Z;
+                 levels=levs, color=color, linestyle=linestyle, linewidth=linewidth)
+    end
+    return ax
+end
+
+  ╠═╡ =#
+
+# ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
+#=╠═╡
+function plot_contourf(df::DataFrame; xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_,
+                       zcol::Symbol=:COP_3, xlogbase::Symbol=:log10,
+                       levels=10, cmap=:viridis, clip_low=nothing, clip_high=nothing,
+                       show_colorbar::Bool=false, return_axis::Bool=false,  # keep false = safest
+                       overlays::Vector=[])
+    invx = xlogbase === :log10 ? exp10 :
+           xlogbase === :log   ? exp   :
+           xlogbase === :none  ? identity :
+           error("xlogbase must be :log10, :log, or :none")
+    xlab = (invx === identity) ? string(xcol) : "ΔTSF"
+
+    grad = cmap isa Symbol ? cgrad(cmap) : cmap
+    pal  = from_continuous(grad)
+    if !(clip_low === nothing && clip_high === nothing)
+        pal = clipped(pal; low=clip_low, high=clip_high)
+    end
+
+    # AoG filled contours
+    base = data(df) * mapping(xcol => invx => xlab, ycol, zcol)
+    fc   = levels isa Integer ? filled_contours(bands=levels, labels=true) : filled_contours(levels=Float64.(levels), labels=true)
+    plt  = base * fc
+    sc   = scales(Color=(; palette=pal, colorbar=false))  # leave AoG colorbar off (stable)
+
+    # own axis; draw AoG into it
+    fig = Figure()
+    ax  = Axis(fig[1,1]; xlabel=xlab, ylabel=string(ycol),
+                         title=string(zcol, " – filled contours"))
+    draw!(ax, plt, sc)
+
+    # overlays
+	for ov in overlays
+	    z   = get(ov, :z, nothing)      ; z === nothing && error("overlay missing :z")
+	    lev = get(ov, :levels, nothing) ; lev === nothing && error("overlay $(z) needs :levels")
+	    col = get(ov, :color, :black)
+	    ls  = get(ov, :linestyle, :solid)
+	    lw  = get(ov, :linewidth, 1.5)
+	
+	    _add_isolines!(ax, df, xcol, ycol, z; xlogbase=xlogbase,
+	        levels=lev, color=col, linestyle=ls, linewidth=lw,
+	        labels=get(ov, :labels, false),
+	        labelformatter=get(ov, :labelformatter, l -> @sprintf("%.3g", l)),
+	        labelsize=get(ov, :labelsize, 10),
+	        labelcolor=get(ov, :labelcolor, nothing),
+	        labelfont=get(ov, :labelfont, nothing))
+	end
+
+    return return_axis ? (fig, ax) : fig
+end
+  ╠═╡ =#
+
+# ╔═╡ b570d453-43f2-4a12-a9d6-889752dd5aeb
+#=╠═╡
+function plot_heatmap(df::DataFrame;
+                      xcol::Symbol = :log_ΔTSF_,
+                      ycol::Symbol = :f_,
+                      zcol::Symbol = :COP_3,
+                      xlogbase::Symbol = :log10)  # use :log if natural log
+
+    invx = xlogbase === :log10 ? exp10 :
+           xlogbase === :log   ? exp   :
+           error("xlogbase must be :log10 or :log")
+
+    plt = data(df) *
+          mapping(                     # <-- POSitional: x, y, z
+              xcol => invx => "ΔTSF",  # log(ΔTSF) -> ΔTSF for plotting
+              ycol,
+              zcol
+          ) *
+          visual(Heatmap)
+
+    fig, ax = draw(
+        plt;
+        axis = (
+            xlabel = "ΔTSF",           # linear axis (default)
+            ylabel = string(ycol),
+            title  = string(zcol, " over ΔTSF vs ", ycol),
+        )
+        # colormap = :viridis,
+        # colorbar = true
+    )
+
+    return fig
+end
+
+  ╠═╡ =#
 
 # ╔═╡ 21cd24f0-4d8b-4298-89e1-7ba7817c2eef
 #=╠═╡
 
+"""
+    process_grid_results(
+      values1, values2,
+      results_thermal, results_hydraulic,
+      sys_thermal, sys_hydraulic;
+      name1=:param1, name2=:param2
+    ) -> DataFrame
+
+Loop over the 2D sweep defined by `values1`×`values2`, extract all the same
+metrics you did in 1D, and return a DataFrame with columns:
+
+  name1, name2, ṁ_sf, ṁ_ref, T_in, …, COP_3
+
+where `name1`/`name2` label the two sweep axes.
+"""
 function process_grid_results(
-  results_thermal, results_hydraulic,
-  χ_values, f_values,
-  sys_thermal, sys_hydraulic
+    values1::AbstractVector,
+    values2::AbstractVector,
+    results_thermal::AbstractMatrix,
+    results_hydraulic::AbstractMatrix,
+    sys_thermal,
+    sys_hydraulic;
+    name1::Symbol = :param1,
+    name2::Symbol = :param2,
+	target_Q_cond::Real = NaN,
 )
-    data = NamedTuple[]  # we'll collect one NamedTuple per (i,j)
+    n1, n2 = length(values1), length(values2)
+    @assert size(results_thermal) == (n1, n2)
+    @assert size(results_hydraulic) == (n1, n2)
 
-    nχ = length(χ_values)
-    nf = length(f_values)
+    rows = NamedTuple[]
 
-    @assert size(results_thermal) == (nχ, nf)
-    @assert size(results_hydraulic) == (nχ, nf)
-
-    for i in 1:nχ, j in 1:nf
+    for i in 1:n1, j in 1:n2
         therm = results_thermal[i,j]
         hyd   = results_hydraulic[i,j]
 
-        # — exactly your thermal extractions —
+        # — your thermal extractions —
         ṁ_sf      = exp( therm[sys_thermal.γṁ_sf] )
         ṁ_ref     = exp( therm[sys_thermal.γṁ_ref] )
         T_in       = therm[sys_thermal.cycle.T_i_b] .- 273.15
@@ -4072,15 +4282,16 @@ function process_grid_results(
         U_EV       = therm[sys_thermal.cycle.evaporator.ev.base.U]
         U_SH       = therm[sys_thermal.cycle.evaporator.sh.base.U]
 
-        # — exactly your hydraulic extractions —
-        Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]        / 1e5
-        Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]   / 1e5
-        Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]  / 1e5
+        # — your hydraulic extractions —
+        Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]          / 1e5
+        Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]     / 1e5
+        Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]    / 1e5
         P_pump     = hyd[sys_hydraulic.pump.base.P_elec]
+        N_pump     = hyd[sys_hydraulic.pump.base.N]
 
         COP_2      = Q_cond / (W_comp + P_pump)
 
-        # — your PHX Reynolds number code —
+        # — PHX Reynolds number —
         ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
                               hyd[sys_hydraulic.phx.props.μ],
                               hyd[sys_hydraulic.phx.base.ṁ]
@@ -4088,92 +4299,80 @@ function process_grid_results(
                                      hyd[sys_hydraulic.phx.W],
                                      hyd[sys_hydraulic.phx.np],
                                      hyd[sys_hydraulic.phx.ϕ]
-        n_ch       = (np_phx - 1)/2
-        A_flow_phx = n_ch * W_phx * (2*b_phx)
-        v_phx      = abs(ṁ_phx)/(ρ_phx * A_flow_phx)
-        dh_phx     = 2*b_phx/ϕ_phx
-        Re_phx     = ρ_phx * v_phx * dh_phx / μ_phx
+        nch       = (np_phx - 1)/2
+        A_flow    = nch * W_phx * (2*b_phx)
+        v_phx     = abs(ṁ_phx)/(ρ_phx*A_flow)
+        dh_phx    = 2*b_phx/ϕ_phx
+        Re_phx    = ρ_phx * v_phx * dh_phx / μ_phx
 
-        # — your BHE‐leg Reynolds numbers —
-        # It looks like in your system object the field isn't `leg1` but something else.
-        # To find the correct field names, do on the REPL:
-        #
-        #   julia> fieldnames(typeof(sys_hydraulic.bhe))
-        #
-        # and then replace `.leg1` and `.leg2` below with the real sub‐component names.
-        #
-        # For the moment, I'll leave placeholders `L1` and `L2`:
-        ρ_bhe1 = hyd[sys_hydraulic.bhe.L1.props.ρ]
-        μ_bhe1 = hyd[sys_hydraulic.bhe.L1.props.μ]
-        ṁ_bhe  = hyd[sys_hydraulic.bhe.ṁ]
-        D_i1   = hyd[sys_hydraulic.bhe.L1.Di]
-        A1     = π*(D_i1/2)^2
-        Re_bhe_leg1 = ρ_bhe1 * abs(ṁ_bhe)/(μ_bhe1*A1) * D_i1
+        # — BHE legs (replace L1 & L2 with your real field‐names) —
+        ρ1 = hyd[sys_hydraulic.bhe.leg1.props.ρ]
+        μ1 = hyd[sys_hydraulic.bhe.leg1.props.μ]
+        D1 = hyd[sys_hydraulic.bhe.leg1.Di]
+        Re_bhe_leg1 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D1 / (μ1 * π*(D1/2)^2)
 
-        ρ_bhe2 = hyd[sys_hydraulic.bhe.L2.props.ρ]
-        μ_bhe2 = hyd[sys_hydraulic.bhe.L2.props.μ]
-        D_i2   = hyd[sys_hydraulic.bhe.L2.Di]
-        A2     = π*(D_i2/2)^2
-        Re_bhe_leg2 = ρ_bhe2 * abs(ṁ_bhe)/(μ_bhe2*A2) * D_i2
+        ρ2 = hyd[sys_hydraulic.bhe.leg2.props.ρ]
+        μ2 = hyd[sys_hydraulic.bhe.leg2.props.μ]
+        D2 = hyd[sys_hydraulic.bhe.leg2.Di]
+        Re_bhe_leg2 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D2 / (μ2 * π*(D2/2)^2)
 
-        # — your BHE thermal resistances & efficiency —
-        η_bh  = therm[sys_thermal.bhe_thermal.ϵ]
-        R_1b  = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
-        R_2b  = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
-        R_12  = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
-        R_f1b = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
-        R_f2b = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
-        R_f1f2= therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
+        # — BHE thermal & resistances —
+        η_bh   = therm[sys_thermal.bhe_thermal.ϵ]
+        R_1b    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
+        R_2b    = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
+        R_12    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
+        R_f1b   = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
+        R_f2b   = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
+        R_f1f2  = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
 
-        push!(data, (
-          χ      = χ_values[i],
-          f      = f_values[j],
-          ṁ_sf  = ṁ_sf,
-          ṁ_ref = ṁ_ref,
-          T_in   = T_in,
-          T_mid  = T_mid,
-          T_out  = T_out,
-          ΔT     = ΔT,
-          T_bot  = T_bot,
-          T_evap = T_evap,
-          T_comp_in = T_comp_in,
-          Q_evap = Q_evap,
-          Q_cond = Q_cond,
-          W_comp = W_comp,
-          COP_1  = COP_1,
-          U_EV   = U_EV,
-          U_SH   = U_SH,
-          fr_EV  = fr_EV,
-          fr_SH  = fr_SH,
-          Δp_bhe = Δp_bhe,
-          Δp_phx = Δp_phx,
-          Δp_tot = Δp_tot,
-          P_pump = P_pump,
-          COP_2  = COP_2,
-          Re_phx = Re_phx,
-          Re_bhe_leg1 = Re_bhe_leg1,
-          Re_bhe_leg2 = Re_bhe_leg2,
-          η_bh   = η_bh,
-          R_1b   = R_1b,
-          R_2b   = R_2b,
-          R_12   = R_12,
-          R_f1b  = R_f1b,
-          R_f2b  = R_f2b,
-          R_f1f2 = R_f1f2
-        ))
+        push!(rows, NamedTuple{(
+            name1,name2,
+            :ṁ_sf,:ṁ_ref,
+            :T_in,:T_mid,:T_out,:ΔT,:T_bot,:T_evap,:T_comp_in,
+            :Q_evap,:Q_cond,:W_comp,:COP_1,
+            :U_EV,:U_SH,:fr_EV,:fr_SH,
+            :Δp_bhe,:Δp_phx,:Δp_tot,:P_pump,:N_pump,:COP_2,
+            :Re_phx,:Re_bhe_leg1,:Re_bhe_leg2,
+            :η_bh,:R_1b,:R_2b,:R_12,:R_f1b,:R_f2b,:R_f1f2
+        )}((
+            values1[i], values2[j],
+            ṁ_sf, ṁ_ref,
+            T_in, T_mid, T_out, ΔT, T_bot, T_evap, T_comp_in,
+            Q_evap, Q_cond, W_comp, COP_1,
+            U_EV, U_SH, fr_EV, fr_SH,
+            Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, COP_2,
+            Re_phx, Re_bhe_leg1, Re_bhe_leg2,
+            η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2
+        )))
     end
+    df = DataFrame(rows)
 
-    df = DataFrame(data)
-    sort!(df, :ΔT)
+    # (optional but handy)
+    sort!(df, [name2, :ΔT])   # keep rows grouped by f then ΔT
+	
+	if isnan(target_Q_cond)
+    # Compute per-f max Q_cond
+	    gdf = groupby(df, name2)
+	    transform!(gdf, :Q_cond => maximum => :Qmax_same_f)
+	
+	    # Aux heater needed to meet the best point at this f
+	    df.P_aux_heating = max.(0, df.Qmax_same_f .- df.Q_cond)
 
-    # add the aux columns just like before
-    max_Q            = maximum(df.Q_cond)
-    df.P_aux_heating = max_Q .- df.Q_cond
-    df.COP_3         = (df.Q_cond .+ df.P_aux_heating) ./
-                       (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
+	else
+			
+	    # Aux heater needed to meet the best point at this f
+	    df.P_aux_heating = max.(0, target_Q_cond .- df.Q_cond)
+
+	end
+    # COP_3 normalized within each f-group
+    df.COP_3 = (df.Q_cond .+ df.P_aux_heating) ./ (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
+
+    # (optional) clean up helper column
+    # select!(df, Not(:Qmax_same_f))
 
     return df
 end
+
 
   ╠═╡ =#
 
@@ -4340,28 +4539,209 @@ function multithreaded_grid_sweep(thermal_prob, hydraulic_prob, sys_thermal,
 end
 
 # ╔═╡ 1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+# ╠═╡ show_logs = false
 sols_thermal2, sols_hydraulic2 = multithreaded_grid_sweep(
     thermal_prob, hydraulic_prob, sys_thermal,
-    base_params, :χ, χ_values, :f, f_values, solvers;
+    base_params, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
     previous_sol_thermal=nothing,
     previous_sol_hydraulic=nothing
 )
 
-# ╔═╡ 03398b1f-8d4c-445c-aae5-4997edccd539
-sols_thermal2[1,1]
-
 # ╔═╡ 6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 #=╠═╡
 df_grid = process_grid_results(
-    χ_values, f_values,
+    log_ΔTSF_values, f_values,
     sols_thermal2, sols_hydraulic2,
     sys_thermal2, sys_hydraulic2;
-    name1 = :χ,
-    name2 = :f
+    name1 = :log_ΔTSF_,
+    name2 = :f_,
+	target_Q_cond = 5000
+)
+  ╠═╡ =#
+
+# ╔═╡ 02497be0-7d2f-43d1-b365-d4a8d72f045e
+#=╠═╡
+plot_heatmap(df_grid; xlogbase = :log)
+  ╠═╡ =#
+
+# ╔═╡ fc5900c1-9704-4384-9a29-be545faf74d6
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_3, levels=20)
+  ╠═╡ =#
+
+# ╔═╡ 0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_2,levels=20)
+  ╠═╡ =#
+
+# ╔═╡ eb8cd9d6-9237-4723-84d3-3f293d74d1e9
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_1,)
+  ╠═╡ =#
+
+# ╔═╡ 6eab6576-10af-432d-abf6-42f424541e5b
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :T_evap,)
+  ╠═╡ =#
+
+# ╔═╡ 8dea2e5f-82b5-408e-843d-c25b7d265d48
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,)
+  ╠═╡ =#
+
+# ╔═╡ b153b909-a8b2-4e5d-abe7-a3c1bad81358
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :fr_EV,)
+
+  ╠═╡ =#
+
+# ╔═╡ 2be85177-c03c-48de-8d4f-c2053fcf2a13
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :η_bh,levels = 50)
+
+  ╠═╡ =#
+
+# ╔═╡ a24d0373-b198-42f6-a6bb-c2ede7259244
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_ref,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 74455461-5277-4fee-a53b-edf34e9e26f4
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ dc49f979-5f43-4234-864d-acfef268f5f9
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :P_pump,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 50af6ba3-363d-4ca6-977a-7eb35919b27b
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Q_evap,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 88cbfed8-9de9-4421-8dd0-8f42b82234bd
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Q_cond,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 9035962a-af30-4870-8ccb-c340892e81c3
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :N_pump,levels = 20)
+  ╠═╡ =#
+
+# ╔═╡ ec35d4c1-58e5-4240-a10d-1bfcd590c5f4
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Re_bhe_leg1)
+
+  ╠═╡ =#
+
+# ╔═╡ 09b7509b-a308-49a4-966d-33d5ef7f9cb1
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=2,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 960c408c-3040-4a00-b285-c01080cb1c02
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Q_cond,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 644901ea-7778-4e7d-a5cf-44e34df77827
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:R_f1f2,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 57e985e5-023c-4389-8e08-2185bed0751a
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:fr_EV, levels=0.0:0.1:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 5e034021-1116-4d1d-8034-d582c8a9643f
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:T_evap,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 1e76b9cd-b3b0-45fe-ae99-0023294869d3
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Re_bhe_leg1,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 924c0b03-6704-4d91-8238-e4f2b4cc561d
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Re_bhe_leg2,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
 )
   ╠═╡ =#
 
 # ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
+
+
+# ╔═╡ f7833464-8c6f-42e1-a1a6-2353d88e4b57
+
+
+# ╔═╡ dfdcded3-026e-4925-ac02-ba801488b267
+
+
+# ╔═╡ 1abb42cf-af03-49a9-837b-902999a89744
+
+
+# ╔═╡ 51d3286a-d89d-41f5-88d5-bb361e76ff09
+
+
+# ╔═╡ 5e9e8e04-4aca-416d-a4b4-410b243fd722
 
 
 # ╔═╡ d56e6679-1745-4efe-8205-aab080a2c0b8
@@ -4559,6 +4939,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
@@ -4574,15 +4955,32 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+
+[compat]
+AlgebraOfGraphics = "~0.11.3"
+CairoMakie = "~0.15.3"
+Colors = "~0.13.1"
+DataFrames = "~1.7.0"
+Distributions = "~0.25.120"
+Interpolations = "~0.15.1"
+LaTeXStrings = "~1.4.0"
+ModelingToolkit = "~10.8.0"
+MonteCarloMeasurements = "~1.4.7"
+NonlinearSolve = "~4.9.0"
+PlutoDevMacros = "~0.9.0"
+PlutoTest = "~0.2.2"
+ProgressMeter = "~1.10.4"
+Roots = "~2.2.8"
+SpecialFunctions = "~2.5.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "d34974a52b387d11d660cad70693fb8d3ca6389c"
+project_hash = "814e9c6dfca05ff24baeb1eadfe23e90245db977"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -7423,6 +7821,12 @@ version = "3.6.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╠═6f32ff1e-5faa-4551-a898-01167021e4a4
+# ╠═f5ba6b5c-9f00-43a2-ae87-4d86444c4b3f
+# ╠═9539a581-42e3-43dc-996d-4d9316aa9c92
+# ╠═8527ed5d-3ff6-435d-a93d-548c824dee78
+# ╠═eadd49a1-7bca-40a2-abdb-064a0fb710e6
+# ╠═cedbf94b-e85d-4662-a64e-16fba9ef2ed4
 # ╠═d47bf527-6960-4e14-b9e5-a422f8888e66
 # ╠═910c36c9-4ec1-4b0f-b044-823a229fa536
 # ╠═00bcb75f-8da5-46a8-9c20-6b94861342c4
@@ -7552,16 +7956,18 @@ version = "3.6.0+0"
 # ╠═88624925-6092-44c8-9539-28527aa43a7c
 # ╠═526d0dad-939f-48af-a09f-c1cae30d6770
 # ╠═f6aed83e-02a5-4d62-874e-55f333266b42
-# ╟─34d568ce-25d5-4a0b-b1db-0ca3b8e8607a
+# ╠═34d568ce-25d5-4a0b-b1db-0ca3b8e8607a
 # ╟─76cc998b-9a7f-4b1c-8403-c16bccbda74e
 # ╠═d7090f5b-50f6-4198-9237-8447ae442789
 # ╠═fdddfe24-f560-4a52-9756-ee1d1d6946d3
 # ╠═104492fc-1c63-4571-80e4-2df35b6abdcf
 # ╠═0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 # ╠═a4b78e57-3f4a-4bd1-a4fd-344aed782596
-# ╟─5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
+# ╠═5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
 # ╠═58a5d982-5d07-4a63-950a-ca5639cff43f
 # ╠═ceb2b429-90ae-4bc5-b346-e65e5727d441
+# ╠═80898f01-7945-48d9-abd5-15de3c76d465
+# ╠═b3bb8c8b-3825-4a21-94f7-a2d0d00fbb09
 # ╠═6ac1ecbf-4833-449f-9933-c782a8566fb0
 # ╠═8b6e0e2e-ecc5-475e-bd31-1f23893dcb38
 # ╠═892ef213-3229-4d91-9ba7-742127f366c8
@@ -7580,13 +7986,10 @@ version = "3.6.0+0"
 # ╠═798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═05bbe96e-023c-413b-a347-d37e74fad7fe
 # ╠═fecd7f3d-bf0b-464e-a1ad-238e508b0f38
-# ╠═8527ed5d-3ff6-435d-a93d-548c824dee78
-# ╠═eadd49a1-7bca-40a2-abdb-064a0fb710e6
 # ╠═0fe18091-e8f6-42d4-9961-5783452ddefd
 # ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
 # ╠═4982df2c-016a-4136-a074-b39c1befffb7
 # ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
-# ╠═6f32ff1e-5faa-4551-a898-01167021e4a4
 # ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
 # ╠═bed552fa-1a51-492b-8552-81186c96c6a1
 # ╟─473f4d2b-92a3-495c-975d-38738f714fb9
@@ -7601,13 +8004,44 @@ version = "3.6.0+0"
 # ╠═1e116b39-5019-4e87-80eb-13b1a9d9ae58
 # ╠═acbfba23-bbb5-4d9e-93b7-1120677332bd
 # ╠═870d81bf-2254-427b-8471-3c9d23b13a72
-# ╠═03398b1f-8d4c-445c-aae5-4997edccd539
+# ╠═02497be0-7d2f-43d1-b365-d4a8d72f045e
+# ╠═fc5900c1-9704-4384-9a29-be545faf74d6
+# ╠═0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
+# ╠═eb8cd9d6-9237-4723-84d3-3f293d74d1e9
+# ╠═6eab6576-10af-432d-abf6-42f424541e5b
+# ╠═8dea2e5f-82b5-408e-843d-c25b7d265d48
+# ╠═b153b909-a8b2-4e5d-abe7-a3c1bad81358
+# ╠═2be85177-c03c-48de-8d4f-c2053fcf2a13
+# ╠═24b94de6-1d03-4225-8fdd-95cac5beb33c
+# ╠═a24d0373-b198-42f6-a6bb-c2ede7259244
+# ╠═74455461-5277-4fee-a53b-edf34e9e26f4
+# ╠═dc49f979-5f43-4234-864d-acfef268f5f9
+# ╠═50af6ba3-363d-4ca6-977a-7eb35919b27b
+# ╠═88cbfed8-9de9-4421-8dd0-8f42b82234bd
+# ╠═9035962a-af30-4870-8ccb-c340892e81c3
+# ╠═ec35d4c1-58e5-4240-a10d-1bfcd590c5f4
+# ╠═09b7509b-a308-49a4-966d-33d5ef7f9cb1
+# ╠═960c408c-3040-4a00-b285-c01080cb1c02
+# ╠═644901ea-7778-4e7d-a5cf-44e34df77827
+# ╠═57e985e5-023c-4389-8e08-2185bed0751a
+# ╠═5e034021-1116-4d1d-8034-d582c8a9643f
+# ╠═cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
+# ╠═1e76b9cd-b3b0-45fe-ae99-0023294869d3
+# ╠═924c0b03-6704-4d91-8238-e4f2b4cc561d
+# ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+# ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
+# ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 # ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 # ╠═1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
-# ╠═cedbf94b-e85d-4662-a64e-16fba9ef2ed4
+# ╠═b570d453-43f2-4a12-a9d6-889752dd5aeb
 # ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
-# ╠═fff91fa6-8ffb-458a-946d-244b5b13c3cd
+# ╟─fff91fa6-8ffb-458a-946d-244b5b13c3cd
 # ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
+# ╠═f7833464-8c6f-42e1-a1a6-2353d88e4b57
+# ╠═dfdcded3-026e-4925-ac02-ba801488b267
+# ╠═1abb42cf-af03-49a9-837b-902999a89744
+# ╠═51d3286a-d89d-41f5-88d5-bb361e76ff09
+# ╠═5e9e8e04-4aca-416d-a4b4-410b243fd722
 # ╠═d56e6679-1745-4efe-8205-aab080a2c0b8
 # ╠═de9faed9-2f88-44e7-94da-098238b99f09
 # ╠═7960a423-b601-4aec-b0ba-b35eebce82c5
