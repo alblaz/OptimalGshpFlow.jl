@@ -3102,55 +3102,6 @@ function GSHP_hydraulics(; name::Symbol, fluid::String="MEA")
     return compose(parent_system, [pump, bhe, phx])
 end
 
-# ╔═╡ 6e243cf3-1f76-4648-b709-e1f8d7fd4c15
-#=╠═╡
-solh.retcode
-  ╠═╡ =#
-
-# ╔═╡ bd9e4d44-4b7b-4b54-8680-20c932e8ea75
-#=╠═╡
-solh[sys_h.pump.base.exceeding_max_speed]
-  ╠═╡ =#
-
-# ╔═╡ 4374a31a-5161-47ae-883a-00dbbbbbe579
-#=╠═╡
-solh[sys_h.pump.base.P_elec]
-  ╠═╡ =#
-
-# ╔═╡ 40c8dc3c-87f8-46e8-a70e-6acc354d5020
-# ╠═╡ disabled = true
-#=╠═╡
-begin    
-	
-	# 1a) Build the system
-	@named sys_h = GSHP_hydraulics()               # uses your defaults dict internally
-	
-	# 1b) Simplify/compile
-	ssys_h = structural_simplify(sys_h)
-	
-	# 1d) Create the NonlinearProblem, passing p0 as the 3rd argument
-	probh = NonlinearProblem(ssys_h, nothing, [])
-	
-	# 1e) Solve it
-	solh = solve(probh, solver_robust, abstol = 1e-6)
-end
-  ╠═╡ =#
-
-# ╔═╡ ed8fd1d6-c51b-4130-8f7c-795231d68ed4
-	p1 = [
-	  #:b       => 1.5e-3,
-	  #:np      => 20.0,
-	  #:W       => 0.10,
-	  #:ϕ       => 1.18,
-	  #:β       => π/6,
-	  #:th      => 0.5e-3,
-	  #:λ_pl    => 16.0,
-	  #:λ_pitch => 4e-3,
-	  #:χ       => 0.28,
-	  :log_ΔTSF       => log(2.55),
-	  #:f       => 45.0
-	]
-
 # ╔═╡ fbc3e326-5684-4029-ba49-6c0f065d151b
 function solve_with_fallback(prob, solvers; abstol=1e-6, max_retries=1, u0=nothing)
     # Use provided initial guess or problem default
@@ -3305,14 +3256,68 @@ function prepare_problems(pars)
     # Build thermal system
     @named sys_thermal = GSHP_thermal()
     sys_thermal_simp = structural_simplify(sys_thermal)
-    thermal_prob = NonlinearProblem(sys_thermal_simp, [], pars)
+    thermal_prob = NonlinearProblem(sys_thermal_simp, [], pars; jac = false)
     
     # Build hydraulic system
     @named sys_hydraulic = GSHP_hydraulics()
     sys_hydraulic_simp = structural_simplify(sys_hydraulic)
-    hydraulic_prob = NonlinearProblem(sys_hydraulic_simp, [], pars)
+    hydraulic_prob = NonlinearProblem(sys_hydraulic_simp, [], pars; jac = false)
     
     return thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic
+end
+
+
+# ╔═╡ 5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
+"""
+    continuation_solve(
+      thermal_prob, hydraulic_prob, sys_thermal,
+      base_params::Dict{Symbol,Real},
+      param::Symbol,
+      target_vals::AbstractVector{<:Real},
+      solver;
+      abstol = 1e-6
+    ) -> (sol_th, sol_hy)
+
+Start at `base_params[param] = first(target_vals)`, solve thermal+hydraulic from scratch,
+then loop over the rest of `target_vals`, each time
+
+  • setting `base_params[param] = v`  
+  • calling `solve(...; p=base_params, u0=previous_sol.u, abstol=abstol)`  
+
+and at the end returning the final `(sol_th, sol_hy)`.  
+"""
+function continuation_solve(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params::Dict{Symbol,Real},
+    param::Symbol,
+    target_vals::AbstractVector{<:Real},
+    solver;
+    abstol = 1e-6
+)
+    # 1) Kick off at the first value (solve from scratch)
+    base_params[param] = first(target_vals)
+    sol_th = NonlinearSolve.solve(thermal_prob, solver;
+                                  p = base_params,
+                                  abstol = abstol)
+    sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
+                                  p = base_params,
+                                  abstol = abstol)
+
+    # 2) March toward the end, re-using prev sol as u0
+    for v in Iterators.rest(target_vals)
+        base_params[param] = v
+        sol_th = NonlinearSolve.solve(thermal_prob, solver;
+                                      p  = base_params,
+                                      u0 = sol_th.u,    # <-- warm start
+                                      abstol = abstol)
+        sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
+                                      p  = base_params,
+                                      u0 = sol_hy.u,    # <-- warm start
+                                      abstol = abstol)
+    end
+
+    # 3) return only the terminal solutions
+    return sol_th, sol_hy
 end
 
 
@@ -3368,60 +3373,6 @@ solver_fallback = NewtonRaphson(autodiff=AutoForwardDiff());
 
 # ╔═╡ 0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 solvers = [solver_fast, solver_robust, solver_fallback];
-
-# ╔═╡ 5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
-"""
-    continuation_solve(
-      thermal_prob, hydraulic_prob, sys_thermal,
-      base_params::Dict{Symbol,Real},
-      param::Symbol,
-      target_vals::AbstractVector{<:Real},
-      solver;
-      abstol = 1e-6
-    ) -> (sol_th, sol_hy)
-
-Start at `base_params[param] = first(target_vals)`, solve thermal+hydraulic from scratch,
-then loop over the rest of `target_vals`, each time
-
-  • setting `base_params[param] = v`  
-  • calling `solve(...; p=base_params, u0=previous_sol.u, abstol=abstol)`  
-
-and at the end returning the final `(sol_th, sol_hy)`.  
-"""
-function continuation_solve(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params::Dict{Symbol,Real},
-    param::Symbol,
-    target_vals::AbstractVector{<:Real},
-    solver;
-    abstol = 1e-6
-)
-    # 1) Kick off at the first value (solve from scratch)
-    base_params[param] = first(target_vals)
-    sol_th = NonlinearSolve.solve(thermal_prob, solver;
-                                  p = base_params,
-                                  abstol = abstol)
-    sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
-                                  p = base_params,
-                                  abstol = abstol)
-
-    # 2) March toward the end, re-using prev sol as u0
-    for v in Iterators.rest(target_vals)
-        base_params[param] = v
-        sol_th = NonlinearSolve.solve(thermal_prob, solver;
-                                      p  = base_params,
-                                      u0 = sol_th.u,    # <-- warm start
-                                      abstol = abstol)
-        sol_hy = NonlinearSolve.solve(hydraulic_prob, solver;
-                                      p  = base_params,
-                                      u0 = sol_hy.u,    # <-- warm start
-                                      abstol = abstol)
-    end
-
-    # 3) return only the terminal solutions
-    return sol_th, sol_hy
-end
-
 
 # ╔═╡ 58a5d982-5d07-4a63-950a-ca5639cff43f
 base_params = [
@@ -3553,7 +3504,7 @@ params_ΔT = [
 ]
 
 # ╔═╡ b48efffc-d19c-4b66-936b-6fd9c9de5a88
-res_ΔT = 0.5
+res_ΔT = 0.1
 
 # ╔═╡ 37d9352d-2357-4f36-b651-5dc73246fd42
 ΔT_SF_vals = log.(3.5:res_ΔT:8)
@@ -4049,24 +4000,88 @@ end
 
 
 # ╔═╡ 1e116b39-5019-4e87-80eb-13b1a9d9ae58
+# ╠═╡ show_logs = false
 thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
 
 # ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
-log_ΔTSF_values = log.(1:0.5:8.0)
+log_ΔTSF_values = log.(1.5:0.25:8.0)
 
 # ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
-f_values = 50:-5:20
+f_values = 50:-2.5:20
 
 # ╔═╡ 24b94de6-1d03-4225-8fdd-95cac5beb33c
 250+708+7634-1400
 
-# ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
+# ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+md" # Comparison COP2"
+
+# ╔═╡ ea33f723-8f17-4000-b483-eb8f1f9354f3
+md" # Comparison efficiency"
+
+# ╔═╡ 44e95eb8-ef96-4832-9168-df5c504b0569
+md" ## Variant with less ethanol"
+
+# ╔═╡ 8a1007ab-a556-4670-a2a6-18292d721c89
+base_params_water = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.15,
+    :L => 0.60,
+    :L_BHE => 150.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+]
+
+# ╔═╡ 0d69490f-83ee-46fc-b034-8370e8a66361
+md" ## Variant with bigger pipes"
+
+# ╔═╡ 880e6614-2556-4d3a-9408-f59b45ba94fe
+base_params_pipe = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.15,
+    :L => 0.60,
+    :L_BHE => 150.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+	:D_p1_o => 40e-3,
+	:D_p1_i => 28.24e-3/32e-3*40e-3,
+	:D_p2_o => 40e-3,
+	:D_p2_i => 28.24e-3/32e-3*40e-3,
+	:D_b => 0.115,
+
+		
+]
+
+# ╔═╡ c5875432-f3f0-4495-a0f0-853d87d73353
+md" ## Looking at the wall temperature"
+
+# ╔═╡ ccdd37e1-e7f3-47c9-b698-34daaca538c9
+T_wall_values = 273.15 .+ collect(0:0.25:10)
+
+# ╔═╡ 9f9d5b69-b9fc-44dc-af28-389800fae70d
 
 
 # ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 #=╠═╡
-# --------- 1) rectangular grid (orientation Contour.jl expects) ---------
-# size(Z) == (length(X), length(Y))  with X strictly increasing
+
+# ------------- grid builder (Makie/Contour expects a rectangular grid) -------------
 function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
                        invx = identity, agg = first)
     df2 = combine(groupby(df, [ycol, xcol]), zcol => agg => :_z)
@@ -4076,12 +4091,11 @@ function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
     x2i = Dict(x => i for (i,x) in enumerate(xs))
     y2j = Dict(y => j for (j,y) in enumerate(ys))
 
-    Z = fill(NaN, length(xs), length(ys))  # (nx, ny): first dim = X, second = Y
+    Z = fill(NaN, length(xs), length(ys))  # size(Z) == (nx, ny)
     @inbounds for r in eachrow(df2)
         Z[x2i[r[xcol]], y2j[r[ycol]]] = Float64(r._z)
     end
 
-    # prune fully-empty X or Y lines (keeps a solid rectangle)
     keep_x = vec(any(isfinite, Z; dims=2))
     keep_y = vec(any(isfinite, Z; dims=1))
     Z = Z[keep_x, keep_y]
@@ -4089,97 +4103,92 @@ function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
 
     X = Float64.(invx.(xs))
     Y = Float64.(ys)
-
-    @assert length(X) ≥ 2 && length(Y) ≥ 2
-    @assert size(Z) == (length(X), length(Y))
     @assert all(diff(X) .> 0) && all(diff(Y) .> 0)
     return X, Y, Z
 end
-
-# --------- 2) overlay iso-lines with Makie on an existing Axis ---------
   ╠═╡ =#
 
 # ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
 #=╠═╡
-
-function _add_isolines!(ax::Makie.Axis, df, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+function _add_isolines!(ax::Makie.Axis, df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
                         xlogbase::Symbol = :log10, levels = [], color = :black,
                         linestyle = :solid, linewidth = 1.5,
-                        # labeling
-                        labels::Bool = false,
-                        labelformatter::Function = l -> @sprintf("%.3g", l),
-                        labelsize::Int = 10,
-                        labelcolor = Makie.automatic,   # <- not `nothing`
-                        labelfont  = Makie.automatic)   # <- not `nothing`
+                        labels::Bool = false, labelformatter = l -> @sprintf("%.3g", l),
+                        labelsize::Int = 20)
 
-    invx = xlogbase === :log10 ? exp10 :
-           xlogbase === :log   ? exp   : identity
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
-    levs = levels isa AbstractVector ? Float64.(levels) : Float64[levels]
 
+    levs = levels isa AbstractVector ? Float64.(levels) : Float64[levels]
     if labels
         contour!(ax, X, Y, Z;
                  levels=levs, color=color, linestyle=linestyle, linewidth=linewidth,
                  labels=true, labelformatter=labelformatter,
-                 labelsize=labelsize, labelcolor=labelcolor, labelfont=labelfont)
+                 labelsize=labelsize)
     else
-        # Important: don't pass any label kwargs when labels=false
-        contour!(ax, X, Y, Z;
-                 levels=levs, color=color, linestyle=linestyle, linewidth=linewidth)
+        contour!(ax, X, Y, Z; levels=levs, color=color, linestyle=linestyle, linewidth=linewidth)
     end
     return ax
 end
-
   ╠═╡ =#
 
 # ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 #=╠═╡
-function plot_contourf(df::DataFrame; xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_,
-                       zcol::Symbol=:COP_3, xlogbase::Symbol=:log10,
-                       levels=10, cmap=:viridis, clip_low=nothing, clip_high=nothing,
-                       show_colorbar::Bool=false, return_axis::Bool=false,  # keep false = safest
-                       overlays::Vector=[])
-    invx = xlogbase === :log10 ? exp10 :
-           xlogbase === :log   ? exp   :
-           xlogbase === :none  ? identity :
-           error("xlogbase must be :log10, :log, or :none")
+function plot_contourf(df::DataFrame;
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+    xlogbase::Symbol=:log10,                             # :log10 | :log | :none
+    levels=10,                                          # Int (bands) OR Vector of boundaries
+    palette=:viridis, lowclip=nothing, highclip=nothing, # AoG banded palette; can be clipped
+    labels_for_lines::Bool=false,                        # add labels on the black outlines
+    overlays::Vector = Vector{Any}(),                    # extra isoline specs as NamedTuples/Dicts
+    return_axis::Bool=false)
+
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     xlab = (invx === identity) ? string(xcol) : "ΔTSF"
 
-    grad = cmap isa Symbol ? cgrad(cmap) : cmap
-    pal  = from_continuous(grad)
-    if !(clip_low === nothing && clip_high === nothing)
-        pal = clipped(pal; low=clip_low, high=clip_high)
+    # --- AoG filled bands (uses a palette, not a colormap) ---
+    pal = palette
+    # For banded filled_contours, AoG expects a palette; if you want explicit low/high clip colors,
+    # use the helper the docs recommend: clipped(from_continuous(...), low=..., high=...)
+    # https://aog.makie.org/stable/reference/analyses/#filled-contours
+    if lowclip !== nothing || highclip !== nothing
+        pal = clipped(from_continuous(palette); low=lowclip, high=highclip)
+    else
+        pal = from_continuous(palette)  # a regular categorical palette from a continuous cmap
     end
 
-    # AoG filled contours
     base = data(df) * mapping(xcol => invx => xlab, ycol, zcol)
-    fc   = levels isa Integer ? filled_contours(bands=levels, labels=true) : filled_contours(levels=Float64.(levels), labels=true)
-    plt  = base * fc
-    sc   = scales(Color=(; palette=pal, colorbar=false))  # leave AoG colorbar off (stable)
+    fc   = levels isa Integer ? filled_contours(bands=levels) : filled_contours(levels=collect(levels))
+    specs = base * fc
+    sc    = scales(Color=(; palette=pal))  # banded colors = categorical palette (not colormap)
 
-    # own axis; draw AoG into it
+    # Own axis so we can add Makie overlays
     fig = Figure()
-    ax  = Axis(fig[1,1]; xlabel=xlab, ylabel=string(ycol),
-                         title=string(zcol, " – filled contours"))
-    draw!(ax, plt, sc)
+    ax  = Axis(fig[1,1]; xlabel=xlab, ylabel=string(ycol), title=string(zcol))
+    draw!(ax, specs, sc)  # AoG draw into the axis (no AoG colorbar via draw!)
 
-    # overlays
-	for ov in overlays
-	    z   = get(ov, :z, nothing)      ; z === nothing && error("overlay missing :z")
-	    lev = get(ov, :levels, nothing) ; lev === nothing && error("overlay $(z) needs :levels")
-	    col = get(ov, :color, :black)
-	    ls  = get(ov, :linestyle, :solid)
-	    lw  = get(ov, :linewidth, 1.5)
-	
-	    _add_isolines!(ax, df, xcol, ycol, z; xlogbase=xlogbase,
-	        levels=lev, color=col, linestyle=ls, linewidth=lw,
-	        labels=get(ov, :labels, false),
-	        labelformatter=get(ov, :labelformatter, l -> @sprintf("%.3g", l)),
-	        labelsize=get(ov, :labelsize, 10),
-	        labelcolor=get(ov, :labelcolor, nothing),
-	        labelfont=get(ov, :labelfont, nothing))
-	end
+    # --- black contour lines at the SAME boundaries with Makie ---
+    # If `levels` is Int, make boundaries that match the filled bands; else use the vector as-is.
+    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
+    boundaries = levels isa Integer ? collect(range(extrema(vec(Z))..., length=levels+1)) : collect(levels)
 
+
+    # --- your extra overlays (other z-columns) ---
+    for ov in overlays
+        zsym = get(ov, :z, nothing); zsym === nothing && error("overlay missing :z")
+        _add_isolines!(ax, df, xcol, ycol, zsym;
+            xlogbase        = xlogbase,
+            levels          = get(ov, :levels, []),
+            color           = get(ov, :color, :black),
+            linestyle       = get(ov, :linestyle, :solid),
+            linewidth       = get(ov, :linewidth, 1.5),
+            labels          = get(ov, :labels, false),
+            labelformatter  = get(ov, :labelformatter, l -> @sprintf("%.3g", l)),
+            labelsize       = get(ov, :labelsize, 10),)
+    end
+
+    contour!(ax, X, Y, Z; levels=boundaries, color=:white, linewidth=.8,
+             labels=labels_for_lines, labelsize = 20)
     return return_axis ? (fig, ax) : fig
 end
   ╠═╡ =#
@@ -4647,7 +4656,7 @@ plot_contourf(df_grid; xlogbase = :log, zcol = :Re_bhe_leg1)
 plot_contourf(
     df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
     overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=2,   labels=false),
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
         (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
         (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
     ]
@@ -4693,7 +4702,7 @@ plot_contourf(
 # ╔═╡ 5e034021-1116-4d1d-8034-d582c8a9643f
 #=╠═╡
 plot_contourf(
-    df_grid; xlogbase=:log, zcol=:T_evap,
+    df_grid; xlogbase=:log, zcol=:T_evap, levels = -5:1:10,
     overlays=[
         (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
         (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
@@ -4702,10 +4711,10 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 1e76b9cd-b3b0-45fe-ae99-0023294869d3
+# ╔═╡ 99e84662-a903-424d-b270-d665a52f479f
 #=╠═╡
 plot_contourf(
-    df_grid; xlogbase=:log, zcol=:Re_bhe_leg1,
+    df_grid; xlogbase=:log, zcol=:COP_1, levels=2.7:0.1:4.0,
     overlays=[
         (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
         (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
@@ -4714,16 +4723,204 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 924c0b03-6704-4d91-8238-e4f2b4cc561d
+# ╔═╡ 05d571f0-c990-430e-971c-965ba527e814
 #=╠═╡
 plot_contourf(
-    df_grid; xlogbase=:log, zcol=:Re_bhe_leg2,
+    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
     overlays=[
         (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
         (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
         (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
     ]
 )
+  ╠═╡ =#
+
+# ╔═╡ daed3493-da2b-489c-b7ae-5bcd66bfc03b
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
+# ╠═╡ show_logs = false
+sols_thermal_water, sols_hydraulic_water = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_water, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 6011e1fa-1058-4bce-bb65-fcdf25951bfa
+#=╠═╡
+df_grid_water = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_water, sols_hydraulic_water,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_,
+	target_Q_cond = 5000
+);
+  ╠═╡ =#
+
+# ╔═╡ e6a2deea-3658-42b3-8ef9-83e31be5a300
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:T_evap, levels = -5:1:10,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ e174ba39-dd8c-4af9-88c1-caa504af2c7b
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ b72f0888-4716-48ec-8a99-fc068a988abf
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
+# ╠═╡ show_logs = false
+sols_thermal_pipe, sols_hydraulic_pipe = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_pipe, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 941dcb04-88be-43ae-bc21-ae3ef9dd0db0
+#=╠═╡
+df_grid_pipe = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_pipe, sols_hydraulic_pipe,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_,
+	target_Q_cond = 5000
+);
+  ╠═╡ =#
+
+# ╔═╡ 387e3115-866a-4831-bb59-a18edf749375
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 7561b4d4-f99e-4da9-aeb8-a351e425d1ed
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ f0e43670-bbd9-487a-b8b6-8b5d6804039c
+# ╠═╡ show_logs = false
+sols_thermal_wall, sols_hydraulic_wall = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params, :log_ΔTSF_, log_ΔTSF_values, :T_wall, T_wall_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
+#=╠═╡
+df_grid_wall = process_grid_results(
+    log_ΔTSF_values, T_wall_values,
+    sols_thermal_wall, sols_hydraulic_wall,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :T_wall,
+	target_Q_cond = 5000
+);
+  ╠═╡ =#
+
+# ╔═╡ 09952ea8-ef5d-414f-ac15-478ad8ea6343
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 16868428-1547-4b8d-a900-5e5120f38088
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:fr_EV, levels = 0:0.1:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 62b6a403-53ac-42c1-9fff-055a9b7a478b
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_1,
+    levels=2.0:0.1:4.0,
+    overlays=[
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
+  ╠═╡ =#
+
+# ╔═╡ c8c35ed3-bd6c-40ac-8049-b603b003f603
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
+    levels=2.0:0.1:4.0,
+    overlays=[
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
   ╠═╡ =#
 
 # ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
@@ -7946,24 +8143,19 @@ version = "3.6.0+0"
 # ╠═04ec6d0d-d812-464e-b244-8458207283da
 # ╠═a0e018cb-a75a-4844-8716-98492b29b6d9
 # ╠═b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
-# ╠═6e243cf3-1f76-4648-b709-e1f8d7fd4c15
-# ╠═bd9e4d44-4b7b-4b54-8680-20c932e8ea75
-# ╠═4374a31a-5161-47ae-883a-00dbbbbbe579
-# ╠═40c8dc3c-87f8-46e8-a70e-6acc354d5020
-# ╠═ed8fd1d6-c51b-4130-8f7c-795231d68ed4
 # ╠═fbc3e326-5684-4029-ba49-6c0f065d151b
 # ╠═7ef1715e-2fd3-4deb-853d-233496735474
 # ╠═88624925-6092-44c8-9539-28527aa43a7c
 # ╠═526d0dad-939f-48af-a09f-c1cae30d6770
 # ╠═f6aed83e-02a5-4d62-874e-55f333266b42
 # ╠═34d568ce-25d5-4a0b-b1db-0ca3b8e8607a
-# ╟─76cc998b-9a7f-4b1c-8403-c16bccbda74e
+# ╠═76cc998b-9a7f-4b1c-8403-c16bccbda74e
+# ╟─5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
 # ╠═d7090f5b-50f6-4198-9237-8447ae442789
 # ╠═fdddfe24-f560-4a52-9756-ee1d1d6946d3
 # ╠═104492fc-1c63-4571-80e4-2df35b6abdcf
 # ╠═0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 # ╠═a4b78e57-3f4a-4bd1-a4fd-344aed782596
-# ╠═5bf0b015-e0f5-4e49-baa8-c34ee5d75a73
 # ╠═58a5d982-5d07-4a63-950a-ca5639cff43f
 # ╠═ceb2b429-90ae-4bc5-b346-e65e5727d441
 # ╠═80898f01-7945-48d9-abd5-15de3c76d465
@@ -7981,14 +8173,14 @@ version = "3.6.0+0"
 # ╠═b48efffc-d19c-4b66-936b-6fd9c9de5a88
 # ╠═37d9352d-2357-4f36-b651-5dc73246fd42
 # ╠═bfe4471c-7033-4ca5-beb1-530a8be5b757
-# ╠═0f6b83f7-167a-4e3f-9fd5-d4f4695fbaea
 # ╠═670cd198-239a-4240-be5d-2def55383a36
+# ╠═0f6b83f7-167a-4e3f-9fd5-d4f4695fbaea
 # ╠═798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═05bbe96e-023c-413b-a347-d37e74fad7fe
 # ╠═fecd7f3d-bf0b-464e-a1ad-238e508b0f38
-# ╠═0fe18091-e8f6-42d4-9961-5783452ddefd
+# ╟─0fe18091-e8f6-42d4-9961-5783452ddefd
 # ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
-# ╠═4982df2c-016a-4136-a074-b39c1befffb7
+# ╟─4982df2c-016a-4136-a074-b39c1befffb7
 # ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
 # ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
 # ╠═bed552fa-1a51-492b-8552-81186c96c6a1
@@ -8025,16 +8217,40 @@ version = "3.6.0+0"
 # ╠═644901ea-7778-4e7d-a5cf-44e34df77827
 # ╠═57e985e5-023c-4389-8e08-2185bed0751a
 # ╠═5e034021-1116-4d1d-8034-d582c8a9643f
-# ╠═cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
-# ╠═1e76b9cd-b3b0-45fe-ae99-0023294869d3
-# ╠═924c0b03-6704-4d91-8238-e4f2b4cc561d
-# ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
-# ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
-# ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
+# ╠═e6a2deea-3658-42b3-8ef9-83e31be5a300
+# ╠═99e84662-a903-424d-b270-d665a52f479f
+# ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+# ╠═05d571f0-c990-430e-971c-965ba527e814
+# ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
+# ╠═387e3115-866a-4831-bb59-a18edf749375
+# ╠═ea33f723-8f17-4000-b483-eb8f1f9354f3
+# ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
+# ╠═b72f0888-4716-48ec-8a99-fc068a988abf
+# ╠═7561b4d4-f99e-4da9-aeb8-a351e425d1ed
 # ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 # ╠═1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
-# ╠═b570d453-43f2-4a12-a9d6-889752dd5aeb
-# ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
+# ╟─44e95eb8-ef96-4832-9168-df5c504b0569
+# ╠═8a1007ab-a556-4670-a2a6-18292d721c89
+# ╠═cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
+# ╠═6011e1fa-1058-4bce-bb65-fcdf25951bfa
+# ╟─0d69490f-83ee-46fc-b034-8370e8a66361
+# ╠═880e6614-2556-4d3a-9408-f59b45ba94fe
+# ╠═f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
+# ╠═941dcb04-88be-43ae-bc21-ae3ef9dd0db0
+# ╠═c5875432-f3f0-4495-a0f0-853d87d73353
+# ╠═ccdd37e1-e7f3-47c9-b698-34daaca538c9
+# ╠═f0e43670-bbd9-487a-b8b6-8b5d6804039c
+# ╠═9f9d5b69-b9fc-44dc-af28-389800fae70d
+# ╠═d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
+# ╠═09952ea8-ef5d-414f-ac15-478ad8ea6343
+# ╠═16868428-1547-4b8d-a900-5e5120f38088
+# ╠═62b6a403-53ac-42c1-9fff-055a9b7a478b
+# ╠═c8c35ed3-bd6c-40ac-8049-b603b003f603
+# ╟─bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+# ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
+# ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
+# ╟─b570d453-43f2-4a12-a9d6-889752dd5aeb
+# ╟─21cd24f0-4d8b-4298-89e1-7ba7817c2eef
 # ╟─fff91fa6-8ffb-458a-946d-244b5b13c3cd
 # ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
 # ╠═f7833464-8c6f-42e1-a1a6-2353d88e4b57

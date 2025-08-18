@@ -393,6 +393,9 @@ function IncompressibleProps(; name::Symbol, fluid="MEA", χ = 0.0)
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
 
+# ╔═╡ 5bf6345a-b696-4348-92c2-9c0aa17ca168
+Tfi("MEA", 0.0, 0.15) .- 273.15
+
 # ╔═╡ b60f53c1-bfa6-4599-8a6c-bb96b2836760
 # ╠═╡ skip_as_script = true
 #=╠═╡
@@ -421,91 +424,47 @@ Clapeyron.PH.temperature(Clapeyron.SingleFluid("R134A"), -1e5, 30000, [1.0])
 
 # ╔═╡ cee84cbe-7e22-423f-b9c6-d952ef96e442
 begin
-    # Transport properties
-    λf(s, p, T) = EntropyScaling.thermal_conductivity(RefpropRESModel(s), p, T)
-    ηf(s, p, T) = EntropyScaling.viscosity(RefpropRESModel(s), p, T)
-    
-    
-    # Direct PH properties (these work well in two-phase region)
-    Tf(s, p, H) = Clapeyron.PH.temperature(Clapeyron.SingleFluid(s), p, H, [1.0])
-    Vf(s, p, H) = Clapeyron.PH.volume(Clapeyron.SingleFluid(s), p, H, [1.0])
-    Sf(s, p, H) = Clapeyron.PH.entropy(Clapeyron.SingleFluid(s), p, H, [1.0])
-    Uf(s, p, H) = Clapeyron.PH.internal_energy(Clapeyron.SingleFluid(s), p, H, [1.0])
-    Gf(s, p, H) = Clapeyron.PH.gibbs_free_energy(Clapeyron.SingleFluid(s), p, H, [1.0])
-    Af(s, p, H) = Clapeyron.PH.helmholtz_free_energy(Clapeyron.SingleFluid(s), p, H, [1.0])
-    ρf(s, p, H) = Clapeyron.PH.mass_density(Clapeyron.SingleFluid(s), p, H, [1.0])
-    ρmolf(s, p, H) = Clapeyron.PH.molar_density(Clapeyron.SingleFluid(s), p, H, [1.0])
-    
-    # VT-based properties for problematic functions in two-phase region
-    pf(s, V, T) = Clapeyron.VT_pressure(Clapeyron.SingleFluid(s), V, T)
-    Cpf(s, V, T) = Clapeyron.VT_isobaric_heat_capacity(Clapeyron.SingleFluid(s), V, T)
-    Cvf(s, V, T) = Clapeyron.VT_isochoric_heat_capacity(Clapeyron.SingleFluid(s), V, T)
-    γf(s, V, T) = Clapeyron.VT_adiabatic_index(Clapeyron.SingleFluid(s), V, T)
-    κTf(s, V, T) = Clapeyron.VT_isothermal_compressibility(Clapeyron.SingleFluid(s), V, T)
-    κSf(s, V, T) = Clapeyron.VT_isentropic_compressibility(Clapeyron.SingleFluid(s), V, T)
-    cf(s, V, T) = Clapeyron.VT_speed_of_sound(Clapeyron.SingleFluid(s), V, T)
-    αf(s, V, T) = Clapeyron.VT_isobaric_expansivity(Clapeyron.SingleFluid(s), V, T)
-    μJTf(s, V, T) = Clapeyron.VT_joule_thomson_coefficient(Clapeyron.SingleFluid(s), V, T)
-    Zf(s, V, T) = Clapeyron.VT_compressibility_factor(Clapeyron.SingleFluid(s), V, T)
+Tf(eos::Clapeyron.EoSModel, p::AbstractFloat, H::AbstractFloat) =
+    Clapeyron.PH.temperature(eos, p, H, [1.0])
+Vf(eos::Clapeyron.EoSModel, p::AbstractFloat, H::AbstractFloat) =
+    Clapeyron.PH.volume(eos, p, H, [1.0])
+Sf(eos::Clapeyron.EoSModel, p::AbstractFloat, H::AbstractFloat) =
+    Clapeyron.PH.entropy(eos, p, H, [1.0])
 
-	Tsatf(s, p) = Clapeyron.saturation_temperature(Clapeyron.SingleFluid(s), p)[1] #break down if glide
-	Vbf(s, p) = Clapeyron.saturation_temperature(Clapeyron.SingleFluid(s), p)[2]
-	Vdf(s, p) = Clapeyron.saturation_temperature(Clapeyron.SingleFluid(s), p)[3]
+Hf(eos::Clapeyron.EoSModel, V::AbstractFloat, T::AbstractFloat) =
+    Clapeyron.VT_enthalpy(eos, V, T)
+Cpf(eos::Clapeyron.EoSModel, V::AbstractFloat, T::AbstractFloat) =
+    Clapeyron.VT_isobaric_heat_capacity(eos, V, T)
 
-	Hf(s, V, T) = Clapeyron.VT_enthalpy(Clapeyron.SingleFluid(s), V, T)
+Tsatf(eos::Clapeyron.EoSModel, p::AbstractFloat) =
+    Clapeyron.saturation_temperature(eos, p)[1]
+Vbf(eos::Clapeyron.EoSModel, p::AbstractFloat) =
+    Clapeyron.saturation_temperature(eos, p)[2]
+Vdf(eos::Clapeyron.EoSModel, p::AbstractFloat) =
+    Clapeyron.saturation_temperature(eos, p)[3]
 
-    # Register symbolic functions for MTK
-    @register_symbolic λf(s::String, p, T) 
-    @register_symbolic ηf(s::String, p, T)
-    
-    # Register direct PH properties
-    @register_symbolic Tf(s::String, p, H)
-    @register_symbolic Vf(s::String, p, H)
-    @register_symbolic Sf(s::String, p, H)
-    @register_symbolic Uf(s::String, p, H)
-    @register_symbolic Gf(s::String, p, H)
-    @register_symbolic Af(s::String, p, H)
-    @register_symbolic ρf(s::String, p, H)
-    @register_symbolic ρmolf(s::String, p, H)
-    
-    # Register VT-based properties
-    @register_symbolic Hf(s::String, V, T)
-    @register_symbolic pf(s::String, V, T)
-    @register_symbolic Cpf(s::String, V, T)
-    @register_symbolic Cvf(s::String, V, T)
-    @register_symbolic γf(s::String, V, T)
-    @register_symbolic κTf(s::String, V, T)
-    @register_symbolic κSf(s::String, V, T)
-    @register_symbolic cf(s::String, V, T)
-    @register_symbolic αf(s::String, V, T)
-    @register_symbolic μJTf(s::String, V, T)
-    @register_symbolic Zf(s::String, V, T)
-    
-    # Register saturation properties
-    @register_symbolic Tsatf(s::String, p)
-    @register_symbolic Vbf(s::String, p)
-    @register_symbolic Vdf(s::String, p)
-    
-    # Direct access to Clapeyron PH functions
-    #PH_temperature(s, p, H) = Clapeyron.PH.temperature(Clapeyron.SingleFluid(s), p, H)
-    #PH_volume(s, p, H) = Clapeyron.PH.volume(Clapeyron.SingleFluid(s), p, H)
-    PH_entropy(s, p, H) = Clapeyron.PH.entropy(Clapeyron.SingleFluid(s), p, H)
-    PH_internal_energy(s, p, H) = Clapeyron.PH.internal_energy(Clapeyron.SingleFluid(s), p, H)
-    PH_enthalpy(s, p, H) = Clapeyron.PH.enthalpy(Clapeyron.SingleFluid(s), p, H)
-    PH_gibbs_free_energy(s, p, H) = Clapeyron.PH.gibbs_free_energy(Clapeyron.SingleFluid(s), p, H)
-    PH_helmholtz_free_energy(s, p, H) = Clapeyron.PH.helmholtz_free_energy(Clapeyron.SingleFluid(s), p, H)
-    PH_mass_density(s, p, H) = Clapeyron.PH.mass_density(Clapeyron.SingleFluid(s), p, H)
-    PH_molar_density(s, p, H) = Clapeyron.PH.molar_density(Clapeyron.SingleFluid(s), p, H)
+λf(res::EntropyScaling.RefpropRESModel, p::AbstractFloat, T::AbstractFloat) =
+    EntropyScaling.thermal_conductivity(res, p, T)
+ηf(res::EntropyScaling.RefpropRESModel, p::AbstractFloat, T::AbstractFloat) =
+    EntropyScaling.viscosity(res, p, T)
 
-    # Access to flash function
-    #PH_flash = Clapeyron.PH.flash
+# ---- register opaque symbolic versions (no types in signature) ----
+@register_symbolic Tf(eos::Clapeyron.EoSModel, p, H)
+@register_symbolic Vf(eos::Clapeyron.EoSModel, p, H)
+@register_symbolic Sf(eos::Clapeyron.EoSModel, p, H)
+
+@register_symbolic Hf(eos::Clapeyron.EoSModel, V, T)
+@register_symbolic Cpf(eos::Clapeyron.EoSModel, V, T)
+
+@register_symbolic Tsatf(eos::Clapeyron.EoSModel, p)
+@register_symbolic Vbf(eos::Clapeyron.EoSModel, p)
+@register_symbolic Vdf(eos::Clapeyron.EoSModel, p)
+	
+@register_symbolic λf(res::EntropyScaling.RefpropRESModel, p, T)
+@register_symbolic ηf(res::EntropyScaling.RefpropRESModel, p, T)
+
 end
 
-# ╔═╡ eb7c553d-8980-4c66-852a-3ea26915d405
-# ╠═╡ disabled = true
-#=╠═╡
-Clapeyron.PH.entropy(Clapeyron.SingleFluid("R134A"), 1e5, 250e3*(Clapeyron.SingleFluid("R134A").properties.Mw/1000), [1.0])
-  ╠═╡ =#
 
 # ╔═╡ 6910cf96-c290-4905-b044-11487973d407
 function RefrigerantProps(; name::Symbol, fluid="R134A")
@@ -513,6 +472,9 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
     pars = @parameters begin
     end
     
+    eos = Clapeyron.SingleFluid(fluid)
+    res = RefpropRESModel(fluid)
+	
     # Variables with reasonable starting points
     vars = @variables begin
 		logp = log(1e5)
@@ -602,95 +564,63 @@ function RefrigerantProps(; name::Symbol, fluid="R134A")
 		σ
     end
 	
-	#k = 2.1e-7
+    Mw_val = eos.properties.Mw/1000
+    Tc_val = eos.properties.Tc
     σ0, nσ = fit_sigma_GK(fluid)
-	# Equations
-    eqs = [
-		p ~ exp(logp),
-        # Material properties
-        Mw ~ Clapeyron.SingleFluid(fluid).properties.Mw/1000,
-        Tc ~ Clapeyron.SingleFluid(fluid).properties.Tc,
-        
-        # Saturation properties
-        Tsat ~ Tsatf(fluid, p),
-        Vb ~ Vbf(fluid, p),
-        Vd ~ Vdf(fluid, p),
-        
-        # Bubble and dew point properties
-        Hb ~ Hf(fluid, Vb, Tsat),
-        Hd ~ Hf(fluid, Vd, Tsat),
-        ΔHv ~ Hd - Hb,
-        
-        # Phase condition
-        X ~ (H - Hb) / ΔHv,
-        
-        # Core thermodynamic relationships - we use p,H as the primary variables
-        V ~ Vf(fluid, p, H),
-        T ~ Tf(fluid, p, H),
-        
-        # Secondary thermodynamic properties derived from p,H
-        S ~ Sf(fluid, p, H),
-        #U ~ Uf(fluid, p, H),
-        #A ~ Af(fluid, p, H),
-        #G ~ Gf(fluid, p, H),
-        
-        # Properties that require the volume and temperature
-        Cp ~ Cpf(fluid, V, T),
-        #Z ~ Zf(fluid, V, T),
-        #γ ~ γf(fluid, V, T),
-        #κT ~ κTf(fluid, V, T),
-        #κS ~ κSf(fluid, V, T),
-        #c ~ cf(fluid, V, T),
-        #α ~ αf(fluid, V, T),
-        #μJT ~ μJTf(fluid, V, T),
-        
-        # Phase-specific molar heat capacities
-        Cpb ~ Cpf(fluid, Vb, Tsat),
-        Cpd ~ Cpf(fluid, Vd, Tsat),
-        
-        # Transport properties - general
-        λ ~ λf(fluid, p, T),
-        η ~ ηf(fluid, p, T),
-        
-        # Transport properties - phase-specific
-        λb ~ λf(fluid, p, Tsat-1e-3),
-        λd ~ λf(fluid, p, Tsat+1e-3),
-        ηb ~ ηf(fluid, p, Tsat-1e-3),
-        ηd ~ ηf(fluid, p, Tsat+1e-3),
-        
-        # Volume relationships
-        v ~ V / Mw,
-        vb ~ Vb / Mw,
-        vd ~ Vd / Mw,
-        ρ_mol ~ 1 / V,
-        ρ_molb ~ 1 / Vb,
-        ρ_mold ~ 1 / Vd,
-        ρ ~ Mw / V,
-        ρb ~ Mw / Vb,
-        ρd ~ Mw / Vd,
-        ν ~ η / ρ,
-        νb ~ ηb / ρb,
-        νd ~ ηd / ρd,
-        
-        # Mass-based properties
-        s ~ S / Mw,
-        #u ~ U / Mw,
-        h ~ H / Mw,
-        hb ~ Hb / Mw,
-        hd ~ Hd / Mw,
-        Δhv ~ ΔHv / Mw,
-        #a ~ A / Mw,
-        #g ~ G / Mw,
-        cp ~ Cp / Mw,
-        cpb ~ Cpb / Mw,
-        cpd ~ Cpd / Mw,
 
-		σ ~ σ0 * (1-Tsat/Tc)^nσ,
-		#σ ~ k * Vb^(2/3) * (Tc - 6.0 - Tsat),
-		Pr ~ cp*η/λ,
-		Prb ~ cpb*ηb/λb,
-		Prd ~ cpd*ηd/λd,
-    ]
+	# Equations
+	eqs = [
+	    p  ~ exp(logp),
+	
+	    Mw ~ Mw_val,
+	    Tc ~ Tc_val,
+		Tsat ~ Tsatf(eos, p),
+		Vb   ~ Vbf(eos, p),
+		Vd   ~ Vdf(eos, p),
+		
+		Hb   ~ Hf(eos, Vb, Tsat),
+		Hd   ~ Hf(eos, Vd, Tsat),
+		ΔHv  ~ Hd - Hb,
+		X    ~ (H - Hb) / ΔHv,
+		
+		V ~ Vf(eos, p, H),
+		T ~ Tf(eos, p, H),
+		S ~ Sf(eos, p, H),
+		
+		Cp  ~ Cpf(eos, V,  T),
+		Cpb ~ Cpf(eos, Vb, Tsat),
+		Cpd ~ Cpf(eos, Vd, Tsat),
+		
+		λ  ~ λf(res, p, T),
+		η  ~ ηf(res, p, T),
+	    λb ~ λf(res, p, Tsat - 1e-3),
+	    λd ~ λf(res, p, Tsat + 1e-3),
+	    ηb ~ ηf(res, p, Tsat - 1e-3),
+	    ηd ~ ηf(res, p, Tsat + 1e-3),
+	
+	    # volumes/densities
+	    v ~ V / Mw,   vb ~ Vb / Mw,   vd ~ Vd / Mw,
+	    ρ_mol  ~ 1 / V,   ρ_molb ~ 1 / Vb,   ρ_mold ~ 1 / Vd,
+	    ρ      ~ Mw / V,  ρb     ~ Mw / Vb,  ρd     ~ Mw / Vd,
+	    ν      ~ η / ρ,   νb     ~ ηb / ρb,  νd     ~ ηd / ρd,
+	
+	    # mass-basis conversions
+	    s   ~ S / Mw,
+	    h   ~ H / Mw,
+	    hb  ~ Hb / Mw,
+	    hd  ~ Hd / Mw,
+	    Δhv ~ ΔHv / Mw,
+	    cp  ~ Cp  / Mw,
+	    cpb ~ Cpb / Mw,
+	    cpd ~ Cpd / Mw,
+	
+	    # misc
+	    σ   ~ σ0 * (1 - Tsat / Tc)^nσ,
+	    Pr  ~ cp  * η  / λ,
+	    Prb ~ cpb * ηb / λb,
+	    Prd ~ cpd * ηd / λd,
+	]
+
     
     return NonlinearSystem(eqs, vars, pars, name=name)
 end
@@ -802,7 +732,7 @@ end
 # ╔═╡ 0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═╡ skip_as_script = true
 #=╠═╡
-sol_props = test_ref_properties(200e3, 1e5, 1e-6)
+@time sol_props = test_ref_properties(200e3, 1e5, 1e-6)
   ╠═╡ =#
 
 # ╔═╡ 0e4ee629-6548-4232-8da4-c72f23167411
@@ -3033,11 +2963,11 @@ version = "17.4.0+2"
 # ╠═681fe917-780e-4776-a1b8-871249dd981b
 # ╠═755facf8-493e-408c-a93d-fe98340d8710
 # ╠═6d013853-cfb6-48b9-be49-9c47e084df56
+# ╠═5bf6345a-b696-4348-92c2-9c0aa17ca168
 # ╠═b60f53c1-bfa6-4599-8a6c-bb96b2836760
 # ╠═6d568112-75df-4310-81bd-1379d2aa426e
 # ╠═28e9a251-b80d-4e0a-af04-3c98894435ad
 # ╠═cee84cbe-7e22-423f-b9c6-d952ef96e442
-# ╠═eb7c553d-8980-4c66-852a-3ea26915d405
 # ╠═6910cf96-c290-4905-b044-11487973d407
 # ╠═0aad83f7-c087-4ba8-8275-998fbf76cd53
 # ╠═d849b912-a80e-429d-8c11-99fc4f7a721d
