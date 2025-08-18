@@ -4108,28 +4108,52 @@ function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
 end
   ╠═╡ =#
 
+# ╔═╡ 3ec7080c-2972-484b-805e-3d9fe0a7d9d1
+# choose reasonable default levels for iso-lines
+function _default_iso_levels(Z; n::Int=8)
+    vals = vec(Z)
+    m = isfinite.(vals)
+    if !any(m)
+        return n               # fallback: let Makie auto-pick n levels
+    end
+    zmin, zmax = extrema(vals[m])
+    if zmin == zmax
+        return [zmin]          # constant field: one contour at that value
+    else
+        return collect(range(zmin, zmax; length=n))
+    end
+end
+
+
 # ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
 #=╠═╡
 function _add_isolines!(ax::Makie.Axis, df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
-                        xlogbase::Symbol = :log10, levels = [], color = :black,
-                        linestyle = :solid, linewidth = 1.5,
-                        labels::Bool = false, labelformatter = l -> @sprintf("%.3g", l),
+                        xlogbase::Symbol = :log10,
+                        levels = nothing,                 # <— allow nothing
+                        color::Union{Symbol,RGBAf,RGBf} = :black,
+                        linestyle::Symbol = :solid,
+                        linewidth::Real = 1.5,
+                        labels::Bool = false,
+                        labelformatter::Function = l -> @sprintf("%.3g", l),
                         labelsize::Int = 20)
 
     invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
 
-    levs = levels isa AbstractVector ? Float64.(levels) : Float64[levels]
-    if labels
-        contour!(ax, X, Y, Z;
-                 levels=levs, color=color, linestyle=linestyle, linewidth=linewidth,
-                 labels=true, labelformatter=labelformatter,
-                 labelsize=labelsize)
-    else
-        contour!(ax, X, Y, Z; levels=levs, color=color, linestyle=linestyle, linewidth=linewidth)
-    end
+    # normalize the levels argument:
+    levs =
+        levels === nothing                       ? _default_iso_levels(Z) :
+        (levels isa AbstractVector && isempty(levels)) ? _default_iso_levels(Z) :
+        (levels isa AbstractVector              ? Float64.(collect(levels)) :
+         levels)  # if it's an Int, pass it through
+
+    # draw (avoid labelcolor/labelfont "Automatic" pitfalls by not setting them)
+    contour!(ax, X, Y, Z;
+             levels = levs, color = color, linestyle = linestyle, linewidth = linewidth,
+             labels = labels, labelformatter = labelformatter, labelsize = labelsize)
     return ax
 end
+
   ╠═╡ =#
 
 # ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
@@ -4909,15 +4933,31 @@ plot_contourf(
 
   ╠═╡ =#
 
+# ╔═╡ bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Δp_tot,
+    overlays=[
+        (z=:N_pump,color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
+  ╠═╡ =#
+
 # ╔═╡ c8c35ed3-bd6c-40ac-8049-b603b003f603
 #=╠═╡
 plot_contourf(
     df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
     levels=2.0:0.1:4.0,
     overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1.5,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=.8, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=.8, linestyle=:dash, labels=true),
+        (z=:Δp_tot,color=:yellow,  labels=true, linewidth=1.5),
+
+		
     ]
 )
 
@@ -8245,12 +8285,14 @@ version = "3.6.0+0"
 # ╠═09952ea8-ef5d-414f-ac15-478ad8ea6343
 # ╠═16868428-1547-4b8d-a900-5e5120f38088
 # ╠═62b6a403-53ac-42c1-9fff-055a9b7a478b
+# ╠═bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
 # ╠═c8c35ed3-bd6c-40ac-8049-b603b003f603
 # ╟─bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+# ╠═3ec7080c-2972-484b-805e-3d9fe0a7d9d1
 # ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
 # ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 # ╟─b570d453-43f2-4a12-a9d6-889752dd5aeb
-# ╟─21cd24f0-4d8b-4298-89e1-7ba7817c2eef
+# ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
 # ╟─fff91fa6-8ffb-458a-946d-244b5b13c3cd
 # ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
 # ╠═f7833464-8c6f-42e1-a1a6-2353d88e4b57
