@@ -6,6 +6,7 @@ format:
       id: iecr
       cite-style: super
     keep-tex: true
+    latex-max-runs: 15
   html:
     toc: true
     toc-depth: 3
@@ -293,30 +294,6 @@ We suggest that the models be leveraged in order to produce better heuristics.
 
 - $R134A$ = 1,1,1,2-Tetrafluoroethane (refrigerant)
 - $MEA$ = Monoethanolamine ($C_2H_7NO$)
-
-
-```julia
-import Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-
-# Install the local package as a regular dependency
-Pkg.add(path="..")
-```
-
-```julia
-using Revise
-using OptimalGshpFlow
-```
-
-```julia
-# Test that the package is loaded properly
-println("OptimalGshpFlow version: ", pkgversion(OptimalGshpFlow))
-
-# Create a sample property object to test functionality
-@named fluid = Properties.DynamicIncompressibleProps(χ = 0.2, fluid = "MEA")
-println("Created fluid properties object: ", fluid)
-```
 
 ## Appendix A: Model Parameters and Technical Specifications
 
