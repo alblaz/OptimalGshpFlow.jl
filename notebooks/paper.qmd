@@ -1,0 +1,410 @@
+---
+title: "Insights into the Optimal Flow Rule for GSHP Systems"
+format:
+  acs-pdf:
+    journal:
+      id: iecr
+      cite-style: super
+    keep-tex: true
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    cross-ref:
+      fig-title: Figure
+      tbl-title: Table
+      eq-title: Equation
+author: 
+  - name: "Your Name"
+    affiliation: "Your Institution"
+    email: "your.email@institution.edu"
+abstract: |
+  This paper investigates the question of flow control in ground source heat pump (GSHP) systems. We focus on systems with a single heat pump connected hydraulically to a borehole without decoupling tanks. The study develops a coupled thermal-hydraulic model that considers steady-state conditions with the borehole wall as the boundary condition. The model incorporates principles of fluid mechanics and heat transfer while accounting for thermal properties of both ground and heat pump components.
+keywords: [Ground Source Heat Pump, Flow Control, Thermal-Hydraulic Coupling, Optimization]
+bibliography: bibliography/export.bib
+csl: https://www.zotero.org/styles/american-chemical-society
+---
+
+
+
+# Abstract:
+
+This paper will look into the question of the flow control in GSHP systems. We will focus on systems with a single heat pump connected hydraulically to a borehole in terms of hydraulics, no decoupling tank.
+
+# Introduction
+
+Heat pump in genreal and GSHP in particular are essential tools allowing for the decarbonization of the heating sector. The question of the flow control in GSHP systems is a central one, as it allows for the optimization of the system performance and the reduction of energy consumption. The cost of changing a few variables in a control algorithm is minimal. Therefore, it is important to understand the hydraulic aspects of GSHP systems in order to design effective control strategies. The flow control in GSHP systems is a complex problem that involves the interaction between the heat pump, the borehole, and the ground. The flow rate through the borehole is influenced by several factors, including the temperature difference between the fluid entering and leaving the borehole, the thermal conductivity of the ground, and the pressure drop across the borehole. In addition, the flow rate is also affected by the control strategy used to operate the heat pump.
+
+In this paper, we will focus on the hydraulic aspects of GSHP systems, specifically on the flow control in systems with a single heat pump connected hydraulically to a borehole.
+The model developped considers a steady state model of the inner problem, and sets the borehole wall as the boundary condition. The model is implemented in ModelingToolkit.jl, a Julia package for modeling and simulation of dynamic systems. The model is based on the principles of fluid mechanics and heat transfer, and takes into account the thermal properties of the ground and the heat pump.
+
+
+# Literature Review
+
+Heat pump control strategies have been extensively studied in the literature, with particular attention to ground source heat pump (GSHP) systems due to their growing importance in building decarbonization efforts.
+
+*Note: Detailed literature review will be expanded in the final version.* 
+
+# Methods:
+
+The GSHP system model consists of three coupled submodels that are solved in sequence: thermodynamic cycle (thermal system), borehole heat exchanger, and pump hydraulics (hydraulic system). The steady-state system is solved using ModelingToolkit.jl with symbolic manipulation and NonlinearSolve.jl for robust Newton-Raphson solution methods. The thermal and hydraulic systems are solved separately but with tight coupling through shared variables and parameter exchange.
+
+## System Architecture:
+
+The model implements a modular approach where the thermal system determines the thermodynamic cycle performance, heat loads, and required mass flows, while the hydraulic system calculates pressure drops, pump power, and validates the hydraulic feasibility of the thermal solution. The systems are coupled through:
+
+1. **Mass flow coupling**: The secondary fluid mass flow from the thermal system becomes the design flow for the hydraulic system
+2. **Temperature coupling**: Borehole inlet/outlet temperatures link the thermal model to the hydraulic thermal properties  
+3. **Performance feedback**: Pump power from the hydraulic system feeds back into overall system performance calculations
+
+## Thermodynamic Cycle Model:
+
+The thermodynamic cycle implements a comprehensive R134A refrigerant circuit with the following components:
+
+### Evaporator:
+
+A moving-boundary plate heat exchanger evaporator with dynamically allocated regions for two-phase evaporation and single-phase superheating. The model features:
+
+- **Geometric modeling**: Chevron plate geometry with adjustable plate spacing (b), number of plates (np), width (W), enlargement factor (ϕ), and chevron angle (β)
+- **Two-zone heat transfer**: The evaporator length is dynamically split between evaporation and superheating zones using a smooth transition function `zap(uz_fr_sh)` that maps the unbounded variable `uz_fr_sh` to the [0,1] interval
+- **Heat transfer correlations**: 
+  - Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers with quality-dependent averaging
+  - Superheating region: Martin correlations for single-phase plate heat exchanger flow with laminar-turbulent transition
+- **Boundary conditions**: Fixed superheat degree (ΔTSH) and secondary fluid temperature difference (ΔTSF) as control variables
+
+### Compressor:
+
+The scroll compressor model incorporates:
+- **Volumetric displacement**: Fixed displacement volume with frequency-controlled capacity
+- **Isentropic efficiency**: Constant isentropic efficiency
+
+### Expansion Valve:
+
+Modeled as an isenthalpic expansion process. A constraint imposed in the solver is the superheating degree.
+
+### Condenser:
+
+Simplified model assuming constant condensing temperature and specified subcooling degree (ΔTSC). The detailed condenser heat transfer is not modeled, focusing on the evaporator side.
+
+## Borehole Heat Exchanger Model:
+
+The U-tube grouted borehole employs two sub models:
+
+### Thermal Model:
+
+- **Analytical solution**: Uses eigenvalue decomposition of coupled 1D ODEs to solve the temperature profiles along the borehole depth
+- **Multipole method**: For the grout resistance, we implement thermal resistance calculations between pipes and to the borehole wall using multipole approximations for complex geometry effects **ref needed**
+- **Heat transfer coefficients**: Derived from the borehole geometry and dynamical fluid properties
+- **Boundary conditions**: Uniform borehole wall temperature as the thermal boundary condition
+- **Temperature profiles**: Analytical expressions for fluid temperatures in both legs as functions of depth
+
+### Hydraulic Integration:
+
+The borehole thermal model is connected to the hydraulic system through temperature-dependent fluid properties calculated via CoolProp interpolants registered as symbolic functions in ModelingToolkit.
+
+## Pump and Hydraulic Model:
+
+Note: the hydraulic mode is decoupled from the thermal model, the solution from the thermal model is used as a boundary condition for the hydraulic model. There is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations (better performances are expected in reality thanks to the added heat).
+
+### Pump Performance:
+
+The centrifugal pump follows dimensionless performance curves based on affinity laws:
+- **Head coefficient**: $\psi = \psi_0 - K \cdot \varphi^2$ where $\varphi$ is the flow coefficient
+- **Efficiency**: $\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)$ with parabolic efficiency curve around the best efficiency point (BEP)
+- **Power calculation**: Electrical power including motor efficiency 
+
+### Hydraulic Loss Calculations:
+
+- **Pipe friction**: Darcy-Weisbach equations with smooth transition between laminar and turbulent regimes using error function blending
+- **Friction factor**: Enhanced Colebrook-White correlations with automatic regime detection
+- **Heat exchanger losses**: Chevron-plate correlations based on Martin's work for pressure drop in plate heat exchangers
+- **Component-wise pressure drops**: Individual calculation for each system component (evaporator, borehole, connecting pipes)
+
+## System Coupling and Solution Strategy:
+
+### Sequential Solution Approach:
+
+1. **Thermal system solution**: Solve the thermodynamic cycle for given boundary conditions (borehole wall temperature, condensing conditions, control setpoints)
+2. **Parameter extraction**: Extract mass flows, temperatures, and thermal loads from the thermal solution
+3. **Hydraulic system solution**: Solve pump and pressure drop calculations using thermal system outputs as boundary conditions
+4. **Performance calculation**: Combine thermal and hydraulic results to compute overall system performance metrics
+### System Coupling and Solution Strategy:
+
+The system architecture follows a sequential solution approach as illustrated in the system flowchart. The process begins with boundary conditions (wall temperature, condensing conditions, and control setpoints) feeding into the thermal system solution. The thermal system encompasses both the thermodynamic cycle (evaporator, compressor, condenser, expansion valve) and the borehole heat exchanger thermal model.
+
+Key coupling points include:
+- **Thermal-to-Hydraulic Transfer**: Mass flow rates and temperatures from the thermal solution become boundary conditions for the hydraulic system
+- **Performance Integration**: Results from both thermal and hydraulic systems combine to calculate overall performance metrics (COP1, COP2, COP3)
+- **Auxiliary Heating Assessment**: When heat pump capacity is insufficient, auxiliary heating requirements are calculated
+
+*Note: A detailed system flowchart will be added in the final version.*
+
+## Performance Metrics:
+
+The model calculates multiple performance indicators:
+
+- **Thermal COP**: $COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$ (refrigeration cycle only)
+- **System COP**: $COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$ (including pump power)
+- **Advanced metrics**: Includes provisions for auxiliary heating assessment when heat pump capacity is insufficient
+
+## Numerical Implementation:
+
+- **Symbolic computation**: Full symbolic derivation of equations using ModelingToolkit.jl
+- **Robust solvers**: Multiple nonlinear solver options including RobustMultiNewton and TrustRegion methods
+- **Automatic differentiation**: Forward-mode AD for enhanced convergence properties
+- **Continuation methods**: Built-in parameter sweep capabilities with automatic stepping and convergence control
+
+The model implementation prioritizes modularity and extensibility, allowing for easy modification of individual components while maintaining system-level coupling consistency. The thermal-hydraulic separation enables efficient parameter studies and optimization while ensuring physical consistency through the coupling interface.
+
+*Detailed system parameters and correlations are provided in Appendix A.*
+
+
+# Results:
+
+## COP3 vs. ΔT
+
+This figure shows the main metric we are considering: COP3 against the control strategy under investigation: constant temperature difference across the evaporator/BHE.
+
+There seems to be an optimal
+
+TDL:
+look into the position of the boundary
+trace the temperatures in the evap
+trace the temperatures in the bhe: get the exponents + ground temperature
+reynolds + transitions (illustrer sur les graphs par des lignes)
+show limit power pump too
+UA?
+
+## Insights into the physical process
+
+Position of the boundary within the evaporator
+The faster the compressor runs, the more evaporation fraction is used
+
+## Robustness
+
+### Partial load
+
+Chosing the COP3 as a metric allows for the comparison of "faster compressor vs. slower compressor + aux electrical power"
+Assuming the HP can tackle the entirety of the load (P_aux_heating = 0.0)
+
+Looking at the graph, 
+
+### Change of operating point
+
+To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?
+
+The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
+
+## Heatmap of COP2 vs T wall vs T condenser
+
+## A fine tuned strategy
+
+We propose different curves for different operational modes. The question of the linear transition is central.
+
+# Conclusions
+
+It seems that the widespread rule based controll perform decently in the test case, however, it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE.
+We suggest that the models be leveraged in order to produce better heuristics.
+
+## Nomenclature
+
+### Symbols
+
+**Geometric Parameters:**
+- $D$ = Impeller diameter [m]
+- $D_{bh}$ = Borehole diameter [m]  
+- $D_{pipe,i}$ = Pipe inner diameter [m]
+- $D_{pipe,o}$ = Pipe outer diameter [m]
+- $H$ = Pump head [m]
+- $L$ = Plate length [m]
+- $L_b$ = Borehole depth [m]
+- $N_{plates}$ = Number of plates [-]
+- $W$ = Plate width [m]
+- $b$ = Channel spacing [m]
+- $s$ = Shank spacing [m]
+- $t_{pipe}$ = Pipe wall thickness [m]
+- $t_{plate}$ = Plate thickness [m]
+
+**Thermophysical Properties:**
+- $\lambda$ = Thermal conductivity [W/(m·K)]
+- $\rho$ = Density [kg/m³]
+- $\chi$ = Mass fraction [-]
+- $\beta$ = Chevron angle [rad]
+- $h$ = Specific enthalpy [kJ/kg]
+
+**Flow and Transport Variables:**
+- $\dot{V}$ = Volumetric flow rate [m³/s]
+- $\dot{m}$ = Mass flow rate [kg/s]
+- $\dot{Q}$ = Heat transfer rate [W]
+- $N$ = Rotational speed [rpm]
+- $P$ = Pressure [bar, Pa]
+- $T$ = Temperature [K, °C]
+- $\Delta T$ = Temperature difference [K]
+
+**Dimensionless Parameters:**
+- $\phi$ = Flow coefficient, $\dot{V}/(N \cdot D^3)$ [-]
+- $\psi$ = Head coefficient, $g \cdot H/(N^2 \cdot D^2)$ [-]
+- $\psi_0$ = Shutoff head coefficient [-]
+- $K$ = Head curve slope parameter [-]
+
+**Performance Parameters:**
+- $COP$ = Coefficient of performance [-]
+- $W$ = Work/Power [W]
+- $\eta$ = Efficiency [-]
+- $f$ = Frequency [Hz]
+- $g$ = Gravitational acceleration [m/s²]
+
+### Subscripts
+
+- $BEP$ = Best efficiency point
+- $comp$ = Compressor
+- $elec$ = Electrical
+- $evap$ = Evaporator
+- $grout$ = Grout material
+- $high$ = High pressure side
+- $in$ = Inlet condition
+- $is$ = Isentropic
+- $max$ = Maximum
+- $motor$ = Motor
+- $out$ = Outlet condition
+- $pipe$ = Pipe material
+- $plate$ = Plate material  
+- $pump$ = Pump
+- $ref$ = Refrigerant
+- $s$ = Isentropic condition
+- $shaft$ = Shaft
+- $soil$ = Soil/ground
+- $wall$ = Wall condition
+
+### Abbreviations
+
+- $BHE$ = Borehole Heat Exchanger
+- $COP$ = Coefficient of Performance  
+- $GSHP$ = Ground Source Heat Pump
+- $MEA$ = Monoethanolamine
+- $OD$ = Outer Diameter
+- $ID$ = Inner Diameter
+- $PE$ = Polyethylene
+- $SC$ = Subcooling
+- $SF$ = Secondary Fluid
+- $SH$ = Superheating
+
+### Chemical Notation
+
+- $R134A$ = 1,1,1,2-Tetrafluoroethane (refrigerant)
+- $MEA$ = Monoethanolamine ($C_2H_7NO$)
+
+
+```julia
+import Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
+# Install the local package as a regular dependency
+Pkg.add(path="..")
+```
+
+```julia
+using Revise
+using OptimalGshpFlow
+```
+
+```julia
+# Test that the package is loaded properly
+println("OptimalGshpFlow version: ", pkgversion(OptimalGshpFlow))
+
+# Create a sample property object to test functionality
+@named fluid = Properties.DynamicIncompressibleProps(χ = 0.2, fluid = "MEA")
+println("Created fluid properties object: ", fluid)
+```
+
+## Appendix A: Model Parameters and Technical Specifications
+
+### A.1 Borehole Heat Exchanger Specifications
+
+**Geometric Parameters:**
+- Borehole depth: $L_b = 250$ m
+- Pipe outer diameter: $D_{pipe,o} = 32$ mm
+- Pipe inner diameter: $D_{pipe,i} = 28.24$ mm
+- Pipe wall thickness: $t_{pipe} = 1.88$ mm
+- Borehole diameter: $D_{bh} = 115$ mm
+- Shank spacing: $s = 75$ mm
+
+**Thermal Properties:**
+- Pipe thermal conductivity: $\lambda_{pipe} = 0.4$ W/(m·K)
+- Grout thermal conductivity: $\lambda_{grout} = 1.5$ W/(m·K)
+- Ground thermal conductivity: $\lambda_{soil} = 2.0$ W/(m·K)
+- Boundary condition: $T_{wall} = 283.15$ K (constant)
+
+### A.2 Heat Pump System Parameters
+
+**Working Fluids:**
+- Primary refrigerant: R134A
+- Secondary fluid: MEA aqueous solution with mass fraction $\chi = 0.28$
+
+**Compressor Specifications:**
+- Isentropic efficiency: $\eta_{is} = 0.7$
+- Operating frequency: $f = 50$ Hz
+- Electrical motor efficiency: $\eta_{motor} = 0.9$
+
+### A.3 Plate Heat Exchanger (Evaporator) Specifications
+
+**Geometric Parameters:**
+- Number of plates: $N_{plates} = 20$
+- Plate width: $W = 0.1$ m
+- Plate length: $L = 0.3$ m
+- Channel spacing: $b = 1.5$ mm
+- Chevron angle: $\beta = \pi/6$ rad $(30°)$
+- Plate thickness: $t_{plate} = 0.5$ mm
+- Plate thermal conductivity: $\lambda_{plate} = 16$ W/(m·K)
+
+### A.4 Operating Conditions (test_GSHP Reference Case)
+
+**Temperature Differences:**
+- Secondary fluid temperature difference: $\Delta T_{SF} = 3.5$ K
+- Superheating temperature difference: $\Delta T_{SH} = 7$ K
+- Subcooling temperature difference: $\Delta T_{SC} = 5$ K
+
+**Pressure Conditions:**
+- High-side pressure: $P_{high} = 14$ bar
+- Secondary fluid mass fraction: $\chi = 0.28$
+
+### A.5 Mathematical Correlations
+
+**A.5.1 Pump Performance:**
+- Dimensionless head coefficient: 
+  $$\psi = \psi_0 - K \cdot \phi^2$$
+  
+- Dimensionless flow coefficient: 
+  $$\phi = \frac{\dot{V}}{N \cdot D^3}$$
+  
+- Dimensionless head coefficient: 
+  $$\psi = \frac{g \cdot H}{N^2 \cdot D^2}$$
+  
+- Pump efficiency: 
+  $$\eta_{pump} = \eta_{max} \left(1 - \left(\frac{\phi - \phi_{BEP}}{\phi_{BEP}}\right)^2\right)$$
+
+where $N$ is rotational speed [rpm], $D$ is impeller diameter [m], $\dot{V}$ is volumetric flow rate [m³/s], $H$ is pump head [m], $\eta_{max}$ is maximum efficiency, and $\phi_{BEP}$ is flow coefficient at best efficiency point.
+
+**A.5.2 Power Consumption:**
+- Shaft power: 
+  $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
+  
+- Electrical power: 
+  $$P_{elec} = \frac{P_{shaft}}{\eta_{motor}}$$
+
+**A.5.3 Compressor Work:**
+- Isentropic compression work: 
+  $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
+
+where $\dot{m}_{ref}$ is refrigerant mass flow rate [kg/s], $h_{in}$ and $h_{out,s}$ are inlet and isentropic outlet specific enthalpies [kJ/kg], respectively.
+
+**A.5.4 Coefficient of Performance:**
+- Thermal COP: 
+  $$COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$$
+  
+- System COP: 
+  $$COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$$
+
+where $\dot{Q}_{evap}$ is evaporator heat transfer rate [W].
+

@@ -1,0 +1,823 @@
+% Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[journal=iecr,manuscript=]{achemso}
+\usepackage[version=3]{mhchem}
+\newcommand*\mycommand[1]{\texttt{\emph{#1}}}
+
+
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+% Make \paragraph and \subparagraph free-standing
+\makeatletter
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}{
+    \@ifstar
+      \xxxParagraphStar
+      \xxxParagraphNoStar
+  }
+  \newcommand{\xxxParagraphStar}[1]{\oldparagraph*{#1}\mbox{}}
+  \newcommand{\xxxParagraphNoStar}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}{
+    \@ifstar
+      \xxxSubParagraphStar
+      \xxxSubParagraphNoStar
+  }
+  \newcommand{\xxxSubParagraphStar}[1]{\oldsubparagraph*{#1}\mbox{}}
+  \newcommand{\xxxSubParagraphNoStar}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+\makeatother
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{241,243,245}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.40,0.45,0.13}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\ExtensionTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.07,0.07,0.07}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+
+
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+
+
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\AtBeginDocument{%
+\ifdefined\contentsname
+  \renewcommand*\contentsname{Table of contents}
+\else
+  \newcommand\contentsname{Table of contents}
+\fi
+\ifdefined\listfigurename
+  \renewcommand*\listfigurename{List of Figures}
+\else
+  \newcommand\listfigurename{List of Figures}
+\fi
+\ifdefined\listtablename
+  \renewcommand*\listtablename{List of Tables}
+\else
+  \newcommand\listtablename{List of Tables}
+\fi
+\ifdefined\figurename
+  \renewcommand*\figurename{Figure}
+\else
+  \newcommand\figurename{Figure}
+\fi
+\ifdefined\tablename
+  \renewcommand*\tablename{Table}
+\else
+  \newcommand\tablename{Table}
+\fi
+}
+\@ifpackageloaded{float}{}{\usepackage{float}}
+\floatstyle{ruled}
+\@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
+\floatname{codelisting}{Listing}
+\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\makeatother
+\makeatletter
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
+\makeatother
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Insights into the Optimal Flow Rule for GSHP Systems},
+  pdfauthor={Your Name},
+  pdfkeywords={Ground Source Heat Pump, Flow Control, Thermal-Hydraulic
+Coupling, Optimization},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+
+\author{Your Name}
+\affiliation{ Your Institution,  }
+
+
+\email{your.email@institution.edu}
+
+
+\keywords{Ground Source Heat PumpFlow ControlThermal-Hydraulic
+CouplingOptimization}
+
+\title[]{Insights into the Optimal Flow Rule for GSHP Systems}
+\makeatletter
+\begin{document}
+\maketitle
+\begin{abstract}
+This paper investigates the question of flow control in ground source
+heat pump (GSHP) systems. We focus on systems with a single heat pump
+connected hydraulically to a borehole without decoupling tanks. The
+study develops a coupled thermal-hydraulic model that considers
+steady-state conditions with the borehole wall as the boundary
+condition. The model incorporates principles of fluid mechanics and heat
+transfer while accounting for thermal properties of both ground and heat
+pump components.
+\end{abstract}
+
+
+\section{Abstract:}\label{abstract}
+
+This paper will look into the question of the flow control in GSHP
+systems. We will focus on systems with a single heat pump connected
+hydraulically to a borehole in terms of hydraulics, no decoupling tank.
+
+\section{Introduction}\label{introduction}
+
+Heat pump in genreal and GSHP in particular are essential tools allowing
+for the decarbonization of the heating sector. The question of the flow
+control in GSHP systems is a central one, as it allows for the
+optimization of the system performance and the reduction of energy
+consumption. The cost of changing a few variables in a control algorithm
+is minimal. Therefore, it is important to understand the hydraulic
+aspects of GSHP systems in order to design effective control strategies.
+The flow control in GSHP systems is a complex problem that involves the
+interaction between the heat pump, the borehole, and the ground. The
+flow rate through the borehole is influenced by several factors,
+including the temperature difference between the fluid entering and
+leaving the borehole, the thermal conductivity of the ground, and the
+pressure drop across the borehole. In addition, the flow rate is also
+affected by the control strategy used to operate the heat pump.
+
+In this paper, we will focus on the hydraulic aspects of GSHP systems,
+specifically on the flow control in systems with a single heat pump
+connected hydraulically to a borehole. The model developped considers a
+steady state model of the inner problem, and sets the borehole wall as
+the boundary condition. The model is implemented in ModelingToolkit.jl,
+a Julia package for modeling and simulation of dynamic systems. The
+model is based on the principles of fluid mechanics and heat transfer,
+and takes into account the thermal properties of the ground and the heat
+pump.
+
+\section{Literature:}\label{literature}
+
+The question of the control of HP is not particularly new. Indeed, manyt
+authors
+
+\section{Methods:}\label{methods}
+
+The GSHP system model consists of three coupled submodels that are
+solved in sequence: thermodynamic cycle (thermal system), borehole heat
+exchanger, and pump hydraulics (hydraulic system). The steady-state
+system is solved using ModelingToolkit.jl with symbolic manipulation and
+NonlinearSolve.jl for robust Newton-Raphson solution methods. The
+thermal and hydraulic systems are solved separately but with tight
+coupling through shared variables and parameter exchange.
+
+\subsection{System Architecture:}\label{system-architecture}
+
+The model implements a modular approach where the thermal system
+determines the thermodynamic cycle performance, heat loads, and required
+mass flows, while the hydraulic system calculates pressure drops, pump
+power, and validates the hydraulic feasibility of the thermal solution.
+The systems are coupled through:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Mass flow coupling}: The secondary fluid mass flow from the
+  thermal system becomes the design flow for the hydraulic system
+\item
+  \textbf{Temperature coupling}: Borehole inlet/outlet temperatures link
+  the thermal model to the hydraulic thermal properties\\
+\item
+  \textbf{Performance feedback}: Pump power from the hydraulic system
+  feeds back into overall system performance calculations
+\end{enumerate}
+
+\subsection{Thermodynamic Cycle Model:}\label{thermodynamic-cycle-model}
+
+The thermodynamic cycle implements a comprehensive R134A refrigerant
+circuit with the following components:
+
+\subsubsection{Evaporator:}\label{evaporator}
+
+A moving-boundary plate heat exchanger evaporator with dynamically
+allocated regions for two-phase evaporation and single-phase
+superheating. The model features:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Geometric modeling}: Chevron plate geometry with adjustable
+  plate spacing (b), number of plates (np), width (W), enlargement
+  factor (ϕ), and chevron angle (β)
+\item
+  \textbf{Two-zone heat transfer}: The evaporator length is dynamically
+  split between evaporation and superheating zones using a smooth
+  transition function \texttt{zap(uz\_fr\_sh)} that maps the unbounded
+  variable \texttt{uz\_fr\_sh} to the {[}0,1{]} interval
+\item
+  \textbf{Heat transfer correlations}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Two-phase region: Amalfi correlation for convective boiling in plate
+    heat exchangers with quality-dependent averaging
+  \item
+    Superheating region: Martin correlations for single-phase plate heat
+    exchanger flow with laminar-turbulent transition
+  \end{itemize}
+\item
+  \textbf{Boundary conditions}: Fixed superheat degree (ΔTSH) and
+  secondary fluid temperature difference (ΔTSF) as control variables
+\end{itemize}
+
+\subsubsection{Compressor:}\label{compressor}
+
+The scroll compressor model incorporates: - \textbf{Volumetric
+displacement}: Fixed displacement volume with frequency-controlled
+capacity - \textbf{Isentropic efficiency}: Constant isentropic
+efficiency
+
+\subsubsection{Expansion Valve:}\label{expansion-valve}
+
+Modeled as an isenthalpic expansion process. A constraint imposed in the
+solver is the superheating degree.
+
+\subsubsection{Condenser:}\label{condenser}
+
+Simplified model assuming constant condensing temperature and specified
+subcooling degree (ΔTSC). The detailed condenser heat transfer is not
+modeled, focusing on the evaporator side.
+
+\subsection{Borehole Heat Exchanger
+Model:}\label{borehole-heat-exchanger-model}
+
+The U-tube grouted borehole employs two sub models:
+
+\subsubsection{Thermal Model:}\label{thermal-model}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Analytical solution}: Uses eigenvalue decomposition of coupled
+  1D ODEs to solve the temperature profiles along the borehole depth
+\item
+  \textbf{Multipole method}: For the grout resistance, we implement
+  thermal resistance calculations between pipes and to the borehole wall
+  using multipole approximations for complex geometry effects
+  \textbf{ref needed}
+\item
+  \textbf{Heat transfer coefficients}: Derived from the borehole
+  geometry and dynamical fluid properties
+\item
+  \textbf{Boundary conditions}: Uniform borehole wall temperature as the
+  thermal boundary condition
+\item
+  \textbf{Temperature profiles}: Analytical expressions for fluid
+  temperatures in both legs as functions of depth
+\end{itemize}
+
+\subsubsection{Hydraulic Integration:}\label{hydraulic-integration}
+
+The borehole thermal model is connected to the hydraulic system through
+temperature-dependent fluid properties calculated via CoolProp
+interpolants registered as symbolic functions in ModelingToolkit.
+
+\subsection{Pump and Hydraulic Model:}\label{pump-and-hydraulic-model}
+
+Note: the hydraulic mode is decoupled from the thermal model, the
+solution from the thermal model is used as a boundary condition for the
+hydraulic model. There is no feedback from hydraulic losses to the
+thermal model, which is a limitation that affects the high flow
+simulations (better performances are expected in reality thanks to the
+added heat).
+
+\subsubsection{Pump Performance:}\label{pump-performance}
+
+The centrifugal pump follows dimensionless performance curves based on
+affinity laws: - \textbf{Head coefficient}:
+\(\psi = \psi_0 - K \cdot \varphi^2\) where \(\varphi\) is the flow
+coefficient - \textbf{Efficiency}:
+\(\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)\)
+with parabolic efficiency curve around the best efficiency point (BEP) -
+\textbf{Power calculation}: Electrical power including motor efficiency
+
+\subsubsection{Hydraulic Loss
+Calculations:}\label{hydraulic-loss-calculations}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Pipe friction}: Darcy-Weisbach equations with smooth
+  transition between laminar and turbulent regimes using error function
+  blending
+\item
+  \textbf{Friction factor}: Enhanced Colebrook-White correlations with
+  automatic regime detection
+\item
+  \textbf{Heat exchanger losses}: Chevron-plate correlations based on
+  Martin's work for pressure drop in plate heat exchangers
+\item
+  \textbf{Component-wise pressure drops}: Individual calculation for
+  each system component (evaporator, borehole, connecting pipes)
+\end{itemize}
+
+\subsection{System Coupling and Solution
+Strategy:}\label{system-coupling-and-solution-strategy}
+
+\subsubsection{Sequential Solution
+Approach:}\label{sequential-solution-approach}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Thermal system solution}: Solve the thermodynamic cycle for
+  given boundary conditions (borehole wall temperature, condensing
+  conditions, control setpoints)
+\item
+  \textbf{Parameter extraction}: Extract mass flows, temperatures, and
+  thermal loads from the thermal solution
+\item
+  \textbf{Hydraulic system solution}: Solve pump and pressure drop
+  calculations using thermal system outputs as boundary conditions
+\item
+  \textbf{Performance calculation}: Combine thermal and hydraulic
+  results to compute overall system performance metrics \#\#\# System
+  Coupling and Solution Strategy:
+\end{enumerate}
+
+The system architecture follows a sequential solution approach as
+illustrated in the system flowchart. The process begins with boundary
+conditions (wall temperature, condensing conditions, and control
+setpoints) feeding into the thermal system solution. The thermal system
+encompasses both the thermodynamic cycle (evaporator, compressor,
+condenser, expansion valve) and the borehole heat exchanger thermal
+model.
+
+Key coupling points include: - \textbf{Thermal-to-Hydraulic Transfer}:
+Mass flow rates and temperatures from the thermal solution become
+boundary conditions for the hydraulic system - \textbf{Performance
+Integration}: Results from both thermal and hydraulic systems combine to
+calculate overall performance metrics (COP1, COP2, COP3) -
+\textbf{Auxiliary Heating Assessment}: When heat pump capacity is
+insufficient, auxiliary heating requirements are calculated
+
+\emph{Note: A detailed system flowchart will be added in the final
+version.}
+
+\subsection{Performance Metrics:}\label{performance-metrics}
+
+The model calculates multiple performance indicators:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Thermal COP}: \(COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}\)
+  (refrigeration cycle only)
+\item
+  \textbf{System COP}:
+  \(COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}\) (including pump
+  power)
+\item
+  \textbf{Advanced metrics}: Includes provisions for auxiliary heating
+  assessment when heat pump capacity is insufficient
+\end{itemize}
+
+\subsection{Numerical Implementation:}\label{numerical-implementation}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Symbolic computation}: Full symbolic derivation of equations
+  using ModelingToolkit.jl
+\item
+  \textbf{Robust solvers}: Multiple nonlinear solver options including
+  RobustMultiNewton and TrustRegion methods
+\item
+  \textbf{Automatic differentiation}: Forward-mode AD for enhanced
+  convergence properties
+\item
+  \textbf{Continuation methods}: Built-in parameter sweep capabilities
+  with automatic stepping and convergence control
+\end{itemize}
+
+The model implementation prioritizes modularity and extensibility,
+allowing for easy modification of individual components while
+maintaining system-level coupling consistency. The thermal-hydraulic
+separation enables efficient parameter studies and optimization while
+ensuring physical consistency through the coupling interface.
+
+\emph{Detailed system parameters and correlations are provided in
+Appendix A.}
+
+\section{Results:}\label{results}
+
+\subsection{COP3 vs.~ΔT}\label{cop3-vs.-ux3b4t}
+
+This figure shows the main metric we are considering: COP3 against the
+control strategy under investigation: constant temperature difference
+across the evaporator/BHE.
+
+There seems to be an optimal
+
+TDL: look into the position of the boundary trace the temperatures in
+the evap trace the temperatures in the bhe: get the exponents + ground
+temperature reynolds + transitions (illustrer sur les graphs par des
+lignes) show limit power pump too UA?
+
+\subsection{Insights into the physical
+process}\label{insights-into-the-physical-process}
+
+Position of the boundary within the evaporator The faster the compressor
+runs, the more evaporation fraction is used
+
+\subsection{Robustness}\label{robustness}
+
+\subsubsection{Partial load}\label{partial-load}
+
+Chosing the COP3 as a metric allows for the comparison of ``faster
+compressor vs.~slower compressor + aux electrical power'' Assuming the
+HP can tackle the entirety of the load (P\_aux\_heating = 0.0)
+
+Looking at the graph,
+
+\subsubsection{Change of operating
+point}\label{change-of-operating-point}
+
+To establish baseline performance characteristics, we initially examine
+a fundamental question: what constitutes the optimal rule-based control
+strategy under standard operating conditions?
+
+The test case represents a typical Swedish GSHP installation. The system
+features a 250m deep borehole with a 40mm outer diameter polyethylene
+single U-tube collector. Complete technical specifications and thermal
+properties are detailed in Appendix A.
+
+\subsection{Heatmap of COP2 vs T wall vs T
+condenser}\label{heatmap-of-cop2-vs-t-wall-vs-t-condenser}
+
+\subsection{A fine tuned strategy}\label{a-fine-tuned-strategy}
+
+We propose different curves for different operational modes. The
+question of the linear transition is central.
+
+\section{Conclusions}\label{conclusions}
+
+It seems that the widespread rule based controll perform decently in the
+test case, however, it remains to be seen if the same heuristic does as
+well when it comes to eg. coaxial BHE. We suggest that the models be
+leveraged in order to produce better heuristics.
+
+\subsection{Nomenclature}\label{nomenclature}
+
+\subsubsection{Symbols}\label{symbols}
+
+\textbf{Geometric Parameters:} - \(D\) = Impeller diameter {[}m{]} -
+\(D_{bh}\) = Borehole diameter {[}m{]}\\
+- \(D_{pipe,i}\) = Pipe inner diameter {[}m{]} - \(D_{pipe,o}\) = Pipe
+outer diameter {[}m{]} - \(H\) = Pump head {[}m{]} - \(L\) = Plate
+length {[}m{]} - \(L_b\) = Borehole depth {[}m{]} - \(N_{plates}\) =
+Number of plates {[}-{]} - \(W\) = Plate width {[}m{]} - \(b\) = Channel
+spacing {[}m{]} - \(s\) = Shank spacing {[}m{]} - \(t_{pipe}\) = Pipe
+wall thickness {[}m{]} - \(t_{plate}\) = Plate thickness {[}m{]}
+
+\textbf{Thermophysical Properties:} - \(\lambda\) = Thermal conductivity
+{[}W/(m·K){]} - \(\rho\) = Density {[}kg/m³{]} - \(\chi\) = Mass
+fraction {[}-{]} - \(\beta\) = Chevron angle {[}rad{]} - \(h\) =
+Specific enthalpy {[}kJ/kg{]}
+
+\textbf{Flow and Transport Variables:} - \(\dot{V}\) = Volumetric flow
+rate {[}m³/s{]} - \(\dot{m}\) = Mass flow rate {[}kg/s{]} - \(\dot{Q}\)
+= Heat transfer rate {[}W{]} - \(N\) = Rotational speed {[}rpm{]} -
+\(P\) = Pressure {[}bar, Pa{]} - \(T\) = Temperature {[}K, °C{]} -
+\(\Delta T\) = Temperature difference {[}K{]}
+
+\textbf{Dimensionless Parameters:} - \(\phi\) = Flow coefficient,
+\(\dot{V}/(N \cdot D^3)\) {[}-{]} - \(\psi\) = Head coefficient,
+\(g \cdot H/(N^2 \cdot D^2)\) {[}-{]} - \(\psi_0\) = Shutoff head
+coefficient {[}-{]} - \(K\) = Head curve slope parameter {[}-{]}
+
+\textbf{Performance Parameters:} - \(COP\) = Coefficient of performance
+{[}-{]} - \(W\) = Work/Power {[}W{]} - \(\eta\) = Efficiency {[}-{]} -
+\(f\) = Frequency {[}Hz{]} - \(g\) = Gravitational acceleration
+{[}m/s²{]}
+
+\subsubsection{Subscripts}\label{subscripts}
+
+\begin{itemize}
+\tightlist
+\item
+  \(BEP\) = Best efficiency point
+\item
+  \(comp\) = Compressor
+\item
+  \(elec\) = Electrical
+\item
+  \(evap\) = Evaporator
+\item
+  \(grout\) = Grout material
+\item
+  \(high\) = High pressure side
+\item
+  \(in\) = Inlet condition
+\item
+  \(is\) = Isentropic
+\item
+  \(max\) = Maximum
+\item
+  \(motor\) = Motor
+\item
+  \(out\) = Outlet condition
+\item
+  \(pipe\) = Pipe material
+\item
+  \(plate\) = Plate material\\
+\item
+  \(pump\) = Pump
+\item
+  \(ref\) = Refrigerant
+\item
+  \(s\) = Isentropic condition
+\item
+  \(shaft\) = Shaft
+\item
+  \(soil\) = Soil/ground
+\item
+  \(wall\) = Wall condition
+\end{itemize}
+
+\subsubsection{Abbreviations}\label{abbreviations}
+
+\begin{itemize}
+\tightlist
+\item
+  \(BHE\) = Borehole Heat Exchanger
+\item
+  \(COP\) = Coefficient of Performance\\
+\item
+  \(GSHP\) = Ground Source Heat Pump
+\item
+  \(MEA\) = Monoethanolamine
+\item
+  \(OD\) = Outer Diameter
+\item
+  \(ID\) = Inner Diameter
+\item
+  \(PE\) = Polyethylene
+\item
+  \(SC\) = Subcooling
+\item
+  \(SF\) = Secondary Fluid
+\item
+  \(SH\) = Superheating
+\end{itemize}
+
+\subsubsection{Chemical Notation}\label{chemical-notation}
+
+\begin{itemize}
+\tightlist
+\item
+  \(R134A\) = 1,1,1,2-Tetrafluoroethane (refrigerant)
+\item
+  \(MEA\) = Monoethanolamine (\(C_2H_7NO\))
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import} \BuiltInTok{Pkg}
+\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{activate}\NormalTok{(}\StringTok{"."}\NormalTok{)}
+\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{instantiate}\NormalTok{()}
+
+\CommentTok{\# Install the local package as a regular dependency}
+\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{add}\NormalTok{(path}\OperatorTok{=}\StringTok{".."}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{using} \BuiltInTok{Revise}
+\ImportTok{using} \BuiltInTok{OptimalGshpFlow}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Test that the package is loaded properly}
+\FunctionTok{println}\NormalTok{(}\StringTok{"OptimalGshpFlow version: "}\NormalTok{, }\FunctionTok{pkgversion}\NormalTok{(OptimalGshpFlow))}
+
+\CommentTok{\# Create a sample property object to test functionality}
+\PreprocessorTok{@named}\NormalTok{ fluid }\OperatorTok{=}\NormalTok{ Properties.}\FunctionTok{DynamicIncompressibleProps}\NormalTok{(χ }\OperatorTok{=} \FloatTok{0.2}\NormalTok{, fluid }\OperatorTok{=} \StringTok{"MEA"}\NormalTok{)}
+\FunctionTok{println}\NormalTok{(}\StringTok{"Created fluid properties object: "}\NormalTok{, fluid)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Appendix A: Model Parameters and Technical
+Specifications}\label{appendix-a-model-parameters-and-technical-specifications}
+
+\subsubsection{A.1 Borehole Heat Exchanger
+Specifications}\label{a.1-borehole-heat-exchanger-specifications}
+
+\textbf{Geometric Parameters:} - Borehole depth: \(L_b = 250\) m - Pipe
+outer diameter: \(D_{pipe,o} = 32\) mm - Pipe inner diameter:
+\(D_{pipe,i} = 28.24\) mm - Pipe wall thickness: \(t_{pipe} = 1.88\) mm
+- Borehole diameter: \(D_{bh} = 115\) mm - Shank spacing: \(s = 75\) mm
+
+\textbf{Thermal Properties:} - Pipe thermal conductivity:
+\(\lambda_{pipe} = 0.4\) W/(m·K) - Grout thermal conductivity:
+\(\lambda_{grout} = 1.5\) W/(m·K) - Ground thermal conductivity:
+\(\lambda_{soil} = 2.0\) W/(m·K) - Boundary condition:
+\(T_{wall} = 283.15\) K (constant)
+
+\subsubsection{A.2 Heat Pump System
+Parameters}\label{a.2-heat-pump-system-parameters}
+
+\textbf{Working Fluids:} - Primary refrigerant: R134A - Secondary fluid:
+MEA aqueous solution with mass fraction \(\chi = 0.28\)
+
+\textbf{Compressor Specifications:} - Isentropic efficiency:
+\(\eta_{is} = 0.7\) - Operating frequency: \(f = 50\) Hz - Electrical
+motor efficiency: \(\eta_{motor} = 0.9\)
+
+\subsubsection{A.3 Plate Heat Exchanger (Evaporator)
+Specifications}\label{a.3-plate-heat-exchanger-evaporator-specifications}
+
+\textbf{Geometric Parameters:} - Number of plates: \(N_{plates} = 20\) -
+Plate width: \(W = 0.1\) m - Plate length: \(L = 0.3\) m - Channel
+spacing: \(b = 1.5\) mm - Chevron angle: \(\beta = \pi/6\) rad \((30°)\)
+- Plate thickness: \(t_{plate} = 0.5\) mm - Plate thermal conductivity:
+\(\lambda_{plate} = 16\) W/(m·K)
+
+\subsubsection{A.4 Operating Conditions (test\_GSHP Reference
+Case)}\label{a.4-operating-conditions-test_gshp-reference-case}
+
+\textbf{Temperature Differences:} - Secondary fluid temperature
+difference: \(\Delta T_{SF} = 3.5\) K - Superheating temperature
+difference: \(\Delta T_{SH} = 7\) K - Subcooling temperature difference:
+\(\Delta T_{SC} = 5\) K
+
+\textbf{Pressure Conditions:} - High-side pressure: \(P_{high} = 14\)
+bar - Secondary fluid mass fraction: \(\chi = 0.28\)
+
+\subsubsection{A.5 Mathematical
+Correlations}\label{a.5-mathematical-correlations}
+
+\textbf{A.5.1 Pump Performance:} - Dimensionless head coefficient:
+\[\psi = \psi_0 - K \cdot \phi^2\]
+
+\begin{itemize}
+\item
+  Dimensionless flow coefficient: \[\phi = \frac{\dot{V}}{N \cdot D^3}\]
+\item
+  Dimensionless head coefficient:
+  \[\psi = \frac{g \cdot H}{N^2 \cdot D^2}\]
+\item
+  Pump efficiency:
+  \[\eta_{pump} = \eta_{max} \left(1 - \left(\frac{\phi - \phi_{BEP}}{\phi_{BEP}}\right)^2\right)\]
+\end{itemize}
+
+where \(N\) is rotational speed {[}rpm{]}, \(D\) is impeller diameter
+{[}m{]}, \(\dot{V}\) is volumetric flow rate {[}m³/s{]}, \(H\) is pump
+head {[}m{]}, \(\eta_{max}\) is maximum efficiency, and \(\phi_{BEP}\)
+is flow coefficient at best efficiency point.
+
+\textbf{A.5.2 Power Consumption:} - Shaft power:
+\[P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}\]
+
+\begin{itemize}
+\tightlist
+\item
+  Electrical power: \[P_{elec} = \frac{P_{shaft}}{\eta_{motor}}\]
+\end{itemize}
+
+\textbf{A.5.3 Compressor Work:} - Isentropic compression work:
+\[W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}\]
+
+where \(\dot{m}_{ref}\) is refrigerant mass flow rate {[}kg/s{]},
+\(h_{in}\) and \(h_{out,s}\) are inlet and isentropic outlet specific
+enthalpies {[}kJ/kg{]}, respectively.
+
+\textbf{A.5.4 Coefficient of Performance:} - Thermal COP:
+\[COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}\]
+
+\begin{itemize}
+\tightlist
+\item
+  System COP: \[COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}\]
+\end{itemize}
+
+where \(\dot{Q}_{evap}\) is evaporator heat transfer rate {[}W{]}.
+
+
+\bibliography{bibliography/export.bib}
+
+
+
+\end{document}
