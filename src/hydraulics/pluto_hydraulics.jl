@@ -2239,6 +2239,7 @@ function test_dynamic_prop_pump()
     return (head > 0) && (power > 0) && (efficiency > 0) && (density > 900)
 end
 
+
 # ╔═╡ 12b98c45-6b61-4ea0-bfb5-4fa152be4ab1
 """
 Test function that demonstrates parameter inheritance with remake
@@ -2268,9 +2269,6 @@ function test_pump()
 	display(sol[pump.base.Δp])
     sol
 end
-
-# ╔═╡ de4cfe89-bc6c-4cbf-96c8-345df5fa6041
-sol_pump = test_pump()
 
 # ╔═╡ cecce7db-5dc5-4c47-a666-af62bfe707a2
 md"""

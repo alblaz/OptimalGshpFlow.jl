@@ -107,6 +107,9 @@ using Distributions
 # ╔═╡ 5870e251-b3da-42b7-b72f-211e74c669fc
 using LinearAlgebra
 
+# ╔═╡ 16436692-04a1-4915-8e89-b8c0805b6bd5
+using PlutoUI
+
 # ╔═╡ cedbf94b-e85d-4662-a64e-16fba9ef2ed4
 import Base: lock, unlock
 
@@ -3575,6 +3578,24 @@ base_params = [
 # ╔═╡ a4b78e57-3f4a-4bd1-a4fd-344aed782596
 thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems(base_params);
 
+# ╔═╡ 89dc461f-71b0-4b91-ab47-a70d2929fec2
+base_params_cold = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+    :L => 0.60,
+	:T_wall => 273.15 + 5,
+    :χ => 0.28,
+    :L_BHE => 150.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+]
+
 # ╔═╡ ceb2b429-90ae-4bc5-b346-e65e5727d441
 sol_start_thermal = NonlinearSolve.solve(thermal_prob, solver_robust; abstol = 1e-6)
 
@@ -3597,6 +3618,9 @@ f_params = [
 
 # ╔═╡ b3bb8c8b-3825-4a21-94f7-a2d0d00fbb09
 solve_thermal_problem(thermal_prob, sol_start_thermal, f_params, solvers)
+
+# ╔═╡ a496bd64-5a9a-4b3f-bb8f-1a0567943d1c
+solve_thermal_problem(thermal_prob, sol_start_thermal, base_params_cold, solvers)
 
 # ╔═╡ 6ac1ecbf-4833-449f-9933-c782a8566fb0
 sol_start_hydraulic = NonlinearSolve.solve(hydraulic_prob, solver_robust; abstol = 1e-6)
@@ -3922,22 +3946,223 @@ function create_plots(df_::DataFrame; smooth_degree::Int=1, y_zero::Bool=false)
 end
   ╠═╡ =#
 
+# ╔═╡ f100b275-2eb2-4d10-93e2-8954f314ae9e
+
+# Merge extra style fields into your discovered transitions
+_apply_transition_styles(base::Dict{String,NamedTuple},
+                         styles::Dict{String,NamedTuple}) =
+    Dict(k => (; v..., get(styles, k, (;))...) for (k, v) in base)
+
+
+# ╔═╡ 058c533c-104d-4ae9-80e3-f356787d0d13
+#=╠═╡
+# Compute y(xt) by 1D linear interpolation on (xcol, ycol) from a *wide* df
+# Assumes df is sorted by xcol (you already do sort!(df2, :ΔT))
+function _y_at(df::DataFrame, xcol::Symbol, ycol::Symbol, xt::Real)
+    x = df[!, xcol] |> collect
+    y = df[!, ycol] |> collect
+    itp = interpolate((x,), y, Gridded(Linear()))
+    return itp(xt)
+end
+
+# Draw vertical guides and put text on a chosen curve at the transition ΔT
+  ╠═╡ =#
+
+# ╔═╡ 4899159f-1c86-478c-b874-ef8db1808bc5
+# Accept Makie.Axis, AoG AxisEntries, or arrays and return the Makie.Axis
+_as_axis(axlike) =
+    axlike isa Makie.Axis                ? axlike :
+    (hasproperty(axlike, :axis)          ? getproperty(axlike, :axis) :
+     axlike isa AbstractArray            ? _as_axis(first(axlike)) :
+     error("Couldn't extract Makie.Axis from $(typeof(axlike))"))
+
+# Auto left/right alignment & small x offset near plot edges
+
+# ╔═╡ c8044a03-837b-411c-8919-7d47f83111c3
+# robust axis ranges across Makie versions
+function _axis_xrange(ax::Makie.Axis)
+    fr = ax.finallimits[]; (fr.origin[1], fr.origin[1] + fr.widths[1])
+end
+
+# ╔═╡ 5575055e-9136-4b4e-925a-ddf82ca1156c
+# Horizontal auto-align, but force vertical anchor at :bottom / :top
+_auto_align_offset_bottom(ax::Makie.Axis, x; margin=0.92, xpad=6, ypad=6) = begin
+    xmin, xmax = _axis_xrange(ax)
+    if !(isfinite(xmin) && isfinite(xmax)) || xmin == xmax
+        ((:left, :bottom), (xpad, ypad))
+    elseif x > xmin + margin * (xmax - xmin)
+        ((:right, :bottom), (-xpad, ypad))
+    else
+        ((:left,  :bottom), ( xpad, ypad))
+    end
+end
+
+# ╔═╡ f8b2fee6-eb35-493c-ac30-331176d9a795
+_auto_align_offset_top(ax::Makie.Axis, x; margin=0.92, xpad=6, ypad=6) = begin
+    xmin, xmax = _axis_xrange(ax)
+    if !(isfinite(xmin) && isfinite(xmax)) || xmin == xmax
+        ((:left, :top), (xpad, -ypad))
+    elseif x > xmin + margin * (xmax - xmin)
+        ((:right, :top), (-xpad, -ypad))
+    else
+        ((:left,  :top), ( xpad, -ypad))
+    end
+end
+
+# ╔═╡ b220d228-e3cb-4dd2-843e-03db76f46fe9
+function _axis_yrange(ax::Makie.Axis)
+    fr = ax.finallimits[]; (fr.origin[2], fr.origin[2] + fr.widths[2])
+end
+
+# ╔═╡ 4412cbfc-d470-4003-a2bd-606df1be7022
+_px_to_data(ax::Makie.Axis; dx_px::Real=0, dy_px::Real=0) = begin
+    xmin, xmax = _axis_xrange(ax); ymin, ymax = _axis_yrange(ax)
+    Δx = xmax - xmin; Δy = ymax - ymin
+    pa = ax.scene.px_area[]
+    sx = Δx / pa.widths[1]
+    sy = Δy / pa.widths[2]
+    (dx_px * sx, dy_px * sy)
+end
+
+# ╔═╡ d7384891-c5c0-4614-99cf-0f1cf58f759c
+
+
+# auto left/right alignment based on where x sits in the axis range
+function _auto_align_offset(ax::Makie.Axis, x; margin=0.92, pad=6)
+    xmin, xmax = _axis_xrange(ax)
+    if !(isfinite(xmin) && isfinite(xmax)) || xmin == xmax
+        return ((:left, :center), (pad, 0))  # conservative fallback
+    end
+    if x > xmin + margin * (xmax - xmin)
+        ((:right, :center), (-pad, 0))
+    else
+        ((:left,  :center), ( pad, 0))
+    end
+end
+
+
+# ╔═╡ 9b2f80c6-18d0-4b10-827a-b9a665f7f1c4
+#=╠═╡
+function _label_transitions!(ax::Makie.Axis, df::DataFrame;
+        xcol::Symbol=:ΔT, ycol::Union{Nothing,Symbol}=nothing,
+        transitions,                               # Dict or Vector of NamedTuples
+        where::Symbol = :bottom,                   # default placement (per-transition override allowed)
+        rotation_deg::Real = 90,
+        fontsize::Real = 12, textcolor=:gray10,    # default text style
+        vcolor=:gray40, vstyle=:dash, vwidth=1,    # default line style
+        # data-space padding fractions
+        x_data_pad_frac::Real = 0.015,
+        y_data_pad_frac::Real = 0.02,
+        # extra pixel pads to keep labels clear of axes regardless of scale
+        x_px_pad::Real = 6, y_px_pad::Real = 10,
+        # switch from right→left alignment near the right edge
+        edge_margin::Real = 0.92
+    )
+
+    angle = rotation_deg * π / 180
+    xmin, xmax = _axis_xrange(ax); ymin, ymax = _axis_yrange(ax)
+    Δx = xmax - xmin; Δy = ymax - ymin
+
+    # base data-space pads
+    xpad_d = x_data_pad_frac * Δx
+    ypad_d = y_data_pad_frac * Δy
+
+    # pixel→data pads (robust lift so text never hides behind x-axis)
+    xpad_px_d, ypad_px_d = _px_to_data(ax; dx_px=x_px_pad, dy_px=y_px_pad)
+
+    iter = transitions isa AbstractDict ? values(transitions) : transitions
+    for t in iter
+        # required fields
+        xt    = t[:dT]
+        label = t[:label]
+
+        # per-transition overrides (fall back to the call-site defaults)
+        t_where        = haskey(t, :where)         ? t[:where]         : where
+        t_rot          = haskey(t, :rotation_deg)  ? t[:rotation_deg]  : rotation_deg
+        t_size         = haskey(t, :fontsize)      ? t[:fontsize]      : fontsize
+        t_tcolor       = haskey(t, :textcolor)     ? t[:textcolor]     : textcolor
+        t_vcolor       = haskey(t, :vcolor)        ? t[:vcolor]        : vcolor
+        t_vstyle       = haskey(t, :vstyle)        ? t[:vstyle]        : vstyle
+        t_vwidth       = haskey(t, :vwidth)        ? t[:vwidth]        : vwidth
+        t_xpad_frac    = haskey(t, :x_data_pad_frac) ? t[:x_data_pad_frac] : x_data_pad_frac
+        t_ypad_frac    = haskey(t, :y_data_pad_frac) ? t[:y_data_pad_frac] : y_data_pad_frac
+        t_xpx          = haskey(t, :x_px_pad)      ? t[:x_px_pad]      : x_px_pad
+        t_ypx          = haskey(t, :y_px_pad)      ? t[:y_px_pad]      : y_px_pad
+        t_z_text       = haskey(t, :z_text)        ? t[:z_text]        : 100
+        t_z_line       = haskey(t, :z_line)        ? t[:z_line]        : 0
+
+        # recompute pads if per-transition changed
+        xpad_d_t = t_xpad_frac * Δx + (_px_to_data(ax; dx_px=t_xpx, dy_px=0)[1])
+        ypad_d_t = t_ypad_frac * Δy + (_px_to_data(ax; dx_px=0, dy_px=t_ypx)[2])
+
+        # y placement
+        yt = if t_where === :curve && ycol !== nothing
+            _y_at(df, xcol, ycol, xt) + ypad_d_t
+        elseif t_where === :top
+            ymax - ypad_d_t
+        else
+            ymin + ypad_d_t               # <- lifted enough to clear the x-axis
+        end
+
+        # side & alignment
+        if xt > xmin + edge_margin*Δx
+            xlbl  = xt + xpad_d_t
+            align = ( :left,  t_where === :top ? :top : :bottom )
+        else
+            xlbl  = xt - xpad_d_t
+            align = ( :right, t_where === :top ? :top : :bottom )
+        end
+		
+		# 1) Guide line: keep using vlines! (no z)
+		vlines!(ax, [xt]; color=t_vcolor, linestyle=t_vstyle, linewidth=t_vwidth)
+		
+		# 2) Label: drop z=..., use overdraw=true so it draws above decorations
+		text!(ax, label;
+		      position=(xlbl, yt),
+		      align=align,
+		      rotation=t_rot * π / 180,
+		      fontsize=t_size,
+		      color=t_tcolor,
+		      space=:data,
+		      overdraw=true)   # <- instead of z=t_z_text
+
+    end
+    ax
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 86429d81-3516-488f-be3d-df2d83bdbae8
+
+# helper to make filesystem-friendly filenames
+_slug(s::AbstractString) = begin
+    t = lowercase(String(s))
+    t = replace(t, r"[^\p{L}\p{N}]+" => "_")
+    t = replace(t, r"_+" => "_")
+    strip(t, '_')
+end
+
 # ╔═╡ 4982df2c-016a-4136-a074-b39c1befffb7
 #=╠═╡
+
 function create_plots_by_dT(df::DataFrame;
-                               smooth_degree::Int=1,
-                               y_zero::Bool=false,
-                               re_thresholds::Dict{String, Tuple{Float64, Float64}} = Dict(
-                                 "Re_bhe_leg1" => (2300, 4000),
-                                 "Re_bhe_leg2" => (2300, 4000),
-                                 "Re_phx"      => (100, 2000)
-                               ))
-    # Prepare data and theme
+    smooth_degree::Int=1,
+    y_zero::Bool=false,
+    re_thresholds::Dict{String, Tuple{Float64, Float64}} = Dict(
+        "Re_bhe_leg1" => (2300, 4000),
+        "Re_bhe_leg2" => (2300, 4000),
+        "Re_phx"      => (100, 2000)
+    ),
+    # saving options
+    save_dir::Union{Nothing, AbstractString}=nothing,
+    save_prefix::AbstractString = "",
+    save_formats::Vector{Symbol} = [:svg],
+)
     df2 = copy(df)
     set_aog_theme!()
-    sort!(df2, :ΔT)  # ensure monotonic ΔT for interpolation
+    sort!(df2, :ΔT)
 
-    # 1) Compute transition points for each Reynolds column
+    # --- transitions (unchanged) ---
     transition_points = Dict{String, NamedTuple}()
     re_cols   = ["Re_bhe_leg1", "Re_bhe_leg2", "Re_phx"]
     re_labels = Dict(
@@ -3945,186 +4170,215 @@ function create_plots_by_dT(df::DataFrame;
         "Re_bhe_leg2" => "BHE Leg2",
         "Re_phx"      => "Evaporator"
     )
-
     for col in re_cols
-        col ∈ names(df2) || continue
-        x = df2.ΔT
-        y = df2[!, col]
-
+        col ∈ names(df2) || continue   # now calls DataFrames.names
+        x = df2.ΔT; y = df2[!, col]
         length(x) < 2 && error("Need ≥2 points for interpolation in $col")
         itp = interpolate((x,), y, Gridded(Linear()))
-
-        # Use custom thresholds from re_thresholds dict
-        thresholds = get(re_thresholds, col, ())
-        for thresh in thresholds
+        for thresh in get(re_thresholds, col, ())
             f(dt) = itp(dt) - thresh
             idx = findfirst(i -> f(x[i]) * f(x[i+1]) ≤ 0, 1:length(x)-1)
             isnothing(idx) && continue
             a, b = x[idx], x[idx+1]
-            root  = find_zero(f, (a, b))
-
+            root = find_zero(f, (a, b))
             key = "$col-$(thresh)"
-            transition_points[key] = (
-                dT        = root,
-                label     = "$(re_labels[col]) Re=$(thresh)",
-                threshold = thresh
-            )
+            transition_points[key] = (dT = root,
+                                      label = "$(re_labels[col]) Re=$(thresh)",
+                                      threshold = thresh)
         end
     end
 
-    # 2) Transition DF for vertical lines
-    trans_df = DataFrame(
-        ΔT   = [t.dT for t in values(transition_points)],
-        label= [t.label for t in values(transition_points)]
-    )
-    vline_layer = data(trans_df) *
-                  mapping(:ΔT, color = :label => nonnumeric) *
-                  visual(VLines, linestyle = :dash)
+	# After you compute `transition_points` in create_plots_by_dT:
+	transition_styles = Dict(
+	    "Re_bhe_leg1-2300" => (
+	        label    = "Leg 1: Re=2300 (L→T)",
+	        vcolor   = :crimson, vstyle=:dash,  vwidth=2.0,
+	        textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
+	    ),
+	    "Re_bhe_leg1-4000" => (
+	        label    = "Leg 1: Re=4000 (T→Tu)",
+	        vcolor   = :crimson, vstyle=:dot,   vwidth=2.0,
+	        textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
+	    ),
+	    "Re_bhe_leg2-2300" => (
+	        label    = "Leg 2: Re=2300",
+	        vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
+	        textcolor=:blue,     where=:top, y_px_pad=12,
+	    ),
+	    "Re_bhe_leg2-4000" => (
+	        label    = "Leg 2: Re=4000",
+	        vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
+	        textcolor=:blue,     where=:top, y_px_pad=12,
+	    ),
+	)
+	
+	transition_points = _apply_transition_styles(transition_points, transition_styles)
 
-    figures = []
+	
+    figures   = Vector{Figure}()
+    fig_names = String[]   # <-- renamed (no shadowing)
 
-    # 3) Temperature plot
+
+    # 3) Temperature vs ΔT ------------------------------------------------------
     temp_long = stack(df2, [:T_wall, :T_in, :T_mid, :T_out, :T_bot, :T_evap, :T_comp_in],
-                      variable_name = :temp_type,
-                      value_name    = :temperature)
+                      variable_name=:temp_type, value_name=:temperature)
     map_temp = Dict(
-        "T_wall"  => "Wall Temperature",
-        "T_in"  => "BHE -> PHX Temperature",
-        "T_mid" => "Mid Temperature",
-        "T_bot" => "BHE bottom Temperature",
-        "T_out" => "PHX -> BHE Temperature",
-        "T_evap"=> "Evaporation Temperature",
-        "T_comp_in"=> "Inlet Compressor Temperature"
+        "T_wall"=>"Wall Temperature", "T_in"=>"BHE -> PHX Temperature",
+        "T_mid"=>"Mid Temperature", "T_bot"=>"BHE bottom Temperature",
+        "T_out"=>"PHX -> BHE Temperature", "T_evap"=>"Evaporation Temperature",
+        "T_comp_in"=>"Inlet Compressor Temperature"
     )
     temp_long.temp_type .= map(s -> map_temp[s], temp_long.temp_type)
 
     temp_plt = data(temp_long) *
-               mapping(:ΔT, :temperature, color = :temp_type => nonnumeric) *
+               mapping(:ΔT, :temperature, color=:temp_type=>nonnumeric) *
                visual(Lines)
-    fig_temp, _ = draw(temp_plt + vline_layer;
-                       axis = (; title = "Temperature vs ΔT"))
-    push!(figures, fig_temp)
+    fig_temp, ax_temp = draw(temp_plt; axis=(; title="Temperature vs ΔT"),
+                                        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_temp), df2; ycol=:T_out,
+        transitions=transition_points, textcolor=:gray10, fontsize=12)
+    push!(figures, fig_temp); push!(fig_names, "temperature_vs_dT")
 
-    # 4) COP vs ΔT
+    # 4) COP vs ΔT --------------------------------------------------------------
     cop_long = stack(df2, [:COP_1, :COP_2, :COP_3],
-                     variable_name = :cop_type,
-                     value_name    = :cop_value)
-    map_cop = Dict(
-        "COP_1" => "Thermal COP",
-        "COP_2" => "Overall COP",
-        "COP_3" => "Overall COP + heating"
-    )
+                     variable_name=:cop_type, value_name=:cop_value)
+    map_cop = Dict("COP_1"=>"COP 1", "COP_2"=>"COP 2", "COP_3"=>"COP 3")
     cop_long.cop_type .= map(s -> map_cop[s], cop_long.cop_type)
 
     base_cop = data(cop_long) *
-               mapping(:ΔT => "ΔT (K)",
-                       :cop_value => "COP";
-                       color = :cop_type => nonnumeric) *
-               visual(Lines, linewidth = 2)
-    fig_cop, _ = draw(base_cop + vline_layer;
-                      axis = (
-                        xlabel = "ΔT (K)",
-                        ylabel = "COP",
-                        title  = "COP vs ΔT",
-                        limits = (y = (y_zero ? 0 : nothing, nothing))
-                      ),
-                      legend = (position = :right,))
-    push!(figures, fig_cop)
+               mapping(:ΔT=>"ΔT (K)", :cop_value=>"COP", color=:cop_type=>nonnumeric) *
+               visual(Lines, linewidth=2)
+    fig_cop, ax_cop = draw(base_cop;
+        axis=(xlabel="ΔT (K)", ylabel="COP", title="COP vs ΔT",
+              limits=(y=(y_zero ? 0 : nothing, nothing))),
+        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_cop), df2; ycol=:COP_3,
+        transitions=transition_points)
+    push!(figures, fig_cop);  push!(fig_names, "cop_vs_dT")
 
-    # 5) Power vs ΔT
+    # 5) Power vs ΔT ------------------------------------------------------------
     power_long = stack(df2, [:Q_evap, :Q_cond, :W_comp, :P_pump, :P_aux_heating],
-                       variable_name = :component,
-                       value_name    = :power)
+                       variable_name=:component, value_name=:power)
     base_power = data(power_long) *
-                 mapping(:ΔT => "ΔT (K)",
-                         :power => "Power (W)";
-                         color = :component => nonnumeric) *
+                 mapping(:ΔT=>"ΔT (K)", :power=>"Power (W)", color=:component=>nonnumeric) *
                  visual(Lines)
-    fig_power, _ = draw(base_power + vline_layer;
-                         axis = (
-                           xlabel = "ΔT (K)",
-                           ylabel = "Power (W)",
-                           title  = "Energy Components vs ΔT"
-                         ),
-                         legend = (position = :right,))
-    push!(figures, fig_power)
+    fig_power, ax_power = draw(base_power;
+        axis=(xlabel="ΔT (K)", ylabel="Power (W)", title="Energy Components vs ΔT"),
+        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_power), df2; ycol=:Q_cond,
+        transitions=transition_points)
+    push!(figures, fig_power); push!(fig_names, "energy_components_vs_dT")
 
-    # 6) Pressure Drop vs ΔT
-    base_pres = data(df2) *
-                mapping(:ΔT => "ΔT (K)",
-                        :Δp_tot => "Pressure Drop (Pa)");
-                visual(Lines)
-    fig_pres, _ = draw(base_pres + vline_layer;
-                        axis = (
-                          xlabel = "ΔT (K)",
-                          ylabel = L"Pressure Drop $Δp$ (Pa)",
-                          title  = "Hydraulic Resistance vs ΔT",
-                          limits = (y = (y_zero ? 0 : nothing, nothing))
-                        ),
-                        legend = (position = :right,))
-    push!(figures, fig_pres)
+    # 6) Pressure Drop vs ΔT ----------------------------------------------------
+	base_pres = data(df2) *
+    mapping(
+        :ΔT      => "ΔT (K)",
+        :Δp_tot  => (x -> x .* 1e5) => "Pressure (Pa)"   # bar → Pa
+    ) *
+    visual(Lines)
+
+	
+	fig_pres, ax_pres = draw(base_pres;
+	    axis=(; xlabel="ΔT (K)",
+	            ylabel=L"Pressure\ (Pa)",
+	            title="Hydraulic Resistance vs ΔT",
+	            yscale = log10,                 # <— log10 axis
+	            limits=(y=(y_zero ? 1.0 : nothing, nothing))),  # avoid 0 on log scale
+	    legend=(position=:right,))
+	
+	_label_transitions!(_as_axis(ax_pres), df2; transitions=transition_points, where=:bottom)
+	push!(figures, fig_pres);  push!(fig_names, "pressure_drop_vs_dT")
 
 
-    # 6) U-values vs ΔT
+
+    # 7) U-values vs ΔT ---------------------------------------------------------
     u_long = stack(df2, [:U_EV, :U_SH], variable_name=:u_type, value_name=:u_value)
     map_u = Dict("U_EV"=>"U Evaporator", "U_SH"=>"U Superheat")
     u_long.u_type .= map(s->map_u[s], u_long.u_type)
-    u_layer = data(u_long) * mapping(:ΔT => "ΔT (K)", :u_value => "U (W/m²K)", color=:u_type=>nonnumeric) * visual(Lines)
-    fig_u, _ = draw(u_layer+vline_layer;
-                     axis=(; xlabel="ΔT (K)", ylabel="U (W/m²K)", title="Heat Transfer Coefficients vs ΔT"),
-                     legend=(position=:right,))
-    push!(figures, fig_u)
+    u_layer = data(u_long) *
+              mapping(:ΔT=>"ΔT (K)", :u_value=>"U (W/m²K)", color=:u_type=>nonnumeric) *
+              visual(Lines)
+    fig_u, ax_u = draw(u_layer;
+        axis=(xlabel="ΔT (K)", ylabel="U (W/m²K)", title="Heat Transfer Coefficients vs ΔT"),
+        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_u), df2; ycol=:U_EV,
+        transitions=transition_points)
+    push!(figures, fig_u);     push!(fig_names, "u_values_vs_dT")
 
-    # 7) Section Lengths vs ΔT
+    # 8) Section Lengths vs ΔT --------------------------------------------------
     l_long = stack(df2, [:fr_EV, :fr_SH], variable_name=:l_type, value_name=:length)
     map_l = Dict("fr_EV"=>"Evaporator Length", "fr_SH"=>"Superheat Length")
     l_long.l_type .= map(s->map_l[s], l_long.l_type)
-    l_layer = data(l_long) * mapping(:ΔT => "ΔT (K)", :length => "Length (m)", color=:l_type=>nonnumeric) * visual(Lines)
-    fig_l, _ = draw(l_layer+vline_layer;
-                     axis=(; xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
-                     legend=(position=:right,))
-    push!(figures, fig_l)
+    l_layer = data(l_long) *
+              mapping(:ΔT=>"ΔT (K)", :length=>"Length (m)", color=:l_type=>nonnumeric) *
+              visual(Lines)
+    fig_l1, ax_l1 = draw(l_layer;
+        axis=(xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
+        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_l1), df2; ycol=:fr_EV,
+        transitions=transition_points)
+    push!(figures, fig_l1);    push!(fig_names, "section_lengths_vs_dT")
 
-    # 7) Section Lengths vs ΔT
-    l_long = stack(df2, [:η_bh], variable_name=:l_type, value_name=:length)
-    map_l = Dict("η_bh"=>"BH efficiency")
-    l_long.l_type .= map(s->map_l[s], l_long.l_type)
-    l_layer = data(l_long) * mapping(:ΔT => "ΔT (K)", :length => "Length (m)", color=:l_type=>nonnumeric) * visual(Lines)
-    fig_l, _ = draw(l_layer+vline_layer;
-                     axis=(; xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
-                     legend=(position=:right,))
-    push!(figures, fig_l)
+    # 9) Efficiency vs ΔT -------------------------------------------------------
+    l2_long = stack(df2, [:η_bh], variable_name=:l_type, value_name=:length)
+    map_l2 = Dict("η_bh"=>"BH efficiency")
+    l2_long.l_type .= map(s->map_l2[s], l2_long.l_type)
+    l2_layer = data(l2_long) *
+               mapping(:ΔT=>"ΔT (K)", :length=>"Length (m)", color=:l_type=>nonnumeric) *
+               visual(Lines)
+    fig_l2, ax_l2 = draw(l2_layer;
+        axis=(xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
+        legend=(position=:right,))
+    _label_transitions!(_as_axis(ax_l2), df2; ycol=:η_bh,
+        transitions=transition_points)
+    push!(figures, fig_l2);    push!(fig_names, "bh_efficiency_vs_dT")
 
-    # 7) Section Lengths vs ΔT
-    l_long = stack(df2, [:R_1b, :R_2b, :R_12, :R_f1b, :R_f2b, :R_f1f2], variable_name=:l_type, value_name=:length)
-    map_l = Dict("R_1b"=>"R pipe 1 wall",
-				"R_2b"=>"R pipe 2 wall",
-				"R_12"=>"R pipe 1 2",
-				"R_f1b"=>"R fluid 1 wall",
-				"R_f2b"=>"R fluid 2 wall",
-				"R_f1f2"=>"R fluid 1 2"
-				)
-    l_long.l_type .= map(s->map_l[s], l_long.l_type)
-    l_layer = data(l_long) * mapping(:ΔT => "ΔT (K)", :length => "Length (m)", color=:l_type=>nonnumeric) * visual(Lines)
-    fig_l, _ = draw(l_layer+vline_layer;
-                     axis=(; xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
-                     legend=(position=:right,))
-    push!(figures, fig_l)
+    # 10) Thermal resistances vs ΔT --------------------------------------------
+    r_long = stack(df2, [:R_1b, :R_2b, :R_12, :R_f1b, :R_f2b, :R_f1f2],
+                   variable_name=:r_type, value_name=:r_val)
+    map_r = Dict("R_1b"=>"R pipe 1 wall", "R_2b"=>"R pipe 2 wall",
+                 "R_12"=>"R pipe 1 ↔ 2", "R_f1b"=>"R fluid 1 ↔ wall",
+                 "R_f2b"=>"R fluid 2 ↔ wall", "R_f1f2"=>"R fluid 1 ↔ 2")
+    r_long.r_type .= map(s->map_r[s], r_long.r_type)
+    r_layer = data(r_long) *
+              mapping(:ΔT=>"ΔT (K)", :r_val=>"R (K/W)", color=:r_type=>nonnumeric) *
+              visual(Lines)
+    fig_r, ax_r = draw(r_layer;
+        axis=(xlabel="ΔT (K)", ylabel="R (K/W)", title="Thermal Resistances vs ΔT"),
+        legend=(position=:right,))
+    # anchor on one available resistance for y (fallback if missing)
+    anchor_y = :R_1b ∈ names(df2) ? :R_1b : first(Symbol.(names(df2, r"^R_")))
+    _label_transitions!(_as_axis(ax_r), df2; ycol=anchor_y,
+        transitions=transition_points)
+    push!(figures, fig_r);     push!(fig_names, "thermal_resistances_vs_dT")
+
+    # --- save if requested ---
+    if save_dir !== nothing
+        mkpath(save_dir)
+        for (fig, nm) in zip(figures, fig_names)
+            base = isempty(save_prefix) ? _slug(nm) : "$( _slug(save_prefix) )_$( _slug(nm) )"
+            for fmt in save_formats
+                path = joinpath(save_dir, "$(base).$(String(fmt))")
+                CairoMakie.save(path, fig)
+            end
+        end
+    end
+
 
     return figures
 end
-
   ╠═╡ =#
 
 # ╔═╡ c18c39fe-6896-433e-90d4-4a8149ae9b5b
 #=╠═╡
-df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sys_hydraulic)
+df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sys_hydraulic);
   ╠═╡ =#
 
 # ╔═╡ ce0ce754-c26a-4b8d-81d9-8234a165a0c6
-new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.), "Re_phx"=>(100., 2000.))
+new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.))
 
 # ╔═╡ bed552fa-1a51-492b-8552-81186c96c6a1
+# ╠═╡ show_logs = false
 #=╠═╡
 plot_A_ΔT, plot_B_ΔT, plot_C_ΔT, plot_D_ΔT, plot_E_ΔT, plot_F_ΔT, plot_G_ΔT , plot_H_ΔT = create_plots_by_dT(df; re_thresholds=new_thresh)
   ╠═╡ =#
@@ -4185,7 +4439,7 @@ end
 thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
 
 # ╔═╡ fb29ede8-6f49-4e14-a6d9-d8caee90e5ba
-Npoints = 30
+Npoints = 45
 
 # ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
 f_values = collect(range(50, 10, length = Npoints))
@@ -4193,14 +4447,60 @@ f_values = collect(range(50, 10, length = Npoints))
 # ╔═╡ 24b94de6-1d03-4225-8fdd-95cac5beb33c
 250+708+7634-1400
 
-# ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
-md" # Comparison COP2"
+# ╔═╡ 977b3df3-0fa4-452f-884b-94b24ec54cf3
+# high-contrast, CVD-safe accents (Okabe–Ito-ish)
+const OI_VERMILLION = RGBf(0.835, 0.365, 0.000)  # #D55E00
+
+# ╔═╡ 1320fac5-2cf2-484d-a01e-98ecd559588d
+const OI_MAGENTA    = RGBf(0.800, 0.475, 0.655)  # #CC79A7
+
+# ╔═╡ a3fe0b30-007d-415d-af04-f5712e3d0489
+const CHARCOAL      = RGBf(0.100, 0.100, 0.100)
+
+# ╔═╡ 298f0a4b-d6e7-4772-9862-54895ba7aab8
+
 
 # ╔═╡ ea33f723-8f17-4000-b483-eb8f1f9354f3
-md" # Comparison efficiency"
+md" # Comparison BH efficiency"
+
+# ╔═╡ dc7866d3-68e8-40de-b82d-26717fff53d9
+md" # Comparison T outlet BH"
+
+# ╔═╡ 21a3e541-8ad9-41de-995a-e2b43221d15a
+md" # Comparison T evap"
+
+# ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+md" # Comparison COP3"
+
+# ╔═╡ 5ce8337c-aae0-476f-914b-854a054b26db
+md" # Comparison ridge position"
+
+# ╔═╡ a966eea4-f3e4-46f9-8230-7ab19eb7f905
+
+
+# ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
+
+
+# ╔═╡ fdfb7456-6d8e-44c8-a883-1d1faeb96ede
+md" # Comparison pump efficiency"
+
+# ╔═╡ 1a9a9e58-41ac-45fb-9891-2e2e531621e5
+
+
+# ╔═╡ 8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
+md" # Other explorations"
+
+# ╔═╡ 4e1204d9-eab8-4890-a957-92341c8edfc4
+md" # 2D Parametric Simulations"
+
+# ╔═╡ 987290e0-8b32-481a-85a0-442b075463cb
+md" ## Base"
+
+# ╔═╡ 8ddb2096-a2b0-4369-a188-5d972af91428
+md" ## Variant with colder wall"
 
 # ╔═╡ 44e95eb8-ef96-4832-9168-df5c504b0569
-md" ## Variant with less ethanol"
+md" ## Variant with water"
 
 # ╔═╡ 8a1007ab-a556-4670-a2a6-18292d721c89
 base_params_water = [
@@ -4222,9 +4522,9 @@ base_params_water = [
 ]
 
 # ╔═╡ 0d69490f-83ee-46fc-b034-8370e8a66361
-md" ## Variant with bigger pipes"
+md" ## Variant with bigger pipes (40mm OD)"
 
-# ╔═╡ 880e6614-2556-4d3a-9408-f59b45ba94fe
+# ╔═╡ 6d9c073c-e05b-45ec-a4b4-1b47c43cc5ba
 base_params_pipe = [
     :b => 1.5e-3,
     :np => 20.0,
@@ -4250,17 +4550,2654 @@ base_params_pipe = [
 		
 ]
 
+# ╔═╡ 6b0ca393-a200-4ee0-b71e-ea3f3b68c3f4
+md" ## Variant with longer BH (40mm OD)"
+
+# ╔═╡ 880e6614-2556-4d3a-9408-f59b45ba94fe
+base_params_long = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.15,
+    :L => 0.60,
+    :L_BHE => 200.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+	:D_b => 0.115,
+
+		
+]
+
 # ╔═╡ c5875432-f3f0-4495-a0f0-853d87d73353
 md" ## Looking at the wall temperature"
 
 # ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
-log_ΔTSF_values = log.(collect(range(1.5, 8.0, length = Npoints)))
+log_ΔTSF_values = log.(collect(range(0.5, 8.0, length = Npoints)))
 
-# ╔═╡ ccdd37e1-e7f3-47c9-b698-34daaca538c9
-T_wall_values = collect(range(-5, 15.0, length = Npoints))) .+ 273.15
+# ╔═╡ b0b5c52c-a795-40a0-9c8d-f678010c454a
+log_msf_values = log.(collect(range(0.1, 2.0, length = Npoints)))
 
-# ╔═╡ 9f9d5b69-b9fc-44dc-af28-389800fae70d
+# ╔═╡ 08d88b40-980e-4d17-91d1-2b1a06180bdd
+T_wall_values = 273.15 .+ collect(range(5, 10, length = Npoints))
 
+# ╔═╡ f0e43670-bbd9-487a-b8b6-8b5d6804039c
+# ╠═╡ show_logs = false
+# ╠═╡ disabled = true
+#=╠═╡
+sols_thermal_wall, sols_hydraulic_wall = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params, :log_ΔTSF_, log_ΔTSF_values, :T_wall, T_wall_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+  ╠═╡ =#
+
+# ╔═╡ d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
+#=╠═╡
+df_grid_wall = process_grid_results(
+    log_ΔTSF_values, T_wall_values,
+    sols_thermal_wall, sols_hydraulic_wall,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :T_wall,
+	target_Q_cond = 5000
+);
+  ╠═╡ =#
+
+# ╔═╡ 09952ea8-ef5d-414f-ac15-478ad8ea6343
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 16868428-1547-4b8d-a900-5e5120f38088
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:fr_EV, levels = 0:0.1:1.0,
+    overlays=[
+        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+  ╠═╡ =#
+
+# ╔═╡ 62b6a403-53ac-42c1-9fff-055a9b7a478b
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_1,
+    levels=2.0:0.1:4.0,
+    overlays=[
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 849d55d9-3e76-4ccb-8635-c8b70376d0b1
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
+    levels=2.0:0.1:4.0,
+    overlays=[
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 34ed86a4-20e9-4b2b-9344-7ec6dfaab815
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_3,
+    levels=2.0:0.1:4.0,
+    overlays=[
+        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 41fe5c48-3b28-4d41-8969-e3d59a84cbfa
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Q_cond,
+    overlays=ovs_plots_2
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 54809c43-f7c3-493b-b06a-a13bf0a44bc6
+
+ovs_plots_2 = [
+        (z=:N_pump,color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+
+
+# ╔═╡ bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Δp_tot,
+    levels=range(0.1^0.5, 5^0.5, length = 15).^2, xlabel = "ΔT Secondary Fluid [K]", ylabel = "Borehole wall temperature [K]", zlabel = "Pressure drop [bar]", title = "",
+    overlays=ovs_plots_2
+)
+
+  ╠═╡ =#
+
+# ╔═╡ c8c35ed3-bd6c-40ac-8049-b603b003f603
+#=╠═╡
+plot_contourf(
+    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
+    levels=2.0:0.1:4.0,
+    overlays=ovs_plots_3
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 33c1996a-aade-400a-9b2f-259db12c0835
+#=╠═╡
+df_grid_wall|> names
+  ╠═╡ =#
+
+# ╔═╡ 79b17009-14ee-422e-8eb6-9e81c270b602
+#=╠═╡
+begin
+	# --- 1) Pack the SR grid with the same keys as df_grid_wall -------------------
+	df_sr_grid_wall = DataFrame()
+	df_sr_grid_wall[!, xcol] = Xgrid_ord[!, xcol]
+	df_sr_grid_wall[!, ycol] = Xgrid_ord[!, ycol]
+	for t in targets
+	    df_sr_grid_wall[!, t] = Ygrid_hat[!, t]         # unitless during math is OK
+	end
+	
+	# --- 2) Join and build error columns (unit-safe) ------------------------------
+	true_tbl = select(df_grid_wall, vcat([xcol, ycol], targets))
+	pred_tbl = select(df_sr_grid_wall, vcat([xcol, ycol], targets))
+	
+	rename!(true_tbl, Dict(t => Symbol(t, "_true") for t in targets))
+	rename!(pred_tbl, Dict(t => Symbol(t, "_sr")   for t in targets))
+	
+	cmp = innerjoin(true_tbl, pred_tbl, on=[xcol, ycol])
+	
+	for t in targets
+	    y  = ustrip.(cmp[!, Symbol(t, "_true")])
+	    ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
+	    cmp[!, Symbol(t, "_Δ")]    = ŷ .- y
+	    cmp[!, Symbol(t, "_rel%")] = 100 .* (cmp[!, Symbol(t, "_Δ")] ./ max.(abs.(y), eps()))
+	end
+	
+	# --- 3) Summary table of metrics ---------------------------------------------
+	function grid_metrics(cmp, targets)
+	    rows = NamedTuple[]
+	    for t in targets
+	        y  = ustrip.(cmp[!, Symbol(t, "_true")])
+	        ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
+	        e  = ŷ .- y
+	        push!(rows, (target=t,
+	                     RMSE = sqrt(mean(e.^2)),
+	                     MAE  = mean(abs.(e)),
+	                     MAPE = 100*mean(abs.(e) ./ max.(abs.(y), eps())),
+	                     R2   = 1 - sum(e.^2) / max(sum((y .- mean(y)).^2), eps())))
+	    end
+	    DataFrame(rows)
+	end
+	
+	metrics_tbl = grid_metrics(cmp, targets)  # ← tidy numeric comparison
+	
+	# --- 4) A few “shape” comparisons --------------------------------------------
+	# Peak shift between true and SR fields
+	function peak_shift(cmp, xcol, ycol, z::Symbol)
+	    yt = ustrip.(cmp[!, Symbol(z, "_true")]); it = argmax(yt)
+	    yp = ustrip.(cmp[!, Symbol(z, "_sr")]);   ip = argmax(yp)
+	    (; Δx = ustrip(cmp[ip, xcol] - cmp[it, xcol]),
+	       Δy = ustrip(cmp[ip, ycol] - cmp[it, ycol]),
+	       max_true = yt[it], max_sr = yp[ip])
+	end
+	peak_Q_cond = peak_shift(cmp, xcol, ycol, :Q_cond)
+	
+	# Dice coefficient for superlevel sets (iso-contour agreement)
+	function dice_at(cmp, z::Symbol, τ::Real)
+	    A = ustrip.(cmp[!, Symbol(z, "_true")]) .>= τ
+	    B = ustrip.(cmp[!, Symbol(z, "_sr")])   .>= τ
+	    2*sum(A .& B) / max(sum(A) + sum(B), 1)
+	end
+	dice_Q5000 = dice_at(cmp, :Q_cond, 5_000.0)
+	
+	# Gradient-direction alignment (cosine similarity of ∇Z)
+	function grad_alignment(cmp, xcol, ycol, z::Symbol, nx::Int, ny::Int)
+	    Zt = reshape(ustrip.(cmp[!, Symbol(z, "_true")]), ny, nx)
+	    Zp = reshape(ustrip.(cmp[!, Symbol(z, "_sr")]),   ny, nx)
+	    ∂x(A) = @views 0.5 .* (A[:,3:end] .- A[:,1:end-2])
+	    ∂y(A) = @views 0.5 .* (A[3:end,:] .- A[1:end-2,:])
+	    gx_t, gy_t = ∂x(Zt)[2:end-1,:], ∂y(Zt)[:,2:end-1]
+	    gx_p, gy_p = ∂x(Zp)[2:end-1,:], ∂y(Zp)[:,2:end-1]
+	    num = gx_t .* gx_p .+ gy_t .* gy_p
+	    den = sqrt.(gx_t.^2 .+ gy_t.^2) .* sqrt.(gx_p.^2 .+ gy_p.^2) .+ eps()
+	    mean(num ./ den)
+	end
+	cos_grad_Q = grad_alignment(cmp, xcol, ycol, :Q_cond, length(xvals), length(yvals))
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 94138b2d-0fd6-494e-9fd1-ef5aecadaabf
+md" # Plotting functions"
+
+# ╔═╡ 2097d037-7f79-4fe2-b683-b74b77d98752
+function plot_pred_vs_actual_long(df_long; markersize=2, width=1200, row_height=240, band_pct=0.10)
+    targets = collect(unique(df_long.target))
+    n = length(targets)
+    fig = Figure(resolution=(width, max(200, row_height*n)))
+    colsize!(fig.layout, 1, Relative(1.0))
+
+    for (i, t) in enumerate(targets)
+        df_t = df_long[df_long.target .== t, :]
+
+        # let AoG handle plotting of unitful columns
+        ax = Axis(fig[i, 1]; title=string(t), aspect=1)
+        draw!(ax, data(df_t) * mapping(:actual, :predicted) *
+                  visual(Scatter; markersize=markersize, strokewidth=0))
+
+        # compute numeric limits from data (unit-safe)
+        a = ustrip.(df_t.actual)
+        p = ustrip.(df_t.predicted)
+        lo = min(minimum(a), minimum(p))
+        hi = max(maximum(a), maximum(p))
+        pad = (hi - lo == 0) ? 1e-6 : 0.02*(hi - lo)
+        lo -= pad;  hi += pad
+
+        xlims!(ax, lo, hi)   # Makie’s documented API for setting limits
+        ylims!(ax, lo, hi)   # (no xlimits/ylimits field access)  ⟵
+
+        # 1:1 and ±band overlays (numeric)
+        lines!(ax, [lo, hi], [lo, hi], linewidth=2)
+        lines!(ax, [lo, hi], [(1+band_pct)*lo, (1+band_pct)*hi], linestyle=:dash)
+        lines!(ax, [lo, hi], [(1-band_pct)*lo, (1-band_pct)*hi], linestyle=:dash)
+    end
+
+    resize_to_layout!(fig)
+    fig
+end
+
+# ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+#=╠═╡
+
+# ------------- grid builder (Makie/Contour expects a rectangular grid) -------------
+function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+                       invx = identity, agg = first)
+    df2 = combine(groupby(df, [ycol, xcol]), zcol => agg => :_z)
+
+    xs = sort(unique(df2[!, xcol]))
+    ys = sort(unique(df2[!, ycol]))
+    x2i = Dict(x => i for (i,x) in enumerate(xs))
+    y2j = Dict(y => j for (j,y) in enumerate(ys))
+
+    Z = fill(NaN, length(xs), length(ys))  # size(Z) == (nx, ny)
+    @inbounds for r in eachrow(df2)
+        Z[x2i[r[xcol]], y2j[r[ycol]]] = Float64(r._z)
+    end
+
+    keep_x = vec(any(isfinite, Z; dims=2))
+    keep_y = vec(any(isfinite, Z; dims=1))
+    Z = Z[keep_x, keep_y]
+    xs = xs[keep_x]; ys = ys[keep_y]
+
+    X = Float64.(invx.(xs))
+    Y = Float64.(ys)
+    @assert all(diff(X) .> 0) && all(diff(Y) .> 0)
+    return X, Y, Z
+end
+  ╠═╡ =#
+
+# ╔═╡ 3ec7080c-2972-484b-805e-3d9fe0a7d9d1
+# choose reasonable default levels for iso-lines
+function _default_iso_levels(Z; n::Int=8)
+    vals = vec(Z)
+    m = isfinite.(vals)
+    if !any(m)
+        return n               # fallback: let Makie auto-pick n levels
+    end
+    zmin, zmax = extrema(vals[m])
+    if zmin == zmax
+        return [zmin]          # constant field: one contour at that value
+    else
+        return collect(range(zmin, zmax; length=n))
+    end
+end
+
+
+# ╔═╡ 7148e421-b7e8-4f3c-a0a9-da3d14dd32e5
+# map selected numeric levels to custom strings (with tolerance)
+_level_labelformatter(labels::AbstractDict; tol=1e-9) = let tbl = Dict(float(k)=>string(v) for (k,v) in labels)
+    l -> begin
+        # try exact hit first
+        if haskey(tbl, float(l))
+            return tbl[float(l)]
+        end
+        # tolerant match (useful when levels came from computations)
+        for (k,v) in tbl
+            if isapprox(k, l; atol=tol, rtol=0)
+                return v
+            end
+        end
+        # fallback: print the numeric value if not mapped
+        @sprintf("%.3g", l)
+    end
+end
+
+# ╔═╡ c21e1161-99f5-4d15-adb8-7f7c669eadb0
+
+ovs_plots = [
+    # Reynolds thresholds — leg 1 (red) with halo
+    (z=:Re_bhe_leg1, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     #halo=true, halocolor=:white, halowidth=1.2,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - down"))),
+
+    (z=:Re_bhe_leg1, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - down"))),
+
+    # Reynolds thresholds — leg 2 (magenta instead of blue) with halo
+    (z=:Re_bhe_leg2, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - up"))),
+
+    (z=:Re_bhe_leg2, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - up"))),
+
+
+    # f_pump guides — dense, unobtrusive (no halo)
+    (z=:r_N_pump, levels=(0.3:0.1:1)[2:end-1], color=CHARCOAL, linewidth=.5, labels=false),
+
+    # f_pump endpoints — highlighted w/ labels + halo
+    (z=:r_N_pump, levels=[1.0], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(1.0 => "f = 1.0"))),
+
+    (z=:r_N_pump, levels=[0.3], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(0.3 => "f = 0.3"))),
+
+    (z=:P_pump_P_max, levels=[1.0], color=CHARCOAL, linewidth=2.5, labels=true, linestyle=:dashdot, labelformatter=_level_labelformatter(Dict(1.0 => "P pump max"))),
+]
+
+
+# ╔═╡ 72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
+ovs_plots
+
+# ╔═╡ 7ceca66f-f75a-4ba5-aa44-1f2b6939da77
+
+ovs_plots_3 = [
+    (z=:Re_bhe_leg1, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - down"))),
+
+    (z=:Re_bhe_leg1, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - down"))),
+
+    (z=:Re_bhe_leg2, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - up"))),
+
+    (z=:Re_bhe_leg2, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - up"))),
+
+
+    # f_pump guides — dense, unobtrusive (no halo)
+    (z=:r_N_pump, levels=(0.3:0.1:1)[2:end-1], color=CHARCOAL, linewidth=.5, labels=false),
+
+    # f_pump endpoints — highlighted w/ labels + halo
+    (z=:r_N_pump, levels=[1.0], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(1.0 => "f = 1.0"))),
+]
+
+
+# ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
+#=╠═╡
+function _add_isolines!(ax::Makie.Axis, df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+                        xlogbase::Symbol = :log10,
+                        levels = nothing,
+                        color::Union{Symbol,RGBAf,RGBf} = :black,
+                        linestyle::Symbol = :solid,
+                        linewidth::Real = 1.5,
+                        labels::Bool = false,
+                        labelformatter::Function = l -> @sprintf("%.3g", l),
+                        labelsize::Int = 20,
+                        halo::Bool = false,                # <— NEW
+                        halowidth::Real = 1.5,             # <— NEW
+                        halocolor::Union{Symbol,RGBAf,RGBf} = :white)  # <— NEW
+
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
+    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
+
+    levs =
+        levels === nothing ? _default_iso_levels(Z) :
+        (levels isa AbstractVector && isempty(levels)) ? _default_iso_levels(Z) :
+        (levels isa AbstractVector ? Float64.(collect(levels)) : levels)
+
+    # 1) optional halo pass (no labels)
+    if halo
+        contour!(ax, X, Y, Z;
+            levels = levs, color = halocolor, linewidth = linewidth + halowidth,
+            linestyle = linestyle, labels = false, overdraw = false)
+    end
+
+    # 2) colored line with labels
+    contour!(ax, X, Y, Z;
+        levels = levs, color = color, linestyle = linestyle, linewidth = linewidth,
+        labels = labels, labelformatter = labelformatter, labelsize = labelsize,
+        labelcolor = color, overdraw = false)
+
+    return ax
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 7520ab74-810f-431a-b24e-724e24595b13
+
+
+_resolve_label(sym::Symbol, fallback::String, map::Dict{Symbol,String},
+               kw::Union{Nothing,AbstractString}) =
+    kw === nothing ? get(map, sym, fallback) : String(kw)
+
+# ╔═╡ 1d8f15e6-0462-4f86-9a97-3364e3e73bc0
+
+
+# --- helpers ---
+_normalize_labelmap(x)::Dict{Symbol,String} = begin
+    out = Dict{Symbol,String}()
+    for (k,v) in pairs(x)          # works for Dict and NamedTuple
+        out[Symbol(k)] = string(v)
+    end
+    out
+end
+
+# ╔═╡ 3afecaa8-1c77-4b26-b534-2c419ddfb027
+#=╠═╡
+# pick a ridge curve by optimizing z over the *other* axis
+# wrt = :x  -> for each x, choose y that extremizes z  (y = y*(x))   [old behavior]
+# wrt = :y  -> for each y, choose x that extremizes z  (x = x*(y))   [what you want]
+function _ridge(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
+                invx = identity, mode::Symbol = :max, wrt::Symbol = :x)
+    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)  # size(Z) == (length(X), length(Y))
+
+    xs = Float64[]; ys = Float64[]
+    if wrt === :x
+        # iterate over x-slices -> y*(x)
+        for i in eachindex(X)
+            best = (mode === :max) ? -Inf : Inf
+            bestj = 0
+            col = @view Z[i, :]
+            @inbounds for j in eachindex(Y)
+                v = col[j]
+                if isfinite(v) && ((mode === :max && v > best) || (mode === :min && v < best))
+                    best = v; bestj = j
+                end
+            end
+            bestj != 0 && (push!(xs, X[i]); push!(ys, Y[bestj]))
+        end
+    elseif wrt === :y
+        # iterate over y-slices -> x*(y)
+        for j in eachindex(Y)
+            best = (mode === :max) ? -Inf : Inf
+            besti = 0
+            row = @view Z[:, j]
+            @inbounds for i in eachindex(X)
+                v = row[i]
+                if isfinite(v) && ((mode === :max && v > best) || (mode === :min && v < best))
+                    best = v; besti = i
+                end
+            end
+            besti != 0 && (push!(xs, X[besti]); push!(ys, Y[j]))
+        end
+    else
+        error("zridge_wrt must be :x or :y")
+    end
+    return xs, ys
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 2164a2d3-59a0-4573-bd12-b62431f46c04
+# Dense max/min over x for each fixed y using Interpolations.jl (linear, irregular grid OK)
+function _ridge_resample_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
+                               mode::Symbol=:max, nsamples::Int=401)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        sel = isfinite.(Z[:, j])
+        if count(sel) ≥ 2
+            xj = X[sel]; zj = Z[sel, j]
+            itp = interpolate((xj,), zj, Gridded(Linear()))  # linear on irregular grid
+            xd = range(first(xj), last(xj), length=nsamples)
+            vals = itp.(xd)
+            k = (mode === :max) ? argmax(vals) : argmin(vals)
+            push!(xs, xd[k]); push!(ys, Y[j])
+        end
+    end
+    xs, ys
+end
+
+# Same, but per-slice smoothing spline with Dierckx (cubic), then dense evaluate
+# Requires: using Dierckx
+
+# ╔═╡ 318a7ca3-1d6a-4a32-9fc7-c2a0072c92d3
+function _ridge_spline_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
+                             mode::Symbol=:max, nsamples::Int=401, s::Real=0.0)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        sel = isfinite.(Z[:, j])
+        if count(sel) ≥ 2
+            xj = X[sel]; zj = Z[sel, j]
+            spl = Dierckx.Spline1D(xj, zj; k=3, s=s)     # smoothing s≥0
+            xd  = range(first(xj), last(xj), length=nsamples)
+            vals = spl.(xd)
+            k = (mode === :max) ? argmax(vals) : argmin(vals)
+            push!(xs, xd[k]); push!(ys, Y[j])
+        end
+    end
+    xs, ys
+end
+
+# Optional post-smoothing of the ridge path x*(y)
+# Requires: using Dierckx
+
+# ╔═╡ c1333a2c-28a8-4a31-a049-8479e43f6c0e
+# Vertex (x at extremum) of quadratic through three points (x1,y1),(x2,y2),(x3,y3)
+# Works for non-uniform spacing. Returns NaN if the fit is degenerate.
+function _parabolic_vertex(x1,y1,x2,y2,x3,y3)
+    denom = (x1 - x2) * (x1 - x3) * (x2 - x3)
+    if denom == 0
+        return NaN
+    end
+    a = (x1*(y3 - y2) + x2*(y1 - y3) + x3*(y2 - y1)) / denom
+    b = (x1^2*(y2 - y3) + x2^2*(y3 - y1) + x3^2*(y1 - y2)) / denom
+    if a == 0
+        return NaN
+    end
+    return -b / (2a)  # x at extremum
+end
+
+# Parabolic refinement for wrt=:y  (x* as a smooth function of y)
+
+# ╔═╡ 1177eea2-1d56-4090-8b70-a636f404b4fb
+function _ridge_parabolic_wrt_y_mask_interp(X::AbstractVector, Y::AbstractVector,
+                                            Z::AbstractMatrix, W::AbstractMatrix;
+                                            mode::Symbol=:max, wmin::Real=-Inf, wmax::Real=Inf)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        mj = isfinite.(Z[:,j]) .& isfinite.(W[:,j])
+        idxs = findall(mj)
+        length(idxs) < 2 && continue
+
+        xi, zi, wi = X[idxs], Z[idxs, j], W[idxs, j]
+        w_itp = interpolate((xi,), wi, Gridded(Linear()))
+
+        # pick best grid point
+        k = mode === :max ? argmax(zi) : argmin(zi)
+        x̂ = xi[k]
+
+        # parabolic refinement if neighbors exist
+        if 1 < k < length(xi)
+            x1,y1 = xi[k-1], zi[k-1]
+            x2,y2 = xi[k],   zi[k]
+            x3,y3 = xi[k+1], zi[k+1]
+            xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
+            if isfinite(xv) && (min(x1,x3)-eps() ≤ xv ≤ max(x1,x3)+eps())
+                curv = (y1 - 2y2 + y3)
+                if (mode === :max && curv < 0) || (mode === :min && curv > 0)
+                    x̂ = xv
+                end
+            end
+        end
+
+        # interpolated limiter check
+        ŵ = w_itp(x̂)
+        if isfinite(ŵ) && (wmin ≤ ŵ ≤ wmax)
+            push!(xs, x̂); push!(ys, Y[j])
+        end
+    end
+    xs, ys
+end
+
+
+# ╔═╡ 1d782694-8f7d-4d1f-a1bc-b7646ac01b23
+function _ridge_parabolic_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
+                                mode::Symbol=:max)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        zcol = view(Z, :, j)
+        m = isfinite.(zcol)
+        n = count(m)
+        n < 2 && continue
+        xi = X[m]; zi = zcol[m]
+
+        k = (mode === :max) ? argmax(zi) : argmin(zi)
+        x̂ = xi[k]  # fallback = grid point
+
+        if 1 < k < length(xi)  # have neighbors
+            x1,y1 = xi[k-1], zi[k-1]
+            x2,y2 = xi[k],   zi[k]
+            x3,y3 = xi[k+1], zi[k+1]
+            xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
+            if isfinite(xv) && min(x1,x3) - eps() ≤ xv ≤ max(x1,x3) + eps()
+                # ensure it's the right extremum shape
+                # For maxima we expect concave (a<0); for minima convex (a>0).
+                # We approximatively check by central second diff sign.
+                curv = (y1 - 2y2 + y3)
+                if (mode === :max && curv < 0) || (mode === :min && curv > 0)
+                    x̂ = xv
+                end
+            end
+        end
+        push!(xs, x̂); push!(ys, Y[j])
+    end
+    xs, ys
+end
+
+# Optional post-smoothing of the ridge path: x(y) -> smooth cubic spline
+# (Requires: using Dierckx)
+
+# ╔═╡ a35e92ea-bee1-4117-9ccf-f2016be29dc3
+function _smooth_path(xs::AbstractVector, ys::AbstractVector; s::Real=0.0)
+    spl = Dierckx.Spline1D(ys, xs; k=3, s=s)
+    return spl.(ys), ys
+end
+
+# ╔═╡ 17aa8588-7089-4247-aaad-0ca54e1d888a
+# Split ridge into continuous segments by jump/Gap/slope rules
+function _split_discontinuities(xs::AbstractVector, ys::AbstractVector;
+        xjump_frac::Real = 0.08,      # break if |Δx| > xjump_frac * (xmax-xmin)
+        ygap_factor::Real = 3.0,      # break if |Δy| > ygap_factor * median(Δy)
+        slope_max::Real = Inf)        # break if |Δx/Δy| > slope_max
+
+    n = length(xs)
+    n ≥ 2 || return Vector{UnitRange{Int}}()
+
+    # basic scales
+    xr = maximum(xs) - minimum(xs)
+    dy = diff(ys)
+    dx = diff(xs)
+    med_dy = median(abs.(dy[isfinite.(dy)]))
+    med_dy = (isfinite(med_dy) && med_dy > 0) ? med_dy : 1.0
+
+    segs = Vector{UnitRange{Int}}()
+    s = 1
+    for k in 1:n-1
+        jump_x  = xr > 0 ? abs(dx[k]) > xjump_frac * xr : false
+        gap_y   = abs(dy[k]) > ygap_factor * med_dy
+        steep   = (slope_max < Inf) ? (abs(dx[k]) / max(abs(dy[k]), eps()) > slope_max) : false
+        if jump_x || gap_y || steep || !isfinite(dx[k]) || !isfinite(dy[k])
+            if k >= s+1
+                push!(segs, s:k)
+            end
+            s = k + 1
+        end
+    end
+    if n >= s+1
+        push!(segs, s:n)
+    end
+    segs
+end
+
+# Optional: discard ridge points too close to left/right edges
+
+# ╔═╡ 286269bd-f4db-4690-81f4-b4c45edeb24d
+function _exclude_edge_points!(xs::Vector{Float64}, ys::Vector{Float64}; edge_frac=0.0)
+    edge_frac ≤ 0 && return xs, ys
+    xmin, xmax = minimum(xs), maximum(xs)
+    pad = edge_frac * (xmax - xmin)
+    keep = @. (xs > xmin + pad) & (xs < xmax - pad) & isfinite(xs) & isfinite(ys)
+    return xs[keep], ys[keep]
+end
+
+# ╔═╡ 34522b07-e28b-4fa6-b2bf-2c7c73895aa2
+# contiguous True-runs helper (if you don't already have it)
+function _true_runs(b::AbstractVector{Bool})
+    runs = Vector{UnitRange{Int}}()
+    i = 1
+    while i <= length(b)
+        if b[i]
+            s = i
+            while i <= length(b) && b[i]
+                i += 1
+            end
+            push!(runs, s:(i-1))
+        else
+            i += 1
+        end
+    end
+    return runs
+end
+
+# ╔═╡ 599e27a4-1aba-4de4-a76d-fb09511de993
+function _mask_intervals_spline(xmin::Real, xmax::Real, sw::Dierckx.Spline1D;
+                                wmin::Real, wmax::Real, nsamples::Int=401)
+    xd = range(xmin, xmax; length=nsamples)
+    w  = sw.(xd)
+    keep = (w .>= wmin) .& (w .<= wmax)
+    runs = _true_runs(keep)
+    isempty(runs) && return Tuple{Float64,Float64}[]
+
+    intervals = Tuple{Float64,Float64}[]
+    for r in runs
+        # crude ends
+        a0, b0 = xd[first(r)], xd[last(r)]
+        # refine left edge if we have a sample just before the run
+        al = a0
+        if first(r) > 1
+            xl = xd[first(r)-1]
+            # which boundary did we cross?
+            wl = sw(xl)
+            if wl < wmin
+                al = try find_zero(x -> sw(x) - wmin, (xl, a0), Bisection()) catch; a0 end
+            elseif wl > wmax
+                al = try find_zero(x -> sw(x) - wmax, (xl, a0), Bisection()) catch; a0 end
+            end
+        end
+        # refine right edge if we have a sample just after the run
+        br = b0
+        if last(r) < length(xd)
+            xr = xd[last(r)+1]
+            wr = sw(xr)
+            if wr < wmin
+                br = try find_zero(x -> sw(x) - wmin, (b0, xr), Bisection()) catch; b0 end
+            elseif wr > wmax
+                br = try find_zero(x -> sw(x) - wmax, (b0, xr), Bisection()) catch; b0 end
+            end
+        end
+        (al < br) && push!(intervals, (al, br))
+    end
+    intervals
+end
+
+# Smooth constrained ridge: for each fixed y, maximize/minimize z(x) s.t. w(x)∈[wmin,wmax].
+# z and w are smoothed with cubic splines on irregular x; optimization is Brent on each interval.
+
+# ╔═╡ 4b5d8e48-6775-4ec6-ab28-3e96b9954af3
+function _ridge_spline_opt_wrt_y_mask(
+    X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix, W::AbstractMatrix;
+    mode::Symbol=:max, s_z::Real=0.0, s_w::Real=0.0, nsamples_mask::Int=401
+)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        sel = isfinite.(Z[:,j]) .& isfinite.(W[:,j])
+        count(sel) ≥ 2 || continue
+        xj, zj, wj = X[sel], Z[sel,j], W[sel,j]
+
+        # smooth splines (cubic; s>0 to denoise)
+        sz = Dierckx.Spline1D(xj, zj; k=3, s=s_z)
+        sw = Dierckx.Spline1D(xj, wj; k=3, s=s_w)
+
+        # feasible intervals from mask spline
+        intervals = _mask_intervals_spline(first(xj), last(xj), sw, zridge_min, zridge_max;
+                                           nsamples=nsamples_mask)
+        isempty(intervals) && continue
+
+        best_v = (mode === :max) ? -Inf : Inf
+        best_x = NaN
+        for (a,b) in intervals
+            # Brent 1D (bounded)
+            obj = mode === :max ? (x->-sz(x)) : (x->sz(x))
+            res = Optim.optimize(obj, a, b, Brent())
+            x̂  = Optim.minimizer(res)
+            v̂  = sz(x̂)
+            if (mode === :max && v̂ > best_v) || (mode === :min && v̂ < best_v)
+                best_v = v̂; best_x = x̂
+            end
+        end
+        isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
+    end
+    xs, ys
+end
+
+# ╔═╡ c9aa37be-53b4-4f23-9898-b5179f7117f2
+# smooth, interpolated-mask ridge: maximize/minimize z(x) for each fixed y,
+# but only where w(x) lies in [wmin, wmax].
+function _ridge_resample_wrt_y_mask_interp(X::AbstractVector, Y::AbstractVector,
+                                           Z::AbstractMatrix, W::AbstractMatrix;
+                                           mode::Symbol=:max, nsamples::Int=401,
+                                           wmin::Real=-Inf, wmax::Real=Inf)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        m = isfinite.(Z[:, j]) .& isfinite.(W[:, j])
+        if count(m) ≥ 2
+            xj, zj, wj = X[m], Z[m, j], W[m, j]
+
+            # linear on irregular grids
+            z_itp = interpolate((xj,), zj, Gridded(Linear()))
+            w_itp = interpolate((xj,), wj, Gridded(Linear()))
+
+            xd   = range(first(xj), last(xj), length=nsamples)
+            wd   = w_itp.(xd)
+            keep = (wd .>= wmin) .& (wd .<= wmax)
+
+            runs = _true_runs(keep)
+            isempty(runs) && continue
+
+            best_val = mode === :max ? -Inf : Inf
+            best_x   = NaN
+            for r in runs
+                # need ≥2 points in a sub-interval to be meaningful
+                if length(r) < 2; continue; end
+                vals = z_itp.(xd[r])
+                k    = mode === :max ? argmax(vals) : argmin(vals)
+                v    = vals[k]
+                if (mode === :max && v > best_val) || (mode === :min && v < best_val)
+                    best_val = v
+                    best_x   = xd[r[k]]
+                end
+            end
+            isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
+        end
+    end
+    xs, ys
+end
+
+
+# ╔═╡ 9d0ffbe1-deff-4de9-a0d7-9e7c8df5bfaf
+function _ridge_parabolic_resample_wrt_y_mask_interp(
+    X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix, W::AbstractMatrix;
+    mode::Symbol=:max, nsamples::Int=601, wmin::Real=-Inf, wmax::Real=Inf
+)
+    xs = Float64[]; ys = Float64[]
+    for j in eachindex(Y)
+        # finite pairs only
+        sel = isfinite.(Z[:, j]) .& isfinite.(W[:, j])
+        count(sel) ≥ 2 || continue
+
+        xj = X[sel]; zj = Z[sel, j]; wj = W[sel, j]
+
+        z_itp = interpolate((xj,), zj, Gridded(Linear()))
+        w_itp = interpolate((xj,), wj, Gridded(Linear()))
+
+        xd   = range(first(xj), last(xj), length=nsamples)
+        keep = (w_itp.(xd) .>= wmin) .& (w_itp.(xd) .<= wmax)
+        runs = _true_runs(keep)
+        isempty(runs) && continue
+
+        best_val = mode === :max ? -Inf : Inf
+        best_x   = NaN
+
+        for r in runs
+            # sample z on this allowed sub-interval
+            vals = z_itp.(xd[r])
+            k    = mode === :max ? argmax(vals) : argmin(vals)
+            xi   = xd[r[k]]; zi = vals[k]
+
+            # parabolic refine if we have neighbors inside the run
+            if 1 < k < length(r)
+                x1, x2, x3 = xd[r[k-1]], xd[r[k]], xd[r[k+1]]
+                y1, y2, y3 = z_itp(x1), z_itp(x2), z_itp(x3)
+                xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
+                # keep refinement only if inside the allowed sub-interval AND still allowed by w
+                if isfinite(xv) && x1 - eps() ≤ xv ≤ x3 + eps()
+                    wv = w_itp(xv)
+                    if isfinite(wv) && (wmin ≤ wv ≤ wmax)
+                        xi = xv; zi = z_itp(xv)
+                    end
+                end
+            end
+
+            if (mode === :max && zi > best_val) || (mode === :min && zi < best_val)
+                best_val = zi
+                best_x   = xi
+            end
+        end
+
+        isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
+    end
+    return xs, ys
+end
+
+# ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
+#=╠═╡
+function plot_contourf(df::DataFrame;
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+    xlogbase::Symbol=:log10,
+    levels=10,
+    palette=:viridis, lowclip=nothing, highclip=nothing,
+    labels_for_lines::Bool=false,
+    overlays::Vector = Vector{Any}(),
+    return_axis::Bool=false,
+
+    # labeling options
+    xlabel::Union{Nothing,AbstractString}=nothing,
+    ylabel::Union{Nothing,AbstractString}=nothing,
+    zlabel::Union{Nothing,AbstractString}=nothing,
+    title::Union{Nothing,AbstractString}=nothing,
+    labelmap::Union{AbstractDict,NamedTuple}=Dict(),
+
+    # ridge (extremum curve of z)
+    zridge_enable::Bool = false,
+    zridge_wrt::Symbol  = :x,        # :x | :y
+    zridge_mode::Symbol = :max,      # :max | :min
+    zridge_color::Union{Symbol,RGBAf,RGBf} = :red,
+    zridge_linestyle::Symbol = :solid,
+    zridge_linewidth::Real = 2.0,
+    zridge_halo::Bool = false,
+    zridge_halowidth::Real = 1.5,
+    zridge_halocolor::Union{Symbol,RGBAf,RGBf} = :white,
+    zridge_labels::Bool = false,
+    zridge_label::Union{Nothing,AbstractString} = nothing,
+    zridge_labelsize::Int = 14,
+    zridge_method::Symbol = :resample,
+    zridge_nsamples::Int = 401,
+    zridge_spline_s::Real = 0.0,
+    zridge_postsmooth::Bool = false,
+    zridge_post_s::Real = 0.0,
+    zridge_xjump_frac::Real = 0.08,
+    zridge_ygap_factor::Real = 3.0,
+    zridge_slope_max::Real = Inf,
+    zridge_exclude_edge_frac::Real = 0.0,
+	
+    # ridge domain limit via *interpolated* limiter column (e.g. :r_N_pump)
+    zridge_limit_col::Union{Nothing,Symbol} = nothing,
+    zridge_min::Real = -Inf,
+    zridge_max::Real =  Inf,
+    zridge_limit_interp::Bool = true,   # use the interpolated-mask variant
+
+
+    # base rendering mode
+    base_style::Symbol = :filled,    # :filled | :lines | :none
+    show_colorbar::Bool = true,
+    line_width::Real = 1.2,          # for :lines
+    line_color::Union{Nothing,Symbol,RGBAf,RGBf} = nothing  # single color if set
+)
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
+    xlab_default = (invx === identity) ? string(xcol) : "ΔTSF"
+
+    lm = _normalize_labelmap(labelmap)
+    xname = _resolve_label(xcol, xlab_default, lm, xlabel)
+    yname = _resolve_label(ycol, string(ycol), lm, ylabel)
+    zname = _resolve_label(zcol, string(zcol), lm, zlabel)
+    plt_title = title === nothing ? zname : String(title)
+
+    fig = Figure()
+    ax  = Axis(fig[1,1]; xlabel=xname, ylabel=yname, title=plt_title)
+    if hasproperty(ax, :clip)
+        ax.clip = true
+    elseif hasproperty(ax, :scene) && hasproperty(ax.scene, :clip)
+        ax.scene.clip = true
+    end
+
+    # grid + helpers
+    Xg, Yg, Zg = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
+    zmin, zmax = extrema(vec(Zg))
+    levs = levels isa Integer ? levels : collect(levels)
+    bfmt(x) = @sprintf("%.4g", x)
+
+    if base_style === :filled
+        # filled bands via AoG
+        pal = (lowclip !== nothing || highclip !== nothing) ?
+              clipped(from_continuous(palette); low=lowclip, high=highclip) :
+              from_continuous(palette)
+        base  = data(df) * mapping(xcol => invx => xname, ycol, zcol)
+        fc    = levels isa Integer ? filled_contours(bands=levels) : filled_contours(levels=collect(levels))
+        specs = base * fc
+        sc    = scales(Color=(; palette=pal))
+        draw!(ax, specs, sc)
+
+        # outline boundaries
+        boundaries = levels isa Integer ?
+                     collect(range(zmin, zmax; length=levels+1)) :
+                     collect(sort(levels))
+        contour!(ax, Xg, Yg, Zg; levels=boundaries, color=:white, linewidth=.3,
+                 labels=labels_for_lines, labelformatter=bfmt, labelsize=20)
+
+        if show_colorbar
+            boundaries = sort!(boundaries)
+            nbands = max(length(boundaries)-1, 1)
+            cm = cgrad(palette, nbands; categorical=true)
+            Colorbar(fig[1,2];
+                colormap=cm,
+                limits=(first(boundaries), last(boundaries)),
+                ticks=(boundaries, map(bfmt, boundaries)),
+                label=zname, vertical=true, lowclip=lowclip, highclip=highclip)
+        end
+
+    elseif base_style === :lines
+        # contour lines only
+        if line_color === nothing
+            cm = cgrad(palette)
+            contour!(ax, Xg, Yg, Zg;
+                levels=levs, colormap=cm, colorrange=(zmin, zmax),
+                linewidth=line_width,
+                labels=labels_for_lines, labelformatter=bfmt, labelsize=18)
+            if show_colorbar
+                chosen = levels isa Integer ? collect(range(zmin, zmax; length=levels)) : Float64.(levs)
+                Colorbar(fig[1,2];
+                    colormap=cm, limits=(zmin, zmax),
+                    ticks=(chosen, map(bfmt, chosen)),
+                    label=zname, vertical=true)
+            end
+        else
+            contour!(ax, Xg, Yg, Zg;
+                levels=levs, color=line_color, linewidth=line_width,
+                labels=labels_for_lines, labelformatter=bfmt, labelsize=18)
+            # (no colorbar by default)
+        end
+
+    elseif base_style === :none
+        # draw nothing; overlays/ridge only
+        # (no colorbar)
+    else
+        error("base_style must be :filled, :lines, or :none")
+    end
+
+    # overlays
+    for ov in overlays
+        zsym = get(ov, :z, nothing); zsym === nothing && error("overlay missing :z")
+        _add_isolines!(ax, df, xcol, ycol, zsym;
+            xlogbase        = xlogbase,
+            levels          = get(ov, :levels, []),
+            color           = get(ov, :color, :black),
+            linestyle       = get(ov, :linestyle, :solid),
+            linewidth       = get(ov, :linewidth, 1.5),
+            labels          = get(ov, :labels, false),
+            labelformatter  = get(ov, :labelformatter, l -> @sprintf("%.3g", l)),
+            labelsize       = get(ov, :labelsize, 10),
+            halo            = get(ov, :halo, false),
+            halowidth       = get(ov, :halowidth, 1.5),
+            halocolor       = get(ov, :halocolor, :white))
+    end
+
+	if zridge_enable
+	    Xg, Yg, Zg = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
+	
+	    Wg = nothing
+	    if zridge_limit_col !== nothing
+	        _, _, Wg = _grid_from_df(df, xcol, ycol, zridge_limit_col; invx=invx)
+	    end
+	
+	    if zridge_wrt === :y
+	        if zridge_method === :resample
+	            if zridge_limit_interp && Wg !== nothing
+	                xs, ys = _ridge_resample_wrt_y_mask_interp(
+	                    Xg, Yg, Zg, Wg; mode=zridge_mode,
+	                    nsamples=zridge_nsamples,
+	                    wmin=zridge_min, wmax=zridge_max)
+	            else
+	                # your previous (discrete-mask) path:
+	                allow = Wg === nothing ? nothing :
+	                        @. isfinite(Wg) & (Wg >= zridge_min) & (Wg <= zridge_max)
+	                xs, ys = _ridge_resample_wrt_y(
+	                    Xg, Yg, Zg; mode=zridge_mode,
+	                    nsamples=zridge_nsamples, allow=allow)
+	            end
+				elseif zridge_method === :parabolic
+			    if zridge_limit_interp && Wg !== nothing
+			        xs, ys = _ridge_parabolic_resample_wrt_y_mask_interp(
+			            Xg, Yg, Zg, Wg; mode=zridge_mode,
+			            nsamples=zridge_nsamples,             # e.g. 601
+			            wmin=zridge_min, wmax=zridge_max
+			        )
+			    else
+			        # (fallbacks unchanged)
+			        allow = Wg === nothing ? nothing :
+			                @. isfinite(Wg) & (Wg >= zridge_min) & (Wg <= zridge_max)
+			        xs, ys = _ridge_parabolic_wrt_y(Xg, Yg, Zg; mode=zridge_mode)  # or a discrete-mask variant if you keep one
+			    end
+
+	        else
+	            error("zridge_method must be :resample or :parabolic for wrt=:y")
+	        end
+	    else
+	        # (wrt=:x variant unchanged; add a similar mask if you ever need it)
+	        xs, ys = _ridge(df, xcol, ycol, zcol; invx=invx, mode=zridge_mode, wrt=:x)
+	    end
+	    # 2) optional path smoothing of x*(y)
+	    if zridge_postsmooth && !isempty(xs)
+	        xs, ys = _smooth_path(xs, ys; s=zridge_post_s)  # requires Dierckx
+	    end
+	
+	    # 3) drop edge-hugging points (optional)
+	    xs, ys = _exclude_edge_points!(collect(xs), collect(ys);
+	                                   edge_frac = zridge_exclude_edge_frac)
+	
+	    # 4) split into continuous segments (jump/gap/slope rules)
+	    segs = _split_discontinuities(xs, ys;
+	        xjump_frac = zridge_xjump_frac,
+	        ygap_factor = zridge_ygap_factor,
+	        slope_max = zridge_slope_max)
+	
+	    # 5) draw each continuous segment (with optional halo)
+	    for r in segs
+	        if zridge_halo
+	            lines!(ax, xs[r], ys[r]; color=zridge_halocolor,
+	                   linewidth = zridge_linewidth + zridge_halowidth,
+	                   linestyle = zridge_linestyle)
+	        end
+	        lines!(ax, xs[r], ys[r]; color=zridge_color,
+	               linewidth = zridge_linewidth, linestyle = zridge_linestyle)
+	    end
+	
+	    # 6) optional label at the end of last segment
+	    if zridge_labels && !isempty(segs)
+	        r = last(segs)
+	        lbl = zridge_label === nothing ?
+	            string(zridge_mode == :max ? "max " : "min ", zname, " wrt ",
+	                   (zridge_wrt == :x ? xname : yname)) :
+	            String(zridge_label)
+	        text!(ax, lbl; position=(xs[last(r)], ys[last(r)]),
+	              align=(:left, :center), offset=(8, 0),
+	              color=zridge_color, fontsize=zridge_labelsize)
+	    end
+	end
+
+    resize_to_layout!(fig)
+    return return_axis ? (fig, ax) : fig
+end
+
+  ╠═╡ =#
+
+# ╔═╡ b570d453-43f2-4a12-a9d6-889752dd5aeb
+#=╠═╡
+function plot_heatmap(df::DataFrame;
+                      xcol::Symbol = :log_ΔTSF_,
+                      ycol::Symbol = :f_,
+                      zcol::Symbol = :COP_3,
+                      xlogbase::Symbol = :log10)  # use :log if natural log
+
+    invx = xlogbase === :log10 ? exp10 :
+           xlogbase === :log   ? exp   :
+           error("xlogbase must be :log10 or :log")
+
+    plt = data(df) *
+          mapping(                     # <-- POSitional: x, y, z
+              xcol => invx => "ΔTSF",  # log(ΔTSF) -> ΔTSF for plotting
+              ycol,
+              zcol
+          ) *
+          visual(Heatmap)
+
+    fig, ax = draw(
+        plt;
+        axis = (
+            xlabel = "ΔTSF",           # linear axis (default)
+            ylabel = string(ycol),
+            title  = string(zcol, " over ΔTSF vs ", ycol),
+        )
+        # colormap = :viridis,
+        # colorbar = true
+    )
+
+    return fig
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 21cd24f0-4d8b-4298-89e1-7ba7817c2eef
+#=╠═╡
+
+"""
+    process_grid_results(
+      values1, values2,
+      results_thermal, results_hydraulic,
+      sys_thermal, sys_hydraulic;
+      name1=:param1, name2=:param2
+    ) -> DataFrame
+
+Loop over the 2D sweep defined by `values1`×`values2`, extract all the same
+metrics you did in 1D, and return a DataFrame with columns:
+
+  name1, name2, ṁ_sf, ṁ_ref, T_in, …, COP_3
+
+where `name1`/`name2` label the two sweep axes.
+"""
+function process_grid_results(
+    values1::AbstractVector,
+    values2::AbstractVector,
+    results_thermal::AbstractMatrix,
+    results_hydraulic::AbstractMatrix,
+    sys_thermal,
+    sys_hydraulic;
+    name1::Symbol = :param1,
+    name2::Symbol = :param2,
+	target_Q_cond::Real = NaN,
+)
+    n1, n2 = length(values1), length(values2)
+    @assert size(results_thermal) == (n1, n2)
+    @assert size(results_hydraulic) == (n1, n2)
+
+    rows = NamedTuple[]
+
+    for i in 1:n1, j in 1:n2
+        therm = results_thermal[i,j]
+        hyd   = results_hydraulic[i,j]
+
+        # — your thermal extractions —
+        ṁ_sf      = exp( therm[sys_thermal.γṁ_sf] )
+        ṁ_ref     = exp( therm[sys_thermal.γṁ_ref] )
+        T_in       = therm[sys_thermal.cycle.T_i_b] .- 273.15
+        T_mid      = therm[sys_thermal.cycle.evaporator.T_mid_1] .- 273.15
+        T_out      = therm[sys_thermal.cycle.T_o_b] .- 273.15
+        T_bot      = therm[sys_thermal.bhe_thermal.thermal.T_b] .- 273.15
+        T_comp_in  = therm[sys_thermal.cycle.evaporator.T_out_2] .- 273.15
+        T_wall     = 10.0
+        ΔTSF         = T_in - T_out
+
+        fr_SH      = zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh])
+        fr_EV      = 1 - fr_SH
+
+        T_evap     = therm[sys_thermal.cycle.evaporator.sh.propref.Tsat] .- 273.15
+        Q_evap     = therm[sys_thermal.Q_evap]
+        Q_cond     = -therm[sys_thermal.Q_cond]
+        W_comp     = therm[sys_thermal.W_comp]
+        COP_1      = therm[sys_thermal.COP1]
+
+        U_EV       = therm[sys_thermal.cycle.evaporator.ev.base.U]
+        U_SH       = therm[sys_thermal.cycle.evaporator.sh.base.U]
+
+        # — your hydraulic extractions —
+        Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]          / 1e5
+        Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]     / 1e5
+        Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]    / 1e5
+        P_pump     = hyd[sys_hydraulic.pump.base.P_elec]
+        N_pump     = hyd[sys_hydraulic.pump.base.N]
+        r_N_pump     = hyd[sys_hydraulic.pump.base.N]/hyd[sys_hydraulic.pump.base.N_max]
+		η_pump = hyd[sys_hydraulic.pump.base.η]
+
+		P_pump_P_max = P_pump / 185#hyd[sys_hydraulic.pump.base.P_elec_max]
+		
+		pump_compressor = P_pump/W_comp
+
+        COP_2      = Q_cond / (W_comp + P_pump)
+
+        # — PHX Reynolds number —
+        ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
+                              hyd[sys_hydraulic.phx.props.μ],
+                              hyd[sys_hydraulic.phx.base.ṁ]
+        b_phx, W_phx, np_phx, ϕ_phx = hyd[sys_hydraulic.phx.b],
+                                     hyd[sys_hydraulic.phx.W],
+                                     hyd[sys_hydraulic.phx.np],
+                                     hyd[sys_hydraulic.phx.ϕ]
+        nch       = (np_phx - 1)/2
+        A_flow    = nch * W_phx * (2*b_phx)
+        v_phx     = abs(ṁ_phx)/(ρ_phx*A_flow)
+        dh_phx    = 2*b_phx/ϕ_phx
+        Re_phx    = ρ_phx * v_phx * dh_phx / μ_phx
+
+        # — BHE legs (replace L1 & L2 with your real field‐names) —
+        ρ1 = hyd[sys_hydraulic.bhe.leg1.props.ρ]
+        μ1 = hyd[sys_hydraulic.bhe.leg1.props.μ]
+        D1 = hyd[sys_hydraulic.bhe.leg1.Di]
+        Re_bhe_leg1 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D1 / (μ1 * π*(D1/2)^2)
+
+        ρ2 = hyd[sys_hydraulic.bhe.leg2.props.ρ]
+        μ2 = hyd[sys_hydraulic.bhe.leg2.props.μ]
+        D2 = hyd[sys_hydraulic.bhe.leg2.Di]
+        Re_bhe_leg2 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D2 / (μ2 * π*(D2/2)^2)
+
+        # — BHE thermal & resistances —
+        η_bh   = therm[sys_thermal.bhe_thermal.ϵ]
+        R_1b    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
+        R_2b    = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
+        R_12    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
+        R_f1b   = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
+        R_f2b   = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
+        R_f1f2  = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
+
+		# Try these corrected paths:
+		ρ_l = therm[sys_thermal.cycle.evaporator.ev.propref.ρb]  # liquid density
+		ρ_g = therm[sys_thermal.cycle.evaporator.ev.propref.ρd]  # gas density  
+		σ = therm[sys_thermal.cycle.evaporator.ev.propref.σ]     # surface tension
+		
+		# Hydraulic diameter from evaporator geometry
+		D_h = 2 * therm[sys_thermal.cycle.evaporator.ev.b] / therm[sys_thermal.cycle.evaporator.ev.ϕ]
+		
+		# Calculate Bond number
+		Bd = (ρ_l - ρ_g) * 9.81 * D_h^2 / σ
+
+		# scalar, not a 1-element vector
+		f_measured = sys_thermal.cycle.compressor.f
+		
+		# build the payload without params
+		payload = (;  ṁ_sf, ṁ_ref, T_in, T_mid, T_out, ΔTSF, T_bot, T_evap, T_comp_in,
+		             Q_evap, Q_cond, W_comp, COP_1, U_EV, U_SH, fr_EV, fr_SH,
+		             Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, r_N_pump, η_pump, COP_2,
+		             Re_phx, Re_bhe_leg1, Re_bhe_leg2,
+		             η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2,
+		             pump_compressor, P_pump_P_max, Bd)
+		
+		# include measured frequency only if it won’t collide with the axis name
+		if :f_ ∉ (name1, name2)
+		    payload = (; payload..., f_ = f_measured)
+		else
+		    # (optional) keep it under another name if you still want it
+		    payload = (; payload..., f_meas = f_measured)
+		end
+		
+		# now make the row: params first, then payload (no duplicates)
+		row = (; (name1 => values1[i]), (name2 => values2[j]), payload...)
+		push!(rows, row)
+
+    end
+    df = DataFrame(rows)
+
+    # (optional but handy)
+    sort!(df, [name2, :ΔTSF])   # keep rows grouped by f then ΔT
+	
+	if isnan(target_Q_cond)
+    # Compute per-f max Q_cond
+	    gdf = groupby(df, name2)
+	    transform!(gdf, :Q_cond => maximum => :Qmax_same_f)
+	
+	    # Aux heater needed to meet the best point at this f
+	    df.P_aux_heating = max.(0, df.Qmax_same_f .- df.Q_cond)
+
+	else
+			
+	    # Aux heater needed to meet the best point at this f
+	    df.P_aux_heating = max.(0, target_Q_cond .- df.Q_cond)
+
+	end
+    # COP_3 normalized within each f-group
+    df.COP_3 = (df.Q_cond .+ df.P_aux_heating) ./ (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
+
+	g = groupby(df, name2)
+	
+	# per-f maximum and per-f normalized COP_3
+	transform!(g,
+	    :COP_3 => (v -> fill(maximum(skipmissing(v)), length(v))) => :COP_3_max_f,
+	    :COP_3 => (v -> v ./ maximum(skipmissing(v)))             => :r_COP_3,
+	)
+	
+	# optional: deficit from the local max
+	df.p_r_COP_3 = df.r_COP_3 .- 1.0
+
+	freq_col = :f_ ∈ names(df) ? :f_ : (:f_meas ∈ names(df) ? :f_meas : name2)
+	df.r_fc_fp = df[!, freq_col] ./ df.N_pump
+
+    return df
+end
+
+
+  ╠═╡ =#
+
+# ╔═╡ fff91fa6-8ffb-458a-946d-244b5b13c3cd
+function multithreaded_grid_sweep(thermal_prob, hydraulic_prob, sys_thermal, 
+                                  base_params, param_sym1, values1, param_sym2, values2, solvers;
+                                  previous_sol_thermal=nothing, previous_sol_hydraulic=nothing)
+    n1 = length(values1)
+    n2 = length(values2)
+    
+    # Preallocate solution arrays
+    sols_thermal = Matrix{Any}(undef, n1, n2)
+    sols_hydraulic = Matrix{Any}(undef, n1, n2)
+    
+    # Calculate Manhattan distances
+    center_i = ceil(Int, n1/2)
+    center_j = ceil(Int, n2/2)
+    distances = [abs(i - center_i) + abs(j - center_j) for i in 1:n1, j in 1:n2]
+    max_distance = maximum(distances)
+    
+    # Compute parameter ranges for normalization
+    range1 = maximum(values1) - minimum(values1)
+    range2 = maximum(values2) - minimum(values2)
+    range1 = range1 == 0 ? 1.0 : range1  # Avoid division by zero
+    range2 = range2 == 0 ? 1.0 : range2
+    
+    # Solve center point with staged parameters
+    center_params = [
+        base_params...,
+        param_sym1 => values1[center_i],
+        param_sym2 => values2[center_j]
+    ]
+    
+    # Stage 1: Solve with base_params only if no previous solution
+    if previous_sol_thermal === nothing
+        staged_sol_thermal = solve_thermal_problem(
+            thermal_prob, 
+            nothing, 
+            base_params,  # Only base_params
+            solvers
+        )
+        staged_sol_hydraulic = solve_hydraulic_problem(
+            hydraulic_prob, 
+            nothing, 
+            base_params,
+            staged_sol_thermal, 
+            sys_thermal, 
+            solvers
+        )
+    else
+        staged_sol_thermal = previous_sol_thermal
+        staged_sol_hydraulic = previous_sol_hydraulic
+    end
+
+    # Stage 2: Solve with full parameters using staged solution as initial condition
+    sols_thermal[center_i, center_j] = solve_thermal_problem(
+        thermal_prob, 
+        staged_sol_thermal,  # Use staged solution
+        center_params,       # Full parameters with sweeps
+        solvers
+    )
+    
+    sols_hydraulic[center_i, center_j] = solve_hydraulic_problem(
+        hydraulic_prob, 
+        staged_sol_hydraulic, 
+        center_params,
+        sols_thermal[center_i, center_j], 
+        sys_thermal, 
+        solvers
+    )
+
+    # Create wavefronts (points grouped by distance from center)
+    wavefronts = [Tuple{Int,Int}[] for _ in 0:max_distance]
+    for i in 1:n1, j in 1:n2
+        d = distances[i, j]
+        if d > 0  # Skip center point
+            push!(wavefronts[d], (i, j))
+        end
+    end
+    
+    # Progress bar
+    total_points = n1 * n2 - 1  # Minus center point
+    p = Progress(total_points, 1, "Grid sweep progress: ")
+    
+    # Process wavefronts in order
+    for d in 1:max_distance
+        points = wavefronts[d]
+        isempty(points) && continue
+        
+        # Process all points in current wavefront
+        for idx in 1:length(points)
+            i, j = points[idx]
+            
+            # Find nearest solved neighbor in PARAMETER SPACE
+            best_thermal = nothing
+            best_hydraulic = nothing
+            min_param_dist = Inf
+            
+            # Search all solved points for closest in parameter space
+            for i2 in 1:n1, j2 in 1:n2
+                # Only consider solved points
+                if isassigned(sols_thermal, i2, j2) && sols_thermal[i2, j2] !== nothing
+                    # Compute normalized parameter distance
+                    param_dist = sqrt(
+                        ((values1[i] - values1[i2]) / range1)^2 +
+                        ((values2[j] - values2[j2]) / range2)^2
+                    )
+                    
+                    # Update best solution if closer
+                    if param_dist < min_param_dist
+                        min_param_dist = param_dist
+                        best_thermal = sols_thermal[i2, j2]
+                        best_hydraulic = sols_hydraulic[i2, j2]
+                    end
+                end
+            end
+            
+            # Fallback to center solution if no neighbors found
+            if best_thermal === nothing
+                best_thermal = sols_thermal[center_i, center_j]
+                best_hydraulic = sols_hydraulic[center_i, center_j]
+            end
+            
+            # Solve systems
+            current_params = [
+                base_params...,
+                param_sym1 => values1[i],
+                param_sym2 => values2[j]
+            ]
+            
+            # Step solving for better convergence
+            try
+                sol_thermal = solve_thermal_problem(
+                    thermal_prob, best_thermal, current_params, solvers
+                )
+                sol_hydraulic = solve_hydraulic_problem(
+                    hydraulic_prob, best_hydraulic, current_params,
+                    sol_thermal, sys_thermal, solvers
+                )
+            # Store solutions
+            sols_thermal[i, j] = sol_thermal
+            sols_hydraulic[i, j] = sol_hydraulic
+            catch e
+                # Fallback to center solution if direct solve fails
+                @warn "Solve failed at ($i,$j), retrying with center solution"
+                sol_thermal = solve_thermal_problem(
+                    thermal_prob, sols_thermal[center_i, center_j], current_params, solvers
+                )
+                sol_hydraulic = solve_hydraulic_problem(
+                    hydraulic_prob, sols_hydraulic[center_i, center_j], current_params,
+                    sol_thermal, sys_thermal, solvers
+                )
+            # Store solutions
+            sols_thermal[i, j] = sol_thermal
+            sols_hydraulic[i, j] = sol_hydraulic
+            end
+            
+            
+            next!(p)
+        end
+    end
+    
+    return sols_thermal, sols_hydraulic
+end
+
+# ╔═╡ 1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+# ╠═╡ show_logs = false
+sols_thermal2, sols_hydraulic2 = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
+#=╠═╡
+df_grid = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal2, sols_hydraulic2,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_
+);
+  ╠═╡ =#
+
+# ╔═╡ 02497be0-7d2f-43d1-b365-d4a8d72f045e
+#=╠═╡
+plot_heatmap(df_grid; xlogbase = :log)
+  ╠═╡ =#
+
+# ╔═╡ fc5900c1-9704-4384-9a29-be545faf74d6
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_3, levels=20, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ 8262db7e-b994-4afa-b823-661a0bb4949b
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Re_phx, levels=20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Reynolds PHX [-]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ eb8cd9d6-9237-4723-84d3-3f293d74d1e9
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_1, levels=3.0:0.05:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 1 (Compressor only) [-]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ 0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :COP_2, levels=3.0:0.05:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 2 (Including pump) [-]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ 6eab6576-10af-432d-abf6-42f424541e5b
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :T_evap,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ 8dea2e5f-82b5-408e-843d-c25b7d265d48
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,)
+  ╠═╡ =#
+
+# ╔═╡ b153b909-a8b2-4e5d-abe7-a3c1bad81358
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :fr_EV,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation fraction [-]", title = "Base scenario")
+  ╠═╡ =#
+
+# ╔═╡ 2be85177-c03c-48de-8d4f-c2053fcf2a13
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :η_bh, levels = 20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "")
+  ╠═╡ =#
+
+# ╔═╡ a24d0373-b198-42f6-a6bb-c2ede7259244
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_ref,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 74455461-5277-4fee-a53b-edf34e9e26f4
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ dc49f979-5f43-4234-864d-acfef268f5f9
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :P_pump, levels = 20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump power [W]", title = "")
+  ╠═╡ =#
+
+# ╔═╡ 50af6ba3-363d-4ca6-977a-7eb35919b27b
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Q_evap,levels = 20)
+
+  ╠═╡ =#
+
+# ╔═╡ 88cbfed8-9de9-4421-8dd0-8f42b82234bd
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :Q_cond,levels = 20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Condenser heat duty [W]", title = "")
+
+  ╠═╡ =#
+
+# ╔═╡ 9035962a-af30-4870-8ccb-c340892e81c3
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :r_fc_fp, levels = 20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump frequency ratio [-]", title = "")
+  ╠═╡ =#
+
+# ╔═╡ b6a370b1-bfe7-4324-b5a6-6018ddf55e12
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :T_out,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet temperature [°C]", title = "Base scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ d7b463f3-4a9d-4572-9ae6-eb5d4ea47531
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :T_in,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Inlet temperature [°C]", title = "Base scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 60d5e58e-237b-4f13-ba00-c50a5315ffd7
+#=╠═╡
+plot_contourf(df_grid; xlogbase = :log, zcol = :T_bot,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Bottom temperature [°C]", title = "Base scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ b9879207-d8b7-4465-b899-e7656e48e5fc
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.2,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 2 (Including pump) [-]", title = "",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 09b7509b-a308-49a4-966d-33d5ef7f9cb1
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:COP_3, levels=10,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 1945625f-482a-4eda-985d-7112b4cf432d
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:U_EV,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporator UA [W/K]", title = "",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 7386981b-7839-4588-aa68-5c4b3d461b06
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:U_SH,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Superheater UA [W/K]", title = "",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ daed3493-da2b-489c-b7ae-5bcd66bfc03b
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "Base scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 5e034021-1116-4d1d-8034-d582c8a9643f
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 1ce3b2c5-71ba-4a1f-ab48-961585e57943
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Base Scenario",    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 16928040-8730-4f0c-a67c-50f9d1ae852b
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 05d571f0-c990-430e-971c-965ba527e814
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 9fa61b9f-1d33-444f-9c1e-d7ed70933000
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 deficit [-]", title = "Base scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 2f8b1672-934b-4b93-9e05-6169ba730cc8
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:η_pump, levels = 0.0:0.05:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump efficiency [-]", title = "Base scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 6ebdb8db-d5cc-4d02-a471-1e29a29ab42b
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:r_COP_3, levels = [0.0, 0.5, 0.7, 0.9, 0.95, 0.99, 0.999,1.0],
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 [-]", title = ""
+)
+  ╠═╡ =#
+
+# ╔═╡ 97b66208-6b79-40dd-bfd9-b710807a4e3f
+#=╠═╡
+plot_contourf(df_grid;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 4.0,
+    zridge_labels = false)
+
+  ╠═╡ =#
+
+# ╔═╡ 960c408c-3040-4a00-b285-c01080cb1c02
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Q_cond,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Condenser heat duty [W]", title = "",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 644901ea-7778-4e7d-a5cf-44e34df77827
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:R_f1f2,
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 57e985e5-023c-4389-8e08-2185bed0751a
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:fr_EV, levels=0.0:0.1:1.0, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation fraction [-]", title = "", 
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ bb90f897-17d3-4a9d-a462-fd6d3f4d98e7
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:pump_compressor, levels = 0.0:0.01:0.2,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump/Compressor power ratio [-]", title = "",
+    overlays=ovs_plots_2
+)
+  ╠═╡ =#
+
+# ╔═╡ 6acbadd7-94f6-4399-ac5f-3a2724ce641c
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:r_fc_fp, levels = 0.2:0.2:1.8,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relataive frequency", title = "",     base_style = :lines, show_colorbar = false, labels_for_lines=true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 29e4a45f-7a0b-425b-90d5-b2fc84f43d10
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Δp_tot, levels = 0.2:0.2:1.8,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relataive frequency", title = "",     base_style = :lines, show_colorbar = true, labels_for_lines=true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 195ab453-b1f2-4632-9420-091f7f702ed7
+# ╠═╡ show_logs = false
+sols_thermal_cold, sols_hydraulic_cold = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_cold, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 517540bb-548e-4b97-8e96-bd674f8a9d18
+#=╠═╡
+df_grid_cold = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_cold, sols_hydraulic_cold,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_
+);
+  ╠═╡ =#
+
+# ╔═╡ e086552e-9ce0-4353-a16b-395d2986d1a9
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "Cold ground scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 4217415e-772c-44d2-8c3d-2e85cf01fb1e
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Cold ground scenario",    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 629aaec1-eca1-4b91-910d-5579b49c8df2
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:T_evap, levels = -10:0.5:0, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Cold ground scenario",
+    overlays=ovs_plots_2
+)
+  ╠═╡ =#
+
+# ╔═╡ 6ae2052e-907c-49b9-bb51-e2e3b0c641bc
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:COP_3, levels=2.5:0.1:4.0, palette=:viridis,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "Cold ground scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ a0332504-e854-4b16-bb9d-e5f4ca277f40
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 deficit [-]", title = "Colder wall scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 0bc8ed9a-6d4d-4983-a204-9b54ef7a1fa9
+#=╠═╡
+plot_contourf(df_grid_cold;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 4.0,
+    zridge_labels = false)
+
+  ╠═╡ =#
+
+# ╔═╡ bba28e41-70b6-409a-a4ec-1a1246261e82
+#=╠═╡
+plot_contourf(df_grid_cold;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :white,
+    zridge_linestyle = :dot,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 4.0,
+    zridge_labels = false)
+
+  ╠═╡ =#
+
+# ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
+# ╠═╡ show_logs = false
+sols_thermal_water, sols_hydraulic_water = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_water, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 6011e1fa-1058-4bce-bb65-fcdf25951bfa
+#=╠═╡
+df_grid_water = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_water, sols_hydraulic_water,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_
+);
+  ╠═╡ =#
+
+# ╔═╡ b72f0888-4716-48ec-8a99-fc068a988abf
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "Pure water scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ e6a2deea-3658-42b3-8ef9-83e31be5a300
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Pure Water Scenario",    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 5d5f3c09-164b-4a55-9bf1-b2bb90221465
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Pure water scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ e174ba39-dd8c-4af9-88c1-caa504af2c7b
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "Pure water scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 3b86a38d-9b62-4db0-b943-a1b973eb9b3c
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 deficit [-]", title = "Pure Water scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+) |> x -> save("cop3_pure_water_scenario.svg", x)
+  ╠═╡ =#
+
+# ╔═╡ 9beedddb-8b5a-4811-98cb-9a26ecd77b52
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:η_pump, levels = 0.0:0.05:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump efficiency [-]", title = "Pure water scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ eac9124f-ffa0-4a9a-948d-3c6e5ec0c7a2
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:fr_EV, levels=0.0:0.1:1.0, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation fraction [-]", title = "Pure water scenario", 
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
+# ╠═╡ show_logs = false
+sols_thermal_pipe, sols_hydraulic_pipe = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_pipe, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ 941dcb04-88be-43ae-bc21-ae3ef9dd0db0
+#=╠═╡
+df_grid_pipe = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_pipe, sols_hydraulic_pipe,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_
+);
+  ╠═╡ =#
+
+# ╔═╡ dfc85639-a09b-44fa-99af-61706a192549
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "Wider pipe scenario",
+    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 99e84662-a903-424d-b270-d665a52f479f
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Wider Pipe Scenario",    overlays=ovs_plots
+)
+  ╠═╡ =#
+
+# ╔═╡ 4175c8ba-346c-4afa-9267-ed7e689cff35
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Wider pipe scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 387e3115-866a-4831-bb59-a18edf749375
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:COP_3, levels=3.0:0.1:4.0, palette=:viridis,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "Wider pipe scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ a7e7ede3-1caa-4483-91f3-c26393f2b45a
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 deficit [-]", title = "Wider pipe scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+	
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+) |> x -> save("cop3_wider_pipe_scenario.svg", x)
+  ╠═╡ =#
+
+# ╔═╡ 5eed01c3-561f-490b-80d5-23db0846bfe3
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:η_pump, levels = 0.0:0.05:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Pump efficiency [-]", title = "Wider pipe scenario"
+)
+  ╠═╡ =#
+
+# ╔═╡ 8bc61318-43a1-447d-81a5-d2fed06799b2
+#=╠═╡
+plot_contourf(df_grid_pipe;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 4.0,
+    zridge_labels = false,)
+  ╠═╡ =#
+
+# ╔═╡ 592a2cfb-9d8a-481e-a39d-3147dc76b643
+# ╠═╡ show_logs = false
+sols_thermal_long, sols_hydraulic_long = multithreaded_grid_sweep(
+    thermal_prob, hydraulic_prob, sys_thermal,
+    base_params_long, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
+    previous_sol_thermal=nothing,
+    previous_sol_hydraulic=nothing
+)
+
+# ╔═╡ c2a86042-1d4b-498c-8370-0d38f73a2bfd
+#=╠═╡
+df_grid_long = process_grid_results(
+    log_ΔTSF_values, f_values,
+    sols_thermal_long, sols_hydraulic_long,
+    sys_thermal2, sys_hydraulic2;
+    name1 = :log_ΔTSF_,
+    name2 = :f_
+);
+  ╠═╡ =#
+
+# ╔═╡ d9a2618d-e923-4370-a20d-b8faf44bf06c
+#=╠═╡
+plot_contourf(
+    df_grid_long; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "Pure water scenario",
+    overlays=ovs_plots,
+    zridge_enable = true,
+    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
+    zridge_mode   = :max,
+    zridge_color  = :red,
+    zridge_linestyle = :solid,
+    zridge_method   = :parabolic,  # <- smoother than :resample
+			  
+    zridge_linewidth = 3.0,
+    zridge_labels = false,
+    # smooth limiter on pump speed
+    zridge_limit_col   = :r_N_pump,
+    zridge_min = 0.3, zridge_max = 1.0,
+    zridge_limit_interp = true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
+
+
+# ╔═╡ dfdcded3-026e-4925-ac02-ba801488b267
+
+
+# ╔═╡ 1abb42cf-af03-49a9-837b-902999a89744
+
+
+# ╔═╡ 51d3286a-d89d-41f5-88d5-bb361e76ff09
+
+
+# ╔═╡ 5e9e8e04-4aca-416d-a4b4-410b243fd722
+
+
+# ╔═╡ 47ab6638-1135-452c-ae79-bb5682094a51
+md" # Sampling and symbolic regression"
+
+# ╔═╡ 23899c17-5414-405e-9bb8-7f505b45e2f6
+begin
+	const QMC = QuasiMonteCarlo
+
+	# --- Canonical sampling over bounds (NamedTuple of (lo, hi)) ---
+	# Returns Vector{NamedTuple} of length n with keys matching `bounds`.
+	sample_canonical(bounds::NamedTuple; n::Int=512) = begin
+        syms = collect(keys(bounds))
+        lb   = Float64[first(bounds[k]) for k in syms]
+        ub   = Float64[last(bounds[k])  for k in syms]
+
+        X = QMC.sample(n, lb, ub, QMC.SobolSample())  # shape: d × n (cols are samples)
+
+        # Build one NamedTuple per *column*/sample
+        [NamedTuple{Tuple(syms)}(Tuple(col)) for col in eachcol(X)]
+    end
+
+	# --- Merge "vector of pairs" with overrides (last-write wins) ---
+	merge_pairs(base::AbstractVector{<:Pair}, overrides::AbstractVector{<:Pair}) = begin
+	    d = Dict(base); foreach(p -> (d[first(p)] = last(p)), overrides); collect(pairs(d))
+	end
+
+	 """
+        make_mapper(; transforms=Dict(), renames=Dict(), drop=Symbol[], base_params=nothing)
+
+    Build a mapper that:
+      • passes through EVERY key in θ as `:key => value` by default
+      • applies `transforms[key](value, θ, base_params)` when provided
+      • otherwise renames via `renames[key] => value`
+      • skips keys in `drop`
+
+    `transforms[key]` may return a `Pair`, a `Vector{<:Pair}`, a `NamedTuple`,
+    or a plain value (then the target name is taken from `renames[key]` or defaults to the same key).
+    """
+    function make_mapper(; transforms=Dict{Symbol,Function}(),
+                           renames=Dict{Symbol,Symbol}(),
+                           drop=Symbol[],
+                           base_params=nothing)
+
+        # Return a closure that accepts θ (and optionally base_params if you prefer calling it directly)
+        return function (θ::NamedTuple)
+            ov = Pair[]
+            for s in propertynames(θ)  # iterate canonical keys  # :contentReference[oaicite:2]{index=2}
+                s in drop && continue
+                val = getproperty(θ, s)
+
+                if haskey(transforms, s)
+                    out = transforms[s](val, θ, base_params)
+                    if out isa Pair
+                        push!(ov, out)
+                    elseif out isa AbstractVector{<:Pair}
+                        append!(ov, out)
+                    elseif out isa NamedTuple
+                        append!(ov, collect(pairs(out)))
+                    else
+                        # plain value: map to renamed key if provided, else same key
+                        target = get(renames, s, s)
+                        push!(ov, target => out)
+                    end
+                else
+                    target = get(renames, s, s)
+                    push!(ov, target => val)  # default pass-through
+                end
+            end
+            return ov
+        end
+    end
+
+	make_params(base_params::AbstractVector{<:Pair}, θ::NamedTuple; mapper=default_mapper) = merge_pairs(base_params, mapper(θ))
+end
+
+
+# ╔═╡ 312118cb-b321-4d8a-b1d9-62411134a980
+begin
+	# Pick super-simple physical bounds to start (edit as you wish)
+	canon_bounds = (
+	    T_wall = ( -5.0+273.15, 15.0+273.15),    # K
+	    L_BHE = ( 50, 300),    # m
+		ΔTSF = (1, 8),
+		f_ = (10, 50),
+		
+	)
+
+	points = sample_canonical(canon_bounds; n=3600);
+
+end;
+
+
+# ╔═╡ e319da9f-acb5-43e4-830f-01822b9a19ab
+"""
+	run_cloud_sweep(thermal_prob, hydraulic_prob, sys_thermal,
+					 base_params, points::Vector{<:NamedTuple}, solvers;
+					 mapper = default_mapper)
+
+Solve center first, then iterate points in increasing distance from the center,
+seeding each solve with the *closest solved* neighbor so far (normalized Euclidean).
+
+Returns (solT::Vector{Any}, solH::Vector{Any}, points::Vector{NamedTuple})
+"""
+function run_cloud_sweep(thermal_prob, hydraulic_prob, sys_thermal,
+                         base_params::AbstractVector{<:Pair},
+                         points::AbstractVector{<:NamedTuple},
+                         solvers; mapper=default_mapper)
+
+	@assert !isempty(points)
+	syms = collect(keys(points[1]))
+
+	# normalize each dim to [0,1] over the sampled set
+	mat  = reduce(hcat, [[p[s] for s in syms] for p in points])'  # n×d
+	mins = mapslices(minimum, mat; dims=1)[:] 
+	rngs = mapslices(x->max(maximum(x)-minimum(x), 1e-12), mat; dims=1)[:]
+	embed(v::AbstractVector) = (v .- mins) ./ rngs
+	embed(θ::NamedTuple)     = embed([θ[s] for s in syms])
+
+	# pick center as the sample closest to the coordinate-wise median
+	med  = mapslices(median, mat; dims=1)[:]
+	center_idx = argmin(sum(abs2, embed(mat[i,:]) .- embed(med)) for i in 1:size(mat,1))
+	center     = points[center_idx]
+
+	# Stage 1: staged/base → Stage 2: full center (like your 2D code)
+	staged_T = solve_thermal_problem(thermal_prob, nothing, base_params, solvers)
+	staged_H = solve_hydraulic_problem(hydraulic_prob, nothing, base_params,
+									   staged_T, sys_thermal, solvers)
+	center_params = make_params(base_params, center; mapper=mapper)
+	solT_c = solve_thermal_problem(thermal_prob, staged_T, center_params, solvers)
+	solH_c = solve_hydraulic_problem(hydraulic_prob, staged_H, center_params,
+									 solT_c, sys_thermal, solvers)
+
+	n = length(points)
+	solT = Vector{Any}(undef, n); solH = Vector{Any}(undef, n)
+	solved = Int[]; push!(solved, center_idx)
+	solT[center_idx] = solT_c; solH[center_idx] = solH_c
+
+	# order remaining by distance from center
+	xc = embed(center)
+	order = sortperm(1:n; by = i -> sum(abs2, embed(points[i]) .- xc))
+	order = filter(!=(center_idx), order)
+
+	for idx in order
+		θ  = points[idx]; x = embed(θ)
+		# find nearest solved neighbor (brute force is simplest & fine to start)
+		nearest = argmin( sum(abs2, x .- embed(points[j])) for j in solved )
+		seed_idx = solved[nearest]
+		seedT, seedH = solT[seed_idx], solH[seed_idx]
+		params = make_params(base_params, θ; mapper=mapper)
+
+		# try with nearest seed; on failure, fallback to center seeds
+		local st, sh
+		try
+			st = solve_thermal_problem(thermal_prob, seedT, params, solvers)
+			sh = solve_hydraulic_problem(hydraulic_prob, seedH, params, st, sys_thermal, solvers)
+		catch
+			st = solve_thermal_problem(thermal_prob, solT_c, params, solvers)
+			sh = solve_hydraulic_problem(hydraulic_prob, solH_c, params, st, sys_thermal, solvers)
+		end
+		solT[idx] = st; solH[idx] = sh
+		push!(solved, idx)
+	end
+
+	return solT, solH, points
+end
+
+# ╔═╡ 31aa8e9b-9122-497f-866f-ef359f7604ad
+#=╠═╡
+function collect_cloud_results(points, results_thermal, results_hydraulic,
+							  sys_thermal, sys_hydraulic; target_Q_cond::Real = NaN)
+	rows = NamedTuple[]
+
+	for i in eachindex(points)
+		θ     = points[i]
+		therm = results_thermal[i]
+		hyd   = results_hydraulic[i]
+
+		# --- thermal (unchanged from your code) ---
+		ṁ_sf      = exp( therm[sys_thermal.γṁ_sf] )
+		ṁ_ref     = exp( therm[sys_thermal.γṁ_ref] )
+		T_in       = therm[sys_thermal.cycle.T_i_b] .- 273.15
+		T_mid      = therm[sys_thermal.cycle.evaporator.T_mid_1] .- 273.15
+		T_out      = therm[sys_thermal.cycle.T_o_b] .- 273.15
+		T_bot      = therm[sys_thermal.bhe_thermal.thermal.T_b] .- 273.15
+		T_comp_in  = therm[sys_thermal.cycle.evaporator.T_out_2] .- 273.15
+		ΔT         = T_in - T_out
+		
+
+		fr_SH      = zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh])
+		fr_EV      = 1 - fr_SH
+		T_evap     = therm[sys_thermal.cycle.evaporator.sh.propref.Tsat] .- 273.15
+		Q_evap     = therm[sys_thermal.Q_evap]
+		Q_cond     = -therm[sys_thermal.Q_cond]
+		W_comp     = therm[sys_thermal.W_comp]
+		COP_1      = therm[sys_thermal.COP1]
+		U_EV       = therm[sys_thermal.cycle.evaporator.ev.base.U]
+		U_SH       = therm[sys_thermal.cycle.evaporator.sh.base.U]
+
+		# --- hydraulic (unchanged) ---
+		Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]          / 1e5
+		Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]     / 1e5
+		Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]    / 1e5
+		P_pump     = hyd[sys_hydraulic.pump.base.P_elec]
+		N_pump     = hyd[sys_hydraulic.pump.base.N]
+		COP_2      = Q_cond / (W_comp + P_pump)
+
+		# --- PHX Reynolds ---
+		ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
+							  hyd[sys_hydraulic.phx.props.μ],
+							  hyd[sys_hydraulic.phx.base.ṁ]
+		b_phx, W_phx, np_phx, ϕ_phx = hyd[sys_hydraulic.phx.b],
+									 hyd[sys_hydraulic.phx.W],
+									 hyd[sys_hydraulic.phx.np],
+									 hyd[sys_hydraulic.phx.ϕ]
+		nch     = (np_phx - 1)/2
+		A_flow  = nch * W_phx * (2*b_phx)
+		v_phx   = abs(ṁ_phx)/(ρ_phx*A_flow)
+		dh_phx  = 2*b_phx/ϕ_phx
+		Re_phx  = ρ_phx * v_phx * dh_phx / μ_phx
+
+		# --- BHE legs ---
+		ρ1 = hyd[sys_hydraulic.bhe.leg1.props.ρ]
+		μ1 = hyd[sys_hydraulic.bhe.leg1.props.μ]
+		D1 = hyd[sys_hydraulic.bhe.leg1.Di]
+		Re_bhe_leg1 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D1 / (μ1 * π*(D1/2)^2)
+
+		ρ2 = hyd[sys_hydraulic.bhe.leg2.props.ρ]
+		μ2 = hyd[sys_hydraulic.bhe.leg2.props.μ]
+		D2 = hyd[sys_hydraulic.bhe.leg2.Di]
+		Re_bhe_leg2 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D2 / (μ2 * π*(D2/2)^2)
+
+		# --- BHE thermal & resistances ---
+		η_bh   = therm[sys_thermal.bhe_thermal.ϵ]
+		R_1b    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
+		R_2b    = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
+		R_12    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
+		R_f1b   = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
+		R_f2b   = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
+		R_f1f2  = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
+
+		# row: include canonical params first so they become columns too
+		row = (; θ...,
+				ṁ_sf, ṁ_ref, T_in, T_mid, T_out, ΔT, T_bot, T_evap, T_comp_in,
+				Q_evap, Q_cond, W_comp, COP_1, U_EV, U_SH, fr_EV, fr_SH,
+				Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, COP_2,
+				Re_phx, Re_bhe_leg1, Re_bhe_leg2,
+				η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2)
+		push!(rows, row)
+	end
+
+	df = DataFrame(rows)
+
+	# Aux heater and COP_3 (global target or none)
+	if isnan(target_Q_cond)
+		# group by last canonical param just to have a grouping (tweak if you like)
+		lastkey = propertynames(points[1])[end]
+		gdf = groupby(df, lastkey)
+		transform!(gdf, :Q_cond => maximum => :Qmax_same_group)
+		df.P_aux_heating = max.(0, df.Qmax_same_group .- df.Q_cond)
+	else
+		df.P_aux_heating = max.(0, target_Q_cond .- df.Q_cond)
+	end
+	df.COP_3 = (df.Q_cond .+ df.P_aux_heating) ./ (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
+	df
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 6ccf5d2b-1e32-4aa6-bea2-f1830e795280
+# ╠═╡ show_logs = false
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	# exceptions:
+	transforms = Dict(
+	    :ΔTSF      => (v, θ, bp) -> :log_ΔTSF_ => log(v),    # map ΔTSF → log_ΔTSF_
+	)
+	renames = Dict(
+	    :log_ΔTSF_ => :log_ΔTSF_ # (no-op)
+	)
+
+	# build the mapper
+	mapper = make_mapper(; transforms, renames)
+
+
+	# Run the sweep (sequential & sturdy)
+	solT, solH, pts = run_cloud_sweep(
+		thermal_prob, hydraulic_prob, sys_thermal,
+		base_params, points, solvers;
+		mapper = mapper
+	)
+
+	# Pack into one DataFrame
+	df_cloud = collect_cloud_results(pts, solT, solH, sys_thermal, sys_hydraulic);
+end;
+  ╠═╡ =#
+
+# ╔═╡ 0e0ec7a4-31a2-4583-a8e5-0a44f48d2c59
+#=╠═╡
+df_cloud
+  ╠═╡ =#
 
 # ╔═╡ 794b5b4d-62d7-4dda-a379-a7f1d9af7573
 md"## 1) Operators (physics-y, NaN-safe)"
@@ -4281,11 +7218,107 @@ end
 # ╔═╡ e78e5fac-9201-4208-a643-3583eecae761
 md"## 3) Choose columns + (optional) filter rows"
 
+# ╔═╡ a8a0c668-be27-4e64-8a03-039c3bf07df8
+#=╠═╡
+begin
+	ys_m = [:W_comp; :P_pump; :Q_cond; :ṁ_sf; :ṁ_ref]
+	xs_m = [:T_wall; :L_BHE; :ΔTSF; :f_]
+	
+	# optional row filter (example from your earlier step)
+	df_sub = copy(df_cloud)
+end
+  ╠═╡ =#
+
+# ╔═╡ 92b07487-ebec-4026-989a-bf1bcdc9d1c9
+#=╠═╡
+begin
+	# add units to X and y columns
+	dfu = copy(df_sub)
+	dfu.T_wall .= dfu.T_wall .* us"K"
+	dfu.L_BHE  .= dfu.L_BHE  .* us"m"
+	dfu.ΔTSF   .= dfu.ΔTSF   .* us"K"
+	dfu.f_     .= dfu.f_     .* us"Hz"
+	
+	dfu.W_comp .= dfu.W_comp .* us"W"
+	dfu.Q_cond .= dfu.Q_cond .* us"W"
+	dfu.ṁ_sf  .= dfu.ṁ_sf  .* us"kg/s"
+	dfu.ṁ_ref .= dfu.ṁ_ref .* us"kg/s"
+end
+
+  ╠═╡ =#
+
 # ╔═╡ 3812a920-c1f8-4ecd-ae82-8d5ab03b3522
 md"## 4) Fit SR, show best formulas"
 
+# ╔═╡ 76482fe3-b1c0-4a40-a41a-a95362d181ee
+# ╠═╡ show_logs = false
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	model_mt = MultitargetSRRegressor(
+	    niterations = 500,
+	    binary_operators = [+, -, *, /, amean, lmean],
+	    unary_operators  = [sqrt, erf, log, exp],
+	    dimensional_constraint_penalty = 1e5,   # strongly discourage unit violations
+	    seed = 0, turbo = true
+	)
+
+	
+	sr_m = sr_fit_multi(dfu; ys=ys_m, x=xs_m, model=model_mt)
+	r = sr_m.report
+	print_best_equations(r, ys_m)
+end
+  ╠═╡ =#
+
 # ╔═╡ dd40bbe0-6b5c-4bcc-a371-f6a956b7759b
 md"## 5) Predictions on training set + long table"
+
+# ╔═╡ 1a0f0c34-0fe2-44ef-b67b-8ecb51732f7f
+# ╠═╡ show_logs = false
+#=╠═╡
+begin
+	# make predictions with the best member per target
+	Xtrain   = select(dfu, xs_m)
+	Ytrain   = select(dfu, ys_m)
+	best     = r.best_idx
+	Yhat_tbl = sr_predict_multi(sr_m.mach, Xtrain; idx=best)
+	
+	# build tidy long table: :row, :target, :actual, :predicted
+	dfA = select(Ytrain, ys_m); dfP = select(Yhat_tbl, ys_m)
+	dfA.row = 1:nrow(dfA); dfP.row = 1:nrow(dfP)
+	longA = stack(dfA, Not(:row); variable_name=:target, value_name=:actual)
+	longP = stack(dfP, Not(:row); variable_name=:target, value_name=:predicted)
+	df_long = innerjoin(longA, longP, on=[:row, :target])
+end
+  ╠═╡ =#
+
+# ╔═╡ 65f2bffb-80eb-42f6-9685-bd719b0f61ed
+#=╠═╡
+eqs_per_target = r.equation_strings    # Vector{Vector{String}}
+  ╠═╡ =#
+
+# ╔═╡ e7f2b4bd-7b17-41d8-9c60-a41d88181456
+#=╠═╡
+best_idxs      = r.best_idx            # Vector{Int}
+  ╠═╡ =#
+
+# ╔═╡ 3a4edf4f-d73b-4dd0-a706-da7f14c4801b
+#=╠═╡
+targets        = ys_m
+  ╠═╡ =#
+
+# ╔═╡ 01ee0a4e-6d90-44ea-8119-bfd48892bff1
+#=╠═╡
+for (i, t) in pairs(targets)           # i is the target index (1..length(ys_m))
+    idx = best_idxs[i]                 # pick the best for this target
+    println("Best for $t: (idx=$idx) ", eqs_per_target[i][idx])
+end
+  ╠═╡ =#
+
+# ╔═╡ 19f8c59d-f243-45db-837c-f664193b24a4
+#=╠═╡
+plot_pred_vs_actual_long(df_long)
+  ╠═╡ =#
 
 # ╔═╡ e2a509cf-f4eb-4db2-9cf9-b390e3c36cd8
 md"## 2-D parametric study (grid → predict → contour)"
@@ -4559,394 +7592,6 @@ end
 # ╔═╡ 39f35083-8fbd-4c1b-8e3b-796752dc8850
 md"### Example: contour of predicted `Q_cond` over (ΔTSF, f_)"
 
-# ╔═╡ 23899c17-5414-405e-9bb8-7f505b45e2f6
-begin
-	const QMC = QuasiMonteCarlo
-
-	# --- Canonical sampling over bounds (NamedTuple of (lo, hi)) ---
-	# Returns Vector{NamedTuple} of length n with keys matching `bounds`.
-	sample_canonical(bounds::NamedTuple; n::Int=512) = begin
-        syms = collect(keys(bounds))
-        lb   = Float64[first(bounds[k]) for k in syms]
-        ub   = Float64[last(bounds[k])  for k in syms]
-
-        X = QMC.sample(n, lb, ub, QMC.SobolSample())  # shape: d × n (cols are samples)
-
-        # Build one NamedTuple per *column*/sample
-        [NamedTuple{Tuple(syms)}(Tuple(col)) for col in eachcol(X)]
-    end
-
-	# --- Merge "vector of pairs" with overrides (last-write wins) ---
-	merge_pairs(base::AbstractVector{<:Pair}, overrides::AbstractVector{<:Pair}) = begin
-	    d = Dict(base); foreach(p -> (d[first(p)] = last(p)), overrides); collect(pairs(d))
-	end
-
-	 """
-        make_mapper(; transforms=Dict(), renames=Dict(), drop=Symbol[], base_params=nothing)
-
-    Build a mapper that:
-      • passes through EVERY key in θ as `:key => value` by default
-      • applies `transforms[key](value, θ, base_params)` when provided
-      • otherwise renames via `renames[key] => value`
-      • skips keys in `drop`
-
-    `transforms[key]` may return a `Pair`, a `Vector{<:Pair}`, a `NamedTuple`,
-    or a plain value (then the target name is taken from `renames[key]` or defaults to the same key).
-    """
-    function make_mapper(; transforms=Dict{Symbol,Function}(),
-                           renames=Dict{Symbol,Symbol}(),
-                           drop=Symbol[],
-                           base_params=nothing)
-
-        # Return a closure that accepts θ (and optionally base_params if you prefer calling it directly)
-        return function (θ::NamedTuple)
-            ov = Pair[]
-            for s in propertynames(θ)  # iterate canonical keys  # :contentReference[oaicite:2]{index=2}
-                s in drop && continue
-                val = getproperty(θ, s)
-
-                if haskey(transforms, s)
-                    out = transforms[s](val, θ, base_params)
-                    if out isa Pair
-                        push!(ov, out)
-                    elseif out isa AbstractVector{<:Pair}
-                        append!(ov, out)
-                    elseif out isa NamedTuple
-                        append!(ov, collect(pairs(out)))
-                    else
-                        # plain value: map to renamed key if provided, else same key
-                        target = get(renames, s, s)
-                        push!(ov, target => out)
-                    end
-                else
-                    target = get(renames, s, s)
-                    push!(ov, target => val)  # default pass-through
-                end
-            end
-            return ov
-        end
-    end
-
-	make_params(base_params::AbstractVector{<:Pair}, θ::NamedTuple; mapper=default_mapper) = merge_pairs(base_params, mapper(θ))
-end
-
-
-# ╔═╡ 312118cb-b321-4d8a-b1d9-62411134a980
-begin
-	# Pick super-simple physical bounds to start (edit as you wish)
-	canon_bounds = (
-	    T_wall = ( -5.0+273.15, 15.0+273.15),    # K
-	    L_BHE = ( 50, 300),    # m
-		ΔTSF = (1, 8),
-		f_ = (10, 50),
-		
-	)
-
-	points = sample_canonical(canon_bounds; n=3600);
-
-end;
-
-
-# ╔═╡ e319da9f-acb5-43e4-830f-01822b9a19ab
-"""
-	run_cloud_sweep(thermal_prob, hydraulic_prob, sys_thermal,
-					 base_params, points::Vector{<:NamedTuple}, solvers;
-					 mapper = default_mapper)
-
-Solve center first, then iterate points in increasing distance from the center,
-seeding each solve with the *closest solved* neighbor so far (normalized Euclidean).
-
-Returns (solT::Vector{Any}, solH::Vector{Any}, points::Vector{NamedTuple})
-"""
-function run_cloud_sweep(thermal_prob, hydraulic_prob, sys_thermal,
-                         base_params::AbstractVector{<:Pair},
-                         points::AbstractVector{<:NamedTuple},
-                         solvers; mapper=default_mapper)
-
-	@assert !isempty(points)
-	syms = collect(keys(points[1]))
-
-	# normalize each dim to [0,1] over the sampled set
-	mat  = reduce(hcat, [[p[s] for s in syms] for p in points])'  # n×d
-	mins = mapslices(minimum, mat; dims=1)[:] 
-	rngs = mapslices(x->max(maximum(x)-minimum(x), 1e-12), mat; dims=1)[:]
-	embed(v::AbstractVector) = (v .- mins) ./ rngs
-	embed(θ::NamedTuple)     = embed([θ[s] for s in syms])
-
-	# pick center as the sample closest to the coordinate-wise median
-	med  = mapslices(median, mat; dims=1)[:]
-	center_idx = argmin(sum(abs2, embed(mat[i,:]) .- embed(med)) for i in 1:size(mat,1))
-	center     = points[center_idx]
-
-	# Stage 1: staged/base → Stage 2: full center (like your 2D code)
-	staged_T = solve_thermal_problem(thermal_prob, nothing, base_params, solvers)
-	staged_H = solve_hydraulic_problem(hydraulic_prob, nothing, base_params,
-									   staged_T, sys_thermal, solvers)
-	center_params = make_params(base_params, center; mapper=mapper)
-	solT_c = solve_thermal_problem(thermal_prob, staged_T, center_params, solvers)
-	solH_c = solve_hydraulic_problem(hydraulic_prob, staged_H, center_params,
-									 solT_c, sys_thermal, solvers)
-
-	n = length(points)
-	solT = Vector{Any}(undef, n); solH = Vector{Any}(undef, n)
-	solved = Int[]; push!(solved, center_idx)
-	solT[center_idx] = solT_c; solH[center_idx] = solH_c
-
-	# order remaining by distance from center
-	xc = embed(center)
-	order = sortperm(1:n; by = i -> sum(abs2, embed(points[i]) .- xc))
-	order = filter(!=(center_idx), order)
-
-	for idx in order
-		θ  = points[idx]; x = embed(θ)
-		# find nearest solved neighbor (brute force is simplest & fine to start)
-		nearest = argmin( sum(abs2, x .- embed(points[j])) for j in solved )
-		seed_idx = solved[nearest]
-		seedT, seedH = solT[seed_idx], solH[seed_idx]
-		params = make_params(base_params, θ; mapper=mapper)
-
-		# try with nearest seed; on failure, fallback to center seeds
-		local st, sh
-		try
-			st = solve_thermal_problem(thermal_prob, seedT, params, solvers)
-			sh = solve_hydraulic_problem(hydraulic_prob, seedH, params, st, sys_thermal, solvers)
-		catch
-			st = solve_thermal_problem(thermal_prob, solT_c, params, solvers)
-			sh = solve_hydraulic_problem(hydraulic_prob, solH_c, params, st, sys_thermal, solvers)
-		end
-		solT[idx] = st; solH[idx] = sh
-		push!(solved, idx)
-	end
-
-	return solT, solH, points
-end
-
-# ╔═╡ 31aa8e9b-9122-497f-866f-ef359f7604ad
-#=╠═╡
-function collect_cloud_results(points, results_thermal, results_hydraulic,
-							  sys_thermal, sys_hydraulic; target_Q_cond::Real = NaN)
-	rows = NamedTuple[]
-
-	for i in eachindex(points)
-		θ     = points[i]
-		therm = results_thermal[i]
-		hyd   = results_hydraulic[i]
-
-		# --- thermal (unchanged from your code) ---
-		ṁ_sf      = exp( therm[sys_thermal.γṁ_sf] )
-		ṁ_ref     = exp( therm[sys_thermal.γṁ_ref] )
-		T_in       = therm[sys_thermal.cycle.T_i_b] .- 273.15
-		T_mid      = therm[sys_thermal.cycle.evaporator.T_mid_1] .- 273.15
-		T_out      = therm[sys_thermal.cycle.T_o_b] .- 273.15
-		T_bot      = therm[sys_thermal.bhe_thermal.thermal.T_b] .- 273.15
-		T_comp_in  = therm[sys_thermal.cycle.evaporator.T_out_2] .- 273.15
-		ΔT         = T_in - T_out
-		
-
-		fr_SH      = zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh])
-		fr_EV      = 1 - fr_SH
-		T_evap     = therm[sys_thermal.cycle.evaporator.sh.propref.Tsat] .- 273.15
-		Q_evap     = therm[sys_thermal.Q_evap]
-		Q_cond     = -therm[sys_thermal.Q_cond]
-		W_comp     = therm[sys_thermal.W_comp]
-		COP_1      = therm[sys_thermal.COP1]
-		U_EV       = therm[sys_thermal.cycle.evaporator.ev.base.U]
-		U_SH       = therm[sys_thermal.cycle.evaporator.sh.base.U]
-
-		# --- hydraulic (unchanged) ---
-		Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]          / 1e5
-		Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]     / 1e5
-		Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]    / 1e5
-		P_pump     = hyd[sys_hydraulic.pump.base.P_elec]
-		N_pump     = hyd[sys_hydraulic.pump.base.N]
-		COP_2      = Q_cond / (W_comp + P_pump)
-
-		# --- PHX Reynolds ---
-		ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
-							  hyd[sys_hydraulic.phx.props.μ],
-							  hyd[sys_hydraulic.phx.base.ṁ]
-		b_phx, W_phx, np_phx, ϕ_phx = hyd[sys_hydraulic.phx.b],
-									 hyd[sys_hydraulic.phx.W],
-									 hyd[sys_hydraulic.phx.np],
-									 hyd[sys_hydraulic.phx.ϕ]
-		nch     = (np_phx - 1)/2
-		A_flow  = nch * W_phx * (2*b_phx)
-		v_phx   = abs(ṁ_phx)/(ρ_phx*A_flow)
-		dh_phx  = 2*b_phx/ϕ_phx
-		Re_phx  = ρ_phx * v_phx * dh_phx / μ_phx
-
-		# --- BHE legs ---
-		ρ1 = hyd[sys_hydraulic.bhe.leg1.props.ρ]
-		μ1 = hyd[sys_hydraulic.bhe.leg1.props.μ]
-		D1 = hyd[sys_hydraulic.bhe.leg1.Di]
-		Re_bhe_leg1 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D1 / (μ1 * π*(D1/2)^2)
-
-		ρ2 = hyd[sys_hydraulic.bhe.leg2.props.ρ]
-		μ2 = hyd[sys_hydraulic.bhe.leg2.props.μ]
-		D2 = hyd[sys_hydraulic.bhe.leg2.Di]
-		Re_bhe_leg2 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D2 / (μ2 * π*(D2/2)^2)
-
-		# --- BHE thermal & resistances ---
-		η_bh   = therm[sys_thermal.bhe_thermal.ϵ]
-		R_1b    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
-		R_2b    = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
-		R_12    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
-		R_f1b   = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
-		R_f2b   = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
-		R_f1f2  = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
-
-		# row: include canonical params first so they become columns too
-		row = (; θ...,
-				ṁ_sf, ṁ_ref, T_in, T_mid, T_out, ΔT, T_bot, T_evap, T_comp_in,
-				Q_evap, Q_cond, W_comp, COP_1, U_EV, U_SH, fr_EV, fr_SH,
-				Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, COP_2,
-				Re_phx, Re_bhe_leg1, Re_bhe_leg2,
-				η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2)
-		push!(rows, row)
-	end
-
-	df = DataFrame(rows)
-
-	# Aux heater and COP_3 (global target or none)
-	if isnan(target_Q_cond)
-		# group by last canonical param just to have a grouping (tweak if you like)
-		lastkey = propertynames(points[1])[end]
-		gdf = groupby(df, lastkey)
-		transform!(gdf, :Q_cond => maximum => :Qmax_same_group)
-		df.P_aux_heating = max.(0, df.Qmax_same_group .- df.Q_cond)
-	else
-		df.P_aux_heating = max.(0, target_Q_cond .- df.Q_cond)
-	end
-	df.COP_3 = (df.Q_cond .+ df.P_aux_heating) ./ (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
-	df
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 6ccf5d2b-1e32-4aa6-bea2-f1830e795280
-# ╠═╡ show_logs = false
-#=╠═╡
-begin
-	# exceptions:
-	transforms = Dict(
-	    :ΔTSF      => (v, θ, bp) -> :log_ΔTSF_ => log(v),    # map ΔTSF → log_ΔTSF_
-	)
-	renames = Dict(
-	    :log_ΔTSF_ => :log_ΔTSF_ # (no-op)
-	)
-
-	# build the mapper
-	mapper = make_mapper(; transforms, renames)
-
-
-	# Run the sweep (sequential & sturdy)
-	solT, solH, pts = run_cloud_sweep(
-		thermal_prob, hydraulic_prob, sys_thermal,
-		base_params, points, solvers;
-		mapper = mapper
-	)
-
-	# Pack into one DataFrame
-	df_cloud = collect_cloud_results(pts, solT, solH, sys_thermal, sys_hydraulic);
-end;
-  ╠═╡ =#
-
-# ╔═╡ 0e0ec7a4-31a2-4583-a8e5-0a44f48d2c59
-#=╠═╡
-df_cloud
-  ╠═╡ =#
-
-# ╔═╡ a8a0c668-be27-4e64-8a03-039c3bf07df8
-#=╠═╡
-begin
-	ys_m = [:W_comp; :P_pump; :Q_cond; :ṁ_sf; :ṁ_ref]
-	xs_m = [:T_wall; :L_BHE; :ΔTSF; :f_]
-	
-	# optional row filter (example from your earlier step)
-	df_sub = copy(df_cloud)
-end
-  ╠═╡ =#
-
-# ╔═╡ 92b07487-ebec-4026-989a-bf1bcdc9d1c9
-#=╠═╡
-begin
-	# add units to X and y columns
-	dfu = copy(df_sub)
-	dfu.T_wall .= dfu.T_wall .* us"K"
-	dfu.L_BHE  .= dfu.L_BHE  .* us"m"
-	dfu.ΔTSF   .= dfu.ΔTSF   .* us"K"
-	dfu.f_     .= dfu.f_     .* us"Hz"
-	
-	dfu.W_comp .= dfu.W_comp .* us"W"
-	dfu.Q_cond .= dfu.Q_cond .* us"W"
-	dfu.ṁ_sf  .= dfu.ṁ_sf  .* us"kg/s"
-	dfu.ṁ_ref .= dfu.ṁ_ref .* us"kg/s"
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 76482fe3-b1c0-4a40-a41a-a95362d181ee
-# ╠═╡ show_logs = false
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	model_mt = MultitargetSRRegressor(
-	    niterations = 500,
-	    binary_operators = [+, -, *, /, amean, lmean],
-	    unary_operators  = [sqrt, erf, log, exp],
-	    dimensional_constraint_penalty = 1e5,   # strongly discourage unit violations
-	    seed = 0, turbo = true
-	)
-
-	
-	sr_m = sr_fit_multi(dfu; ys=ys_m, x=xs_m, model=model_mt)
-	r = sr_m.report
-	print_best_equations(r, ys_m)
-end
-  ╠═╡ =#
-
-# ╔═╡ 65f2bffb-80eb-42f6-9685-bd719b0f61ed
-#=╠═╡
-eqs_per_target = r.equation_strings    # Vector{Vector{String}}
-  ╠═╡ =#
-
-# ╔═╡ e7f2b4bd-7b17-41d8-9c60-a41d88181456
-#=╠═╡
-best_idxs      = r.best_idx            # Vector{Int}
-  ╠═╡ =#
-
-# ╔═╡ 1a0f0c34-0fe2-44ef-b67b-8ecb51732f7f
-# ╠═╡ show_logs = false
-#=╠═╡
-begin
-	# make predictions with the best member per target
-	Xtrain   = select(dfu, xs_m)
-	Ytrain   = select(dfu, ys_m)
-	best     = r.best_idx
-	Yhat_tbl = sr_predict_multi(sr_m.mach, Xtrain; idx=best)
-	
-	# build tidy long table: :row, :target, :actual, :predicted
-	dfA = select(Ytrain, ys_m); dfP = select(Yhat_tbl, ys_m)
-	dfA.row = 1:nrow(dfA); dfP.row = 1:nrow(dfP)
-	longA = stack(dfA, Not(:row); variable_name=:target, value_name=:actual)
-	longP = stack(dfP, Not(:row); variable_name=:target, value_name=:predicted)
-	df_long = innerjoin(longA, longP, on=[:row, :target])
-end
-  ╠═╡ =#
-
-# ╔═╡ 3a4edf4f-d73b-4dd0-a706-da7f14c4801b
-#=╠═╡
-targets        = ys_m
-  ╠═╡ =#
-
-# ╔═╡ 01ee0a4e-6d90-44ea-8119-bfd48892bff1
-#=╠═╡
-for (i, t) in pairs(targets)           # i is the target index (1..length(ys_m))
-    idx = best_idxs[i]                 # pick the best for this target
-    println("Best for $t: (idx=$idx) ", eqs_per_target[i][idx])
-end
-  ╠═╡ =#
-
 # ╔═╡ c4355205-1929-48ec-9582-5b3d2b9255d3
 #=╠═╡
 begin
@@ -4977,1083 +7622,6 @@ begin
 end
 
   ╠═╡ =#
-
-# ╔═╡ 2097d037-7f79-4fe2-b683-b74b77d98752
-function plot_pred_vs_actual_long(df_long; markersize=2, width=1200, row_height=240, band_pct=0.10)
-    targets = collect(unique(df_long.target))
-    n = length(targets)
-    fig = Figure(resolution=(width, max(200, row_height*n)))
-    colsize!(fig.layout, 1, Relative(1.0))
-
-    for (i, t) in enumerate(targets)
-        df_t = df_long[df_long.target .== t, :]
-
-        # let AoG handle plotting of unitful columns
-        ax = Axis(fig[i, 1]; title=string(t), aspect=1)
-        draw!(ax, data(df_t) * mapping(:actual, :predicted) *
-                  visual(Scatter; markersize=markersize, strokewidth=0))
-
-        # compute numeric limits from data (unit-safe)
-        a = ustrip.(df_t.actual)
-        p = ustrip.(df_t.predicted)
-        lo = min(minimum(a), minimum(p))
-        hi = max(maximum(a), maximum(p))
-        pad = (hi - lo == 0) ? 1e-6 : 0.02*(hi - lo)
-        lo -= pad;  hi += pad
-
-        xlims!(ax, lo, hi)   # Makie’s documented API for setting limits
-        ylims!(ax, lo, hi)   # (no xlimits/ylimits field access)  ⟵
-
-        # 1:1 and ±band overlays (numeric)
-        lines!(ax, [lo, hi], [lo, hi], linewidth=2)
-        lines!(ax, [lo, hi], [(1+band_pct)*lo, (1+band_pct)*hi], linestyle=:dash)
-        lines!(ax, [lo, hi], [(1-band_pct)*lo, (1-band_pct)*hi], linestyle=:dash)
-    end
-
-    resize_to_layout!(fig)
-    fig
-end
-
-# ╔═╡ 19f8c59d-f243-45db-837c-f664193b24a4
-#=╠═╡
-plot_pred_vs_actual_long(df_long)
-  ╠═╡ =#
-
-# ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
-#=╠═╡
-
-# ------------- grid builder (Makie/Contour expects a rectangular grid) -------------
-function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
-                       invx = identity, agg = first)
-    df2 = combine(groupby(df, [ycol, xcol]), zcol => agg => :_z)
-
-    xs = sort(unique(df2[!, xcol]))
-    ys = sort(unique(df2[!, ycol]))
-    x2i = Dict(x => i for (i,x) in enumerate(xs))
-    y2j = Dict(y => j for (j,y) in enumerate(ys))
-
-    Z = fill(NaN, length(xs), length(ys))  # size(Z) == (nx, ny)
-    @inbounds for r in eachrow(df2)
-        Z[x2i[r[xcol]], y2j[r[ycol]]] = Float64(r._z)
-    end
-
-    keep_x = vec(any(isfinite, Z; dims=2))
-    keep_y = vec(any(isfinite, Z; dims=1))
-    Z = Z[keep_x, keep_y]
-    xs = xs[keep_x]; ys = ys[keep_y]
-
-    X = Float64.(invx.(xs))
-    Y = Float64.(ys)
-    @assert all(diff(X) .> 0) && all(diff(Y) .> 0)
-    return X, Y, Z
-end
-  ╠═╡ =#
-
-# ╔═╡ 3ec7080c-2972-484b-805e-3d9fe0a7d9d1
-# choose reasonable default levels for iso-lines
-function _default_iso_levels(Z; n::Int=8)
-    vals = vec(Z)
-    m = isfinite.(vals)
-    if !any(m)
-        return n               # fallback: let Makie auto-pick n levels
-    end
-    zmin, zmax = extrema(vals[m])
-    if zmin == zmax
-        return [zmin]          # constant field: one contour at that value
-    else
-        return collect(range(zmin, zmax; length=n))
-    end
-end
-
-
-# ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
-#=╠═╡
-function _add_isolines!(ax::Makie.Axis, df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
-                        xlogbase::Symbol = :log10,
-                        levels = nothing,                 # <— allow nothing
-                        color::Union{Symbol,RGBAf,RGBf} = :black,
-                        linestyle::Symbol = :solid,
-                        linewidth::Real = 1.5,
-                        labels::Bool = false,
-                        labelformatter::Function = l -> @sprintf("%.3g", l),
-                        labelsize::Int = 20)
-
-    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
-    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
-
-    # normalize the levels argument:
-    levs =
-        levels === nothing                       ? _default_iso_levels(Z) :
-        (levels isa AbstractVector && isempty(levels)) ? _default_iso_levels(Z) :
-        (levels isa AbstractVector              ? Float64.(collect(levels)) :
-         levels)  # if it's an Int, pass it through
-
-    # draw (avoid labelcolor/labelfont "Automatic" pitfalls by not setting them)
-    contour!(ax, X, Y, Z;
-             levels = levs, color = color, linestyle = linestyle, linewidth = linewidth,
-             labels = labels, labelformatter = labelformatter, labelsize = labelsize)
-    return ax
-end
-
-  ╠═╡ =#
-
-# ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
-#=╠═╡
-function plot_contourf(df::DataFrame;
-    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
-    xlogbase::Symbol=:log10,                             # :log10 | :log | :none
-    levels=10,                                          # Int (bands) OR Vector of boundaries
-    palette=:viridis, lowclip=nothing, highclip=nothing, # AoG banded palette; can be clipped
-    labels_for_lines::Bool=false,                        # add labels on the black outlines
-    overlays::Vector = Vector{Any}(),                    # extra isoline specs as NamedTuples/Dicts
-    return_axis::Bool=false)
-
-    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
-    xlab = (invx === identity) ? string(xcol) : "ΔTSF"
-
-    # --- AoG filled bands (uses a palette, not a colormap) ---
-    pal = palette
-    # For banded filled_contours, AoG expects a palette; if you want explicit low/high clip colors,
-    # use the helper the docs recommend: clipped(from_continuous(...), low=..., high=...)
-    # https://aog.makie.org/stable/reference/analyses/#filled-contours
-    if lowclip !== nothing || highclip !== nothing
-        pal = clipped(from_continuous(palette); low=lowclip, high=highclip)
-    else
-        pal = from_continuous(palette)  # a regular categorical palette from a continuous cmap
-    end
-
-    base = data(df) * mapping(xcol => invx => xlab, ycol, zcol)
-    fc   = levels isa Integer ? filled_contours(bands=levels) : filled_contours(levels=collect(levels))
-    specs = base * fc
-    sc    = scales(Color=(; palette=pal))  # banded colors = categorical palette (not colormap)
-
-    # Own axis so we can add Makie overlays
-    fig = Figure()
-    ax  = Axis(fig[1,1]; xlabel=xlab, ylabel=string(ycol), title=string(zcol))
-    draw!(ax, specs, sc)  # AoG draw into the axis (no AoG colorbar via draw!)
-
-    # --- black contour lines at the SAME boundaries with Makie ---
-    # If `levels` is Int, make boundaries that match the filled bands; else use the vector as-is.
-    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
-    boundaries = levels isa Integer ? collect(range(extrema(vec(Z))..., length=levels+1)) : collect(levels)
-
-
-    # --- your extra overlays (other z-columns) ---
-    for ov in overlays
-        zsym = get(ov, :z, nothing); zsym === nothing && error("overlay missing :z")
-        _add_isolines!(ax, df, xcol, ycol, zsym;
-            xlogbase        = xlogbase,
-            levels          = get(ov, :levels, []),
-            color           = get(ov, :color, :black),
-            linestyle       = get(ov, :linestyle, :solid),
-            linewidth       = get(ov, :linewidth, 1.5),
-            labels          = get(ov, :labels, false),
-            labelformatter  = get(ov, :labelformatter, l -> @sprintf("%.3g", l)),
-            labelsize       = get(ov, :labelsize, 10),)
-    end
-
-    contour!(ax, X, Y, Z; levels=boundaries, color=:white, linewidth=.8,
-             labels=labels_for_lines, labelsize = 20)
-    return return_axis ? (fig, ax) : fig
-end
-  ╠═╡ =#
-
-# ╔═╡ b570d453-43f2-4a12-a9d6-889752dd5aeb
-#=╠═╡
-function plot_heatmap(df::DataFrame;
-                      xcol::Symbol = :log_ΔTSF_,
-                      ycol::Symbol = :f_,
-                      zcol::Symbol = :COP_3,
-                      xlogbase::Symbol = :log10)  # use :log if natural log
-
-    invx = xlogbase === :log10 ? exp10 :
-           xlogbase === :log   ? exp   :
-           error("xlogbase must be :log10 or :log")
-
-    plt = data(df) *
-          mapping(                     # <-- POSitional: x, y, z
-              xcol => invx => "ΔTSF",  # log(ΔTSF) -> ΔTSF for plotting
-              ycol,
-              zcol
-          ) *
-          visual(Heatmap)
-
-    fig, ax = draw(
-        plt;
-        axis = (
-            xlabel = "ΔTSF",           # linear axis (default)
-            ylabel = string(ycol),
-            title  = string(zcol, " over ΔTSF vs ", ycol),
-        )
-        # colormap = :viridis,
-        # colorbar = true
-    )
-
-    return fig
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 21cd24f0-4d8b-4298-89e1-7ba7817c2eef
-#=╠═╡
-
-"""
-    process_grid_results(
-      values1, values2,
-      results_thermal, results_hydraulic,
-      sys_thermal, sys_hydraulic;
-      name1=:param1, name2=:param2
-    ) -> DataFrame
-
-Loop over the 2D sweep defined by `values1`×`values2`, extract all the same
-metrics you did in 1D, and return a DataFrame with columns:
-
-  name1, name2, ṁ_sf, ṁ_ref, T_in, …, COP_3
-
-where `name1`/`name2` label the two sweep axes.
-"""
-function process_grid_results(
-    values1::AbstractVector,
-    values2::AbstractVector,
-    results_thermal::AbstractMatrix,
-    results_hydraulic::AbstractMatrix,
-    sys_thermal,
-    sys_hydraulic;
-    name1::Symbol = :param1,
-    name2::Symbol = :param2,
-	target_Q_cond::Real = NaN,
-)
-    n1, n2 = length(values1), length(values2)
-    @assert size(results_thermal) == (n1, n2)
-    @assert size(results_hydraulic) == (n1, n2)
-
-    rows = NamedTuple[]
-
-    for i in 1:n1, j in 1:n2
-        therm = results_thermal[i,j]
-        hyd   = results_hydraulic[i,j]
-
-        # — your thermal extractions —
-        ṁ_sf      = exp( therm[sys_thermal.γṁ_sf] )
-        ṁ_ref     = exp( therm[sys_thermal.γṁ_ref] )
-        T_in       = therm[sys_thermal.cycle.T_i_b] .- 273.15
-        T_mid      = therm[sys_thermal.cycle.evaporator.T_mid_1] .- 273.15
-        T_out      = therm[sys_thermal.cycle.T_o_b] .- 273.15
-        T_bot      = therm[sys_thermal.bhe_thermal.thermal.T_b] .- 273.15
-        T_comp_in  = therm[sys_thermal.cycle.evaporator.T_out_2] .- 273.15
-        T_wall     = 10.0
-        ΔTSF         = T_in - T_out
-
-        fr_SH      = zap(therm[sys_thermal.cycle.evaporator.uz_fr_sh])
-        fr_EV      = 1 - fr_SH
-
-        T_evap     = therm[sys_thermal.cycle.evaporator.sh.propref.Tsat] .- 273.15
-        Q_evap     = therm[sys_thermal.Q_evap]
-        Q_cond     = -therm[sys_thermal.Q_cond]
-        W_comp     = therm[sys_thermal.W_comp]
-        COP_1      = therm[sys_thermal.COP1]
-
-        U_EV       = therm[sys_thermal.cycle.evaporator.ev.base.U]
-        U_SH       = therm[sys_thermal.cycle.evaporator.sh.base.U]
-
-        # — your hydraulic extractions —
-        Δp_bhe     = hyd[sys_hydraulic.bhe.Δp]          / 1e5
-        Δp_phx     = hyd[sys_hydraulic.phx.base.Δp]     / 1e5
-        Δp_tot     = hyd[sys_hydraulic.pump.base.Δp]    / 1e5
-        P_pump     = hyd[sys_hydraulic.pump.base.P_elec]
-        N_pump     = hyd[sys_hydraulic.pump.base.N]
-
-        COP_2      = Q_cond / (W_comp + P_pump)
-
-        # — PHX Reynolds number —
-        ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
-                              hyd[sys_hydraulic.phx.props.μ],
-                              hyd[sys_hydraulic.phx.base.ṁ]
-        b_phx, W_phx, np_phx, ϕ_phx = hyd[sys_hydraulic.phx.b],
-                                     hyd[sys_hydraulic.phx.W],
-                                     hyd[sys_hydraulic.phx.np],
-                                     hyd[sys_hydraulic.phx.ϕ]
-        nch       = (np_phx - 1)/2
-        A_flow    = nch * W_phx * (2*b_phx)
-        v_phx     = abs(ṁ_phx)/(ρ_phx*A_flow)
-        dh_phx    = 2*b_phx/ϕ_phx
-        Re_phx    = ρ_phx * v_phx * dh_phx / μ_phx
-
-        # — BHE legs (replace L1 & L2 with your real field‐names) —
-        ρ1 = hyd[sys_hydraulic.bhe.leg1.props.ρ]
-        μ1 = hyd[sys_hydraulic.bhe.leg1.props.μ]
-        D1 = hyd[sys_hydraulic.bhe.leg1.Di]
-        Re_bhe_leg1 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D1 / (μ1 * π*(D1/2)^2)
-
-        ρ2 = hyd[sys_hydraulic.bhe.leg2.props.ρ]
-        μ2 = hyd[sys_hydraulic.bhe.leg2.props.μ]
-        D2 = hyd[sys_hydraulic.bhe.leg2.Di]
-        Re_bhe_leg2 = abs(hyd[sys_hydraulic.bhe.ṁ]) * D2 / (μ2 * π*(D2/2)^2)
-
-        # — BHE thermal & resistances —
-        η_bh   = therm[sys_thermal.bhe_thermal.ϵ]
-        R_1b    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_b]
-        R_2b    = therm[sys_thermal.bhe_thermal.utube_res.R_t2_b]
-        R_12    = therm[sys_thermal.bhe_thermal.utube_res.R_t1_t2]
-        R_f1b   = therm[sys_thermal.bhe_thermal.thermal.R_f1_b]
-        R_f2b   = therm[sys_thermal.bhe_thermal.thermal.R_f2_b]
-        R_f1f2  = therm[sys_thermal.bhe_thermal.thermal.R_f1_f2]
-
-        push!(rows, NamedTuple{(
-            name1,name2,
-            :ṁ_sf,:ṁ_ref,
-            :T_in,:T_mid,:T_out,:ΔTSF,:T_bot,:T_evap,:T_comp_in,
-            :Q_evap,:Q_cond,:W_comp,:COP_1,
-            :U_EV,:U_SH,:fr_EV,:fr_SH,
-            :Δp_bhe,:Δp_phx,:Δp_tot,:P_pump,:N_pump,:COP_2,
-            :Re_phx,:Re_bhe_leg1,:Re_bhe_leg2,
-            :η_bh,:R_1b,:R_2b,:R_12,:R_f1b,:R_f2b,:R_f1f2
-        )}((
-            values1[i], values2[j],
-            ṁ_sf, ṁ_ref,
-            T_in, T_mid, T_out, ΔTSF, T_bot, T_evap, T_comp_in,
-            Q_evap, Q_cond, W_comp, COP_1,
-            U_EV, U_SH, fr_EV, fr_SH,
-            Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, COP_2,
-            Re_phx, Re_bhe_leg1, Re_bhe_leg2,
-            η_bh, R_1b, R_2b, R_12, R_f1b, R_f2b, R_f1f2
-        )))
-    end
-    df = DataFrame(rows)
-
-    # (optional but handy)
-    sort!(df, [name2, :ΔTSF])   # keep rows grouped by f then ΔT
-	
-	if isnan(target_Q_cond)
-    # Compute per-f max Q_cond
-	    gdf = groupby(df, name2)
-	    transform!(gdf, :Q_cond => maximum => :Qmax_same_f)
-	
-	    # Aux heater needed to meet the best point at this f
-	    df.P_aux_heating = max.(0, df.Qmax_same_f .- df.Q_cond)
-
-	else
-			
-	    # Aux heater needed to meet the best point at this f
-	    df.P_aux_heating = max.(0, target_Q_cond .- df.Q_cond)
-
-	end
-    # COP_3 normalized within each f-group
-    df.COP_3 = (df.Q_cond .+ df.P_aux_heating) ./ (df.W_comp .+ df.P_pump .+ df.P_aux_heating)
-
-    # (optional) clean up helper column
-    # select!(df, Not(:Qmax_same_f))
-
-    return df
-end
-
-
-  ╠═╡ =#
-
-# ╔═╡ fff91fa6-8ffb-458a-946d-244b5b13c3cd
-function multithreaded_grid_sweep(thermal_prob, hydraulic_prob, sys_thermal, 
-                                  base_params, param_sym1, values1, param_sym2, values2, solvers;
-                                  previous_sol_thermal=nothing, previous_sol_hydraulic=nothing)
-    n1 = length(values1)
-    n2 = length(values2)
-    
-    # Preallocate solution arrays
-    sols_thermal = Matrix{Any}(undef, n1, n2)
-    sols_hydraulic = Matrix{Any}(undef, n1, n2)
-    
-    # Calculate Manhattan distances
-    center_i = ceil(Int, n1/2)
-    center_j = ceil(Int, n2/2)
-    distances = [abs(i - center_i) + abs(j - center_j) for i in 1:n1, j in 1:n2]
-    max_distance = maximum(distances)
-    
-    # Compute parameter ranges for normalization
-    range1 = maximum(values1) - minimum(values1)
-    range2 = maximum(values2) - minimum(values2)
-    range1 = range1 == 0 ? 1.0 : range1  # Avoid division by zero
-    range2 = range2 == 0 ? 1.0 : range2
-    
-    # Solve center point with staged parameters
-    center_params = [
-        base_params...,
-        param_sym1 => values1[center_i],
-        param_sym2 => values2[center_j]
-    ]
-    
-    # Stage 1: Solve with base_params only if no previous solution
-    if previous_sol_thermal === nothing
-        staged_sol_thermal = solve_thermal_problem(
-            thermal_prob, 
-            nothing, 
-            base_params,  # Only base_params
-            solvers
-        )
-        staged_sol_hydraulic = solve_hydraulic_problem(
-            hydraulic_prob, 
-            nothing, 
-            base_params,
-            staged_sol_thermal, 
-            sys_thermal, 
-            solvers
-        )
-    else
-        staged_sol_thermal = previous_sol_thermal
-        staged_sol_hydraulic = previous_sol_hydraulic
-    end
-
-    # Stage 2: Solve with full parameters using staged solution as initial condition
-    sols_thermal[center_i, center_j] = solve_thermal_problem(
-        thermal_prob, 
-        staged_sol_thermal,  # Use staged solution
-        center_params,       # Full parameters with sweeps
-        solvers
-    )
-    
-    sols_hydraulic[center_i, center_j] = solve_hydraulic_problem(
-        hydraulic_prob, 
-        staged_sol_hydraulic, 
-        center_params,
-        sols_thermal[center_i, center_j], 
-        sys_thermal, 
-        solvers
-    )
-
-    # Create wavefronts (points grouped by distance from center)
-    wavefronts = [Tuple{Int,Int}[] for _ in 0:max_distance]
-    for i in 1:n1, j in 1:n2
-        d = distances[i, j]
-        if d > 0  # Skip center point
-            push!(wavefronts[d], (i, j))
-        end
-    end
-    
-    # Progress bar
-    total_points = n1 * n2 - 1  # Minus center point
-    p = Progress(total_points, 1, "Grid sweep progress: ")
-    
-    # Process wavefronts in order
-    for d in 1:max_distance
-        points = wavefronts[d]
-        isempty(points) && continue
-        
-        # Process all points in current wavefront
-        for idx in 1:length(points)
-            i, j = points[idx]
-            
-            # Find nearest solved neighbor in PARAMETER SPACE
-            best_thermal = nothing
-            best_hydraulic = nothing
-            min_param_dist = Inf
-            
-            # Search all solved points for closest in parameter space
-            for i2 in 1:n1, j2 in 1:n2
-                # Only consider solved points
-                if isassigned(sols_thermal, i2, j2) && sols_thermal[i2, j2] !== nothing
-                    # Compute normalized parameter distance
-                    param_dist = sqrt(
-                        ((values1[i] - values1[i2]) / range1)^2 +
-                        ((values2[j] - values2[j2]) / range2)^2
-                    )
-                    
-                    # Update best solution if closer
-                    if param_dist < min_param_dist
-                        min_param_dist = param_dist
-                        best_thermal = sols_thermal[i2, j2]
-                        best_hydraulic = sols_hydraulic[i2, j2]
-                    end
-                end
-            end
-            
-            # Fallback to center solution if no neighbors found
-            if best_thermal === nothing
-                best_thermal = sols_thermal[center_i, center_j]
-                best_hydraulic = sols_hydraulic[center_i, center_j]
-            end
-            
-            # Solve systems
-            current_params = [
-                base_params...,
-                param_sym1 => values1[i],
-                param_sym2 => values2[j]
-            ]
-            
-            # Step solving for better convergence
-            try
-                sol_thermal = solve_thermal_problem(
-                    thermal_prob, best_thermal, current_params, solvers
-                )
-                sol_hydraulic = solve_hydraulic_problem(
-                    hydraulic_prob, best_hydraulic, current_params,
-                    sol_thermal, sys_thermal, solvers
-                )
-            # Store solutions
-            sols_thermal[i, j] = sol_thermal
-            sols_hydraulic[i, j] = sol_hydraulic
-            catch e
-                # Fallback to center solution if direct solve fails
-                @warn "Solve failed at ($i,$j), retrying with center solution"
-                sol_thermal = solve_thermal_problem(
-                    thermal_prob, sols_thermal[center_i, center_j], current_params, solvers
-                )
-                sol_hydraulic = solve_hydraulic_problem(
-                    hydraulic_prob, sols_hydraulic[center_i, center_j], current_params,
-                    sol_thermal, sys_thermal, solvers
-                )
-            # Store solutions
-            sols_thermal[i, j] = sol_thermal
-            sols_hydraulic[i, j] = sol_hydraulic
-            end
-            
-            
-            next!(p)
-        end
-    end
-    
-    return sols_thermal, sols_hydraulic
-end
-
-# ╔═╡ 1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
-# ╠═╡ show_logs = false
-sols_thermal2, sols_hydraulic2 = multithreaded_grid_sweep(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
-    previous_sol_thermal=nothing,
-    previous_sol_hydraulic=nothing
-)
-
-# ╔═╡ 6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
-#=╠═╡
-df_grid = process_grid_results(
-    log_ΔTSF_values, f_values,
-    sols_thermal2, sols_hydraulic2,
-    sys_thermal2, sys_hydraulic2;
-    name1 = :log_ΔTSF_,
-    name2 = :f_,
-	target_Q_cond = 5000
-)
-  ╠═╡ =#
-
-# ╔═╡ 02497be0-7d2f-43d1-b365-d4a8d72f045e
-#=╠═╡
-plot_heatmap(df_grid; xlogbase = :log)
-  ╠═╡ =#
-
-# ╔═╡ fc5900c1-9704-4384-9a29-be545faf74d6
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_3, levels=20)
-  ╠═╡ =#
-
-# ╔═╡ 0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_2,levels=20)
-  ╠═╡ =#
-
-# ╔═╡ eb8cd9d6-9237-4723-84d3-3f293d74d1e9
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_1,)
-  ╠═╡ =#
-
-# ╔═╡ 6eab6576-10af-432d-abf6-42f424541e5b
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :T_evap,)
-  ╠═╡ =#
-
-# ╔═╡ 8dea2e5f-82b5-408e-843d-c25b7d265d48
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,)
-  ╠═╡ =#
-
-# ╔═╡ b153b909-a8b2-4e5d-abe7-a3c1bad81358
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :fr_EV,)
-
-  ╠═╡ =#
-
-# ╔═╡ 2be85177-c03c-48de-8d4f-c2053fcf2a13
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :η_bh,levels = 50)
-
-  ╠═╡ =#
-
-# ╔═╡ a24d0373-b198-42f6-a6bb-c2ede7259244
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_ref,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 74455461-5277-4fee-a53b-edf34e9e26f4
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ dc49f979-5f43-4234-864d-acfef268f5f9
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :P_pump,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 50af6ba3-363d-4ca6-977a-7eb35919b27b
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Q_evap,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 88cbfed8-9de9-4421-8dd0-8f42b82234bd
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Q_cond,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 9035962a-af30-4870-8ccb-c340892e81c3
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :N_pump,levels = 20)
-  ╠═╡ =#
-
-# ╔═╡ ec35d4c1-58e5-4240-a10d-1bfcd590c5f4
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Re_bhe_leg1)
-
-  ╠═╡ =#
-
-# ╔═╡ 09b7509b-a308-49a4-966d-33d5ef7f9cb1
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 960c408c-3040-4a00-b285-c01080cb1c02
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:Q_cond,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 644901ea-7778-4e7d-a5cf-44e34df77827
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:R_f1f2,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 57e985e5-023c-4389-8e08-2185bed0751a
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:fr_EV, levels=0.0:0.1:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 5e034021-1116-4d1d-8034-d582c8a9643f
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:T_evap, levels = -5:1:10,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 99e84662-a903-424d-b270-d665a52f479f
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_1, levels=2.7:0.1:4.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 05d571f0-c990-430e-971c-965ba527e814
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=0.8, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=0.8, linestyle=:dash, labels=false),
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ daed3493-da2b-489c-b7ae-5bcd66bfc03b
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-		
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
-# ╠═╡ show_logs = false
-sols_thermal_water, sols_hydraulic_water = multithreaded_grid_sweep(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params_water, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
-    previous_sol_thermal=nothing,
-    previous_sol_hydraulic=nothing
-)
-
-# ╔═╡ 6011e1fa-1058-4bce-bb65-fcdf25951bfa
-#=╠═╡
-df_grid_water = process_grid_results(
-    log_ΔTSF_values, f_values,
-    sols_thermal_water, sols_hydraulic_water,
-    sys_thermal2, sys_hydraulic2;
-    name1 = :log_ΔTSF_,
-    name2 = :f_,
-	target_Q_cond = 5000
-);
-  ╠═╡ =#
-
-# ╔═╡ e6a2deea-3658-42b3-8ef9-83e31be5a300
-#=╠═╡
-plot_contourf(
-    df_grid_water; xlogbase=:log, zcol=:T_evap, levels = -5:1:10,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ e174ba39-dd8c-4af9-88c1-caa504af2c7b
-#=╠═╡
-plot_contourf(
-    df_grid_water; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=0.8, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=0.8, linestyle=:dash, labels=false),
-		
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ b72f0888-4716-48ec-8a99-fc068a988abf
-#=╠═╡
-plot_contourf(
-    df_grid_water; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-		
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
-# ╠═╡ show_logs = false
-sols_thermal_pipe, sols_hydraulic_pipe = multithreaded_grid_sweep(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params_pipe, :log_ΔTSF_, log_ΔTSF_values, :f_, f_values, solvers;
-    previous_sol_thermal=nothing,
-    previous_sol_hydraulic=nothing
-)
-
-# ╔═╡ 941dcb04-88be-43ae-bc21-ae3ef9dd0db0
-#=╠═╡
-df_grid_pipe = process_grid_results(
-    log_ΔTSF_values, f_values,
-    sols_thermal_pipe, sols_hydraulic_pipe,
-    sys_thermal2, sys_hydraulic2;
-    name1 = :log_ΔTSF_,
-    name2 = :f_,
-	target_Q_cond = 5000
-);
-  ╠═╡ =#
-
-# ╔═╡ 387e3115-866a-4831-bb59-a18edf749375
-#=╠═╡
-plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-		
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 7561b4d4-f99e-4da9-aeb8-a351e425d1ed
-#=╠═╡
-plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-		
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ f0e43670-bbd9-487a-b8b6-8b5d6804039c
-# ╠═╡ show_logs = false
-sols_thermal_wall, sols_hydraulic_wall = multithreaded_grid_sweep(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params, :log_ΔTSF_, log_ΔTSF_values, :T_wall, T_wall_values, solvers;
-    previous_sol_thermal=nothing,
-    previous_sol_hydraulic=nothing
-)
-
-# ╔═╡ d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
-#=╠═╡
-df_grid_wall = process_grid_results(
-    log_ΔTSF_values, T_wall_values,
-    sols_thermal_wall, sols_hydraulic_wall,
-    sys_thermal2, sys_hydraulic2;
-    name1 = :log_ΔTSF_,
-    name2 = :T_wall,
-	target_Q_cond = 5000
-);
-  ╠═╡ =#
-
-# ╔═╡ 09952ea8-ef5d-414f-ac15-478ad8ea6343
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 16868428-1547-4b8d-a900-5e5120f38088
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:fr_EV, levels = 0:0.1:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 62b6a403-53ac-42c1-9fff-055a9b7a478b
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_1,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 2b5ce68f-14e3-4dae-9da1-10971f2e778a
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 41fe5c48-3b28-4d41-8969-e3d59a84cbfa
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Q_cond,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Δp_tot,
-    overlays=[
-        (z=:N_pump,color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ c8c35ed3-bd6c-40ac-8049-b603b003f603
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1.5,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:yellow,   linewidth=.8, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=.8, linestyle=:dash, labels=true),
-        (z=:Δp_tot,color=:brown,  labels=true, linewidth=1.5),
-
-		
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 7ceca66f-f75a-4ba5-aa44-1f2b6939da77
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:ṁ_ref,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 33c1996a-aade-400a-9b2f-259db12c0835
-#=╠═╡
-df_grid_wall|> names
-  ╠═╡ =#
-
-# ╔═╡ 79b17009-14ee-422e-8eb6-9e81c270b602
-#=╠═╡
-begin
-	# --- 1) Pack the SR grid with the same keys as df_grid_wall -------------------
-	df_sr_grid_wall = DataFrame()
-	df_sr_grid_wall[!, xcol] = Xgrid_ord[!, xcol]
-	df_sr_grid_wall[!, ycol] = Xgrid_ord[!, ycol]
-	for t in targets
-	    df_sr_grid_wall[!, t] = Ygrid_hat[!, t]         # unitless during math is OK
-	end
-	
-	# --- 2) Join and build error columns (unit-safe) ------------------------------
-	true_tbl = select(df_grid_wall, vcat([xcol, ycol], targets))
-	pred_tbl = select(df_sr_grid_wall, vcat([xcol, ycol], targets))
-	
-	rename!(true_tbl, Dict(t => Symbol(t, "_true") for t in targets))
-	rename!(pred_tbl, Dict(t => Symbol(t, "_sr")   for t in targets))
-	
-	cmp = innerjoin(true_tbl, pred_tbl, on=[xcol, ycol])
-	
-	for t in targets
-	    y  = ustrip.(cmp[!, Symbol(t, "_true")])
-	    ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
-	    cmp[!, Symbol(t, "_Δ")]    = ŷ .- y
-	    cmp[!, Symbol(t, "_rel%")] = 100 .* (cmp[!, Symbol(t, "_Δ")] ./ max.(abs.(y), eps()))
-	end
-	
-	# --- 3) Summary table of metrics ---------------------------------------------
-	function grid_metrics(cmp, targets)
-	    rows = NamedTuple[]
-	    for t in targets
-	        y  = ustrip.(cmp[!, Symbol(t, "_true")])
-	        ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
-	        e  = ŷ .- y
-	        push!(rows, (target=t,
-	                     RMSE = sqrt(mean(e.^2)),
-	                     MAE  = mean(abs.(e)),
-	                     MAPE = 100*mean(abs.(e) ./ max.(abs.(y), eps())),
-	                     R2   = 1 - sum(e.^2) / max(sum((y .- mean(y)).^2), eps())))
-	    end
-	    DataFrame(rows)
-	end
-	
-	metrics_tbl = grid_metrics(cmp, targets)  # ← tidy numeric comparison
-	
-	# --- 4) A few “shape” comparisons --------------------------------------------
-	# Peak shift between true and SR fields
-	function peak_shift(cmp, xcol, ycol, z::Symbol)
-	    yt = ustrip.(cmp[!, Symbol(z, "_true")]); it = argmax(yt)
-	    yp = ustrip.(cmp[!, Symbol(z, "_sr")]);   ip = argmax(yp)
-	    (; Δx = ustrip(cmp[ip, xcol] - cmp[it, xcol]),
-	       Δy = ustrip(cmp[ip, ycol] - cmp[it, ycol]),
-	       max_true = yt[it], max_sr = yp[ip])
-	end
-	peak_Q_cond = peak_shift(cmp, xcol, ycol, :Q_cond)
-	
-	# Dice coefficient for superlevel sets (iso-contour agreement)
-	function dice_at(cmp, z::Symbol, τ::Real)
-	    A = ustrip.(cmp[!, Symbol(z, "_true")]) .>= τ
-	    B = ustrip.(cmp[!, Symbol(z, "_sr")])   .>= τ
-	    2*sum(A .& B) / max(sum(A) + sum(B), 1)
-	end
-	dice_Q5000 = dice_at(cmp, :Q_cond, 5_000.0)
-	
-	# Gradient-direction alignment (cosine similarity of ∇Z)
-	function grad_alignment(cmp, xcol, ycol, z::Symbol, nx::Int, ny::Int)
-	    Zt = reshape(ustrip.(cmp[!, Symbol(z, "_true")]), ny, nx)
-	    Zp = reshape(ustrip.(cmp[!, Symbol(z, "_sr")]),   ny, nx)
-	    ∂x(A) = @views 0.5 .* (A[:,3:end] .- A[:,1:end-2])
-	    ∂y(A) = @views 0.5 .* (A[3:end,:] .- A[1:end-2,:])
-	    gx_t, gy_t = ∂x(Zt)[2:end-1,:], ∂y(Zt)[:,2:end-1]
-	    gx_p, gy_p = ∂x(Zp)[2:end-1,:], ∂y(Zp)[:,2:end-1]
-	    num = gx_t .* gx_p .+ gy_t .* gy_p
-	    den = sqrt.(gx_t.^2 .+ gy_t.^2) .* sqrt.(gx_p.^2 .+ gy_p.^2) .+ eps()
-	    mean(num ./ den)
-	end
-	cos_grad_Q = grad_alignment(cmp, xcol, ycol, :Q_cond, length(xvals), length(yvals))
-	
-end
-  ╠═╡ =#
-
-# ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
-
-
-# ╔═╡ dfdcded3-026e-4925-ac02-ba801488b267
-
-
-# ╔═╡ 1abb42cf-af03-49a9-837b-902999a89744
-
-
-# ╔═╡ 51d3286a-d89d-41f5-88d5-bb361e76ff09
-
-
-# ╔═╡ 5e9e8e04-4aca-416d-a4b4-410b243fd722
-
 
 # ╔═╡ 106e37c3-8c25-4fae-b906-00b86831e58d
 
@@ -6257,6 +7825,10 @@ fig_study = Makie.lines(XX, m_Y)
 end
   ╠═╡ =#
 
+# ╔═╡ 37e3be87-dff9-456d-b921-e0e1ecbb4909
+
+TableOfContents()
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -6277,6 +7849,7 @@ MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 QuasiMonteCarlo = "8a4e6c94-4038-4cdc-81c3-7e6ffdb2a71b"
@@ -6304,6 +7877,7 @@ MonteCarloMeasurements = "~1.4.7"
 NonlinearSolve = "~4.9.0"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
+PlutoUI = "~0.7.68"
 ProgressMeter = "~1.10.4"
 QuasiMonteCarlo = "~0.3.3"
 Roots = "~2.2.8"
@@ -6317,7 +7891,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "311f20ca0c0600d73811268eccc4acf06ad52ea8"
+project_hash = "fe87b14dbcedb0222b92eb2d8233096787340081"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -6346,6 +7920,12 @@ weakdeps = ["ChainRulesCore", "Test"]
     [deps.AbstractFFTs.extensions]
     AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
     AbstractFFTsTestExt = "Test"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "6e1d2a35f2f90a4bc7c2ed98079b2ba09c35b83a"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.3.2"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -7519,11 +9099,23 @@ git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.28"
 
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "179267cfa5e712760cd43dcae385d7ea90cc25a4"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.5"
+
 [[deps.HypertextLiteral]]
 deps = ["Tricks"]
 git-tree-sha1 = "7134810b1afce04bbc1045ca1985fbe81ce17653"
 uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 version = "0.9.5"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "b6d6bfdd7ce25b0f9b2f6b3dd56b2673a66c8770"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.5"
 
 [[deps.IfElse]]
 git-tree-sha1 = "debdd00ffef04665ccbb3e150747a77560e8fad1"
@@ -8077,6 +9669,11 @@ weakdeps = ["CategoricalArrays"]
 
     [deps.LossFunctions.extensions]
     LossFunctionsCategoricalArraysExt = "CategoricalArrays"
+
+[[deps.MIMEs]]
+git-tree-sha1 = "c64d943587f7187e751162b3b84445bbbd79f691"
+uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
+version = "1.1.0"
 
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
@@ -8644,6 +10241,12 @@ deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
 git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
 uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 version = "0.2.2"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "Downloads", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "ec9e63bd098c50e4ad28e7cb95ca7a4860603298"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.68"
 
 [[deps.PoissonRandom]]
 deps = ["LogExpFunctions", "Random"]
@@ -9754,7 +11357,7 @@ version = "4.1.0+0"
 # ╠═9b117e8b-7a38-49ba-9586-f3aacaafa0f3
 # ╠═143ccb02-56b0-4b50-a1e5-0d06b53f1b46
 # ╠═98c20212-3447-481c-b0d4-326a1703997c
-# ╟─f7eeabcd-23e6-4733-81aa-a6bbde82837e
+# ╠═f7eeabcd-23e6-4733-81aa-a6bbde82837e
 # ╠═9d502c24-7e38-4c3f-96ed-0e18425d82d9
 # ╟─0907ee2b-5ce8-4789-936a-ec14a4c3c059
 # ╠═039f80ce-620b-4863-aa98-1f0f2ed49a7e
@@ -9816,7 +11419,7 @@ version = "4.1.0+0"
 # ╠═79b5e151-be4a-4d38-ae46-c975b4bf557e
 # ╠═04ec6d0d-d812-464e-b244-8458207283da
 # ╠═a0e018cb-a75a-4844-8716-98492b29b6d9
-# ╟─b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
+# ╠═b9a1f8e0-7ca4-4435-b2fa-741b0a25da82
 # ╠═fbc3e326-5684-4029-ba49-6c0f065d151b
 # ╠═7ef1715e-2fd3-4deb-853d-233496735474
 # ╠═88624925-6092-44c8-9539-28527aa43a7c
@@ -9831,9 +11434,11 @@ version = "4.1.0+0"
 # ╠═0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 # ╠═a4b78e57-3f4a-4bd1-a4fd-344aed782596
 # ╠═58a5d982-5d07-4a63-950a-ca5639cff43f
+# ╠═89dc461f-71b0-4b91-ab47-a70d2929fec2
 # ╠═ceb2b429-90ae-4bc5-b346-e65e5727d441
 # ╠═80898f01-7945-48d9-abd5-15de3c76d465
 # ╠═b3bb8c8b-3825-4a21-94f7-a2d0d00fbb09
+# ╠═a496bd64-5a9a-4b3f-bb8f-1a0567943d1c
 # ╠═6ac1ecbf-4833-449f-9933-c782a8566fb0
 # ╠═8b6e0e2e-ecc5-475e-bd31-1f23893dcb38
 # ╠═892ef213-3229-4d91-9ba7-742127f366c8
@@ -9854,7 +11459,18 @@ version = "4.1.0+0"
 # ╠═fecd7f3d-bf0b-464e-a1ad-238e508b0f38
 # ╟─0fe18091-e8f6-42d4-9961-5783452ddefd
 # ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
-# ╟─4982df2c-016a-4136-a074-b39c1befffb7
+# ╠═5575055e-9136-4b4e-925a-ddf82ca1156c
+# ╠═4412cbfc-d470-4003-a2bd-606df1be7022
+# ╠═f100b275-2eb2-4d10-93e2-8954f314ae9e
+# ╠═f8b2fee6-eb35-493c-ac30-331176d9a795
+# ╠═058c533c-104d-4ae9-80e3-f356787d0d13
+# ╠═4899159f-1c86-478c-b874-ef8db1808bc5
+# ╠═c8044a03-837b-411c-8919-7d47f83111c3
+# ╠═b220d228-e3cb-4dd2-843e-03db76f46fe9
+# ╠═d7384891-c5c0-4614-99cf-0f1cf58f759c
+# ╠═9b2f80c6-18d0-4b10-827a-b9a665f7f1c4
+# ╠═86429d81-3516-488f-be3d-df2d83bdbae8
+# ╠═4982df2c-016a-4136-a074-b39c1befffb7
 # ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
 # ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
 # ╠═bed552fa-1a51-492b-8552-81186c96c6a1
@@ -9872,8 +11488,9 @@ version = "4.1.0+0"
 # ╠═870d81bf-2254-427b-8471-3c9d23b13a72
 # ╠═02497be0-7d2f-43d1-b365-d4a8d72f045e
 # ╠═fc5900c1-9704-4384-9a29-be545faf74d6
-# ╠═0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
+# ╠═8262db7e-b994-4afa-b823-661a0bb4949b
 # ╠═eb8cd9d6-9237-4723-84d3-3f293d74d1e9
+# ╠═0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
 # ╠═6eab6576-10af-432d-abf6-42f424541e5b
 # ╠═8dea2e5f-82b5-408e-843d-c25b7d265d48
 # ╠═b153b909-a8b2-4e5d-abe7-a3c1bad81358
@@ -9885,45 +11502,135 @@ version = "4.1.0+0"
 # ╠═50af6ba3-363d-4ca6-977a-7eb35919b27b
 # ╠═88cbfed8-9de9-4421-8dd0-8f42b82234bd
 # ╠═9035962a-af30-4870-8ccb-c340892e81c3
-# ╠═ec35d4c1-58e5-4240-a10d-1bfcd590c5f4
+# ╠═b6a370b1-bfe7-4324-b5a6-6018ddf55e12
+# ╠═d7b463f3-4a9d-4572-9ae6-eb5d4ea47531
+# ╠═60d5e58e-237b-4f13-ba00-c50a5315ffd7
+# ╠═b9879207-d8b7-4465-b899-e7656e48e5fc
 # ╠═09b7509b-a308-49a4-966d-33d5ef7f9cb1
+# ╠═1945625f-482a-4eda-985d-7112b4cf432d
+# ╠═7386981b-7839-4588-aa68-5c4b3d461b06
+# ╠═977b3df3-0fa4-452f-884b-94b24ec54cf3
+# ╠═1320fac5-2cf2-484d-a01e-98ecd559588d
+# ╠═a3fe0b30-007d-415d-af04-f5712e3d0489
+# ╠═c21e1161-99f5-4d15-adb8-7f7c669eadb0
+# ╠═298f0a4b-d6e7-4772-9862-54895ba7aab8
+# ╟─ea33f723-8f17-4000-b483-eb8f1f9354f3
+# ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
+# ╠═b72f0888-4716-48ec-8a99-fc068a988abf
+# ╠═e086552e-9ce0-4353-a16b-395d2986d1a9
+# ╠═dfc85639-a09b-44fa-99af-61706a192549
+# ╠═dc7866d3-68e8-40de-b82d-26717fff53d9
+# ╠═5e034021-1116-4d1d-8034-d582c8a9643f
+# ╠═e6a2deea-3658-42b3-8ef9-83e31be5a300
+# ╠═99e84662-a903-424d-b270-d665a52f479f
+# ╠═4217415e-772c-44d2-8c3d-2e85cf01fb1e
+# ╠═21a3e541-8ad9-41de-995a-e2b43221d15a
+# ╠═1ce3b2c5-71ba-4a1f-ab48-961585e57943
+# ╠═5d5f3c09-164b-4a55-9bf1-b2bb90221465
+# ╠═4175c8ba-346c-4afa-9267-ed7e689cff35
+# ╠═629aaec1-eca1-4b91-910d-5579b49c8df2
+# ╠═16928040-8730-4f0c-a67c-50f9d1ae852b
+# ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+# ╠═05d571f0-c990-430e-971c-965ba527e814
+# ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
+# ╠═d9a2618d-e923-4370-a20d-b8faf44bf06c
+# ╠═387e3115-866a-4831-bb59-a18edf749375
+# ╠═6ae2052e-907c-49b9-bb51-e2e3b0c641bc
+# ╟─5ce8337c-aae0-476f-914b-854a054b26db
+# ╠═9fa61b9f-1d33-444f-9c1e-d7ed70933000
+# ╠═a0332504-e854-4b16-bb9d-e5f4ca277f40
+# ╠═3b86a38d-9b62-4db0-b943-a1b973eb9b3c
+# ╠═a966eea4-f3e4-46f9-8230-7ab19eb7f905
+# ╠═a7e7ede3-1caa-4483-91f3-c26393f2b45a
+# ╠═e2504f4a-6606-4051-b91e-189bbd218edf
+# ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
+# ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
+# ╟─9beedddb-8b5a-4811-98cb-9a26ecd77b52
+# ╠═5eed01c3-561f-490b-80d5-23db0846bfe3
+# ╠═6ebdb8db-d5cc-4d02-a471-1e29a29ab42b
+# ╠═1a9a9e58-41ac-45fb-9891-2e2e531621e5
+# ╠═97b66208-6b79-40dd-bfd9-b710807a4e3f
+# ╠═8bc61318-43a1-447d-81a5-d2fed06799b2
+# ╠═0bc8ed9a-6d4d-4983-a204-9b54ef7a1fa9
+# ╠═bba28e41-70b6-409a-a4ec-1a1246261e82
+# ╟─8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
 # ╠═960c408c-3040-4a00-b285-c01080cb1c02
 # ╠═644901ea-7778-4e7d-a5cf-44e34df77827
 # ╠═57e985e5-023c-4389-8e08-2185bed0751a
-# ╠═5e034021-1116-4d1d-8034-d582c8a9643f
-# ╟─e6a2deea-3658-42b3-8ef9-83e31be5a300
-# ╟─99e84662-a903-424d-b270-d665a52f479f
-# ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
-# ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
-# ╠═05d571f0-c990-430e-971c-965ba527e814
-# ╠═387e3115-866a-4831-bb59-a18edf749375
-# ╠═ea33f723-8f17-4000-b483-eb8f1f9354f3
-# ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
-# ╠═b72f0888-4716-48ec-8a99-fc068a988abf
-# ╠═7561b4d4-f99e-4da9-aeb8-a351e425d1ed
+# ╠═eac9124f-ffa0-4a9a-948d-3c6e5ec0c7a2
+# ╠═bb90f897-17d3-4a9d-a462-fd6d3f4d98e7
+# ╠═6acbadd7-94f6-4399-ac5f-3a2724ce641c
+# ╠═29e4a45f-7a0b-425b-90d5-b2fc84f43d10
+# ╠═4e1204d9-eab8-4890-a957-92341c8edfc4
+# ╟─987290e0-8b32-481a-85a0-442b075463cb
 # ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 # ╠═1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+# ╠═8ddb2096-a2b0-4369-a188-5d972af91428
+# ╠═195ab453-b1f2-4632-9420-091f7f702ed7
+# ╠═517540bb-548e-4b97-8e96-bd674f8a9d18
 # ╟─44e95eb8-ef96-4832-9168-df5c504b0569
 # ╠═8a1007ab-a556-4670-a2a6-18292d721c89
 # ╠═cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
 # ╠═6011e1fa-1058-4bce-bb65-fcdf25951bfa
-# ╟─0d69490f-83ee-46fc-b034-8370e8a66361
-# ╠═880e6614-2556-4d3a-9408-f59b45ba94fe
+# ╠═0d69490f-83ee-46fc-b034-8370e8a66361
+# ╠═6d9c073c-e05b-45ec-a4b4-1b47c43cc5ba
 # ╠═f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
 # ╠═941dcb04-88be-43ae-bc21-ae3ef9dd0db0
+# ╠═6b0ca393-a200-4ee0-b71e-ea3f3b68c3f4
+# ╠═880e6614-2556-4d3a-9408-f59b45ba94fe
+# ╠═592a2cfb-9d8a-481e-a39d-3147dc76b643
+# ╠═c2a86042-1d4b-498c-8370-0d38f73a2bfd
 # ╟─c5875432-f3f0-4495-a0f0-853d87d73353
 # ╠═acbfba23-bbb5-4d9e-93b7-1120677332bd
-# ╠═ccdd37e1-e7f3-47c9-b698-34daaca538c9
+# ╠═b0b5c52c-a795-40a0-9c8d-f678010c454a
+# ╠═08d88b40-980e-4d17-91d1-2b1a06180bdd
 # ╠═f0e43670-bbd9-487a-b8b6-8b5d6804039c
-# ╠═9f9d5b69-b9fc-44dc-af28-389800fae70d
 # ╠═d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
 # ╠═09952ea8-ef5d-414f-ac15-478ad8ea6343
 # ╠═16868428-1547-4b8d-a900-5e5120f38088
 # ╠═62b6a403-53ac-42c1-9fff-055a9b7a478b
-# ╠═2b5ce68f-14e3-4dae-9da1-10971f2e778a
+# ╠═849d55d9-3e76-4ccb-8635-c8b70376d0b1
+# ╠═34ed86a4-20e9-4b2b-9344-7ec6dfaab815
 # ╠═41fe5c48-3b28-4d41-8969-e3d59a84cbfa
+# ╠═54809c43-f7c3-493b-b06a-a13bf0a44bc6
 # ╠═bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
 # ╠═c8c35ed3-bd6c-40ac-8049-b603b003f603
+# ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
+# ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
+# ╠═33c1996a-aade-400a-9b2f-259db12c0835
+# ╠═79b17009-14ee-422e-8eb6-9e81c270b602
+# ╟─94138b2d-0fd6-494e-9fd1-ef5aecadaabf
+# ╟─2097d037-7f79-4fe2-b683-b74b77d98752
+# ╠═599e27a4-1aba-4de4-a76d-fb09511de993
+# ╠═4b5d8e48-6775-4ec6-ab28-3e96b9954af3
+# ╠═c9aa37be-53b4-4f23-9898-b5179f7117f2
+# ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
+# ╠═3ec7080c-2972-484b-805e-3d9fe0a7d9d1
+# ╠═7148e421-b7e8-4f3c-a0a9-da3d14dd32e5
+# ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
+# ╠═7520ab74-810f-431a-b24e-724e24595b13
+# ╠═1d8f15e6-0462-4f86-9a97-3364e3e73bc0
+# ╠═3afecaa8-1c77-4b26-b534-2c419ddfb027
+# ╠═2164a2d3-59a0-4573-bd12-b62431f46c04
+# ╠═318a7ca3-1d6a-4a32-9fc7-c2a0072c92d3
+# ╠═c1333a2c-28a8-4a31-a049-8479e43f6c0e
+# ╠═1177eea2-1d56-4090-8b70-a636f404b4fb
+# ╠═1d782694-8f7d-4d1f-a1bc-b7646ac01b23
+# ╠═a35e92ea-bee1-4117-9ccf-f2016be29dc3
+# ╠═17aa8588-7089-4247-aaad-0ca54e1d888a
+# ╠═286269bd-f4db-4690-81f4-b4c45edeb24d
+# ╠═34522b07-e28b-4fa6-b2bf-2c7c73895aa2
+# ╠═9d0ffbe1-deff-4de9-a0d7-9e7c8df5bfaf
+# ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
+# ╟─b570d453-43f2-4a12-a9d6-889752dd5aeb
+# ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
+# ╟─fff91fa6-8ffb-458a-946d-244b5b13c3cd
+# ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
+# ╠═dfdcded3-026e-4925-ac02-ba801488b267
+# ╠═1abb42cf-af03-49a9-837b-902999a89744
+# ╠═51d3286a-d89d-41f5-88d5-bb361e76ff09
+# ╠═5e9e8e04-4aca-416d-a4b4-410b243fd722
+# ╟─47ab6638-1135-452c-ae79-bb5682094a51
 # ╠═4ef8beb3-621c-41f4-97cf-5a634ec87769
 # ╠═011f212e-63b1-4df3-a646-37bcf23717f8
 # ╠═12ca0c64-931b-4989-9594-6bd09ed6fea9
@@ -9931,6 +11638,9 @@ version = "4.1.0+0"
 # ╠═0ef59446-cc78-47f8-8196-32fdfe199980
 # ╠═f6b71da4-db72-4896-9e34-b7afc2e5677c
 # ╠═312118cb-b321-4d8a-b1d9-62411134a980
+# ╠═23899c17-5414-405e-9bb8-7f505b45e2f6
+# ╟─e319da9f-acb5-43e4-830f-01822b9a19ab
+# ╟─31aa8e9b-9122-497f-866f-ef359f7604ad
 # ╠═6ccf5d2b-1e32-4aa6-bea2-f1830e795280
 # ╠═0e0ec7a4-31a2-4583-a8e5-0a44f48d2c59
 # ╟─794b5b4d-62d7-4dda-a379-a7f1d9af7573
@@ -9958,25 +11668,6 @@ version = "4.1.0+0"
 # ╠═50b5bb13-afd8-4ad8-8ec5-8fd2bbd3b050
 # ╟─39f35083-8fbd-4c1b-8e3b-796752dc8850
 # ╠═c4355205-1929-48ec-9582-5b3d2b9255d3
-# ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
-# ╠═33c1996a-aade-400a-9b2f-259db12c0835
-# ╠═79b17009-14ee-422e-8eb6-9e81c270b602
-# ╠═23899c17-5414-405e-9bb8-7f505b45e2f6
-# ╟─e319da9f-acb5-43e4-830f-01822b9a19ab
-# ╟─31aa8e9b-9122-497f-866f-ef359f7604ad
-# ╠═2097d037-7f79-4fe2-b683-b74b77d98752
-# ╟─bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
-# ╟─3ec7080c-2972-484b-805e-3d9fe0a7d9d1
-# ╟─23f9f68a-9e3c-4bbe-8abe-1b851206162f
-# ╟─bf82a17d-f524-4aa7-ab17-eadcc045d6cb
-# ╟─b570d453-43f2-4a12-a9d6-889752dd5aeb
-# ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
-# ╟─fff91fa6-8ffb-458a-946d-244b5b13c3cd
-# ╠═698de8c1-b7a4-477c-ba42-88e78cabddf2
-# ╠═dfdcded3-026e-4925-ac02-ba801488b267
-# ╠═1abb42cf-af03-49a9-837b-902999a89744
-# ╠═51d3286a-d89d-41f5-88d5-bb361e76ff09
-# ╠═5e9e8e04-4aca-416d-a4b4-410b243fd722
 # ╠═106e37c3-8c25-4fae-b906-00b86831e58d
 # ╠═d6386d9d-fc6b-495c-aed3-9030073281a4
 # ╠═c0287358-04ff-49b5-926d-75c10a97da44
@@ -9994,5 +11685,7 @@ version = "4.1.0+0"
 # ╠═e9a4105f-abec-47ca-9170-ca6aef7a9c49
 # ╠═4bbe463f-7e79-44f8-8abe-5f104b346e45
 # ╠═5870e251-b3da-42b7-b72f-211e74c669fc
+# ╠═16436692-04a1-4915-8e89-b8c0805b6bd5
+# ╠═37e3be87-dff9-456d-b921-e0e1ecbb4909
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

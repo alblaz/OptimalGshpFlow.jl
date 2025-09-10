@@ -66,46 +66,6 @@
 \fi
 \makeatother
 
-\usepackage{color}
-\usepackage{fancyvrb}
-\newcommand{\VerbBar}{|}
-\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
-% Add ',fontsize=\small' for more characters per line
-\usepackage{framed}
-\definecolor{shadecolor}{RGB}{241,243,245}
-\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
-\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.40,0.45,0.13}{#1}}
-\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
-\newcommand{\CharTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
-\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
-\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
-\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
-\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
-\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\ExtensionTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
-\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
-\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
-\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
-\newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
-\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
-\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
-\newcommand{\RegionMarkerTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
-\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
-\newcommand{\StringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
-\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.07,0.07,0.07}{#1}}
-\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
-\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
 \usepackage{calc} % for calculating minipage widths
@@ -262,49 +222,73 @@ model is based on the principles of fluid mechanics and heat transfer,
 and takes into account the thermal properties of the ground and the heat
 pump.
 
-\section{Literature:}\label{literature}
+\section{Literature Review}\label{literature-review}
 
-The question of the control of HP is not particularly new. Indeed, manyt
-authors
+Several tools exist to model GSHP:
+
+\begin{itemize}
+\item
+  Modelica
+\item
+  Trnsys
+\item
+  EES
+\item
+  Python
+\item
+  Combinations of the above/co simulation
+\end{itemize}
 
 \section{Methods:}\label{methods}
 
+\subsection{Modeling framework:}\label{modeling-framework}
+
+We dedided to implement the model from scratch using ModelingToolkit.jl.
+This ecosystem overlays onto Julia. It is very similar in principle to
+Modelica: an acausal component based framework. However, there are a few
+key reasons why this tool has been chosen over the alternatives: free,
+open source.
+
 The GSHP system model consists of three coupled submodels that are
-solved in sequence: thermodynamic cycle (thermal system), borehole heat
+solved together: thermodynamic cycle (thermal system), borehole heat
 exchanger, and pump hydraulics (hydraulic system). The steady-state
 system is solved using ModelingToolkit.jl with symbolic manipulation and
-NonlinearSolve.jl for robust Newton-Raphson solution methods. The
-thermal and hydraulic systems are solved separately but with tight
-coupling through shared variables and parameter exchange.
+NonlinearSolve.jl library for the solvers.
 
-\subsection{System Architecture:}\label{system-architecture}
+The model implementation prioritizes modularity and extensibility,
+allowing for easy modification of individual components while
+maintaining system-level coupling consistency. The thermal-hydraulic
+separation enables efficient parameter studies and optimization while
+ensuring physical consistency through the coupling interface. The model
+architecture employs a modular approach typical of ModelingToolkit,
+where fundamental components such as thermophysical properties are
+defined first and then used to build parent components like the pump and
+compressor. Both the thermal and hydraulic models are coupled through
+mass flow (the secondary fluid mass flow from the thermal system sets
+the design flow for the hydraulic system), temperature (borehole
+inlet/outlet temperatures link the thermal and hydraulic properties),
+and performance feedback (pump power from the hydraulic system feeds
+into overall system KPIs). The solution strategy follows a sequential
+approach: first, the thermodynamic cycle is solved for given boundary
+conditions; next, mass flows, temperatures, and thermal loads are
+extracted; then, the hydraulic system is solved using these outputs as
+boundary conditions; finally, thermal and hydraulic results are combined
+to compute overall system performance metrics, including auxiliary
+heating requirements if the heat pump capacity is insufficient.
 
-The model implements a modular approach where the thermal system
-determines the thermodynamic cycle performance, heat loads, and required
-mass flows, while the hydraulic system calculates pressure drops, pump
-power, and validates the hydraulic feasibility of the thermal solution.
-The systems are coupled through:
+\subsubsection{Thermophysical
+properties:}\label{thermophysical-properties}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{Mass flow coupling}: The secondary fluid mass flow from the
-  thermal system becomes the design flow for the hydraulic system
-\item
-  \textbf{Temperature coupling}: Borehole inlet/outlet temperatures link
-  the thermal model to the hydraulic thermal properties\\
-\item
-  \textbf{Performance feedback}: Pump power from the hydraulic system
-  feeds back into overall system performance calculations
-\end{enumerate}
+Clapeyron.jl and EntropyScaling are used for determining the properties
+of the refrigerant. CoolProp correlations are used for the secondary
+fluid.
 
-\subsection{Thermodynamic Cycle Model:}\label{thermodynamic-cycle-model}
+\subsubsection{Thermodynamic Cycle:}\label{thermodynamic-cycle}
 
-The thermodynamic cycle implements a comprehensive R134A refrigerant
-circuit with the following components:
+The thermodynamic cycle implements a R134A cycle with the following
+components:
 
-\subsubsection{Evaporator:}\label{evaporator}
+\paragraph{Evaporator:}\label{evaporator}
 
 A moving-boundary plate heat exchanger evaporator with dynamically
 allocated regions for two-phase evaporation and single-phase
@@ -317,10 +301,9 @@ superheating. The model features:
   plate spacing (b), number of plates (np), width (W), enlargement
   factor (ϕ), and chevron angle (β)
 \item
-  \textbf{Two-zone heat transfer}: The evaporator length is dynamically
-  split between evaporation and superheating zones using a smooth
-  transition function \texttt{zap(uz\_fr\_sh)} that maps the unbounded
-  variable \texttt{uz\_fr\_sh} to the {[}0,1{]} interval
+  \textbf{Two-zone heat transfer}: The evaporator length is split
+  between evaporation and superheating zones. The fraction of the HX
+  occupied by each zone is a variable.
 \item
   \textbf{Heat transfer correlations}:
 
@@ -328,40 +311,59 @@ superheating. The model features:
   \tightlist
   \item
     Two-phase region: Amalfi correlation for convective boiling in plate
-    heat exchangers with quality-dependent averaging
+    heat exchangers (avergaed ovr a vapor quality range)
   \item
     Superheating region: Martin correlations for single-phase plate heat
-    exchanger flow with laminar-turbulent transition
+    exchanger flow with laminar-turbulent (smooth) transition
   \end{itemize}
 \item
   \textbf{Boundary conditions}: Fixed superheat degree (ΔTSH) and
   secondary fluid temperature difference (ΔTSF) as control variables
 \end{itemize}
 
-\subsubsection{Compressor:}\label{compressor}
+The smooth transition is necessary for the solver to
 
-The scroll compressor model incorporates: - \textbf{Volumetric
-displacement}: Fixed displacement volume with frequency-controlled
-capacity - \textbf{Isentropic efficiency}: Constant isentropic
-efficiency
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Friction}: Darcy-Weisbach equations with smooth transition
+  between laminar and turbulent regimes using error function blending
+\item
+  \textbf{Friction factor}: Enhanced Colebrook-White correlations
+\item
+  \textbf{Heat exchanger losses}: Chevron-plate correlations based on
+  Martin's work for pressure drop in plate heat exchangers
+\end{itemize}
 
-\subsubsection{Expansion Valve:}\label{expansion-valve}
+\paragraph{Compressor:}\label{compressor}
+
+The compressor model incorporates:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Volumetric displacement}: Fixed displacement volume with
+  frequency-controlled capacity -
+\item
+  \textbf{Isentropic efficiency}: Constant isentropic efficiency
+\end{enumerate}
+
+\paragraph{Expansion Valve:}\label{expansion-valve}
 
 Modeled as an isenthalpic expansion process. A constraint imposed in the
 solver is the superheating degree.
 
-\subsubsection{Condenser:}\label{condenser}
+\paragraph{Condenser:}\label{condenser}
 
 Simplified model assuming constant condensing temperature and specified
 subcooling degree (ΔTSC). The detailed condenser heat transfer is not
 modeled, focusing on the evaporator side.
 
-\subsection{Borehole Heat Exchanger
-Model:}\label{borehole-heat-exchanger-model}
+\subsubsection{Borehole Heat Exchanger:}\label{borehole-heat-exchanger}
 
-The U-tube grouted borehole employs two sub models:
+The U-tube grouted borehole is simulated by two different models:
 
-\subsubsection{Thermal Model:}\label{thermal-model}
+\paragraph{Thermal:}\label{thermal}
 
 \begin{itemize}
 \tightlist
@@ -384,94 +386,51 @@ The U-tube grouted borehole employs two sub models:
   temperatures in both legs as functions of depth
 \end{itemize}
 
-\subsubsection{Hydraulic Integration:}\label{hydraulic-integration}
+\paragraph{Hydraulic:}\label{hydraulic}
 
 The borehole thermal model is connected to the hydraulic system through
-temperature-dependent fluid properties calculated via CoolProp
-interpolants registered as symbolic functions in ModelingToolkit.
-
-\subsection{Pump and Hydraulic Model:}\label{pump-and-hydraulic-model}
-
-Note: the hydraulic mode is decoupled from the thermal model, the
-solution from the thermal model is used as a boundary condition for the
-hydraulic model. There is no feedback from hydraulic losses to the
-thermal model, which is a limitation that affects the high flow
-simulations (better performances are expected in reality thanks to the
-added heat).
-
-\subsubsection{Pump Performance:}\label{pump-performance}
-
-The centrifugal pump follows dimensionless performance curves based on
-affinity laws: - \textbf{Head coefficient}:
-\(\psi = \psi_0 - K \cdot \varphi^2\) where \(\varphi\) is the flow
-coefficient - \textbf{Efficiency}:
-\(\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)\)
-with parabolic efficiency curve around the best efficiency point (BEP) -
-\textbf{Power calculation}: Electrical power including motor efficiency
-
-\subsubsection{Hydraulic Loss
-Calculations:}\label{hydraulic-loss-calculations}
+temperature-dependent fluid properties.
 
 \begin{itemize}
 \tightlist
 \item
   \textbf{Pipe friction}: Darcy-Weisbach equations with smooth
-  transition between laminar and turbulent regimes using error function
-  blending
+  transition between laminar and turbulent regimes using smooth blending
+  (erf)
 \item
   \textbf{Friction factor}: Enhanced Colebrook-White correlations with
   automatic regime detection
-\item
-  \textbf{Heat exchanger losses}: Chevron-plate correlations based on
-  Martin's work for pressure drop in plate heat exchangers
 \item
   \textbf{Component-wise pressure drops}: Individual calculation for
   each system component (evaporator, borehole, connecting pipes)
 \end{itemize}
 
-\subsection{System Coupling and Solution
-Strategy:}\label{system-coupling-and-solution-strategy}
+\subsection{Pump}\label{pump}
 
-\subsubsection{Sequential Solution
-Approach:}\label{sequential-solution-approach}
+Since the hydraulic mode is decoupled from the thermal model, there is
+no feedback from hydraulic losses to the thermal model, which is a
+limitation that affects the high flow simulations. In reality, better
+performances are expected in reality thanks to the added heat in the
+heat source loop, both because of electrical losses as well as the
+conversion of work into heat due to frictional losses.
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
+\subsubsection{Pump Performance:}\label{pump-performance}
+
+The centrifugal pump follows dimensionless performance curves based on
+affinity laws:
+
+\begin{itemize}
 \item
-  \textbf{Thermal system solution}: Solve the thermodynamic cycle for
-  given boundary conditions (borehole wall temperature, condensing
-  conditions, control setpoints)
+  \textbf{Head coefficient}: \(\psi = \psi_0 - K \cdot \varphi^2\) where
+  \(\varphi\) is the flow coefficient
 \item
-  \textbf{Parameter extraction}: Extract mass flows, temperatures, and
-  thermal loads from the thermal solution
+  \textbf{Efficiency}:
+  \(\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)\)
+  with parabolic efficiency curve around the best efficiency point (BEP)
 \item
-  \textbf{Hydraulic system solution}: Solve pump and pressure drop
-  calculations using thermal system outputs as boundary conditions
-\item
-  \textbf{Performance calculation}: Combine thermal and hydraulic
-  results to compute overall system performance metrics \#\#\# System
-  Coupling and Solution Strategy:
-\end{enumerate}
-
-The system architecture follows a sequential solution approach as
-illustrated in the system flowchart. The process begins with boundary
-conditions (wall temperature, condensing conditions, and control
-setpoints) feeding into the thermal system solution. The thermal system
-encompasses both the thermodynamic cycle (evaporator, compressor,
-condenser, expansion valve) and the borehole heat exchanger thermal
-model.
-
-Key coupling points include: - \textbf{Thermal-to-Hydraulic Transfer}:
-Mass flow rates and temperatures from the thermal solution become
-boundary conditions for the hydraulic system - \textbf{Performance
-Integration}: Results from both thermal and hydraulic systems combine to
-calculate overall performance metrics (COP1, COP2, COP3) -
-\textbf{Auxiliary Heating Assessment}: When heat pump capacity is
-insufficient, auxiliary heating requirements are calculated
-
-\emph{Note: A detailed system flowchart will be added in the final
-version.}
+  \textbf{Power calculation}: Electrical power including motor
+  efficiency
+\end{itemize}
 
 \subsection{Performance Metrics:}\label{performance-metrics}
 
@@ -487,11 +446,11 @@ The model calculates multiple performance indicators:
   \(COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}\) (including pump
   power)
 \item
-  \textbf{Advanced metrics}: Includes provisions for auxiliary heating
-  assessment when heat pump capacity is insufficient
+  COP 3 (includes auxiliary heating)
 \end{itemize}
 
-\subsection{Numerical Implementation:}\label{numerical-implementation}
+\subsubsection{Numerical
+Implementation:}\label{numerical-implementation}
 
 \begin{itemize}
 \tightlist
@@ -509,29 +468,10 @@ The model calculates multiple performance indicators:
   with automatic stepping and convergence control
 \end{itemize}
 
-The model implementation prioritizes modularity and extensibility,
-allowing for easy modification of individual components while
-maintaining system-level coupling consistency. The thermal-hydraulic
-separation enables efficient parameter studies and optimization while
-ensuring physical consistency through the coupling interface.
-
 \emph{Detailed system parameters and correlations are provided in
 Appendix A.}
 
 \section{Results:}\label{results}
-
-\subsection{COP3 vs.~ΔT}\label{cop3-vs.-ux3b4t}
-
-This figure shows the main metric we are considering: COP3 against the
-control strategy under investigation: constant temperature difference
-across the evaporator/BHE.
-
-There seems to be an optimal
-
-TDL: look into the position of the boundary trace the temperatures in
-the evap trace the temperatures in the bhe: get the exponents + ground
-temperature reynolds + transitions (illustrer sur les graphs par des
-lignes) show limit power pump too UA?
 
 \subsection{Insights into the physical
 process}\label{insights-into-the-physical-process}
@@ -539,18 +479,169 @@ process}\label{insights-into-the-physical-process}
 Position of the boundary within the evaporator The faster the compressor
 runs, the more evaporation fraction is used
 
+This figure show that all the convective thermal resistances are lower
+at low delta T, which is expected.
+
+Focusing on the borehole heat exchanger (BHE) efficiency, defined as: \[
+1 - \frac{T_{\text{out}} - T_{\text{wall}}}{T_{\text{in}} - T_{\text{wall}}}
+\]
+
+Schematically, this better efficiency leads to higher evaporation
+temperature:
+
+Then, this higher temperature leads to a better capacity:
+
+When factoring in the pumpin pwer, we therefore obtain the COP 3 figure:
+
+We observe a clear peak around 3K Delta T. This is in line with the
+standard practice accross the field.
+
+\subsection{COPs vs.~ΔT}\label{cops-vs.-ux3b4t}
+
+This first figure shows the main metrics we are considering: COPs
+against the control strategy under investigation: constant temperature
+difference across the evaporator/BHE.
+
+The COP 3 is calculated such that the delivered heat is the heat
+delivered at the maximum case for this frequency.
+
+We can see clearly that there is an optimal at 3.0K, around when the
+flow is fully turbulent in both legs of the BHE (see appendix for
+explanations)
+
 \subsection{Robustness}\label{robustness}
+
+\subsubsection{Scenarios}\label{scenarios}
+
+4 scenarios have been simulated with one difference for each variant:
+
+\begin{itemize}
+\item
+  Base
+\item
+  ``Cold wall'', T wall is set to 5C instead of 10C
+\item
+  ``Pure Water'', the secondary fluid is pure water
+\item
+  ``Bigger pipes'', the OD of the collector pipes is set to 40 instead
+  of 32mm
+\end{itemize}
 
 \subsubsection{Partial load}\label{partial-load}
 
-Chosing the COP3 as a metric allows for the comparison of ``faster
-compressor vs.~slower compressor + aux electrical power'' Assuming the
-HP can tackle the entirety of the load (P\_aux\_heating = 0.0)
+\begin{figure}
 
-Looking at the graph,
+\centering{
 
-\subsubsection{Change of operating
-point}\label{change-of-operating-point}
+\pandocbounded{\includegraphics[keepaspectratio]{paper_files/mediabag/images/cop3_pure_water_scenario.pdf}}
+
+}
+
+\caption{\label{fig-pure_water_cop3}Test}
+
+\end{figure}%
+
+Figure~\ref{fig-pure_water_cop3} is a contour plot representing a 2d
+parametric exploration. The x axis is the set delta T for the secondary
+fluid. The ordinates represent the compressor frequency. The contours
+represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a
+given fgrequency, The maximum condenser heat that the HP can deliver at
+this frequency and then the necessary auxiliary heating to match it is
+added. It's a way to quantify the efficiency of the system while not
+having to chose a target Q cond.
+
+On the diagram, several isolines are represented:
+
+\begin{itemize}
+\item
+  The iso pump speed are represented in black. The 30\% and 100\% speeds
+  are represented in thick and each 10\% step in between is a thiner
+  line. Beyond these two boundaries, the physical system can actually
+  not be operated.
+\item
+  Similarily, the maximum electrical power is also represented by such a
+  line (dashed black). The operative envelope is also constrained by
+  this additional parameter.
+\item
+  The different kaminar to turbulent transitions of each legs of the BHE
+  are represented by the onset and full transition iso rteynolds number
+  (2300 and 4000).
+\end{itemize}
+
+In order to better visualize these ridges, we have calculated a
+relatrive COP 3 deficit for a given compressor frequency. NEEDS
+explanation
+
+The ridge line in red corresponds to the location of this maximum used
+for the auxiliary heating calculation. The ridge line presents 2
+regions:
+
+\begin{itemize}
+\item
+  In the ttop part, there is a clear ridge
+\item
+  In the bottom part, a hockey stick ridge is present
+\end{itemize}
+
+In the lower region, the behaviour of the system is dominated by the
+high borehole efficiency. In the top, the relative increase of pumpng
+power is justified: it allows achieveing turbulence in the collector,
+and therefore better BH efficiency. Conversely, achieveing turbulence at
+low compressor speed is not worth the extra pumping power. In some
+sense, achiveing turbulence is ``having a high speed'', regardless of
+the thermal load.
+
+This second region is often not reachable in the base scenario: the pump
+minimum speed being too high and therefore does not allow for a low
+enough SF flow.
+
+When
+
+Focusing on the position of the ridge, one can see that, in the colder
+wall collector scenario, there seems to be a moment where switching the
+pump to the minimum in order to take advantage of the increased BH
+efficiency instead of wasting the pumping power trying to achieve
+turbulence in the collector.
+
+Looking at the graph and coming back the the different ways to control
+as GSHP SF pump, we can make the following remarks:
+
+\begin{itemize}
+\item
+  A constant Delta T / strategy necessarily fails at keeping the system
+  on the ridge.
+\item
+  A constant pressure drop strategy could be
+\item
+  A constant pump speed strategy can not track the change either
+\item
+  A constant compressor speed to pump speed ratio
+\item
+  A constant mass flow ratio could also be devised (however in practice
+  sensors are never installed for cost effieicncy reaspons. Maybe a s
+\end{itemize}
+
+Idea: show all on different graphs, only the rules without the effiency
+
+Conslusion is that nothing seems to be able to capture the complex
+interplay of the different effects.
+
+Lookking at the graph, the
+
+NEW GRAOH AT DIFFERENT T WALL
+
+The figure XX shows that the ridge
+
+It is important to remember the model's assumptions when discussing
+these aspects. In the transition region, the behaviour is somewhat
+unclear. There is some entry length effect that happen in reality, the
+temperature is not unform in each leg (-\textgreater{} some part of the
+same leg can be turbulent while the other is laminar). Regardless of
+these limitations, it does seem that the optimal flow is ``right after
+the transition''. However, as discussed, the classic rule based control
+strategies can not track this transition point in a satifactory manner.
+
+\subsubsection{Variations}\label{variations}
 
 To establish baseline performance characteristics, we initially examine
 a fundamental question: what constitutes the optimal rule-based control
@@ -560,14 +651,6 @@ The test case represents a typical Swedish GSHP installation. The system
 features a 250m deep borehole with a 40mm outer diameter polyethylene
 single U-tube collector. Complete technical specifications and thermal
 properties are detailed in Appendix A.
-
-\subsection{Heatmap of COP2 vs T wall vs T
-condenser}\label{heatmap-of-cop2-vs-t-wall-vs-t-condenser}
-
-\subsection{A fine tuned strategy}\label{a-fine-tuned-strategy}
-
-We propose different curves for different operational modes. The
-question of the linear transition is central.
 
 \section{Conclusions}\label{conclusions}
 
@@ -689,35 +772,6 @@ coefficient {[}-{]} - \(K\) = Head curve slope parameter {[}-{]}
 \item
   \(MEA\) = Monoethanolamine (\(C_2H_7NO\))
 \end{itemize}
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\ImportTok{import} \BuiltInTok{Pkg}
-\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{activate}\NormalTok{(}\StringTok{"."}\NormalTok{)}
-\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{instantiate}\NormalTok{()}
-
-\CommentTok{\# Install the local package as a regular dependency}
-\BuiltInTok{Pkg}\NormalTok{.}\FunctionTok{add}\NormalTok{(path}\OperatorTok{=}\StringTok{".."}\NormalTok{)}
-\end{Highlighting}
-\end{Shaded}
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\ImportTok{using} \BuiltInTok{Revise}
-\ImportTok{using} \BuiltInTok{OptimalGshpFlow}
-\end{Highlighting}
-\end{Shaded}
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\CommentTok{\# Test that the package is loaded properly}
-\FunctionTok{println}\NormalTok{(}\StringTok{"OptimalGshpFlow version: "}\NormalTok{, }\FunctionTok{pkgversion}\NormalTok{(OptimalGshpFlow))}
-
-\CommentTok{\# Create a sample property object to test functionality}
-\PreprocessorTok{@named}\NormalTok{ fluid }\OperatorTok{=}\NormalTok{ Properties.}\FunctionTok{DynamicIncompressibleProps}\NormalTok{(χ }\OperatorTok{=} \FloatTok{0.2}\NormalTok{, fluid }\OperatorTok{=} \StringTok{"MEA"}\NormalTok{)}
-\FunctionTok{println}\NormalTok{(}\StringTok{"Created fluid properties object: "}\NormalTok{, fluid)}
-\end{Highlighting}
-\end{Shaded}
 
 \subsection{Appendix A: Model Parameters and Technical
 Specifications}\label{appendix-a-model-parameters-and-technical-specifications}
