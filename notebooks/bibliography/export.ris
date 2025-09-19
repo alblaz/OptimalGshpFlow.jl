@@ -1,184 +1,5 @@
 TY  - JOUR
-AU  - Madani, Hatef 
-AU  - Claesson, Joachim 
-AU  - Lundqvist, Per 
-TI  - Capacity control in ground source heat pump systems part II: Comparative analysis between on/off controlled and variable capacity systems
-T2  - International Journal of Refrigeration
-VL  - 34
-PY  - 2011
-SP  - 
-EP  - 
-DA  - 2011
-UR  - 
-DO  - 10.1016/j.ijrefrig.2011.05.012
-AB  - In the present paper, as the second part of two, modeling and simulation was carried out for a Ground Source Heat Pump (GSHP) system in the presence of all the most important interacting sub-systems such as building, ground heat source, electrical auxiliary heater, and the heat pump unit in order to make a fair and comprehensive comparison between the annual performance of on/off controlled and variable capacity systems. The annual modeling showed that dimensioning of the on/off controlled GSHP based on the peak heat demand of the building plays a significant role when the two control strategies are compared: if the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand of the building, the electrical auxiliary, which then covers about 10% of the annual heating demand of the building, makes the SPF of the on/off controlled GSHP to be lower than the one of the variable speed system. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.
-KW  - Heat pump
-KW  - Ground Source Heat Pumps
-KW  - Control
-N1  - C. Highlights. 
-N1  - C1. Brine to water heat pump systems like Ground Source Heat Pumps (GSHPs) are one of the common and fast growing systems for heating the buildings in USA and European countries. 
-N1  - C2. The presents paper aims at making a fair comparison between the annual performance of an on/off and variable capacity GSHP systems, using the generic model developed by Madani et al (2011). 
-N1  - C3. The current paper compares the annual performance of the on/off controlled and inverter-driven variable capacity heat pump systems, using the generic model developed by Madani et al (2011). 
-N1  - C4. The results from the annual modeling for both systems indicate: C When the annual performance of on/off controlled GSHP system is compared with the one of the variable speed GSHP system, it must be noticed that dimensioning of the on/off controlled GSHP based on the peak heat demand of the building plays a significant role: if the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand of the building, the important role of the electrical auxiliary heater makes the Seasonal Performance Factor (SPF) of the on/off controlled GSHP be lower than the one of the variable speed system. 
-N1  - C5. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
-N1  - C6. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
-N1  - D. Findings. 
-N1  - D1. As of 2005, there are over a million units installed worldwide providing about 15 GW of thermal capacity (Rybach, 2005) and the annual global increase has been more than 10% over the last ten years (Lund et al, 2004). 
-N1  - D2. As may be seen from Fig. 9, the variable capacity system has higher efficiency than unit A due to avoiding the electrical auxiliary heater; Furthermore, the modeling results show that there is no significant difference between the COP of system B, system C, and the variable speed system. 
-N1  - D3. As shown in Fig. 12, the SPF of unit A is about 13% lower than the SPF of the variable speed system whereas the SPF of system B, C, and D are almost the same as the one of variable speed system. 
-N1  - D4. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
-N1  - D5. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
-N1  - D6. As a final remark, in order to obtain a higher efficiency for on/off controlled systems, it is important to dimension them in a way that electrical auxiliary heater covers less than 5% of annual heat demand. 
-N1  - E. Summary. 
-N1  - E1. Snapshot. 
-N1  - E2. The study compares the annual performance of on/off controlled and variable capacity Ground Source Heat Pump (GSHP) systems, finding that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand.. 
-N1  - E3. Key findings. 
-N1  - E4. The study finds that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. Additionally, the study finds that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
-N1  - E5. The study finds that the variable speed GSHP unit has a higher balance point temperature than the single speed units, resulting in a smaller compressor cycling region. The variable speed unit also shows higher efficiency in certain temperature ranges, but higher energy consumption due to the lack of need for an electrical auxiliary heater.. 
-N1  - E6. The key findings of the study are that the dimensioning of on/off controlled heat pump systems plays a significant role in their performance, and that the use of electrical auxiliary heaters can significantly impact energy consumption. Additionally, the study found that the energy use by liquid pumps in the variable speed GSHP system can be 5-30% higher compared to the single speed system.. 
-N1  - E7. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
-N1  - E8. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
-N1  - E9. Objectives. 
-N1  - E10. The objectives of the study are to compare the annual performance of on/off controlled and inverter-driven variable capacity heat pump systems, and to investigate the impact of dimensioning and electrical auxiliary heaters on energy consumption.. 
-N1  - E11. Methods. 
-N1  - E12. The study uses modeling and simulation to evaluate the annual performance of the two control strategies, with all the systems modeled over a year. The study also uses a quasi-static model to consider the dynamic interactions among the system components.. 
-N1  - E13. The study uses a modeling approach to estimate the building's heat demand and the performance of the GSHP units. The model takes into account various parameters such as solar insolation, thermal inertia, and user behavior. The study also uses data from the Meteonorm database to simulate the climatic conditions in Stockholm.. 
-N1  - E14. The methods used in the study include modeling and simulation of the heat pump systems, as well as validation with experimental data from in-situ field measurements.. 
-N1  - E15. Results. 
-N1  - E16. The study finds that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. The study also finds that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
-N1  - E17. The study finds that the variable speed GSHP unit has a higher balance point temperature than the single speed units, resulting in a smaller compressor cycling region. The variable speed unit also shows higher efficiency in certain temperature ranges, but higher energy consumption due to the lack of need for an electrical auxiliary heater. The study also finds that the unit A and unit B have higher total energy consumption than the variable speed system over a year due to high annual energy consumption of the electrical auxiliary heater.. 
-N1  - E18. The results of the study show that the SPF of the on/off controlled systems can be lower than that of the variable speed system, especially when the on/off controlled system is dimensioned to cover only a small percentage of the peak heat demand. The results also show that the energy use by liquid pumps in the variable speed GSHP system can be 5-30% higher compared to the single speed system.. 
-N1  - E19. Conclusions. 
-N1  - E20. The study concludes that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. The study also concludes that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
-N1  - E21. The study concludes that the variable speed GSHP unit has higher efficiency in certain temperature ranges, but also higher energy consumption due to the lack of need for an electrical auxiliary heater. The study also concludes that the unit A and unit B have higher total energy consumption than the variable speed system over a year due to high annual energy consumption of the electrical auxiliary heater.. 
-N1  - E22. The conclusions of the study are that the dimensioning of on/off controlled heat pump systems is crucial for their performance, and that the use of electrical auxiliary heaters can significantly impact energy consumption. The study also concludes that retrofitting an inverter to existing single speed HP systems can increase their annual efficiency. 
-LA  -
-ER  -
-
-TY  - JOUR
-AU  - Gao, Jiajia 
-AU  - Huang, Gongsheng 
-AU  - Xu, Xinhua 
-TI  - An optimization strategy for the control of small capacity heat pump integrated air-conditioning system
-T2  - Energy Conversion and Management
-VL  - 119
-PY  - 2016
-SP  - 
-EP  - 
-DA  - 2016
-UR  - 
-DO  - 10.1016/j.enconman.2016.04.027
-AB  - This paper studies the optimization of a small-scale central air-conditioning system, in which the cooling is provided by a ground source heat pump (GSHP) equipped with an on/off capacity control. The optimization strategy aims to optimize the overall system energy consumption and simultaneously guarantee the robustness of the space air temperature control without violating the allowed GSHP maximum start-ups number per hour specified by customers. The set-point of the chilled water return temperature and the width of the water temperature control band are used as the decision variables for the optimization. The performance of the proposed strategy was tested on a simulation platform. Results show that the optimization strategy can save the energy consumption by 9.59% in a typical spring day and 2.97% in a typical summer day. Meanwhile it is able to enhance the space air temperature control robustness when compared with a basic control strategy without optimization.
-KW  - ground source heat pump
-KW  - Optimization
-KW  - control strategy
-KW  - Air-conditioning system
-N1  - C. Highlights. 
-N1  - C1. This paper studies the optimization of a small-scale A/C system integrated with a ground source heat pump (GSHP). 
-N1  - C2. This paper presents an optimization strategy for a GSHPintegrated A/C system in order to optimize the overall system energy consumption without violating the allowed GSHP maximum start-ups number and degrading the space air temperature control performance. 
-N1  - C3. The performance of the optimization strategy is compared with the basic control strategy. 
-N1  - C4. The results show that the optimization strategy can improve the robustness of the space air temperature control significantly and reduce the system energy consumption obviously in spring days, i.e. under light load conditions. 
-N1  - C5. The energy consumption of the GSHP was reduced by 21.15% and the overall system was reduced by 9.59%. 
-N1  - C6. Both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller when the optimization strategy is used. 
-N1  - D. Findings. 
-N1  - D1. It has been shown that more than 40% of the building energy consumptions are mainly used for the heating, ventilation, and air-conditioning (HVAC) systems [1,2]. 
-N1  - D2. The energy consumption of the GSHP was reduced by 21.15% and the overall system was reduced by 9.59%. 
-N1  - D3. In the summer day, both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller (reduced by 2.97%) when the optimization strategy is used. 
-N1  - E. Summary. 
-N1  - E1. Snapshot. 
-N1  - E2. The study proposes an optimization scheme to improve the energy performance of a ground source heat pump (GSHP) integrated air conditioning (A/C) system by optimizing the chilled water return (CHWR) temperature set-point and the temperature control band.. 
-N1  - E3. Key findings. 
-N1  - E4. The proposed optimization strategy can save energy consumption by 9.59% in a typical spring day and 2.97% in a typical summer day, while enhancing the space air temperature control robustness. The strategy optimizes the set-point of the chilled water return temperature and the width of the water temperature control band to minimize overall system energy consumption.. 
-N1  - E5. The study finds that optimizing the CHWR temperature set-point and the temperature control band can improve the energy performance of the GSHP integrated A/C system, reduce the on/off cycling, and enhance the room temperature control performance.. 
-N1  - E6. The study finds that the proposed optimization algorithm can achieve good control robustness and minimize energy consumption, with an average absolute tracking error of 0.030 °C. The GSHP model and GSHE model are validated using experimental data, with a maximum mean deviation of 2.46% for compressor power consumption and 4.45% for chilled water temperature.. 
-N1  - E7. The optimization strategy can reduce the energy consumption of the GSHP by 21.15% and the overall system by 9.59% in spring days, and by 6.34% and 2.97% in summer days, respectively. The optimization strategy also improves the robustness of space air temperature control.. 
-N1  - E8. Both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller when the optimization strategy is used. 
-N1  - E9. Objectives. 
-N1  - E10. The objective of the study is to propose an optimization strategy for a GSHP-integrated A/C system to minimize overall system energy consumption subject to the allowed GSHP maximum start-ups number per hour specified by customers.. 
-N1  - E11. Methods. 
-N1  - E12. The study uses a simulation platform to test the performance of the proposed strategy. The optimization strategy involves two steps: checking the water volume inside the chilled water loop and optimizing the set-point of the chilled water return temperature and the width of the water temperature control band.. 
-N1  - E13. The study uses a simulation-based approach to test the performance of the optimization strategy, with a simulated virtual system representing an actual GSHP-integrated central A/C system.. 
-N1  - E14. The study uses a simulation platform constructed using TRNSYS software, which includes models for the building, GSHP, AHU, water pump, water tank, GSHE, and temperature and humidity sensors. The optimization algorithm is coded using MATLAB and embedded in TRNSYS. The study uses experimental data to validate the GSHP model and GSHE model.. 
-N1  - E15. The optimization strategy involves two steps: checking the water volume inside the chilled water loop and developing an optimization algorithm to optimize the system settings (DTw and Tw,set) by minimizing the total power of the system. The performance of the optimization strategy is compared with the basic control strategy using simulation data.. 
-N1  - E16. Results. 
-N1  - E17. The results show that the proposed optimization strategy can save energy consumption and enhance the space air temperature control robustness. The strategy also optimizes the set-point of the chilled water return temperature and the width of the water temperature control band to minimize overall system energy consumption.. 
-N1  - E18. The study finds that the proposed optimization algorithm can achieve good control robustness and minimize energy consumption. The GSHP model and GSHE model are validated using experimental data, with a maximum mean deviation of 2.46% for compressor power consumption and 4.45% for chilled water temperature.. 
-N1  - E19. The results show that the optimization strategy can reduce the energy consumption of the GSHP and the overall system, and improve the robustness of space air temperature control. The optimization strategy can also guarantee the GSHP start-ups number specified by customers.. 
-N1  - E20. Conclusions. 
-N1  - E21. The study concludes that the proposed optimization strategy is effective in minimizing overall system energy consumption while guaranteeing the robustness of space air temperature control. The strategy can be used to optimize the performance of GSHP-integrated A/C systems.. 
-N1  - E22. The study concludes that optimizing the CHWR temperature set-point and the temperature control band is essential to improve the energy performance of the GSHP integrated A/C system.. 
-N1  - E23. The optimization strategy can efficiently reduce the energy consumption of the overall system, especially under partial load conditions, and improve the robustness of space air temperature control. The proposed strategy is not difficult to use and can be implemented in existing GSHP integrated A/C systems. 
-LA  -
-ER  -
-
-TY  - JOUR
-AU  - Ikeda, Shintaro 
-AU  - Choi, Wonjun 
-AU  - Ooka, Ryozo 
-TI  - Optimization method for multiple heat source operation including ground source heat pump considering dynamic variation in ground temperature
-T2  - Applied Energy
-VL  - 193
-PY  - 2017
-SP  - 
-EP  - 
-DA  - 2017
-UR  - 
-DO  - 10.1016/j.apenergy.2017.02.047
-AB  - Recent years have witnessed the widespread use of highly efficient energy systems as an important measure to reduce not only energy consumption but also operating costs. A ground source heat pump system has been attracting considerable attention because of its high efficiency. Although many studies have been conducted to investigate and evaluate the ground source heat pump’s performance, they have not sufficiently studied its optimal operation considering dynamic ground temperature variation caused by the high thermal capacity of the ground. Calculations considering both thermal history of the ground and optimal load dispatch are complicated and thus entail high computation costs. In this paper, an efficient optimization method is proposed to determine optimal operations of a hybrid ground source heat pump system that is used to handle the cooling load and hot water demand. The proposed method, namely epsilon-constrained differential evolution with random jumping, can solve nearly all possible configurations and is a suitable method for the nonlinear configuration used herein because the ground source heat pump has highly nonlinear characteristics and the ground temperature calculation cannot be simplified to a linear formulation. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. In addition, the proposed method derives the solution rapidly while maintaining high computation accuracy. Therefore, it can be used in practical situations to determine an optimal operating schedule as a day-ahead optimization.
-KW  - ground source heat pump
-KW  - borehole heat exchangers
-KW  - differential evolution
-KW  - air source heat pump
-KW  - auxiliary boiler
-KW  - operating cost
-KW  - energy system
-N1  - B. Participants: 6 cases. 
-N1  - B1. Furthermore, in Cases 1–1, 1–2, 2–1, and 2–2, when the outlet fluid temperature of GSHPh was lower than 2 °C and that of GSHPc was greater than 40 °C, the heat generation was reduced by 50% to keep the fluid temperature within the upper and lower bounds. To confirm the differences in the results in terms of the calculation period, six cases were considered because the performance of GSHP systems depends on the thermal history (i.e., heat demand of past time steps). 4. Results and discussion. 
-N1  - C. Highlights. 
-N1  - C1. In recent years, efficient utilization of energy sources has emerged as an important target owing to ever-increasing energy consumption and CO2 emissions. 
-N1  - C2. Vf xs volumetric heat capacity [J/m3 K] amount of electricity and gas consumption, respectively [kW h], [m3] mutation rate generation convective heat transfer coefficient of pipe inner surface [W/(m2 K)] machine load rate Nusselt number Prandtl number decision variable temporary decision variable unit price of electricity [yen/kW h] and gas [yen/m3], respectively population vector heat rate per unit length of borehole heat exchangers (BHEs) [W/m] radius, radial direction [m] thermal resistance [m K/W] Reynolds number time, time step used for ground source heat pump (GSHP) [s] time step used for BHE calculation [–] time step used for system optimization [–] temperature [°C] initial ground temperature [°C] BHE wall temperature [°C] average borefiled wall temperature [°C] average fluid temperature [°C] velocity [m/s] averaged velocity [m/s] volumetric flow rate [m3/s] half of the shank spacing [m]. 
-N1  - C3. The epsilon-constrained differential evolution (eDE) algorithm has been presented in [51]. eDE was compared to mixed-integer linear programming to validate its accuracy when minimizing operating costs in a complex energy system in [52]. eDE showed great searching capability in that the difference between the given results for MILP and eDE was less than 1%. 
-N1  - C4. The simplified optimization strategy that determined only the start and stop times of the GSHP operation could reduce the operating costs compared to the empirical operation for a single day and 7 days by 3.78% and 9.59%, respectively. 
-N1  - C5. The detailed optimization strategy that determined the load rates of all the components in each time step could reduce the operating costs compared to the empirical operation for a single day and 7 days by 6.81% and 12.56%, respectively. 
-N1  - C6. The proposed method can be widely used in both theoretical and practical studies when users want to obtain an optimal operation schedule. It remains to address how this method can be applied to a much longer period such as for an analysis of the life-cycle impact of GSHP, thermal interaction among BHEs, and optimal GSHP design. 
-N1  - D. Findings. 
-N1  - D1. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. 
-N1  - D2. The eDE algorithm has been presented in [51]. eDE was compared to mixed-integer linear programming to validate its accuracy when minimizing operating costs in a complex energy system in [52]. eDE showed great searching capability in that the difference between the given results for MILP and eDE was less than 1%. 
-N1  - D3. To reduce the computation costs, the search was terminated the search when the value did not change by more than 10% of the predefined number of generations. 
-N1  - D4. Furthermore, in Cases 1–1, 1–2, 2–1, and 2–2, when the outlet fluid temperature of GSHPh was lower than 2 °C and that of GSHPc was greater than 40 °C, the heat generation was reduced by 50% to keep the fluid temperature within the upper and lower bounds. 
-N1  - D5. The operating cost of Case 1–1 was 10,280 yen/day and that of Case 1–2 was 9738 yen/day, representing a reduction of 5.27%. 
-N1  - D6. The operating cost of Case 1–3 was 9346 yen/day, representing a reduction of 9.09% compared to Case 1–1. 
-N1  - D7. On the other hand, the operating cost in Case 1–3 was 4027 yen/day, representing a reduction of 1.08% compared to Cases 1–1 and 1–2, owing to the difference in the partial load operation of GSHPh and AB at 9 and 10 p.m. (Fig. 7). 
-N1  - D8. The total operating cost of cooling for 7 days was 68,740 yen, and it was reduced by 12.54% compared to Case 2–1 (Table 3). 
-N1  - D9. The total reduction rate was 16.35% compared to Case 2–1. 
-N1  - D10. The operating costs of Cases 2–2 and 2–3 were reduced by 1.15% and 2.20% compared to Case 2–1, respectively. 
-N1  - E. Summary. 
-N1  - E1. Snapshot. 
-N1  - E2. The study aimed to minimize the operating cost of a system using an epsilon-constrained differential evolution algorithm with random jumping (eDE-RJ) to optimize the operation of ground source heat pumps (GSHPs) and other machines, considering constraints such as upper and lower bounds of circulating fluid temperature and maximum thermal output.. 
-N1  - E3. Key findings. 
-N1  - E4. The proposed method, eDE-RJ, can solve nearly all possible configurations and is suitable for nonlinear configurations. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations.. 
-N1  - E5. The key findings of the study include the development of a model to calculate the borefield temperature and the GSHP's inlet temperature, and the evaluation of the impact of dynamic electricity prices on the system's operation.. 
-N1  - E6. The simplified optimization strategy that determined only the start and stop times of the GSHP operation could reduce the operating costs compared to the empirical operation for a single day and 7 days by 3.78% and 9.59%, respectively. 
-N1  - E7. The detailed optimization strategy that determined the load rates of all the components in each time step could reduce the operating costs compared to the empirical operation for a single day and 7 days by 6.81% and 12.56%, respectively. 
-N1  - E8. The proposed method can be widely used in both theoretical and practical studies when users want to obtain an optimal operation schedule. It remains to address how this method can be applied to a much longer period such as for an analysis of the life-cycle impact of GSHP, thermal interaction among BHEs, and optimal GSHP design. 
-N1  - E9. Objectives. 
-N1  - E10. The objective of the study is to determine the optimal operations of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance. Another objective is to reduce operating costs and energy consumption.. 
-N1  - E11. Methods. 
-N1  - E12. The proposed optimization method, eDE-RJ, is based on the differential evolution (DE) algorithm, categorized as the metaheuristics of an artificial intelligence method. The method is used to determine the optimal operation of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance.. 
-N1  - E13. The methods used in the study include the development of a model to calculate the borefield temperature and the GSHP's inlet temperature, using the infinite line source (ILS) model and temporal and spatial superposition techniques.. 
-N1  - E14. The method used in the study is an epsilon-constrained differential evolution algorithm with random jumping (eDE-RJ), which is a metaheuristic optimization method.. 
-N1  - E15. The study uses the proposed eDE-RJ method, which can efficiently solve highly nonlinear configurations and iterative calculations to calculate the ground temperature, and compares the results with empirical operation.. 
-N1  - E16. Results. 
-N1  - E17. The results show that the proposed method, eDE-RJ, can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. The method can also derive the solution rapidly while maintaining high computation accuracy.. 
-N1  - E18. The results of the study include the calculation of the borefield temperature and the GSHP's inlet temperature, and the evaluation of the impact of dynamic electricity prices on the system's operation.. 
-N1  - E19. The results of the study show that the optimal operation schedules for GSHPs and other machines result in reduced operating costs, and that considering thermal history and partial load operation is important in the optimization.. 
-N1  - E20. Conclusions. 
-N1  - E21. The study concludes that the proposed method, eDE-RJ, is effective in determining the optimal operations of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance. The method can reduce operating costs and energy consumption, making it a useful tool for practical applications.. 
-N1  - E22. The conclusions of the study are that the developed model can be used to calculate the borefield temperature and the GSHP's inlet temperature, and that dynamic electricity prices have a significant impact on the system's operation. 
-LA  -
-ER  -
-
-TY  - JOUR
+ID  - edwards2015generalised
 AU  - Edwards, K.C. 
 AU  - Finn, Donal 
 TI  - Generalised water flow rate control strategy for optimal part load operation of ground source heat pump systems
@@ -237,6 +58,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - corberan2010quasi
 AU  - Corberán, José M. 
 AU  - Finn, Donal 
 AU  - Montagud, Carla 
@@ -297,6 +119,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - de2011optimal
 AU  - De Ridder, Fjo 
 AU  - Diehl, Moritz 
 AU  - Mulder, Grietus 
@@ -348,6 +171,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - beaudry2022flow
 AU  - Beaudry, Gabrielle 
 AU  - Pasquier, Philippe 
 AU  - Marcotte, Denis 
@@ -416,6 +240,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - mader2014capacity
 AU  - Mader, Gunda 
 AU  - Madani, Hatef 
 TI  - Capacity control in air–water heat pumps: Total cost of ownership analysis
@@ -472,6 +297,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - montagud2013situ
 AU  - Montagud, Carla 
 AU  - Corberán, José M. 
 AU  - Montero, Álvaro 
@@ -527,6 +353,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - cervera2014situ
 AU  - Cervera-Vázquez, J. 
 AU  - Montagud, Carla 
 AU  - Corberán, José M. 
@@ -585,6 +412,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - benassi2015energy
 AU  - Del Col, Davide 
 AU  - Azzolin, Marco 
 AU  - Benassi, G. 
@@ -643,6 +471,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - capozza2015long
 AU  - Capozza, Antonio 
 AU  - Zarrella, Angelo 
 AU  - De Carli, Michele 
@@ -700,6 +529,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - mu2015extremum
 AU  - Bin Hu, 
 AU  - Li, Yaoyu 
 AU  - Mu, Baojie 
@@ -756,6 +586,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - edwards2021optimal
 AU  - Edwards, K.C. 
 AU  - Роса, Маттиа Де 
 AU  - Finn, Donal 
@@ -817,6 +648,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - li2024field
 AU  - Li, Yiming 
 AU  - Qian, Suxin 
 TI  - Field test of a ground-source heat pump system and numerical investigation on advanced control strategies
@@ -880,6 +712,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - somogyi2016scientific
 AU  - Somogyi, Viola 
 AU  - Sebestyén, Viktor 
 AU  - Nagy, Georgina 
@@ -939,6 +772,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - atam2015design
 AU  - Atam, Ercan 
 AU  - Helsen, Lieve 
 TI  - Ground-coupled heat pumps: Part 2—Literature review and research challenges in optimal design
@@ -992,6 +826,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - atam2015ground
 AU  - Atam, Ercan 
 AU  - Helsen, Lieve 
 TI  - Ground-coupled heat pumps: Part 1 – Literature review and research challenges in modeling and optimal control
@@ -1044,6 +879,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - ma2020recent
 AU  - Ma, Zhenjun 
 AU  - Xia, Lei 
 AU  - Gong, Xuemei 
@@ -1117,6 +953,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - gao2022optimal
 AU  - Gao, Jiajia 
 AU  - Yan, Junjun 
 AU  - Xu, Xinhua 
@@ -1173,6 +1010,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - menegazzo2022state
 AU  - Menegazzo, Davide 
 AU  - Lombardo, Giulia 
 AU  - Bobbo, Sergio 
@@ -1251,6 +1089,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - salhein2022control
 AU  - Salhein, Khaled 
 AU  - Kobus, C. J. 
 AU  - Zohdy, Mohamed 
@@ -1310,6 +1149,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - zhou2024study
 AU  - Zhou, Chaohui 
 AU  - Hu, Yue 
 AU  - Liu, Yuce 
@@ -1371,6 +1211,7 @@ LA  -
 ER  -
 
 TY  - JOUR
+ID  - bordignon2024evaluation
 AU  - Bordignon, Sara 
 AU  - Pengo, Riccardo 
 AU  - De Carli, Michele 
@@ -1428,7 +1269,8 @@ LA  -
 ER  -
 
 TY  - GEN
-AU  - by, Doctoral Thesis 
+ID  - cervera2016control
+AU  - Cervera Vázquez, Javier
 TI  - Control and energy optimization of ground source heat pump systems for heating and cooling in buildings
 T2  - Valencia
 VL  - 
@@ -1497,6 +1339,830 @@ N1  - E22. The conclusions of this study are that the developed integrated optim
 N1  - E23. The study concludes that the optimized control strategy is effective in improving energy performance and user comfort in both cooling and heating modes. The study also concludes that the design guideline provides a minimum volume for the buffer tank that is sufficient for the heat pump system.. 
 N1  - E24. The conclusions of the study are that the energy optimization algorithm developed is effective in achieving energy savings while keeping user comfort, and that the algorithm can be used to optimize the performance of GSHP systems.. 
 N1  - E25. The conclusions of the study highlight the effectiveness of the optimized control methodology in improving energy performance while maintaining user comfort, with potential applications to other ground source heat pump installations. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - claesson2018explicit
+AU  - Claesson, Johan 
+AU  - Javed, Saqib 
+TI  - Explicit Multipole Formulas for Calculating Thermal Resistance of Single U-Tube Ground Heat Exchangers
+T2  - Energies
+VL  - 11
+PY  - 2018
+SP  - 
+EP  - 
+DA  - 2018
+UR  - 
+DO  - 10.3390/en11010214
+AB  - Borehole thermal resistance is both an important design parameter and a key performance characteristic of a ground heat exchanger. Another quantity that is particularly important for ground heat exchangers is the internal thermal resistance between the heat exchanger pipes. Both these resistances can be calculated to a high degree of accuracy by means of the well-known multipole method. However, the multipole method has a fairly intricate mathematical algorithm and is thus not trivial to implement. Consequently, there is considerable interest in developing explicit formulas for calculating borehole resistances. This paper presents derivation and solutions of newly derived second-order and higher-order multipole formulas for calculating borehole thermal resistance and total internal thermal resistance of single U-tube ground heat exchangers. A new and simple form of the first-order multipole formula is also presented. The accuracy of the presented formulas is established by comparing them to the original multipole method. The superiority of the new higher-order multipole formulas over the existing formulas is also demonstrated.
+KW  - formulas
+KW  - second-order
+KW  - U Tube
+KW  - calculation
+KW  - ground heat exchanger
+N1  - B. Participants: 72 studied cases with varying grout and soil conductivities. 
+N1  - B1. Young [17] compared the tenth-order multipole method with a boundary-fitted coordinates finite volume methods for 18 combinations of shank spacing and grout conductivities, and observed a maximum difference of 0.26% between the two methods. Lamarche et al [12] calculated a root-mean-square difference of 0.003 between the first-order multipole method and a finite element numerical model for 72 studied cases with varying grout and soil conductivities, and pipe sizes and positing. He [18] studied four cases of different borehole diameters and grout conductivities using a three-dimensional numerical model and the multipole method, and reported a maximum difference of. 
+N1  - C. Highlights. 
+N1  - C1. The use of ground source heat pump (GSHP) systems to provide heating and cooling in buildings has increased at a rapid rate in the last two decades or so. 
+N1  - C2. This paper has presented new second-order and third-order multipole formulas for calculating. 
+N1  - C3. This paper has presented new second-order and third-order multipole formulas for calculating borehole thermal resistance and total internal thermal resistance. 
+N1  - C4. The newly derived formulas can used for all single U-tube applications where the two legs of the U-tube are symmetrically placed in be used for all single U-tube applications where the two legs of the U-tube are symmetrically placed the borehole. 
+N1  - C5. The presented formulas have been compared with the original multipole method, as in the borehole. 
+N1  - C6. The results shown in these figures are for a single ground thermal conductivity of 4.0 W/m-K. 
+N1  - C7. The presented formulas have been compared with the original multipole method, well as the previously derived zeroth-order and first-order explicit multipole formulas. 
+N1  - D. Findings. 
+N1  - D1. The results shown in these figures are for a single ground thermal conductivity of 4.0 W/m-K. 
+N1  - D2. The results shown in these resistance. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. This paper presents the derivation and solutions of new second-order and higher-order multipole formulas for calculating borehole thermal resistance of single U-tube ground heat exchangers with symmetric pipes, which can be used to improve the design and performance of ground source heat pump systems.. 
+N1  - E3. Key findings. 
+N1  - E4. The new multipole formulas presented in the paper are more accurate and simpler to implement than existing formulas, and can be used to calculate borehole thermal resistance and total internal thermal resistance of single U-tube ground heat exchangers.. 
+N1  - E5. The study finds that the multipole factors for the two pipes depend on the prescribed heat fluxes, and the temperature field is symmetric in x for equal heat fluxes and odd in x for antisymmetric heat fluxes. The multipoles of pipe 2 are closely related to the multipoles of pipe 1 in the even and odd cases.. 
+N1  - E6. The second-order and third-order multipole formulas provide higher accuracy than the zeroth-order and first-order multipole formulas for calculating borehole thermal resistance and total internal thermal resistance. The grout thermal resistance values obtained from the second-order and third-order multipole formulas are within 0.5% and 0.2% of the tenth-order multipole method for all 216 cases.. 
+N1  - E7. The key findings of the study include the development of new second-order and third-order multipole formulas that provide significant accuracy improvements over previous methods. The study also finds that the second-order multipole formulas are more straightforward to use and are recommended for use in practice.. 
+N1  - E8. The presented formulas have been compared with the original multipole method, well as the previously derived zeroth-order and first-order explicit multipole formulas. 
+N1  - E9. Objectives. 
+N1  - E10. The main objective of the study is to present a very precise method to calculate the relations between heat flows and fluid temperatures in a grouted borehole with multiple pipes. The study aims to determine the thermal resistance of the borehole, which is critical to understanding the effective borehole thermal resistance.. 
+N1  - E11. Methods. 
+N1  - E12. The multipole method is an analytical method used to determine thermal resistances for any number of arbitrarily placed pipes in a composite region, and is based on two-dimensional steady-state conductive heat transfer in a borehole. The method is simplified by assuming that heat exchanger pipes are placed symmetrically about the center of the borehole.. 
+N1  - E13. The study uses a multipole method to determine the thermal resistance of the borehole. The method involves solving a set of equations for the multipole factors, which depend on the prescribed heat fluxes. The study also uses a dimensionless parameter β to represent the thermal resistance and a parameter σ to represent the ratio between the two conductivities.. 
+N1  - E14. The study uses a reference dataset provided by [13] to compare and benchmark the borehole thermal resistance estimations from different analytical methods. The study involves the development of new higher-order multipole formulas and their comparison to previously published results.. 
+N1  - E15. The methods used in the study include the derivation of new second-order and third-order multipole formulas. The study also uses comparisons with the original multipole method and previously derived zeroth-order and first-order explicit multipole formulas to evaluate the accuracy of the new formulas.. 
+N1  - E16. Results. 
+N1  - E17. The new multipole formulas are tested against the original multipole method and previously-derived zeroth-order and first-order multipole formulas, and are shown to be more accurate and simpler to implement.. 
+N1  - E18. The study finds that the thermal resistances depend on the choice of the number of multipoles J, and the accuracy increases rapidly with increasing J. The study also determines the required fluid temperatures for unit heat flux, which are obtained from the multipole solutions.. 
+N1  - E19. The results show that the second-order and third-order multipole formulas provide higher accuracy than the zeroth-order and first-order multipole formulas. The mean absolute percentage error of the results obtained from the second-order and third-order multipole formulas never exceed 0.4% and 0.1%, respectively.. 
+N1  - E20. The results of the study show that the new second-order and third-order multipole formulas provide significant accuracy improvements over previous methods. The results also show that the second-order multipole formulas are more straightforward to use and are recommended for use in practice.. 
+N1  - E21. Conclusions. 
+N1  - E22. The new multipole formulas presented in the paper can be used to improve the design and performance of ground source heat pump systems by providing more accurate calculations of borehole thermal resistance and total internal thermal resistance.. 
+N1  - E23. The study concludes that the multipole method is a precise way to calculate the relations between heat flows and fluid temperatures in a grouted borehole with multiple pipes. The study also highlights the importance of considering the thermal resistance of the borehole in understanding the effective borehole thermal resistance.. 
+N1  - E24. The study concludes that the new higher-order multipole formulas provide significant improvements in accuracy for calculating borehole thermal resistance and total internal thermal resistance. The second-order and third-order multipole formulas are simple enough to apply for computation purposes.. 
+N1  - E25. The conclusions of the study include the recommendation of the new second-order multipole formulas for use in practice due to their excellent accuracy and relative ease of implementation. The study also concludes that the new formulas can be used for all single U-tube applications where the two legs of the U-tube are symmetrically placed in the borehole. 
+LA  -
+ER  -
+
+TY  - GEN
+AU  - Claesson, Joachim
+TI  - TRITA REFR Report No 04/44
+T2  - Stockholm
+VL  - 
+ID  - Claesson2004
+PY  - 2004
+SP  - 
+EP  - 
+DA  - 2004
+UR  - 
+DO  - 
+AB  - This thesis investigates the performance of compact brazed plate heat exchangers(CBE) operating as evaporator in heat pump applications. The thesis, and the performances investigated, has been divided into three main sections; One zone evaporator performance; Two zone evaporator performance; and finally Local performance.The ‘One zone evaporator performance’ section considers the evaporator as one
+KW  - HEAT
+KW  - Evaporator
+KW  - Heat pump
+KW  - plate heat exchanger
+KW  - Flow boiling
+KW  - Pressure drop
+KW  - geometry
+KW  - single phase
+N1  - C. Highlights. 
+N1  - C1. I wish to say thanks to Erik Bjérk, with whom I had many long discussions regarding all aspects of heat exchangers, two-phase flows and boiling, and not least domestic refrigerators!. 
+N1  - C2. Claesson J., Palm B., 2003, Performance of a compact brazed plate heat exchanger evaporator run in co-current and counter-current, in Proceeding 5" International Conference on Boiling Heat Transfer, Montego Bay, Jamaica, May 5 — May 8, Session VIII: Heat Transfer and Heater Characteristics, third paper. 
+N1  - E. Summary. 
+N1  - E1. Introduction. 
+N1  - E2. The thesis investigates the performance of compact brazed plate heat exchangers (CBE) operating as evaporators in heat pump applications.. 
+N1  - E3. The performance is divided into three main sections: one zone evaporator performance, two zone evaporator performance, and local performance.. 
+N1  - E4. The purpose of the thesis is to investigate the evaporator, specifically the compact brazed plate heat exchanger, under conditions similar to those in domestic heat pumps.. 
+N1  - E5. The focus is on the experimental part, with numerical parts used to compare trends with experimental observations.. 
+N1  - E6. The thesis aims to determine and evaluate the performance of the plate heat exchanger operating as an evaporator in domestic heat pumps.. 
+N1  - E7. Evaporator Performance. 
+N1  - E8. The one zone evaporator performance section considers the evaporator as a single unit, and it was found that approaching terminal temperatures were obtained at low overall heat flux.. 
+N1  - E9. The total area averaged film heat transfer coefficient was affected by changes in the brine mass flow rate, indicating that the Wilson plot method may not be suitable for determining flow boiling heat transfer coefficients.. 
+N1  - E10. Co-current and counter-current flow configurations performed equally well at low superheat.. 
+N1  - E11. A numerical simulation showed that a nucleate boiling model better predicted the performance than a convective evaporation model.. 
+N1  - E12. Local Performance. 
+N1  - E13. The local performance section considers local pressure drop and flow boiling heat transfer.. 
+N1  - E14. The Chisholm parameter was found to correlate well with the kinetic energy per volume, and the resulting predictions of the pressure drop were accurate to within 10%.. 
+N1  - E15. The local flow boiling heat transfer coefficient was compared to flow boiling correlations, and it was found that the saturated nucleate pool boiling correlation by Cooper (1984) and narrow channel flow boiling correlations predicted the experimental data better than traditional flow boiling correlations.. 
+N1  - E16. Methodology. 
+N1  - E17. The investigations are both experimental and numerical, with a focus on the experimental part.. 
+N1  - E18. The experiments are conducted using classical experimental methods, with measurements taken under steady-state conditions and at least 100 readings for each measured point.. 
+N1  - E19. The accuracy of experimental data is ensured by checking for steady state and standard deviation.. 
+N1  - E20. The thesis also uses numerical approaches, such as the LMTD method, to evaluate the temperature difference in the boiling section of the evaporator.. 
+N1  - E21. Results. 
+N1  - E22. The thesis presents several key findings, including the performance of the evaporator under different operating conditions, the impact of inlet flow geometry on performance, and the estimation of local heat transfer coefficients.. 
+N1  - E23. The results show that the brine mass flow rate and heat exchanger size should be selected with care to obtain efficient heat transfer, and that the nucleate boiling model better predicts the performance of the plate heat evaporator.. 
+N1  - E24. The thesis also investigates the performance of the evaporator as a two-zone heat exchanger, with separate boiling and superheating sections, and presents a novel technique for estimating local flow boiling heat transfer coefficients. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - granryd2010analytical
+AU  - Granryd, Eric 
+TI  - Analytical expressions for optimum flow rates in evaporators and condensers of heat pumping systems
+T2  - International Journal of Refrigeration
+VL  - 33
+PY  - 2010
+SP  - 
+EP  - 
+DA  - 2010
+UR  - 
+DO  - 10.1016/j.ijrefrig.2010.05.009
+AB  - Tin refers to base case refers to condenser side refers to evaporator side heat transfer (on air or brine side) compressor conditions for maximum overall COP friction factor inlet (to heat exchanger) isentropic net pump or fan pump or fan including motor conditions for maximum net cooling capacity sink source total average temperature (in heat exchangers logarithmic average) inlet temperature
+KW  - Fan
+KW  - Evaporator
+KW  - Condenser
+KW  - Flow
+KW  - heat exchanger
+KW  - Heat pump
+KW  - base case
+N1  - B. Participants: 4 covers cases with temperature efficiencies about 0. 
+N1  - B1. e Influence of flow rates on mean temperature difference. e Influence of flow rates on and inlet temperature difference. Comments to Figs. 5 and 6: Average temperature difference qM is set to 5 K at (w/w0) [ 1. Curves are estimated for heat exchangers with constant temperature on one side (typical for evaporators or condensers) and with different values of the exponent describing the influence of velocity on air side heat transfer (nh). For w [ w0 the U$A/(m$cp) is set [ 1 (at that point the temperature efficiency is 0,63 for (w/w0) [ 1). Values of 0.4 &lt; (w/w 0) &lt; 4 covers cases with temperature efficiencies about 0.2e0.9. Straight lines show exponents nTM (in Eq (5a)) and nTin (in Eq (5b)). The exponent nTin is considerably larger than nTM. Exponent nTin is about 0.5e0.6 almost regardless of the exponent for nh. e COP-variation with condenser side velocity. Three different base case temperature differences with nT [ 0,6 and one of the cases also with nT [ 0,3 for illustration. 
+N1  - C. Highlights. 
+N1  - C1. In a “base case” the fluid velocity is chosen to a certain value and for a given application the operating temperatures depends on the performance of the evaporator and condenser. 
+N1  - C2. Using Eq 12 this reasoning gives for the evaporator side the following simple expression of fan power corresponding to maximum net capacity in a refrigeration system: Ep2 Qmax 1⁄4 nT $kq$q2Qmax nP þ 1 (23). 
+N1  - C3. It is desirable to have a design with a small value for the “pump power ratio”. 
+N1  - C4. Considering a base case of a refrigerating system where the design data for the evaporator and condenser are known, simple analytical relations are deduced for optimum flow rates that will result in highest overall COP of the system when energy demand for the compressor as well as fans are included. 
+N1  - D. Findings. 
+N1  - D1. Adding the fan powers on the evaporator and the condenser side together (with COP2 y 2.7), the numbers in this example will in total correspond to about 1.8 þ 0.9$ (1 þ 1/2.7) y 3.0% of the refrigerating capacity Q2, equivalent to about 3.0$2.7 y 8% of the compressor power, EC. 
+N1  - E. Summary. 
+N1  - E1. Introduction. 
+N1  - E2. The paper discusses the optimization of flow rates in evaporators and condensers of heat pumping systems to achieve the highest overall Coefficient of Performance (COP) and maximum net cooling capacity.. 
+N1  - E3. The flow velocities on the air or liquid side of these components significantly affect the system's performance.. 
+N1  - E4. Optimization. 
+N1  - E5. The optimization of flow rates is mainly a technical problem, as the choice of fan speed or flow rate has a marginal influence on the first cost of the system.. 
+N1  - E6. The paper derives analytical relations for optimum flow rates, considering the energy demand for the compressor, pumps, and fans.. 
+N1  - E7. The relations can be used for design purposes and for checking suitable flow velocities in existing plants.. 
+N1  - E8. The system's net cooling capacity is influenced by air velocity, with an optimum velocity for maximum capacity.. 
+N1  - E9. The optimum velocity is affected by the temperature difference and the exponents nT and np.. 
+N1  - E10. The overall coefficient of performance (COP) is also influenced by the air velocity, with an optimum velocity for maximum COP.. 
+N1  - E11. To realize a low pump power ratio, one should aim for heat exchanger geometries with a high analogy number A, high efficiency fan (pump) and motor, heat exchanger designs with small additional flow restrictions, and a heat exchanger with a high overall heat transfer coefficient, U.. 
+N1  - E12. The choice of velocity w and temperature difference qM is crucial, and the expressions derived can be used for design purposes and for checking flow velocities used in an existing plant.. 
+N1  - E13. Key Relations. 
+N1  - E14. The paper presents key relations for the temperature differences in heat exchangers, including the mean temperature difference (qM) and the inlet temperature difference (qin).. 
+N1  - E15. The pressure drop on the air side is also related to the velocity raised to an exponent (np).. 
+N1  - E16. The net refrigerating capacity is affected by the evaporating temperature and the fan power, and an optimum velocity is found by maximizing the net capacity.. 
+N1  - E17. System Design. 
+N1  - E18. The system's design, including the heat exchanger and fan, affects the pump power ratio.. 
+N1  - E19. The pump power ratio can be expressed in terms of the friction factor, fluid properties, and heat exchanger geometry.. 
+N1  - E20. The hydraulic diameter of the heat exchanger is an important parameter in determining the pump power ratio.. 
+N1  - E21. Applications. 
+N1  - E22. The system's performance is affected by the application, such as refrigeration or heat pump systems.. 
+N1  - E23. In heat pump applications, increasing the evaporator fan speed can increase the capacity, but at the cost of decreasing the coefficient of performance.. 
+N1  - E24. The optimal design and operation of the system depend on the specific application and requirements.. 
+N1  - E25. Friction And Heat Transfer. 
+N1  - E26. Friction in turbulent flow is expressed as St = f/8, and for fluids with Pr ≠ 1, the Colburn J-factor is introduced as J = St*Pr^(2/3) = Nu/(Re*Pr^(1/3)).. 
+N1  - E27. The analogy parameter "A" is defined, and the equation for the "pump power ratio" (EpIs/Q) is influenced by w2=qM, the analogy number A, and the fluid properties Pr and cp.. 
+N1  - E28. Design Considerations. 
+N1  - E29. The analogy number A is seldom 1 for compact heat exchangers in practice, and for most heat exchanger designs, the overall pressure drop is higher than that caused by pure friction.. 
+N1  - E30. The additional pressure drop caused by restrictions, tubes, etc. appears not to be fully effective from a heat transfer point of view, resulting in A &lt; 1.. 
+N1  - E31. Examples of experimental results for finned coils show that A decreases slightly with Reynolds number and has a strong dependence on tube arrangements. 
+LA  -
+ER  -
+
+TY  - GEN
+ID  - zhao2002theoretical
+AU  - Zhao, Li
+AU  - Zhao, Lili
+AU  - Zhang, Q.
+AU  - Institute of Refrigeration and Cryogenics, G.L. Ding a a 
+AU  - University, Shanghai Jiaotong 
+AU  - 1954, No. 
+AU  - Road, Huashan 
+AU  - Shanghai, 
+AU  - 200030, 
+AU  - Center, China b Tianjin Geothermal Research and Training 
+AU  - University, Tianjin 
+AU  - 92, No. 
+AU  - Road, Weijin 
+AU  - Tianjin, 
+AU  - 300072, 
+AU  - China, 
+TI  - Theoretical and basic experimental analysis on load adjustment of geothermal heat pump systems
+T2  - Energy Conversion and Management
+VL  - 44
+PY  - 2002
+SP  - 
+EP  - 
+DA  - 2002
+UR  - 
+DO  - 
+AB  - In order to match the output capacity of a geothermal heat pump system (GHPS) with the actual load requirement, research has been conducted in searching for suitable adjusting methods for the GHPS and on the subsequent effects on the working parameters of the GHPS. Firstly, several methods are compared, and it is found that the method of adjusting the compressor’s rotation speed using a transducer is better than the others. Secondly, this method is experimented on a small scale GHPS at frequencies ranging from 30 to 55 Hz. The analysis of the experimental data reveals the relationships between the compressor frequency and other important parameters, such as coefficient of performance, heat capacity, cool capacity and compressor power input. The conclusions in the paper can serve as some guidance to the load adjustment of GHPS. Ó 2002 Elsevier Science Ltd.
+KW  - coefficient of performance
+KW  - rotation speed
+KW  - Geothermal heat pump
+KW  - Experimental study
+KW  - Frequency conversion
+N1  - C. Highlights. 
+N1  - C1. The geothermal heat pump technology is one of energy conversion that uses geothermal discharge water as a low temperature heat source and heating network water as a high temperature heat sink. 
+N1  - C2. Geothermal heat pump systems (GHPS) are able to lower the temperature of the geothermal discharge water and, raise the efficiency of geothermal energy and, at the same time, reduce thermal pollution on the earth surface. 
+N1  - C3. When the water temperature is further increased to 45 °C, the coefficient of performance (COP) fluctuates between 3 and 4 with the frequency changing, and the maximum COP is at 40 Hz. 
+N1  - C4. Based on the theoretical and experimental analyses, we arrive at the following conclusions on applying a transducer to the GHPS: Using an AC transducer is a suitable way in the GHPS to adjust the rotation speed of a compressor. 
+N1  - C5. Since the GHPS operates under different working conditions than conventional air conditioning or heat pump systems, the results from previous researches on the latter systems should be examined and tailored to the GHPS. 
+N1  - C6. When the water temperature in water tank (1) is lower than 40 °C, a higher COP can be obtained by reducing the frequency, and the operating cost can be reduced. 
+N1  - D. Findings. 
+N1  - D1. The partial load working condition is achieved by closing the suction valve. This method can continuously reduce the output by up to 50%. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study investigates the load adjustment of geothermal heat pump systems, focusing on the method of changing the compressor's rotation speed with an AC transducer, and its effects on the system's performance.. 
+N1  - E3. Key findings. 
+N1  - E4. The key findings of the study include the relationships between the frequency and the coefficient of performance (COP), heat capacity, cool capacity, condenser inlet working fluid pressure, compressor power input, and condenser exit water temperature at different condenser inlet water temperatures. The study also found that the COP decreases with increasing frequency at lower water temperatures, but increases with frequency at higher water temperatures.. 
+N1  - E5. The key findings include the observation that the maximum COP occurs at a frequency that increases with the water temperature in the tank, and that reducing the frequency can improve the COP when the water temperature is below 40 °C, but worsens the cycle condition when the temperature is above 45 °C.. 
+N1  - E6. Based on the theoretical and experimental analyses, we arrive at the following conclusions on applying a transducer to the GHPS: Using an AC transducer is a suitable way in the GHPS to adjust the rotation speed of a compressor. 
+N1  - E7. Since the GHPS operates under different working conditions than conventional air conditioning or heat pump systems, the results from previous researches on the latter systems should be examined and tailored to the GHPS. 
+N1  - E8. When the water temperature in water tank (1) is lower than 40 °C, a higher COP can be obtained by reducing the frequency, and the operating cost can be reduced. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to investigate the load adjustment of geothermal heat pump systems, and to analyze the effects of changing the compressor's rotation speed with an AC transducer on the system's performance.. 
+N1  - E11. Methods. 
+N1  - E12. The methods used in the study include experimental analysis of a GHPS with a single stage vapor compression system, and data collection using temperature sensors, pressure sensors, and flow meters. The study also used a transducer to control the compressor's rotation speed, and varied the frequency and water temperatures to collect data.. 
+N1  - E13. The methods used in the study involve theoretical and experimental analyses, including the use of an AC transducer to adjust the rotation speed of a compressor.. 
+N1  - E14. Results. 
+N1  - E15. The results of the study show the relationships between the frequency and the COP, heat capacity, cool capacity, condenser inlet working fluid pressure, compressor power input, and condenser exit water temperature at different condenser inlet water temperatures. The results also show that the COP decreases with increasing frequency at lower water temperatures, but increases with frequency at higher water temperatures.. 
+N1  - E16. The results show that the maximum COP occurs at a frequency that increases with the water temperature in the tank, and that the gradients of the heat capacity rate and the cool capacity rate with respect to frequency are almost constant.. 
+N1  - E17. Conclusions. 
+N1  - E18. The conclusions of the study are that the method of changing the compressor's rotation speed with an AC transducer is a suitable method for load adjustment of geothermal heat pump systems, and that the relationships between the frequency and the COP, heat capacity, cool capacity, condenser inlet working fluid pressure, compressor power input, and condenser exit water temperature are complex and dependent on the water temperature.. 
+N1  - E19. The conclusions drawn from the study are that using an AC transducer is a suitable way to adjust the rotation speed of a compressor in a GHPS, and that the optimal frequency increases with the water temperature in the tank. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - madani2013descriptive
+AU  - Madani, Hatef 
+AU  - Claesson, Joachim 
+AU  - Lundqvist, Per 
+TI  - A descriptive and comparative analysis of three common control techniques for an on/off controlled Ground Source Heat Pump (GSHP) system
+T2  - Energy and Buildings
+VL  - 65
+PY  - 2013
+SP  - 
+EP  - 
+DA  - 2013
+UR  - 
+DO  - 10.1016/j.enbuild.2013.05.006
+AB  - In the present paper, three common methods in order to control an on/off controlled Ground Source Heat Pump (GSHP) system called “Constant hysteresis”, “Floating hysteresis”, and “Degree–Minute” methods are comprehensively described. Then, the generic model already developed by the authors is used in order to do the dynamic simulation of the systems with three different control methods over a year and making the comparison between them. The results from annual modeling of the systems show that the mean temperature of the heating water supplied to the building for the system controlled with degree–minute method is always close to the required temperature, regardless of the climatic boundary conditions over a typical year, whereas, the average supply temperature for the system with constant hysteresis method is mostly higher or lower than the required temperature, depending on the boundary condition. Regarding the annual energy use, the degree–minute and constant hysteresis methods have the lowest and highest annual energy use respectively. Switching from constant hysteresis to floating hysteresis method, the annual energy use will become lower and the mean temperature of the heating water supplied to the building will be closer to the required one.
+KW  - Control
+KW  - hysteresis
+KW  - Heat pump
+KW  - Ground Source Heat Pumps
+KW  - Capacity
+N1  - C. Highlights. 
+N1  - C1. Brine to water heat pump systems like Ground Source Heat Pumps (GSHPs) are one of the common and fast growing systems for heating the buildings in USA and European countries. 
+N1  - C2. The present paper aims at describing and comparing three common methods in order to control an on/off controlled GSHP system. 
+N1  - C3. The generic model presented by Madani et al [6,8] is used in order to simulate the performance of the heat pump system over a year when either method A, B or C is used as the control method. 
+N1  - C4. When the ambient temperature is considerably higher than the balance point temperature, the on-time for each cycle of the system controlled with the constant hysteresis method is so short that the average supply temperature is lower than the required temperature. 
+N1  - C5. When the ambient temperature is slightly higher than the balance point temperature, the system controlled with the hysteresis method operates almost continuously without any stop; so the average supply temperature for the hysteresis method is higher than the required supply temperature. 
+N1  - C6. Concerning the temperature control of the heating water supplied to the building, the average supply temperature for the system controlled with degree–minute method is always close to the required supply temperature; whereas, the average supply temperature for the system with constant hysteresis method can be mostly higher or lower than the required temperature. 
+N1  - D. Findings. 
+N1  - D1. The annual energy use of compressor for the system controlled with degree–minute method is about 6% lower than the one with constant hysteresis method. 
+N1  - D2. Degree–minute method has the lowest annual energy use of the electrical auxiliary heater (approximately 50% lower than constant hysteresis method) whereas floating hysteresis method has the highest use of auxiliary heater over a year. 
+N1  - D3. The lowest total energy use over a year belongs to the degree–minute method (9% lower than the constant hysteresis method). 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study compares three control techniques for an on/off controlled Ground Source Heat Pump (GSHP) system, namely "Constant hysteresis", "Floating hysteresis", and "Degree–Minute" methods, to evaluate their impact on the system's performance and energy use.. 
+N1  - E3. Key findings. 
+N1  - E4. The study finds that the "Degree–Minute" method results in a mean temperature of the heating water supplied to the building that is always close to the required temperature, regardless of climatic boundary conditions. Additionally, the study finds that the "Constant Hysteresis" method has the highest annual energy use, while the "Degree–Minute" and "Floating Hysteresis" methods have lower energy use.. 
+N1  - E5. The key findings of the study include the comparison of the performance of three control methods (A, B, and C) for a GSHP system, and the results show that the floating hysteresis method (C) has a better control over the water temperature compared to constant hysteresis method (A). The study also found that the supply temperature for the degree–minute method can be 5 K lower or 11 K higher than the required temperature, while the temperature swing for the constant hysteresis method is around ±6 K.. 
+N1  - E6. When the ambient temperature is considerably higher than the balance point temperature, the on-time for each cycle of the system controlled with the constant hysteresis method is so short that the average supply temperature is lower than the required temperature. 
+N1  - E7. When the ambient temperature is slightly higher than the balance point temperature, the system controlled with the hysteresis method operates almost continuously without any stop; so the average supply temperature for the hysteresis method is higher than the required supply temperature. 
+N1  - E8. Concerning the temperature control of the heating water supplied to the building, the average supply temperature for the system controlled with degree–minute method is always close to the required supply temperature; whereas, the average supply temperature for the system with constant hysteresis method can be mostly higher or lower than the required temperature. 
+N1  - E9. Objectives. 
+N1  - E10. The objectives of the study include comparing the annual performance of the GSHP system with three different control methods (A, B, and C), and evaluating the dynamic interaction between the heat pump unit, the building, the ground heat exchanger, and climate. The study aims to determine the best control method for the GSHP system to achieve optimal performance and comfort.. 
+N1  - E11. Methods. 
+N1  - E12. The study uses a generic model developed by the authors to simulate the dynamic performance of the GSHP system with the three control techniques over a year. The study also uses a heating curve to calculate the required supply and return temperatures based on the ambient temperature.. 
+N1  - E13. The methods used in the study include dynamic simulation of the GSHP system with three different control methods (A, B, and C) using a generic model. The study uses a black box model for the heat pump unit, and a borehole model to calculate the outlet temperature of the secondary fluid.. 
+N1  - E14. The study uses a generic model to simulate the performance of the GSHP system over a year, with the three control methods applied to the system.. 
+N1  - E15. Results. 
+N1  - E16. The study finds that the "Degree–Minute" method results in a mean temperature of the heating water supplied to the building that is always close to the required temperature, regardless of climatic boundary conditions. The study also finds that the "Constant Hysteresis" method has the highest annual energy use, while the "Degree–Minute" and "Floating Hysteresis" methods have lower energy use.. 
+N1  - E17. The results of the study show that the floating hysteresis method (C) has a better control over the water temperature compared to constant hysteresis method (A). The study also found that the supply temperature for the degree–minute method can be 5 K lower or 11 K higher than the required temperature, while the temperature swing for the constant hysteresis method is around ±6 K.. 
+N1  - E18. Conclusions. 
+N1  - E19. The study concludes that the "Degree–Minute" method is the most efficient control technique for an on/off controlled GSHP system, resulting in a mean temperature of the heating water supplied to the building that is always close to the required temperature, and lower annual energy use. The study also concludes that improving the efficiency of GSHP systems can save a considerable amount of energy, gain a higher credibility for GSHPs in the market, and reduce greenhouse emissions.. 
+N1  - E20. The conclusions of the study include the recommendation of the floating hysteresis method (C) for controlling the GSHP system, as it provides better control over the water temperature and reduces the temperature swing. The study also highlights the importance of appropriate control of the supply or return temperature of the heating water in on/off controlled heat pumps systems.. 
+N1  - E21. The study concludes that the degree-minute method is a robust method to control the operation of the electrical auxiliary heater, and provides the most stable supply temperature and lowest total energy use. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - noye2021review
+AU  - Noyé, Sarah 
+AU  - Mulero, Rubén 
+AU  - Carnieletto, Laura 
+AU  - De Carli, Michele 
+AU  - Castelruiz, Amaia 
+TI  - A review of advanced ground source heat pump control: Artificial intelligence for autonomous and adaptive control
+T2  - Renewable and Sustainable Energy Reviews
+VL  - 153
+PY  - 2021
+SP  - 
+EP  - 
+DA  - 2021
+UR  - 
+DO  - 10.1016/j.rser.2021.111685
+AB  - Geothermal energy has the potential to contribute significantly to the CO2 reduction targets as a renewable source for building heating and cooling but is yet under exploited, mostly due to its high initial investment cost. A lot of research is being carried out to optimise Ground Source Heat Pump (GSHP) systems' design, but a good control strategy is also fundamental to achieve long-term performance and reduced payback time. GSHP control optimisation is a non-linear dynamic optimisation problem that is influenced by multiple parameters. It can thus not be fully optimised with traditional methods. Artificial Intelligence, and in particular Machine Learning, is suited for this type of optimisation as it can learn implicit relations between parameters and can address non-linearity. This paper reviews the challenges of GSHP control and the strategies for control optimisation found in the literature, from basic rule-based system to artificial neural network-based strategies. Two principal uses of Artificial Intelligence for ground source heat pump control are identified: building a predictive model of the system that reflects its real performances and optimising the control decision in real time. However, the examples found in the literature are limited and the need to further explore the benefits of Machine Learning is identified. The latest developments in the field are reviewed to explore their potential to further improve GSHP control. The challenges of the full implementation of such algorithms are also discussed.
+KW  - Control
+KW  - Heat Pump
+KW  - Ground Source Heat Pumps
+KW  - Machine learning
+KW  - Artificial Intelligence
+KW  - Reinforcement Learning
+KW  - Artificial Neural Networks
+KW  - Deep Learning
+N1  - B. Participants: 4 papers. 
+N1  - B1. Similarly, Gong et al found fixed temperature difference between the cooling water leaving the HP and the ambient air dry-bulb temperature to provide the best COP and heat balance of the ground compared to more traditional control methods [28]. These four papers considered a fixed threshold for the control parameter. Finally, control rules can be made more complex to improve system operation. 
+N1  - C. Highlights. 
+N1  - C1. In Europe, all new buildings are required to be Nearly Zero Energy Buildings since 2020, roadmaps are implemented to convert existing buildings to nZEBs [1], and the trend is towards positive energy buildings [2]. nZEB, having high energy performance and sourcing the little energy they require mostly from renewable energies, are necessary to achieve the 2050 CO2 reduction targets.Geothermal energy is a key source of renewable energy for nZEBs, but is still largely underexploited [3]. 
+N1  - C2. When focusing on Artificial Intelligence (AI) for Ground Source Heat Pumps (GSHP) control, this paper identifies three applications, which are reviewed : (1) parameter optimisation; (2) system modelling; (3) control optimisation. 
+N1  - C3. This paper reviews the state of the art of GSHP control and the potential of Artificial Intelligence to reduce operating cost and improve energy efficiency. 
+N1  - C4. GSHPs are complex system and require controls that can adapt to their operating environment so that maximum performance can be achieved, making online optimisation better adapted for their control. 
+N1  - C5. The field of Artificial Intelligence provides algorithms that can learn complex patterns from data and work with a great number of parameters without the need of explicit knowledge to link them. These algorithms can provide autonomous and adaptive control to better control GSHP for energy, comfort and cost optimisation, but long-term performance need to be better included in their learning objectives. 
+N1  - C6. The focus in the literature so far has been on using AI to build predictive models of GSHP systems. 
+N1  - D. Findings. 
+N1  - D1. Yang et al used RL agents trained on a Simulink model to control an HGSHP system with PVT panels. They first used a RL controller for the PVT system, leading to an increase in performance of 10% compared to the rule-based alternative after 3 years. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. This paper reviews the challenges of Ground Source Heat Pump (GSHP) control and the potential of Artificial Intelligence (AI) to improve GSHP operation, reducing operating costs and increasing energy efficiency.. 
+N1  - E3. Key findings. 
+N1  - E4. The key findings of the study are that AI can be used to optimize GSHP control, reducing operating costs and increasing energy efficiency, and that there are various approaches to achieve this, including parameter optimization, system modeling, and control optimization. The study also found that metaheuristic algorithms and deep reinforcement learning are promising approaches for GSHP control optimization.. 
+N1  - E5. This paper reviews the state of the art of GSHP control and the potential of Artificial Intelligence to reduce operating cost and improve energy efficiency. 
+N1  - E6. GSHPs are complex system and require controls that can adapt to their operating environment so that maximum performance can be achieved, making online optimisation better adapted for their control. 
+N1  - E7. The field of Artificial Intelligence provides algorithms that can learn complex patterns from data and work with a great number of parameters without the need of explicit knowledge to link them. These algorithms can provide autonomous and adaptive control to better control GSHP for energy, comfort and cost optimisation, but long-term performance need to be better included in their learning objectives. 
+N1  - E8. The focus in the literature so far has been on using AI to build predictive models of GSHP systems. 
+N1  - E9. Objectives. 
+N1  - E10. The objectives of the study are to review the challenges of GSHP control, to identify the potential of AI to improve GSHP operation, and to discuss the advantages and limitations of different approaches to GSHP control optimization. The study also aims to explore the potential of AI to reduce operating costs and increase energy efficiency in GSHP systems.. 
+N1  - E11. Methods. 
+N1  - E12. The methods used in the study include a review of the literature on GSHP control and AI, classification of different approaches to GSHP control optimization, and discussion of the advantages and limitations of each approach. The study also uses examples of AI applications in GSHP control to illustrate the potential of AI in this field.. 
+N1  - E13. Results. 
+N1  - E14. The results of the study show that AI can be used to optimize GSHP control, reducing operating costs and increasing energy efficiency. The study also found that there are various approaches to achieve this, including parameter optimization, system modeling, and control optimization.. 
+N1  - E15. Conclusions. 
+N1  - E16. The conclusions of the study are that AI has the potential to improve GSHP operation, reducing operating costs and increasing energy efficiency, and that further research is needed to explore the potential of AI in this field. The study also concludes that metaheuristic algorithms and deep reinforcement learning are promising approaches for GSHP control optimization. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - karlsson2006capacity
+AU  - Karlsson, Fredrik 
+AU  - Fahlén, Per 
+TI  - Capacity-controlled ground source heat pumps in hydronic heating systems
+T2  - International Journal of Refrigeration
+VL  - 30
+PY  - 2006
+SP  - 
+EP  - 
+DA  - 2006
+UR  - 
+DO  - 10.1016/j.ijrefrig.2006.08.008
+AB  - The objective of this study was to investigate the energy-saving potential of using variable-speed capacity control instead of the conventional intermittent operation mode for domestic ground source heat pumps. Variable-speed capacity control is commonly used in air-to-air heat pumps, but not in ground source heat pumps for hydronic heating systems, even though the energysaving potential may be greater for this application. A theoretical analysis indicates how the energy efficiency is influenced by variable-speed capacity control of the compressor. The analysis shows that, to take full advantage of the capacity control, care should be taken to achieve the correct relationship between refrigerant flow and heat transfer media flows. Intermittent control and variable-speed capacity control were compared by laboratory tests on two capacity-controlled heat pumps and one standard heat pump with a single-speed compressor. Test data were then used for seasonal performance factor (SPF) calculations. The SPF calculations show that despite improved performance at part load the variable-speed controlled heat pump did not improve the annual efficiency compared to the intermittently operated heat pump. This is mainly due to inverter and compressor motor efficiencies and the need for improved efficiency and control of pumps used in the heating and ground collector systems. Ó 2006 Elsevier Ltd and IIR.
+KW  - Heat pump
+KW  - Control
+KW  - Heating
+KW  - ground source heat pump
+N1  - C. Highlights. 
+N1  - C1. In order to investigate how the above-mentioned advantages apply to capacity-controlled ground source heat pumps, laboratory tests and seasonal performance calculations were performed on three ground source heat pumps. 
+N1  - C2. In the case of heat pump B, with a compressor designed for variable-speed operation, efficiency increases when operated in a variable-speed mode, when compared with intermittent operation. 
+N1  - C3. With the compressors of each being operated in variable-speed mode and in intermittent operation mode, have been evaluated by laboratory tests. 
+N1  - C4. The theory outlined in this article, plus the measured temperatures and pressures in the refrigerant circuit, indicates that variablespeed operation should increase the COPhp by 5e9% for heat pump A, and by 7e15% for heat pump B, in comparison with intermittent operation. 
+N1  - C5. This investigation was made on prototype heat pumps, and higher efficiency may be achieved by further development of compressors, compressor motors, motor controls and pumps. 
+N1  - D. Findings. 
+N1  - D1. The two heat pumps have equal SPFhs whereas SPFhp for D is 5e8% higher than for C. 
+N1  - D2. Considering the heat pump only, D is still 5e6% more efficient than C. 
+N1  - D3. Heat pump C gives an SPFhs which is 14e19% higher than that of heat pump B. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study evaluates the performance of variable-speed heat pumps compared to standard heat pumps, finding that while variable-speed operation can increase efficiency at part load, the overall seasonal efficiency is still lower due to factors such as compressor motor efficiency and pump control.. 
+N1  - E3. Key findings. 
+N1  - E4. The study found that variable-speed capacity control can increase the efficiency of heat pump systems, reduce the number of on/off cycles, and lower the condensing temperature. The results also show that the seasonal performance factor (SPF) can be improved with variable-speed capacity control.. 
+N1  - E5. The key findings are that variable-speed operation can increase efficiency at part load, but the overall seasonal efficiency is still lower due to factors such as compressor motor efficiency and pump control, and that heat pump B with a compressor designed for variable-speed operation shows improved efficiency, while heat pump A with a conventional compressor shows decreased efficiency.. 
+N1  - E6. With the compressors of each being operated in variable-speed mode and in intermittent operation mode, have been evaluated by laboratory tests. 
+N1  - E7. The theory outlined in this article, plus the measured temperatures and pressures in the refrigerant circuit, indicates that variablespeed operation should increase the COPhp by 5e9% for heat pump A, and by 7e15% for heat pump B, in comparison with intermittent operation. 
+N1  - E8. This investigation was made on prototype heat pumps, and higher efficiency may be achieved by further development of compressors, compressor motors, motor controls and pumps. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study was to investigate the energy-saving potential of applying variable-speed capacity control to brine-to-water heat pump systems. The study aimed to analyze the annual performance of ground source heat pumps in hydronic heating systems and to determine the possible benefits from variable-speed capacity control.. 
+N1  - E11. Methods. 
+N1  - E12. The study used a combination of theoretical analysis and laboratory tests to investigate the energy-saving potential of variable-speed capacity control. The laboratory tests were performed on three ground source heat pumps, and the results were used to develop a calculation model for analyzing the annual performance.. 
+N1  - E13. The methods used in the study include laboratory tests of the heat pumps, measurements of temperatures and pressures in the refrigerant circuit, and calculations of seasonal performance using equations such as Eq (2) and Eq (3).. 
+N1  - E14. Results. 
+N1  - E15. The results of the study show that variable-speed capacity control can increase the efficiency of heat pump systems and improve the seasonal performance factor (SPF). The results also show that the condensing temperature can be lowered with variable-speed capacity control, leading to increased efficiency.. 
+N1  - E16. The results show that heat pump B with a compressor designed for variable-speed operation shows improved efficiency, while heat pump A with a conventional compressor shows decreased efficiency, and that the overall seasonal efficiency is still lower for the variable-speed heat pumps due to factors such as compressor motor efficiency and pump control.. 
+N1  - E17. Conclusions. 
+N1  - E18. The study concludes that variable-speed capacity control can be an effective way to increase the efficiency of heat pump systems and reduce energy consumption. The results of the study can be used to optimize the design and operation of ground source heat pump systems in hydronic heating systems.. 
+N1  - E19. The conclusions of the study are that variable-speed operation can increase efficiency at part load, but the overall seasonal efficiency is still lower due to factors such as compressor motor efficiency and pump control, and that further development of compressors, compressor motors, motor controls, and pumps is needed to improve system efficiency. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - zarrella2016simulation
+AU  - Zarrella, Angelo 
+AU  - Emmi, Giuseppe 
+AU  - De Carli, Michele 
+TI  - A simulation-based analysis of variable flow pumping in ground source heat pump systems with different types of borehole heat exchangers: A case study
+T2  - Energy Conversion and Management
+VL  - 131
+PY  - 2016
+SP  - 
+EP  - 
+DA  - 2016
+UR  - 
+DO  - 10.1016/j.enconman.2016.10.061
+AB  - A simulation model of ground source heat pump systems has been used to investigate to what extent a variable flow of the heat-carrier fluid of the ground loop affects the energy efficiency of the entire system. The model contemporaneously considers the borehole heat exchangers, the heat pump, the building load, and the control strategies for the circulation pumps of the ground loop. A constant speed of the circulation pumps of the ground loop was compared with a variable flow controlled by means of a constant temperature difference across the heat pump on the ground side considering the load profile of an office building located in North Italy. The analysis was carried out for a single U-tube, double U-tube and coaxial pipe heat exchangers. The control strategies adopted to manage the flow rate of the heat-carrier fluid of the ground loop affect both the heat exchange rate of the borehole field and the heat pump’s long-term energy efficiency. The simulations show considerable differences in the system’s seasonal energy efficiency. The constant speed of the circulation pumps leads to the best results as far as the heat pump’s energy performance was concerned, but this advantage was lost because of the greater amount of electrical energy used by the circulation pumps; this, of course, affects the energy efficiency of the entire system. The optimal solution appears then to be a constant temperature difference in the heat-carrier fluid across the heat pump.
+KW  - Flow rate
+KW  - borehole heat exchanger
+KW  - Energy efficiency
+KW  - ground loop
+KW  - circulation pump
+KW  - Reynolds number
+KW  - Ground source heat pumps
+KW  - GSHP
+N1  - B. Participants: 310 people. 
+N1  - B1. The total floor area is approximately 4550 m2. Approximately 310 people work inside the building. The thermal transmittance is equal to 0.3 W/(m2 K) for the external walls, 0.25 W/(m2 K) for the roof and 1.1 W/(m2 K) for the glazed surfaces. 
+N1  - C. Highlights. 
+N1  - C1. Efforts to reduce CO2 emissions have become a pivotal environmental priority of this century. 
+N1  - C2. Case A: this represents the reference solution which is without a variable flow; nominal mass flow rates were assumed constant throughout time and the temperature difference across the heat pump changed depending on the ground load. 
+N1  - C3. The study focuses on the effects of the control strategy of the mass flow rate of the ground loop on the system’s long-term energy efficiency. 
+N1  - C4. In the considered case study, the seasonal cooling energy performance of the heat pump decreased by about 9–14% with a constant temperature difference control across the heat pump equal to 5 °C in the cooling mode; whereas the degradation of the energy performance of the heat pump was less than 4% when the constant temperature difference control of 3 °C was applied. 
+N1  - C5. Using small values of temperature difference control of the flow rate in the cooling operation mode as 3 °C, both the heating and cooling operations, uncovered significant variations in flow rate percentage distribution over the seasonal operations that led to an annual energy saving range of the electrical consumption of the heat pump and ground circulation pump between 5 and 7% with respect to the constant speed. 
+N1  - C6. Ground properties did not significantly modify the flows of the heat-carrier fluid because the flow rates were determined by the control strategy, but the system’s energy efficiency was without doubt affected. 
+N1  - D. Findings. 
+N1  - D1. A large difference was found between the SEERhp values of Cases A and B; at the tenth year, the SEERhp value of the Case B was approximately 9, 12 and 14% lower than that of the reference Case A for the single U-tube, double U-tube and coaxial pipes respectively. 
+N1  - D2. On the other hand, the SEERhp value of the Case C was approximately 3–4% lower for each type of borehole heat exchanger than for the reference Case A. 
+N1  - D3. For the double U-tube and coaxial pipes, the SEERsys of Case B was again about 7% lower than that in Cases A and C for Ground G1 and about 4% for Ground G2. 
+N1  - D4. On the other hand, the contribution of the ground loop pump was less than 4% of the total energy demand of the system when the variable flow is considered in Cases B and C. 
+N1  - D5. In the Scenario S2, the SEERsys values were approximately 13, 2 and 5% lower than SEERhp values in Cases A, B and C for each type of borehole heat exchanger and ground. 
+N1  - D6. In the considered case study, the seasonal cooling energy performance of the heat pump decreased by about 9–14% with a constant temperature difference control across the heat pump equal to 5 °C in the cooling mode; whereas the degradation of the energy performance of the heat pump was less than 4% when the constant temperature difference control of 3 °C was applied. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study analyzes the energy performance of a ground source heat pump system with different types of vertical borehole heat exchangers, focusing on the effects of the control strategy of the mass flow rate of the ground loop on the system's long-term energy efficiency.. 
+N1  - E3. Key findings. 
+N1  - E4. The study found that the control strategy of the mass flow rate of the ground loop significantly affects the system's long-term energy efficiency, with a constant temperature difference control across the heat pump being the optimal solution. The study also found that the energy saving due to the variable flow was negligible in one scenario, but ranged between 5 and 7% in another scenario.. 
+N1  - E5. The key findings of the study included that a variable flow with a constant temperature difference across the heat pump resulted in lower energy efficiency compared to a constant mass flow rate, and that the difference in energy efficiency between the two control strategies decreased when the pressure losses in the borehole heat exchangers were considered. The study also found that the energy efficiency of the heat pump improved with an increase in the thermal conductivity of the ground.. 
+N1  - E6. In the considered case study, the seasonal cooling energy performance of the heat pump decreased by about 9–14% with a constant temperature difference control across the heat pump equal to 5 °C in the cooling mode; whereas the degradation of the energy performance of the heat pump was less than 4% when the constant temperature difference control of 3 °C was applied. 
+N1  - E7. Using small values of temperature difference control of the flow rate in the cooling operation mode as 3 °C, both the heating and cooling operations, uncovered significant variations in flow rate percentage distribution over the seasonal operations that led to an annual energy saving range of the electrical consumption of the heat pump and ground circulation pump between 5 and 7% with respect to the constant speed. 
+N1  - E8. Ground properties did not significantly modify the flows of the heat-carrier fluid because the flow rates were determined by the control strategy, but the system’s energy efficiency was without doubt affected. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study was to investigate the effect of variable flow of the heat-carrier fluid on the energy efficiency of the entire system, considering different control strategies and types of borehole heat exchangers. The study aimed to analyze the impact of the control strategy on the system's energy performance and to identify the optimal control strategy.. 
+N1  - E11. Methods. 
+N1  - E12. The study used a simulation model of ground source heat pump systems, considering different control strategies and types of borehole heat exchangers. The study also used numerical simulations to analyze the impact of the control strategy on the system's energy performance.. 
+N1  - E13. The study used numerical simulations to investigate the effect of a variable flow in the ground loop on the energy efficiency of a GSHP system. The simulations were based on a model that took into account the energy balance of the heat pump and the ground loop.. 
+N1  - E14. The methods used in the study include simulating the energy performance of the ground source heat pump system with different control strategies, such as constant mass flow rate, constant temperature difference control, and variable flow rate.. 
+N1  - E15. Results. 
+N1  - E16. The study found that the constant speed of the circulation pumps leads to the best results as far as the heat pump's energy performance is concerned, but this advantage is lost due to the greater amount of electrical energy used by the circulation pumps. The study also found that the seasonal cooling energy performance of the heat pump decreased by about 9-14% with a constant temperature difference control across the heat pump equal to 5 °C in the cooling mode.. 
+N1  - E17. The results of the study showed that a variable flow with a constant temperature difference across the heat pump resulted in lower energy efficiency compared to a constant mass flow rate. The results also showed that the energy efficiency of the heat pump improved with an increase in the thermal conductivity of the ground.. 
+N1  - E18. The results of the study show that the heat pump's energy performance decreased by about 9-14% with a constant temperature difference control across the heat pump equal to 5 °C in the cooling mode, and that the degradation of the energy performance of the heat pump was less than 4% when the constant temperature difference control of 3 °C was applied.. 
+N1  - E19. Conclusions. 
+N1  - E20. The study concluded that the control strategy of the mass flow rate of the ground loop significantly affects the system's long-term energy efficiency, and that a constant temperature difference control across the heat pump is the optimal solution. The study also concluded that the energy saving due to the variable flow can range between 5 and 7% in certain scenarios.. 
+N1  - E21. The study concluded that a variable flow with a constant temperature difference across the heat pump can result in lower energy efficiency compared to a constant mass flow rate, but that the difference in energy efficiency between the two control strategies decreases when the pressure losses in the borehole heat exchangers are considered. The study also concluded that the energy efficiency of the heat pump improves with an increase in the thermal conductivity of the ground.. 
+N1  - E22. The conclusions of the study are that the energy performance of ground source heat pump systems must be analyzed attentively considering its configuration, and that the control of the ground loop affects the behavior of the heat pump and the efficiency of the entire system on the long-term. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - madani2011capacity
+AU  - Madani, Hatef 
+AU  - Claesson, Joachim 
+AU  - Lundqvist, Per 
+TI  - Capacity control in ground source heat pump systems
+T2  - International Journal of Refrigeration
+VL  - 34
+PY  - 2011
+SP  - 
+EP  - 
+DA  - 2011
+UR  - 
+DO  - 10.1016/j.ijrefrig.2011.05.007
+AB  - E-mail address: hatef.madani@energy.kth.se (H. Madani). 1 Hatef Madani is a Website manager and contact person of IIR commission E2. 2 Per Lundqvist is the President of IIR commission E2. 0140-7007/$ e see front matter a 2011 Elsevier Ltd and IIR.
+KW  - Heat pump
+KW  - Control
+KW  - Modeling
+KW  - heat source
+KW  - storage tank
+KW  - TRNSYS
+KW  - Simulation
+N1  - C. Highlights. 
+N1  - C1. In order to reach the full thermodynamic potential of heat pumps systems an appropriate capacity control technique must be developed and adjusted for each unique installation. 
+N1  - C2. This paper describes the development of a generic model of a ground source heat pump system, covering the heat pump unit, the building, the ground as heat source, a thermal storage tank. 
+N1  - C3. The developed computer model in the present study aims at facilitating a reasonable accurate comparative analysis of the seasonal performance of different control strategies or different system layouts by finding the balance between complexity of models and possible simplifications; so HP unit, heat source and heat sink are all modeled in detail and the models are located in the upper right corner of Zone A of Fig. 1, somewhere close to the crossing of the dashed lines. 
+N1  - C4. By using the model developed in the present study, it is possible to compare some of methods and strategies used for capacity control of a heat pump system such as using a variable speed compressor and/or variable speed pumps in the HP system. 
+N1  - C5. The present paper, as the first part of two, suggests a generic method to approach the challenge of further understanding capacity control in a ground source heat pump. 
+N1  - C6. The paper describes the development of a computer model of ground source heat pump, covering the heat pump unit, the building, the heat source, a thermal storage tank, and the climate, in order to analyze existing or new control methods or strategies in the HP system. 
+N1  - D. Findings. 
+N1  - D1. As may be seen in Table 2, the HP unit model is able to predict the evaporation and condensation temperatures fairly accurate, as well as the heating capacity, compressor power and COP of the unit. It is shown in Figs. 5 and 6 that the calculated COP and heating capacity by the developed HP unit model have less than 15% deviation from the measurements. 
+N1  - D2. Furthermore, the calculated compressor power has less than 10% deviation from the measurements, as it is presented in Fig. 7. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The paper presents a method to approach the challenge of capacity control in Ground Source Heat Pumps (GSHP) by developing a model of the system, including sub-models for the heat pump unit, building, ground source, thermal storage tank, auxiliary heater, and climate, to facilitate comparative analysis of different control methods and strategies.. 
+N1  - E3. Key findings. 
+N1  - E4. The paper highlights the complexity of capacity control in GSHP systems due to the dynamic interaction among components and the impact of climatic conditions, building behavior, and heat source characteristics. The study also notes that there are several possible methods to provide capacity control of heat pump systems, including capacity control by components, cycle design, and advanced control algorithms.. 
+N1  - E5. The key findings of the study include the development of semi-empirical sub-models for various components of the heat pump system, which can be used to predict the performance of the system. The study also finds that the total isentropic efficiency of the compressor reaches its maximum when the compressor speed is around 50 Hz.. 
+N1  - E6. The HP unit model is able to predict the evaporation and condensation temperatures fairly accurately, as well as the heating capacity, compressor power, and COP of the unit. The calculated COP and heating capacity by the developed HP unit model have less than 15% deviation from the measurements.. 
+N1  - E7. The present paper, as the first part of two, suggests a generic method to approach the challenge of further understanding capacity control in a ground source heat pump. 
+N1  - E8. The paper describes the development of a computer model of ground source heat pump, covering the heat pump unit, the building, the heat source, a thermal storage tank, and the climate, in order to analyze existing or new control methods or strategies in the HP system. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to develop a generic model of a ground source heat pump system to facilitate comparative analysis of different control strategies and to investigate the impact of various parameters on the system's performance. The study also aims to find the minimum required level of detail for the sub-models to capture the necessary behavior of the real system with satisfying accuracy.. 
+N1  - E11. Methods. 
+N1  - E12. The study uses a co-solving technique to develop a computer model of the GSHP system in two environments, EES and TRNSYS. The model includes sub-models for the heat pump unit, building, ground source, thermal storage tank, auxiliary heater, and climate. The study also uses a roadmap to determine the required complexity of the sub-models based on the type of analysis.. 
+N1  - E13. The methods used in the study include the development of semi-empirical sub-models for various components of the heat pump system, such as compressors, condensers, evaporators, and expansion valves. The study also uses experimental data and correlations to validate the models.. 
+N1  - E14. The study uses a semi-empirical model of the heat pump unit, which is validated with experimental data. The model is developed using TRNSYS and EES simulation tools in a co-solving manner.. 
+N1  - E15. Results. 
+N1  - E16. The study presents a qualitative model of the system with two different levels of complexity. The model can be used to evaluate the performance of on/off controlled and variable capacity GSHPs with single speed or variable speed pumps. The study also notes that the model can be used to investigate the impact of various parameters on the system's performance, such as the coefficient of performance (COP) and the seasonal performance factor (SPF).. 
+N1  - E17. The results of the study include the development of a detailed model of the heat pump system, which can be used to predict the performance of the system. The study also finds that the total isentropic efficiency of the compressor reaches its maximum when the compressor speed is around 50 Hz.. 
+N1  - E18. The results show that the HP unit model is able to predict the evaporation and condensation temperatures fairly accurately, as well as the heating capacity, compressor power, and COP of the unit. The calculated COP and heating capacity by the developed HP unit model have less than 15% deviation from the measurements.. 
+N1  - E19. Conclusions. 
+N1  - E20. The study concludes that the developed model can be used to facilitate comparative analysis of different control strategies and to investigate the impact of various parameters on the system's performance. The study also notes that the model can be used to find the minimum required level of detail for the sub-models to capture the necessary behavior of the real system with satisfying accuracy.. 
+N1  - E21. The conclusions of the study are that the developed modeling approach can be used to predict the performance of heat pump systems. The study also concludes that the total isentropic efficiency of the compressor reaches its maximum when the compressor speed is around 50 Hz.. 
+N1  - E22. The study concludes that the developed HP unit model is able to predict the real system's behavior fairly accurately. The model can be used to compare different methods and strategies used for capacity control of a heat pump system. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - granryd2010analytical2
+AU  - Granryd, Eric 
+TI  - Analytical expressions for optimum flow rates in evaporators and condensers of heat pumping systems
+T2  - International Journal of Refrigeration
+VL  - 33
+PY  - 2010
+SP  - 
+EP  - 
+DA  - 2010
+UR  - 
+DO  - 10.1016/j.ijrefrig.2010.05.009
+AB  - Tin refers to base case refers to condenser side refers to evaporator side heat transfer (on air or brine side) compressor conditions for maximum overall COP friction factor inlet (to heat exchanger) isentropic net pump or fan pump or fan including motor conditions for maximum net cooling capacity sink source total average temperature (in heat exchangers logarithmic average) inlet temperature
+KW  - Evaporator
+KW  - Fan
+KW  - Condenser
+KW  - Flow
+KW  - heat exchanger
+KW  - Heat pump
+KW  - base case
+N1  - B. Participants: 4 covers cases with temperature efficiencies about 0. 
+N1  - B1. e Influence of flow rates on mean temperature difference. e Influence of flow rates on and inlet temperature difference. Comments to Figs. 5 and 6: Average temperature difference qM is set to 5 K at (w/w0) [ 1. Curves are estimated for heat exchangers with constant temperature on one side (typical for evaporators or condensers) and with different values of the exponent describing the influence of velocity on air side heat transfer (nh). For w [ w0 the U$A/(m$cp) is set [ 1 (at that point the temperature efficiency is 0,63 for (w/w0) [ 1). Values of 0.4 &lt; (w/w 0) &lt; 4 covers cases with temperature efficiencies about 0.2e0.9. Straight lines show exponents nTM (in Eq (5a)) and nTin (in Eq (5b)). The exponent nTin is considerably larger than nTM. Exponent nTin is about 0.5e0.6 almost regardless of the exponent for nh. e COP-variation with condenser side velocity. Three different base case temperature differences with nT [ 0,6 and one of the cases also with nT [ 0,3 for illustration. 
+N1  - C. Highlights. 
+N1  - C1. In a “base case” the fluid velocity is chosen to a certain value and for a given application the operating temperatures depends on the performance of the evaporator and condenser. 
+N1  - C2. Using Eq 12 this reasoning gives for the evaporator side the following simple expression of fan power corresponding to maximum net capacity in a refrigeration system: Ep2 Qmax 1⁄4 nT $kq$q2Qmax nP þ 1 (23). 
+N1  - C3. It is desirable to have a design with a small value for the “pump power ratio”. 
+N1  - C4. Considering a base case of a refrigerating system where the design data for the evaporator and condenser are known, simple analytical relations are deduced for optimum flow rates that will result in highest overall COP of the system when energy demand for the compressor as well as fans are included. 
+N1  - D. Findings. 
+N1  - D1. Adding the fan powers on the evaporator and the condenser side together (with COP2 y 2.7), the numbers in this example will in total correspond to about 1.8 þ 0.9$ (1 þ 1/2.7) y 3.0% of the refrigerating capacity Q2, equivalent to about 3.0$2.7 y 8% of the compressor power, EC. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study examines the factors influencing the "pump power ratio" in heat exchangers, aiming to minimize energy demand and optimize system performance, with key considerations including heat exchanger geometry, fan or pump efficiency, and fluid properties.. 
+N1  - E3. Key findings. 
+N1  - E4. The key findings include the derivation of simple analytical relations for optimum flow rates that result in the highest overall COP of the system, and the determination of a different flow rate that results in maximum net cooling capacity for a refrigerating system with fixed compressor speed.. 
+N1  - E5. The study finds that the optimum fan power for maximum net cooling capacity and coefficient of performance can be determined using expressions derived from the system's thermodynamic properties. The study also finds that the temperature difference, exponents, and Carnot efficiency play important roles in determining the optimum fan power.. 
+N1  - E6. The analogy number A is typically less than 1 for compact heat exchangers, and its value decreases with Reynolds number and depends on tube arrangements, with "streamlined" designs having higher A-values but potentially lower heat transfer coefficients. The study also finds that the "pump power ratio" is strongly influenced by operating parameters and fluid properties.. 
+N1  - E7. It is desirable to have a design with a small value for the “pump power ratio”. 
+N1  - E8. Considering a base case of a refrigerating system where the design data for the evaporator and condenser are known, simple analytical relations are deduced for optimum flow rates that will result in highest overall COP of the system when energy demand for the compressor as well as fans are included. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to optimize the fan power in refrigeration systems to achieve maximum net cooling capacity and coefficient of performance, while minimizing energy consumption. The study also aims to provide simple expressions for the fan power that will give maximum capacity or maximum coefficient of performance.. 
+N1  - E11. Methods. 
+N1  - E12. The methods used in the study include analyzing the influence of flow rates on the temperature differences in heat exchangers, and deriving relations for the mean temperature difference and inlet temperature difference as a function of flow rate.. 
+N1  - E13. The study uses a combination of theoretical analysis and simulation to derive expressions for the optimum fan power. The study also uses existing relations for fluid friction and heat transfer to express the fan power and heat load in heat exchangers.. 
+N1  - E14. The study uses analytical relations and experimental results to examine the factors influencing the "pump power ratio", including the analogy number A, heat exchanger geometry, fan or pump efficiency, and fluid properties. The study also introduces parameters such as the fan (or pump) and motor efficiency, and the ratio of overall heat transfer coefficient and the surface coefficient.. 
+N1  - E15. Results. 
+N1  - E16. The results show that the flow rate has a significant influence on the net refrigerating capacity and the overall COP of the system, and that the optimal velocity to save energy is almost half that corresponding to maximum net capacity.. 
+N1  - E17. The study finds that the optimum fan power for maximum net cooling capacity and coefficient of performance can be determined using expressions derived from the system's thermodynamic properties. The study also finds that the temperature difference, exponents, and Carnot efficiency play important roles in determining the optimum fan power.. 
+N1  - E18. The study finds that the "pump power ratio" is strongly influenced by the operating parameters and fluid properties, and that a low "pump power ratio" can be achieved by using heat exchanger geometries with a high analogy number A, high efficiency fans (or pumps) and motors, and heat exchanger designs with small additional flow restrictions. The study also provides simple analytical relations for optimum flow rates that result in the highest overall COP of a refrigerating system.. 
+N1  - E19. Conclusions. 
+N1  - E20. The conclusions of the study are that the derived analytical relations can be used for design purposes and for checking suitable flow velocities in existing plants, and that the relations can also be incorporated in algorithms for optimal operation of systems with variable speed compressors.. 
+N1  - E21. The study concludes that optimizing fan power in refrigeration systems can lead to significant energy savings and improved system performance. The study also concludes that the expressions derived for the optimum fan power can be used to design heat exchangers for low pump power ratio.. 
+N1  - E22. The study concludes that the "pump power ratio" is an important factor in optimizing heat exchanger design and minimizing energy demand, and that a low "pump power ratio" can be achieved by careful selection of heat exchanger geometry, fan or pump efficiency, and fluid properties. The study also concludes that the analytical relations provided can be used for design purposes and for checking flow velocities used in existing plants. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - delcol2014experimental
+AU  - Del Col, Davide 
+AU  - Azzolin, Marco 
+AU  - Benassi, G. 
+AU  - Mantovan, Mauro 
+TI  - Experimental Analysis of Optimal Operation Mode of a Ground Source Heat Pump System
+T2  - Energy Procedia
+VL  - 45
+PY  - 2014
+SP  - 
+EP  - 
+DA  - 2014
+UR  - 
+DO  - 10.1016/j.egypro.2014.01.142
+AB  - This paper presents experimental data and modeling of a ground source heat pump (GSHP) with variable speed compressor, variable speed water pumps and variable speed fans in the coils, installed at Hiref Spa (Italy) in the framework of the European Project Ground-Med. The present model has been developed to evaluate the operating conditions that lead to the maximum seasonal coefficient of performance and to analyze the behavior of the system at partial loads since variable capacity heat pumps do not work at nominal power for most of the time. The control parameters of the model that can be varied are the followings: frequency of compressor, frequency of water pump to the borehole heat exchangers, frequency of water pump to the user, velocity of the fans and water temperature to the user. The model has been compared with experimental data taken during a heating season and it can be the baseline to develop a control strategy with the final objective of maximizing the seasonal coefficient of performance of the system.
+KW  - COP3
+KW  - model
+KW  - ground source heat pump
+KW  - experimental
+KW  - water pump
+KW  - borehole heat exchanger
+N1  - C. Highlights. 
+N1  - C1. This study indicated that if the on/off controlled systems were dimensioned to cover more than the 65% of the building peak demand, there was no considerable difference with the variable capacity system. 
+N1  - C2. The parameters that can be varied for the heat pump system control are: electric frequency of compressor, frequency of water pumps in the external circuit, frequency of the water pump in the internal circuit, velocity of the fans and supply water temperature to the fancoils. 
+N1  - C3. When decreasing the load ratio, the maximum value of the system COP (COP3) is obtained at the minimum values of water flow rate to the borehole heat exchangers and to the building because at partial loads the heat exchangers are somehow oversized, reducing the energy consumption of the water pumps becomes important as it is demonstrated when keeping constant the β parameter (Eq 5). 
+N1  - C4. At higher load ratio the maximum COP3 is obtained for a water temperature difference at the condenser of about 5 K. 
+N1  - C5. The present model allows to predict the system behavior: values of COP3 are predicted in the range ±10%, so it can be used as the baseline to develop a proper control strategy. 
+N1  - C6. Substituting the asynchronous motor compressor lookup tables (LUTs) with a brushless DC (BLDC) motor compressor LUT, the possible SCOP3 increase is about 30%, due to higher efficiency of the BLDC at partial loads. 
+N1  - D. Findings. 
+N1  - D1. This study indicated that if the on/off controlled systems were dimensioned to cover more than the 65% of the building peak demand, there was no considerable difference with the variable capacity system. 
+N1  - D2. At both ends, if the on/off controlled heat pump was oversized, thus covers more than 94% of the building peak load, economic constraints prevented the option to be the best solution and if it was dimensioned to cover the 55% of the peak demand, the electrical auxiliary heaters consumption would be extremely high. 
+N1  - D3. In the variable speed heat pump due to almost continuous operations the energy consumptions of the water pumps were 5-30% higher than the on/off controlled heat pumps. 
+N1  - D4. Comparing the SCOP3 calculated data, at the same operating conditions, an increase of about 30% could be achieved using a BLDC motor compressor instead of the the inverter-driven asynchronous motor compressor. 
+N1  - D5. Substituting the asynchronous motor compressor LUT with a BLDC motor compressor LUT, the possible SCOP3 increase is about 30%, due to higher efficiency of the BLDC at partial loads. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study presents an experimental analysis of the optimal operation mode of a ground source heat pump system, focusing on the adjustment of heating and cooling capacities to the load required by the building,.. 
+N1  - E3. Key findings. 
+N1  - E4. The key findings of the study include the importance of adjusting the heating and cooling capacities to the load required by the building, and the need for a satisfactory regulation to achieve the maximum coefficient of performance when varying the load,. The study also found that the water temperature difference at the borehole heat exchangers that maximizes the COP3 is in the range 2.4 ÷ 3.1 K,.. 
+N1  - E5. The model is able to predict the system's coefficient of performance (COP) within a ±10% error band. The use of a brushless DC (BLDC) motor compressor instead of an inverter-driven asynchronous motor compressor can increase the seasonal performance factor (SCOP3) by about 30%.. 
+N1  - E6. At higher load ratio the maximum COP3 is obtained for a water temperature difference at the condenser of about 5 K. 
+N1  - E7. The present model allows to predict the system behavior: values of COP3 are predicted in the range ±10%, so it can be used as the baseline to develop a proper control strategy. 
+N1  - E8. Substituting the asynchronous motor compressor lookup tables (LUTs) with a brushless DC (BLDC) motor compressor LUT, the possible SCOP3 increase is about 30%, due to higher efficiency of the BLDC at partial loads. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to develop a model that can predict the behavior of a ground source heat pump system and optimize its seasonal performance. The model aims to provide a baseline for developing a control strategy that maximizes the system's seasonal coefficient of performance.. 
+N1  - E11. Methods. 
+N1  - E12. The methods used in the study include experimental measurements and numerical modeling,. The study also used lookup tables (LUTs) to model the main components of the system,.. 
+N1  - E13. The study uses a combination of simulation and experimental methods. The model is developed using commercial software and lookup tables (LUTs) provided by the manufacturer. The experimental data is collected from a heat pump installation and used to calibrate and validate the model.. 
+N1  - E14. Results. 
+N1  - E15. The results of the study include the experimental COP3 curves as a function of the water temperature difference to the building and the water temperature difference to the borehole heat exchangers,. The study also found that the ratio of compressor electric power consumption to the electric power absorbed by the water pumps (β parameter) is almost constant,.. 
+N1  - E16. The model is able to predict the system's COP within a ±10% error band. The use of a BLDC motor compressor instead of an inverter-driven asynchronous motor compressor can increase the SCOP3 by about 30%. The model can be used to compare the performance of different system layouts.. 
+N1  - E17. Conclusions. 
+N1  - E18. The conclusions of the study include the importance of adjusting the heating and cooling capacities to the load required by the building, and the need for a satisfactory regulation to achieve the maximum coefficient of performance when varying the load,.. 
+N1  - E19. The study concludes that the developed model can predict the behavior of a ground source heat pump system and optimize its seasonal performance. The use of a BLDC motor compressor can significantly improve the system's SCOP3. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - madani2011capacity2
+AU  - Madani, Hatef 
+AU  - Claesson, Joachim 
+AU  - Lundqvist, Per 
+TI  - Capacity control in ground source heat pump systems part II: Comparative analysis between on/off controlled and variable capacity systems
+T2  - International Journal of Refrigeration
+VL  - 34
+PY  - 2011
+SP  - 
+EP  - 
+DA  - 2011
+UR  - 
+DO  - 10.1016/j.ijrefrig.2011.05.012
+AB  - In the present paper, as the second part of two, modeling and simulation was carried out for a Ground Source Heat Pump (GSHP) system in the presence of all the most important interacting sub-systems such as building, ground heat source, electrical auxiliary heater, and the heat pump unit in order to make a fair and comprehensive comparison between the annual performance of on/off controlled and variable capacity systems. The annual modeling showed that dimensioning of the on/off controlled GSHP based on the peak heat demand of the building plays a significant role when the two control strategies are compared: if the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand of the building, the electrical auxiliary, which then covers about 10% of the annual heating demand of the building, makes the SPF of the on/off controlled GSHP to be lower than the one of the variable speed system. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.
+KW  - Heat pump
+KW  - Ground Source Heat Pumps
+KW  - Control
+N1  - C. Highlights. 
+N1  - C1. Brine to water heat pump systems like Ground Source Heat Pumps (GSHPs) are one of the common and fast growing systems for heating the buildings in USA and European countries. 
+N1  - C2. The presents paper aims at making a fair comparison between the annual performance of an on/off and variable capacity GSHP systems, using the generic model developed by Madani et al (2011). 
+N1  - C3. The current paper compares the annual performance of the on/off controlled and inverter-driven variable capacity heat pump systems, using the generic model developed by Madani et al (2011). 
+N1  - C4. The results from the annual modeling for both systems indicate: C When the annual performance of on/off controlled GSHP system is compared with the one of the variable speed GSHP system, it must be noticed that dimensioning of the on/off controlled GSHP based on the peak heat demand of the building plays a significant role: if the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand of the building, the important role of the electrical auxiliary heater makes the Seasonal Performance Factor (SPF) of the on/off controlled GSHP be lower than the one of the variable speed system. 
+N1  - C5. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
+N1  - C6. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
+N1  - D. Findings. 
+N1  - D1. As of 2005, there are over a million units installed worldwide providing about 15 GW of thermal capacity (Rybach, 2005) and the annual global increase has been more than 10% over the last ten years (Lund et al, 2004). 
+N1  - D2. As may be seen from Fig. 9, the variable capacity system has higher efficiency than unit A due to avoiding the electrical auxiliary heater; Furthermore, the modeling results show that there is no significant difference between the COP of system B, system C, and the variable speed system. 
+N1  - D3. As shown in Fig. 12, the SPF of unit A is about 13% lower than the SPF of the variable speed system whereas the SPF of system B, C, and D are almost the same as the one of variable speed system. 
+N1  - D4. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
+N1  - D5. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
+N1  - D6. As a final remark, in order to obtain a higher efficiency for on/off controlled systems, it is important to dimension them in a way that electrical auxiliary heater covers less than 5% of annual heat demand. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study compares the annual performance of on/off controlled and variable capacity Ground Source Heat Pump (GSHP) systems, finding that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand.. 
+N1  - E3. Key findings. 
+N1  - E4. The study finds that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. Additionally, the study finds that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
+N1  - E5. The study finds that the variable speed GSHP unit has a higher balance point temperature than the single speed units, resulting in a smaller compressor cycling region. The variable speed unit also shows higher efficiency in certain temperature ranges, but higher energy consumption due to the lack of need for an electrical auxiliary heater.. 
+N1  - E6. The key findings of the study are that the dimensioning of on/off controlled heat pump systems plays a significant role in their performance, and that the use of electrical auxiliary heaters can significantly impact energy consumption. Additionally, the study found that the energy use by liquid pumps in the variable speed GSHP system can be 5-30% higher compared to the single speed system.. 
+N1  - E7. On the contrary, when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, i.e. more than 95% of the annual heat demand of the building, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems. 
+N1  - E8. C The energy use by liquid pumps in the variable speed GSHP system can be 5e30% higher compared to the single speed system. 
+N1  - E9. Objectives. 
+N1  - E10. The objectives of the study are to compare the annual performance of on/off controlled and inverter-driven variable capacity heat pump systems, and to investigate the impact of dimensioning and electrical auxiliary heaters on energy consumption.. 
+N1  - E11. Methods. 
+N1  - E12. The study uses modeling and simulation to evaluate the annual performance of the two control strategies, with all the systems modeled over a year. The study also uses a quasi-static model to consider the dynamic interactions among the system components.. 
+N1  - E13. The study uses a modeling approach to estimate the building's heat demand and the performance of the GSHP units. The model takes into account various parameters such as solar insolation, thermal inertia, and user behavior. The study also uses data from the Meteonorm database to simulate the climatic conditions in Stockholm.. 
+N1  - E14. The methods used in the study include modeling and simulation of the heat pump systems, as well as validation with experimental data from in-situ field measurements.. 
+N1  - E15. Results. 
+N1  - E16. The study finds that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. The study also finds that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
+N1  - E17. The study finds that the variable speed GSHP unit has a higher balance point temperature than the single speed units, resulting in a smaller compressor cycling region. The variable speed unit also shows higher efficiency in certain temperature ranges, but higher energy consumption due to the lack of need for an electrical auxiliary heater. The study also finds that the unit A and unit B have higher total energy consumption than the variable speed system over a year due to high annual energy consumption of the electrical auxiliary heater.. 
+N1  - E18. The results of the study show that the SPF of the on/off controlled systems can be lower than that of the variable speed system, especially when the on/off controlled system is dimensioned to cover only a small percentage of the peak heat demand. The results also show that the energy use by liquid pumps in the variable speed GSHP system can be 5-30% higher compared to the single speed system.. 
+N1  - E19. Conclusions. 
+N1  - E20. The study concludes that the dimensioning of the on/off controlled GSHP plays a significant role in the comparison, with variable capacity systems performing better when the on/off controlled GSHP is dimensioned to cover only 55% of the peak heat demand. The study also concludes that when the on/off controlled system is dimensioned to cover more than 65% of the building’s peak heat demand, there is no considerable difference between the SPFs of the on/off controlled and variable capacity systems.. 
+N1  - E21. The study concludes that the variable speed GSHP unit has higher efficiency in certain temperature ranges, but also higher energy consumption due to the lack of need for an electrical auxiliary heater. The study also concludes that the unit A and unit B have higher total energy consumption than the variable speed system over a year due to high annual energy consumption of the electrical auxiliary heater.. 
+N1  - E22. The conclusions of the study are that the dimensioning of on/off controlled heat pump systems is crucial for their performance, and that the use of electrical auxiliary heaters can significantly impact energy consumption. The study also concludes that retrofitting an inverter to existing single speed HP systems can increase their annual efficiency. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - gao2016optimization
+AU  - Gao, Jiajia 
+AU  - Huang, Gongsheng 
+AU  - Xu, Xinhua 
+TI  - An optimization strategy for the control of small capacity heat pump integrated air-conditioning system
+T2  - Energy Conversion and Management
+VL  - 119
+PY  - 2016
+SP  - 
+EP  - 
+DA  - 2016
+UR  - 
+DO  - 10.1016/j.enconman.2016.04.027
+AB  - This paper studies the optimization of a small-scale central air-conditioning system, in which the cooling is provided by a ground source heat pump (GSHP) equipped with an on/off capacity control. The optimization strategy aims to optimize the overall system energy consumption and simultaneously guarantee the robustness of the space air temperature control without violating the allowed GSHP maximum start-ups number per hour specified by customers. The set-point of the chilled water return temperature and the width of the water temperature control band are used as the decision variables for the optimization. The performance of the proposed strategy was tested on a simulation platform. Results show that the optimization strategy can save the energy consumption by 9.59% in a typical spring day and 2.97% in a typical summer day. Meanwhile it is able to enhance the space air temperature control robustness when compared with a basic control strategy without optimization.
+KW  - ground source heat pump
+KW  - Optimization
+KW  - control strategy
+KW  - Air-conditioning system
+N1  - C. Highlights. 
+N1  - C1. This paper studies the optimization of a small-scale A/C system integrated with a ground source heat pump (GSHP). 
+N1  - C2. This paper presents an optimization strategy for a GSHPintegrated A/C system in order to optimize the overall system energy consumption without violating the allowed GSHP maximum start-ups number and degrading the space air temperature control performance. 
+N1  - C3. The performance of the optimization strategy is compared with the basic control strategy. 
+N1  - C4. The results show that the optimization strategy can improve the robustness of the space air temperature control significantly and reduce the system energy consumption obviously in spring days, i.e. under light load conditions. 
+N1  - C5. The energy consumption of the GSHP was reduced by 21.15% and the overall system was reduced by 9.59%. 
+N1  - C6. Both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller when the optimization strategy is used. 
+N1  - D. Findings. 
+N1  - D1. It has been shown that more than 40% of the building energy consumptions are mainly used for the heating, ventilation, and air-conditioning (HVAC) systems [1,2]. 
+N1  - D2. The energy consumption of the GSHP was reduced by 21.15% and the overall system was reduced by 9.59%. 
+N1  - D3. In the summer day, both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller (reduced by 2.97%) when the optimization strategy is used. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study proposes an optimization scheme to improve the energy performance of a ground source heat pump (GSHP) integrated air conditioning (A/C) system by optimizing the chilled water return (CHWR) temperature set-point and the temperature control band.. 
+N1  - E3. Key findings. 
+N1  - E4. The proposed optimization strategy can save energy consumption by 9.59% in a typical spring day and 2.97% in a typical summer day, while enhancing the space air temperature control robustness. The strategy optimizes the set-point of the chilled water return temperature and the width of the water temperature control band to minimize overall system energy consumption.. 
+N1  - E5. The study finds that optimizing the CHWR temperature set-point and the temperature control band can improve the energy performance of the GSHP integrated A/C system, reduce the on/off cycling, and enhance the room temperature control performance.. 
+N1  - E6. The study finds that the proposed optimization algorithm can achieve good control robustness and minimize energy consumption, with an average absolute tracking error of 0.030 °C. The GSHP model and GSHE model are validated using experimental data, with a maximum mean deviation of 2.46% for compressor power consumption and 4.45% for chilled water temperature.. 
+N1  - E7. The optimization strategy can reduce the energy consumption of the GSHP by 21.15% and the overall system by 9.59% in spring days, and by 6.34% and 2.97% in summer days, respectively. The optimization strategy also improves the robustness of space air temperature control.. 
+N1  - E8. Both the optimization strategy and the base control strategy can achieve a robust control of the space air temperature, while the energy consumption of the overall system is slightly smaller when the optimization strategy is used. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to propose an optimization strategy for a GSHP-integrated A/C system to minimize overall system energy consumption subject to the allowed GSHP maximum start-ups number per hour specified by customers.. 
+N1  - E11. Methods. 
+N1  - E12. The study uses a simulation platform to test the performance of the proposed strategy. The optimization strategy involves two steps: checking the water volume inside the chilled water loop and optimizing the set-point of the chilled water return temperature and the width of the water temperature control band.. 
+N1  - E13. The study uses a simulation-based approach to test the performance of the optimization strategy, with a simulated virtual system representing an actual GSHP-integrated central A/C system.. 
+N1  - E14. The study uses a simulation platform constructed using TRNSYS software, which includes models for the building, GSHP, AHU, water pump, water tank, GSHE, and temperature and humidity sensors. The optimization algorithm is coded using MATLAB and embedded in TRNSYS. The study uses experimental data to validate the GSHP model and GSHE model.. 
+N1  - E15. The optimization strategy involves two steps: checking the water volume inside the chilled water loop and developing an optimization algorithm to optimize the system settings (DTw and Tw,set) by minimizing the total power of the system. The performance of the optimization strategy is compared with the basic control strategy using simulation data.. 
+N1  - E16. Results. 
+N1  - E17. The results show that the proposed optimization strategy can save energy consumption and enhance the space air temperature control robustness. The strategy also optimizes the set-point of the chilled water return temperature and the width of the water temperature control band to minimize overall system energy consumption.. 
+N1  - E18. The study finds that the proposed optimization algorithm can achieve good control robustness and minimize energy consumption. The GSHP model and GSHE model are validated using experimental data, with a maximum mean deviation of 2.46% for compressor power consumption and 4.45% for chilled water temperature.. 
+N1  - E19. The results show that the optimization strategy can reduce the energy consumption of the GSHP and the overall system, and improve the robustness of space air temperature control. The optimization strategy can also guarantee the GSHP start-ups number specified by customers.. 
+N1  - E20. Conclusions. 
+N1  - E21. The study concludes that the proposed optimization strategy is effective in minimizing overall system energy consumption while guaranteeing the robustness of space air temperature control. The strategy can be used to optimize the performance of GSHP-integrated A/C systems.. 
+N1  - E22. The study concludes that optimizing the CHWR temperature set-point and the temperature control band is essential to improve the energy performance of the GSHP integrated A/C system.. 
+N1  - E23. The optimization strategy can efficiently reduce the energy consumption of the overall system, especially under partial load conditions, and improve the robustness of space air temperature control. The proposed strategy is not difficult to use and can be implemented in existing GSHP integrated A/C systems. 
+LA  -
+ER  -
+
+TY  - JOUR
+ID  - ikeda2017optimization
+AU  - Ikeda, Shintaro 
+AU  - Choi, Wonjun 
+AU  - Ooka, Ryozo 
+TI  - Optimization method for multiple heat source operation including ground source heat pump considering dynamic variation in ground temperature
+T2  - Applied Energy
+VL  - 193
+PY  - 2017
+SP  - 
+EP  - 
+DA  - 2017
+UR  - 
+DO  - 10.1016/j.apenergy.2017.02.047
+AB  - Recent years have witnessed the widespread use of highly efficient energy systems as an important measure to reduce not only energy consumption but also operating costs. A ground source heat pump system has been attracting considerable attention because of its high efficiency. Although many studies have been conducted to investigate and evaluate the ground source heat pump’s performance, they have not sufficiently studied its optimal operation considering dynamic ground temperature variation caused by the high thermal capacity of the ground. Calculations considering both thermal history of the ground and optimal load dispatch are complicated and thus entail high computation costs. In this paper, an efficient optimization method is proposed to determine optimal operations of a hybrid ground source heat pump system that is used to handle the cooling load and hot water demand. The proposed method, namely epsilon-constrained differential evolution with random jumping, can solve nearly all possible configurations and is a suitable method for the nonlinear configuration used herein because the ground source heat pump has highly nonlinear characteristics and the ground temperature calculation cannot be simplified to a linear formulation. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. In addition, the proposed method derives the solution rapidly while maintaining high computation accuracy. Therefore, it can be used in practical situations to determine an optimal operating schedule as a day-ahead optimization.
+KW  - ground source heat pump
+KW  - borehole heat exchangers
+KW  - differential evolution
+KW  - air source heat pump
+KW  - auxiliary boiler
+KW  - operating cost
+KW  - energy system
+N1  - B. Participants: 6 cases. 
+N1  - B1. Furthermore, in Cases 1–1, 1–2, 2–1, and 2–2, when the outlet fluid temperature of GSHPh was lower than 2 °C and that of GSHPc was greater than 40 °C, the heat generation was reduced by 50% to keep the fluid temperature within the upper and lower bounds. To confirm the differences in the results in terms of the calculation period, six cases were considered because the performance of GSHP systems depends on the thermal history (i.e., heat demand of past time steps). 4. Results and discussion. 
+N1  - C. Highlights. 
+N1  - C1. In recent years, efficient utilization of energy sources has emerged as an important target owing to ever-increasing energy consumption and CO2 emissions. 
+N1  - C2. Vf xs volumetric heat capacity [J/m3 K] amount of electricity and gas consumption, respectively [kW h], [m3] mutation rate generation convective heat transfer coefficient of pipe inner surface [W/(m2 K)] machine load rate Nusselt number Prandtl number decision variable temporary decision variable unit price of electricity [yen/kW h] and gas [yen/m3], respectively population vector heat rate per unit length of borehole heat exchangers (BHEs) [W/m] radius, radial direction [m] thermal resistance [m K/W] Reynolds number time, time step used for ground source heat pump (GSHP) [s] time step used for BHE calculation [–] time step used for system optimization [–] temperature [°C] initial ground temperature [°C] BHE wall temperature [°C] average borefiled wall temperature [°C] average fluid temperature [°C] velocity [m/s] averaged velocity [m/s] volumetric flow rate [m3/s] half of the shank spacing [m]. 
+N1  - C3. The epsilon-constrained differential evolution (eDE) algorithm has been presented in [51]. eDE was compared to mixed-integer linear programming to validate its accuracy when minimizing operating costs in a complex energy system in [52]. eDE showed great searching capability in that the difference between the given results for MILP and eDE was less than 1%. 
+N1  - C4. The simplified optimization strategy that determined only the start and stop times of the GSHP operation could reduce the operating costs compared to the empirical operation for a single day and 7 days by 3.78% and 9.59%, respectively. 
+N1  - C5. The detailed optimization strategy that determined the load rates of all the components in each time step could reduce the operating costs compared to the empirical operation for a single day and 7 days by 6.81% and 12.56%, respectively. 
+N1  - C6. The proposed method can be widely used in both theoretical and practical studies when users want to obtain an optimal operation schedule. It remains to address how this method can be applied to a much longer period such as for an analysis of the life-cycle impact of GSHP, thermal interaction among BHEs, and optimal GSHP design. 
+N1  - D. Findings. 
+N1  - D1. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. 
+N1  - D2. The eDE algorithm has been presented in [51]. eDE was compared to mixed-integer linear programming to validate its accuracy when minimizing operating costs in a complex energy system in [52]. eDE showed great searching capability in that the difference between the given results for MILP and eDE was less than 1%. 
+N1  - D3. To reduce the computation costs, the search was terminated the search when the value did not change by more than 10% of the predefined number of generations. 
+N1  - D4. Furthermore, in Cases 1–1, 1–2, 2–1, and 2–2, when the outlet fluid temperature of GSHPh was lower than 2 °C and that of GSHPc was greater than 40 °C, the heat generation was reduced by 50% to keep the fluid temperature within the upper and lower bounds. 
+N1  - D5. The operating cost of Case 1–1 was 10,280 yen/day and that of Case 1–2 was 9738 yen/day, representing a reduction of 5.27%. 
+N1  - D6. The operating cost of Case 1–3 was 9346 yen/day, representing a reduction of 9.09% compared to Case 1–1. 
+N1  - D7. On the other hand, the operating cost in Case 1–3 was 4027 yen/day, representing a reduction of 1.08% compared to Cases 1–1 and 1–2, owing to the difference in the partial load operation of GSHPh and AB at 9 and 10 p.m. (Fig. 7). 
+N1  - D8. The total operating cost of cooling for 7 days was 68,740 yen, and it was reduced by 12.54% compared to Case 2–1 (Table 3). 
+N1  - D9. The total reduction rate was 16.35% compared to Case 2–1. 
+N1  - D10. The operating costs of Cases 2–2 and 2–3 were reduced by 1.15% and 2.20% compared to Case 2–1, respectively. 
+N1  - E. Summary. 
+N1  - E1. Snapshot. 
+N1  - E2. The study aimed to minimize the operating cost of a system using an epsilon-constrained differential evolution algorithm with random jumping (eDE-RJ) to optimize the operation of ground source heat pumps (GSHPs) and other machines, considering constraints such as upper and lower bounds of circulating fluid temperature and maximum thermal output.. 
+N1  - E3. Key findings. 
+N1  - E4. The proposed method, eDE-RJ, can solve nearly all possible configurations and is suitable for nonlinear configurations. The optimal operations achieved by the proposed method can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations.. 
+N1  - E5. The key findings of the study include the development of a model to calculate the borefield temperature and the GSHP's inlet temperature, and the evaluation of the impact of dynamic electricity prices on the system's operation.. 
+N1  - E6. The simplified optimization strategy that determined only the start and stop times of the GSHP operation could reduce the operating costs compared to the empirical operation for a single day and 7 days by 3.78% and 9.59%, respectively. 
+N1  - E7. The detailed optimization strategy that determined the load rates of all the components in each time step could reduce the operating costs compared to the empirical operation for a single day and 7 days by 6.81% and 12.56%, respectively. 
+N1  - E8. The proposed method can be widely used in both theoretical and practical studies when users want to obtain an optimal operation schedule. It remains to address how this method can be applied to a much longer period such as for an analysis of the life-cycle impact of GSHP, thermal interaction among BHEs, and optimal GSHP design. 
+N1  - E9. Objectives. 
+N1  - E10. The objective of the study is to determine the optimal operations of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance. Another objective is to reduce operating costs and energy consumption.. 
+N1  - E11. Methods. 
+N1  - E12. The proposed optimization method, eDE-RJ, is based on the differential evolution (DE) algorithm, categorized as the metaheuristics of an artificial intelligence method. The method is used to determine the optimal operation of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance.. 
+N1  - E13. The methods used in the study include the development of a model to calculate the borefield temperature and the GSHP's inlet temperature, using the infinite line source (ILS) model and temporal and spatial superposition techniques.. 
+N1  - E14. The method used in the study is an epsilon-constrained differential evolution algorithm with random jumping (eDE-RJ), which is a metaheuristic optimization method.. 
+N1  - E15. The study uses the proposed eDE-RJ method, which can efficiently solve highly nonlinear configurations and iterative calculations to calculate the ground temperature, and compares the results with empirical operation.. 
+N1  - E16. Results. 
+N1  - E17. The results show that the proposed method, eDE-RJ, can reduce operating costs by at least 3.78% and at most 12.56% compared to empirical operations. The method can also derive the solution rapidly while maintaining high computation accuracy.. 
+N1  - E18. The results of the study include the calculation of the borefield temperature and the GSHP's inlet temperature, and the evaluation of the impact of dynamic electricity prices on the system's operation.. 
+N1  - E19. The results of the study show that the optimal operation schedules for GSHPs and other machines result in reduced operating costs, and that considering thermal history and partial load operation is important in the optimization.. 
+N1  - E20. Conclusions. 
+N1  - E21. The study concludes that the proposed method, eDE-RJ, is effective in determining the optimal operations of a hybrid GSHP system, considering dynamic ground temperature variation and machine performance. The method can reduce operating costs and energy consumption, making it a useful tool for practical applications.. 
+N1  - E22. The conclusions of the study are that the developed model can be used to calculate the borefield temperature and the GSHP's inlet temperature, and that dynamic electricity prices have a significant impact on the system's operation. 
 LA  -
 ER  -
 
