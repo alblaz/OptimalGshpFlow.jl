@@ -20,6 +20,9 @@ using Interpolations
 # ╔═╡ eadd49a1-7bca-40a2-abdb-064a0fb710e6
 using Roots
 
+# ╔═╡ 04d30f44-7bbe-4eb7-b878-bce0c48debec
+using Dierckx
+
 # ╔═╡ d47bf527-6960-4e14-b9e5-a422f8888e66
 using PlutoDevMacros
 
@@ -67,6 +70,9 @@ using MLJ
 
 # ╔═╡ 164a20af-4421-4cb6-a4fe-0f8b00ad7059
 using SymbolicRegression  # provides SRRegressor via MLJ interface
+
+# ╔═╡ 2c2b2270-5760-486f-a33f-427b24febdcb
+using Optim
 
 # ╔═╡ 734d74db-7b19-42fd-89ad-78816a939565
 @fromparent begin
@@ -4734,6 +4740,227 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
+md" # COP3 interpolation"
+
+# ╔═╡ 682f4fc9-e4c5-4c5a-b872-f901388e1992
+image_dir
+
+# ╔═╡ 778d8c9e-2762-44d6-b8c0-318196498304
+function _auto_s(z::AbstractMatrix; frac::Real = 0.01)
+    v = var(skipmissing(vec(z)))
+    isnan(v) && (v = 0.0)
+    return frac * v * length(z)
+end
+
+# ╔═╡ 23ce92ed-6f53-4f1c-9896-b9280e08b272
+# --- 1) Smooth max helper (softplus) -----------------------------------------
+# tau controls the "softness": smaller tau ~ sharper kink (tau≈5–20 is usually good)
+softmax0(x; tau::Real=10.0) = (1/tau) * log1p(exp(tau * x))
+
+# --- 2) cop3_at with smooth Paux ---------------------------------------------
+
+# ╔═╡ 92502f92-9e37-43a3-bf33-cc795218f98e
+function cop3_at(spl::NamedTuple, x::Real, y::Real; Qsp::Real, tau::Real=12.0)
+    Ŵ = max(0.0, spl.W(x, y))
+    P̂ = max(0.0, spl.P(x, y))
+    Q̂ = max(0.0, spl.Q(x, y))
+    # smooth approximation of max(0, Qsp - Q̂)
+    Paux = softmax0(Qsp - Q̂; tau=tau)
+    return (Q̂ + Paux) / (Ŵ + P̂ + Paux)
+end
+
+# ╔═╡ d4f3ac34-65e1-404b-8ca8-6ca09e0b466a
+function optimal_cop3_from_splines_robust(setup::NamedTuple; Qsp::Real,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    coarse_nx::Int=61, coarse_ny::Int=61,     # a bit denser coarse grid
+    Kstarts::Int=6,                            # multistart count (top-K coarse points)
+    tau::Real=12.0,                            # softplus sharpness
+    shrink_frac::Real=1e-3,                    # avoid exact boundary eval
+    optimizer=Fminbox(NelderMead()),
+    maxiters::Int=2_000,                       # more room than default
+    inner_options::Optim.Options=Optim.Options(g_tol=1e-8, f_tol=1e-10, iterations=2_000),
+    warm_start::Union{Nothing,Tuple{Float64,Float64}}=nothing
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+
+    # shrink to interior to reduce 2D spline extrapolation weirdness near edges
+    dx = shrink_frac * (xmax - xmin)
+    dy = shrink_frac * (ymax - ymin)
+    xmin_, xmax_ = xmin + dx, xmax - dx
+    ymin_, ymax_ = ymin + dy, ymax - dy
+
+    clampxy(x, y) = (clamp(x, xmin_, xmax_), clamp(y, ymin_, ymax_))
+
+    fmin(v) = begin
+        x, y = clampxy(v[1], v[2])
+        -cop3_at(spl, x, y; Qsp=Qsp, tau=tau)
+    end
+
+    # --- coarse grid scan
+    xs = range(xmin_, xmax_; length=coarse_nx)
+    ys = range(ymin_, ymax_; length=coarse_ny)
+    coarse = Tuple{Float64,Float64,Float64}[]
+    @inbounds for yy in ys, xx in xs
+        c = cop3_at(spl, xx, yy; Qsp=Qsp, tau=tau)
+        if isfinite(c)
+            push!(coarse, (c, xx, yy))
+        end
+    end
+    isempty(coarse) && error("No finite COP₃ over the search grid; check bounds/splines.")
+    sort!(coarse, by = first, rev = true)
+
+    # seed list = (optional warm start first) + top-K coarse
+    seeds = Vector{SVector{2,Float64}}()
+    if warm_start !== nothing
+        x0, y0 = clampxy(warm_start[1], warm_start[2])
+        push!(seeds, SVector(x0, y0))
+    end
+    for i in 1:min(Kstarts, length(coarse))
+        _, xx, yy = coarse[i]
+        push!(seeds, SVector(xx, yy))
+    end
+
+    # run locals and keep best
+    best_val = -Inf
+    best_v   = seeds[1]
+    for s in seeds
+        res = Optim.optimize(fmin,
+            [xmin_, ymin_], [xmax_, ymax_], collect(s),
+            optimizer; iterations = maxiters, optimizer_o = inner_options)
+        v̂ = Optim.minimizer(res)
+        x̂, ŷ = clampxy(v̂[1], v̂[2])
+        ĉ = cop3_at(spl, x̂, ŷ; Qsp=Qsp, tau=tau)
+        if isfinite(ĉ) && ĉ > best_val
+            best_val = ĉ
+            best_v   = SVector(x̂, ŷ)
+        end
+    end
+
+    x̂, ŷ = best_v
+    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
+    Paux̂ = softmax0(Qsp - Q̂; tau=tau)
+
+    return (ΔT=x̂, f=ŷ, COP3=best_val, Q_cond=Q̂, W_comp=Ŵ, P_pump=P̂, P_aux=Paux̂)
+end
+
+# ╔═╡ 3d1c09c9-9144-4ceb-82da-ee9d50ed108c
+"""
+    optimal_cop3_from_splines(setup; Qsp, xbounds=nothing, ybounds=nothing,
+                              coarse_nx=41, coarse_ny=41,
+                              optimizer=Fminbox(NelderMead()); maxiters=1_000)
+
+Same as `optimal_cop3`, but takes the output of `make_splines` to reuse splines.
+"""
+function optimal_cop3_from_splines(setup::NamedTuple; Qsp::Real,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    coarse_nx::Int=41, coarse_ny::Int=41,
+    optimizer=Fminbox(NelderMead()), maxiters::Int=1_000)
+
+    X, Y, spl = setup.X, setup.Y, setup.spl
+
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
+
+    xs = range(xmin, xmax; length=coarse_nx)
+    ys = range(ymin, ymax; length=coarse_ny)
+    best_cop, x0, y0 = -Inf, NaN, NaN
+    @inbounds for yy in ys, xx in xs
+        c = cop3_at(spl, xx, yy; Qsp=Qsp)
+        if isfinite(c) && c > best_cop
+            best_cop = c; x0 = xx; y0 = yy
+        end
+    end
+    isnan(x0) && error("No finite COP3 over the search grid; check bounds")
+
+    fmin(v) = begin
+        x, y = clampxy(v[1], v[2])
+        -cop3_at(spl, x, y; Qsp=Qsp)
+    end
+    lower = [xmin, ymin]; upper = [xmax, ymax]; init = [x0, y0]
+    res = Optim.optimize(fmin, lower, upper, init, optimizer)
+
+    v̂ = Optim.minimizer(res)
+    x̂, ŷ = clampxy(v̂[1], v̂[2])
+    COP̂ = cop3_at(spl, x̂, ŷ; Qsp=Qsp)
+
+    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
+    Paux̂ = max(0.0, Qsp - Q̂)
+
+    return (ΔT=x̂, f=ŷ, COP3=COP̂, Q_cond=Q̂, W_comp=Ŵ, P_pump=P̂, P_aux=Paux̂, result=res)
+end
+
+
+# ╔═╡ 381c94cb-10a0-424d-bbfd-999f71ce5df2
+#=╠═╡
+
+"""
+    sweep_optimal_curve(setup; Qs, show_cop3=true, save_path=nothing, transparent=false)
+
+For each setpoint in `Qs` (vector of Real), compute the optimal (ΔT*, f*, COP3)
+using `optimal_cop3_from_splines(setup; Qsp=...)`.
+
+Returns `(fig, df)` where `df` has columns: `:Qsp, :ΔT, :f, :COP3`.
+
+If `save_path` is given, saves the figure (dir is created if needed).
+"""
+function sweep_optimal_curve(setup; Qs::AbstractVector,
+                             show_cop3::Bool=true,
+                             save_path::Union{Nothing,AbstractString}=nothing,
+                             transparent::Bool=false)
+
+    rows = NamedTuple[]
+    @inbounds for q in Qs
+        r = optimal_cop3_from_splines(setup; Qsp=q)
+        push!(rows, (; Qsp=float(q), ΔT=float(r.ΔT), f=float(r.f), COP3=float(r.COP3)))
+    end
+    df = DataFrame(rows)
+    sort!(df, :Qsp)
+
+    # --- figure & axes
+    fig = Figure(backgroundcolor = (transparent ? :transparent : :white))
+
+    # top panel: ΔT* (left) and f* (right) vs Qsp
+    axL = Axis(fig[1, 1]; xlabel = "Qₛₚ (W)", ylabel = "ΔT* (K)")
+    axR = Axis(fig[1, 1]; yaxisposition = :right, ylabel = "f* (Hz)")
+    # overlay trick: hide spines/decorations on the right axis, share x
+    hidespines!(axR)
+    hidexdecorations!(axR, grid=false)
+    linkxaxes!(axL, axR)
+
+    # plots (keep the handles for the legend)
+    pΔT = lines!(axL, df.Qsp, df.ΔT)
+    pf  = lines!(axR, df.Qsp, df.f)
+
+    # legend collecting both plot objects
+    Legend(fig[1, 2], [pΔT, pf], ["ΔT*", "f*"]; tellheight=false)
+
+    # optional bottom panel: COP3 vs Qsp
+    if show_cop3
+        axC = Axis(fig[2, 1]; xlabel="Qₛₚ (W)", ylabel="COP₃ (–)", title="Optimal COP₃")
+        lines!(axC, df.Qsp, df.COP3)
+    end
+
+    resize_to_layout!(fig)
+
+    # save if requested
+    if save_path !== nothing
+        p = String(save_path)
+        d = dirname(p); if !isempty(d) && d != "."; mkpath(d); end
+        save(p, fig)  # CairoMakie.save behind the scenes
+    end
+
+    return fig, df
+end
+
+  ╠═╡ =#
+
 # ╔═╡ 94138b2d-0fd6-494e-9fd1-ef5aecadaabf
 md" # Plotting functions"
 
@@ -4801,6 +5028,107 @@ function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
     @assert all(diff(X) .> 0) && all(diff(Y) .> 0)
     return X, Y, Z
 end
+  ╠═╡ =#
+
+# ╔═╡ 9ef98f84-be67-42f2-9304-5f48e706e394
+#=╠═╡
+function make_splines(df::DataFrame;
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_,
+    zcols::NamedTuple=(W=:W_comp, P=:P_pump, Q=:Q_cond),
+    xlogbase::Symbol=:log10,
+    kx::Integer=3, ky::Integer=3,
+    s::Union{NamedTuple,Nothing}=nothing,     # <— allow auto
+    s_frac::Real = 0.01                       # <— ~1% smoothing by default
+)
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
+
+    X, Y, ZW = _grid_from_df(df, xcol, ycol, zcols.W; invx=invx)
+    _, _, ZP = _grid_from_df(df, xcol, ycol, zcols.P; invx=invx)
+    _, _, ZQ = _grid_from_df(df, xcol, ycol, zcols.Q; invx=invx)
+
+    sW = s === nothing ? _auto_s(ZW; frac=s_frac) : s.W
+    sP = s === nothing ? _auto_s(ZP; frac=s_frac) : s.P
+    sQ = s === nothing ? _auto_s(ZQ; frac=s_frac) : s.Q
+
+    sW2 = Dierckx.Spline2D(X, Y, ZW; kx=kx, ky=ky, s=sW)
+    sP2 = Dierckx.Spline2D(X, Y, ZP; kx=kx, ky=ky, s=sP)
+    sQ2 = Dierckx.Spline2D(X, Y, ZQ; kx=kx, ky=ky, s=sQ)
+
+    return (X=X, Y=Y, spl=(W=sW2, P=sP2, Q=sQ2))
+end
+  ╠═╡ =#
+
+# ╔═╡ 0786c7cc-d7c1-403d-a442-bafdcd6fccb4
+#=╠═╡
+"""
+    optimal_cop3(df; Qsp,
+                 xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log10,
+                 zW=:W_comp, zP=:P_pump, zQ=:Q_cond,
+                 kx=3, ky=3, sW=0.0, sP=0.0, sQ=0.0,
+                 xbounds=nothing, ybounds=nothing,
+                 coarse_nx=41, coarse_ny=41,
+                 optimizer=Fminbox(NelderMead());
+                 maxiters=1_000)
+
+Find (ΔT*, f*) that maximizes COP₃ at set-point Qsp. Returns a NamedTuple with
+the optimum, diagnostics, and the Optim.jl result object.
+"""
+function optimal_cop3(df::DataFrame; Qsp::Real,
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, xlogbase::Symbol=:log10,
+    zW::Symbol=:W_comp, zP::Symbol=:P_pump, zQ::Symbol=:Q_cond,
+    kx::Integer=3, ky::Integer=3, sW::Real=0.0, sP::Real=0.0, sQ::Real=0.0,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    coarse_nx::Int=41, coarse_ny::Int=41,
+    optimizer=Fminbox(NelderMead()),
+    maxiters::Int=1_000,
+)
+    setup = make_splines(df; xcol=xcol, ycol=ycol,
+                         zcols=(W=zW, P=zP, Q=zQ), xlogbase=xlogbase,
+                         kx=kx, ky=ky, s=(W=sW, P=sP, Q=sQ))
+    X, Y, spl = setup.X, setup.Y, setup.spl
+
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
+
+    # coarse start
+    xs = range(xmin, xmax; length=coarse_nx)
+    ys = range(ymin, ymax; length=coarse_ny)
+    best_cop, x0, y0 = -Inf, NaN, NaN
+    @inbounds for yy in ys, xx in xs
+        c = cop3_at(spl, xx, yy; Qsp=Qsp)
+        if isfinite(c) && c > best_cop
+            best_cop = c; x0 = xx; y0 = yy
+        end
+    end
+    isnan(x0) && error("No finite COP3 over the search grid; check data/splines/bounds")
+
+    # refine (maximize COP => minimize -COP)
+    fmin(v) = begin
+        x, y = clampxy(v[1], v[2])
+        -cop3_at(spl, x, y; Qsp=Qsp)
+    end
+    lower = [xmin, ymin]; upper = [xmax, ymax]; init = [x0, y0]
+
+    res = Optim.optimize(fmin, lower, upper, init, optimizer; iterations=maxiters)
+    v̂  = Optim.minimizer(res)
+    x̂, ŷ = clampxy(v̂[1], v̂[2])
+    COP̂ = cop3_at(spl, x̂, ŷ; Qsp=Qsp)
+
+    # diagnostics
+    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
+    Paux̂ = max(0.0, Qsp - Q̂)
+
+    return (
+        ΔT = x̂, f = ŷ, COP3 = COP̂,
+        Q_cond = Q̂, W_comp = Ŵ, P_pump = P̂, P_aux = Paux̂,
+        start = (x0=x0, y0=y0, COP3=best_cop),
+        bounds = (x=(xmin, xmax), y=(ymin, ymax)),
+        result = res
+    )
+end
+
   ╠═╡ =#
 
 # ╔═╡ 3ec7080c-2972-484b-805e-3d9fe0a7d9d1
@@ -6413,6 +6741,37 @@ plot_contourf(
 )
   ╠═╡ =#
 
+# ╔═╡ 7ad3f8c8-2847-4992-a08e-81a12d6b60d4
+#=╠═╡
+# 1) Build splines once
+setup_cop3 = make_splines(df_grid; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
+
+  ╠═╡ =#
+
+# ╔═╡ 8343400c-daf3-48b0-91d0-2ec6d06c5c92
+#=╠═╡
+res = optimal_cop3_from_splines(setup_cop3; Qsp=4500.0)
+  ╠═╡ =#
+
+# ╔═╡ fe843e78-b91f-4cbe-bc72-77c90658bc96
+#=╠═╡
+begin
+	Qs = 3000:10:6000           # pick your setpoint grid
+	fig, dfopt = sweep_optimal_curve(setup_cop3; Qs=Qs,
+	                                 show_cop3=true,
+	                                 save_path=nothing,      # e.g. "figs/opt_curve.svg"
+	                                 transparent=false)
+	fig
+#	first(dfopt, 5)              # peek at the numbers
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 2f015541-ce60-4975-80ab-1ce26c0cdfc0
+#=╠═╡
+Makie.save(joinpath(image_dir, "optimal_control.svg"), fig)
+  ╠═╡ =#
+
 # ╔═╡ 195ab453-b1f2-4632-9420-091f7f702ed7
 # ╠═╡ show_logs = false
 sols_thermal_cold, sols_hydraulic_cold = multithreaded_grid_sweep(
@@ -7869,6 +8228,7 @@ AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicExpressions = "a40a106e-89c9-4ca8-8020-a735e8728b6b"
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
@@ -7880,6 +8240,7 @@ MLJ = "add582a8-e3ab-11e8-2d5e-e98b27df1bc7"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 PlutoDevMacros = "a0499f29-c39b-4c5c-807c-88074221b949"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
@@ -7898,6 +8259,7 @@ AlgebraOfGraphics = "~0.11.3"
 CairoMakie = "~0.15.3"
 Colors = "~0.13.1"
 DataFrames = "~1.7.0"
+Dierckx = "~0.5.4"
 Distributions = "~0.25.120"
 DynamicExpressions = "~1.10.3"
 DynamicQuantities = "~1.8.0"
@@ -7908,6 +8270,7 @@ MLJ = "~0.20.9"
 ModelingToolkit = "~10.8.0"
 MonteCarloMeasurements = "~1.4.7"
 NonlinearSolve = "~4.9.0"
+Optim = "~1.11.0"
 PlutoDevMacros = "~0.9.0"
 PlutoTest = "~0.2.2"
 PlutoUI = "~0.7.68"
@@ -7924,7 +8287,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "fe87b14dbcedb0222b92eb2d8233096787340081"
+project_hash = "f0edbcd504644850365ddc23cb07820c876f0636"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -8509,6 +8872,18 @@ deps = ["Indexing", "Random", "Serialization"]
 git-tree-sha1 = "a86af9c4c4f33e16a2b2ff43c2113b2f390081fa"
 uuid = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 version = "0.4.5"
+
+[[deps.Dierckx]]
+deps = ["Dierckx_jll"]
+git-tree-sha1 = "7da4b14cc4c3443a1afc64abee17f4fcb45ad837"
+uuid = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
+version = "0.5.4"
+
+[[deps.Dierckx_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "3251f44b3cac6fec4cec8db45d3ab0bfed51c4d8"
+uuid = "cd4c43a9-7502-52ba-aa6d-59fb2a88580b"
+version = "0.2.0+0"
 
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "TruncatedStacktraces"]
@@ -11331,6 +11706,7 @@ version = "4.1.0+0"
 # ╠═8527ed5d-3ff6-435d-a93d-548c824dee78
 # ╠═eadd49a1-7bca-40a2-abdb-064a0fb710e6
 # ╠═cedbf94b-e85d-4662-a64e-16fba9ef2ed4
+# ╠═04d30f44-7bbe-4eb7-b878-bce0c48debec
 # ╠═d47bf527-6960-4e14-b9e5-a422f8888e66
 # ╠═910c36c9-4ec1-4b0f-b044-823a229fa536
 # ╠═00bcb75f-8da5-46a8-9c20-6b94861342c4
@@ -11346,6 +11722,7 @@ version = "4.1.0+0"
 # ╠═6e948a61-d8bb-4d93-b6e6-da19256cb24f
 # ╠═f3d29aa1-ee85-46a9-8258-f6b9f03d87a2
 # ╠═164a20af-4421-4cb6-a4fe-0f8b00ad7059
+# ╠═2c2b2270-5760-486f-a33f-427b24febdcb
 # ╠═a2cd3b4a-713b-4d5d-8739-139d0a64214c
 # ╠═f3070a9a-d98b-49b8-b300-631a4065211e
 # ╠═734d74db-7b19-42fd-89ad-78816a939565
@@ -11633,6 +12010,20 @@ version = "4.1.0+0"
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 # ╠═33c1996a-aade-400a-9b2f-259db12c0835
 # ╠═79b17009-14ee-422e-8eb6-9e81c270b602
+# ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
+# ╠═7ad3f8c8-2847-4992-a08e-81a12d6b60d4
+# ╠═8343400c-daf3-48b0-91d0-2ec6d06c5c92
+# ╠═fe843e78-b91f-4cbe-bc72-77c90658bc96
+# ╠═2f015541-ce60-4975-80ab-1ce26c0cdfc0
+# ╠═682f4fc9-e4c5-4c5a-b872-f901388e1992
+# ╠═778d8c9e-2762-44d6-b8c0-318196498304
+# ╠═23ce92ed-6f53-4f1c-9896-b9280e08b272
+# ╠═92502f92-9e37-43a3-bf33-cc795218f98e
+# ╠═d4f3ac34-65e1-404b-8ca8-6ca09e0b466a
+# ╠═9ef98f84-be67-42f2-9304-5f48e706e394
+# ╠═0786c7cc-d7c1-403d-a442-bafdcd6fccb4
+# ╠═3d1c09c9-9144-4ceb-82da-ee9d50ed108c
+# ╠═381c94cb-10a0-424d-bbfd-999f71ce5df2
 # ╟─94138b2d-0fd6-494e-9fd1-ef5aecadaabf
 # ╟─2097d037-7f79-4fe2-b683-b74b77d98752
 # ╠═599e27a4-1aba-4de4-a76d-fb09511de993
