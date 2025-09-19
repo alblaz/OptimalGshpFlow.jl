@@ -3946,41 +3946,28 @@ function create_plots(df_::DataFrame; smooth_degree::Int=1, y_zero::Bool=false)
 end
   ╠═╡ =#
 
-# ╔═╡ f100b275-2eb2-4d10-93e2-8954f314ae9e
-
-# Merge extra style fields into your discovered transitions
-_apply_transition_styles(base::Dict{String,NamedTuple},
-                         styles::Dict{String,NamedTuple}) =
-    Dict(k => (; v..., get(styles, k, (;))...) for (k, v) in base)
-
-
-# ╔═╡ 058c533c-104d-4ae9-80e3-f356787d0d13
-#=╠═╡
-# Compute y(xt) by 1D linear interpolation on (xcol, ycol) from a *wide* df
-# Assumes df is sorted by xcol (you already do sort!(df2, :ΔT))
-function _y_at(df::DataFrame, xcol::Symbol, ycol::Symbol, xt::Real)
-    x = df[!, xcol] |> collect
-    y = df[!, ycol] |> collect
-    itp = interpolate((x,), y, Gridded(Linear()))
-    return itp(xt)
+# ╔═╡ 2a40d270-cfbd-4b79-b54b-301db14a7163
+ensure_bottom_margin!(ax::Makie.Axis; bottom_rel::Float32 = 0.10f0) = begin
+    Makie.autolimits!(ax)  # make sure finallimits[] is up-to-date
+    cur = ax.yautolimitmargin[]
+    ax.yautolimitmargin[] = (max(cur[1], bottom_rel), cur[2])
+    Makie.autolimits!(ax)  # recompute with the new margin
+    return ax
 end
 
-# Draw vertical guides and put text on a chosen curve at the transition ΔT
-  ╠═╡ =#
 
-# ╔═╡ 4899159f-1c86-478c-b874-ef8db1808bc5
-# Accept Makie.Axis, AoG AxisEntries, or arrays and return the Makie.Axis
+# ╔═╡ 8622c9e6-db4a-49de-8a8a-c08dda988556
+# -- Robustly extract the Makie.Axis (works with AoG returns, Arrays, etc.)
 _as_axis(axlike) =
-    axlike isa Makie.Axis                ? axlike :
-    (hasproperty(axlike, :axis)          ? getproperty(axlike, :axis) :
-     axlike isa AbstractArray            ? _as_axis(first(axlike)) :
+    axlike isa Makie.Axis ? axlike :
+    (hasproperty(axlike, :axis) ? getproperty(axlike, :axis) :
+     axlike isa AbstractArray ? _as_axis(first(axlike)) :
      error("Couldn't extract Makie.Axis from $(typeof(axlike))"))
 
-# Auto left/right alignment & small x offset near plot edges
+# -- Current axis ranges (use finallimits to avoid limits=(nothing,nothing) traps)
 
-# ╔═╡ c8044a03-837b-411c-8919-7d47f83111c3
-# robust axis ranges across Makie versions
-function _axis_xrange(ax::Makie.Axis)
+# ╔═╡ b451ced6-8933-4c55-9618-089a389a12a4
+_axis_xrange(ax::Makie.Axis) = begin
     fr = ax.finallimits[]; (fr.origin[1], fr.origin[1] + fr.widths[1])
 end
 
@@ -4009,21 +3996,6 @@ _auto_align_offset_top(ax::Makie.Axis, x; margin=0.92, xpad=6, ypad=6) = begin
     end
 end
 
-# ╔═╡ b220d228-e3cb-4dd2-843e-03db76f46fe9
-function _axis_yrange(ax::Makie.Axis)
-    fr = ax.finallimits[]; (fr.origin[2], fr.origin[2] + fr.widths[2])
-end
-
-# ╔═╡ 4412cbfc-d470-4003-a2bd-606df1be7022
-_px_to_data(ax::Makie.Axis; dx_px::Real=0, dy_px::Real=0) = begin
-    xmin, xmax = _axis_xrange(ax); ymin, ymax = _axis_yrange(ax)
-    Δx = xmax - xmin; Δy = ymax - ymin
-    pa = ax.scene.px_area[]
-    sx = Δx / pa.widths[1]
-    sy = Δy / pa.widths[2]
-    (dx_px * sx, dy_px * sy)
-end
-
 # ╔═╡ d7384891-c5c0-4614-99cf-0f1cf58f759c
 
 
@@ -4041,95 +4013,158 @@ function _auto_align_offset(ax::Makie.Axis, x; margin=0.92, pad=6)
 end
 
 
-# ╔═╡ 9b2f80c6-18d0-4b10-827a-b9a665f7f1c4
+# ╔═╡ 10e4d4f7-3446-4ba3-8bb2-e311e7e6d51f
+_axis_yrange(ax::Makie.Axis) = begin
+    fr = ax.finallimits[]; (fr.origin[2], fr.origin[2] + fr.widths[2])
+end
+
+# -- Interpolate y(x) on a wide DataFrame (xcol sorted ascending)
+
+# ╔═╡ 4412cbfc-d470-4003-a2bd-606df1be7022
+_px_to_data(ax::Makie.Axis; dx_px::Real=0, dy_px::Real=0) = begin
+    xmin, xmax = _axis_xrange(ax); ymin, ymax = _axis_yrange(ax)
+    Δx = xmax - xmin; Δy = ymax - ymin
+    pa = ax.scene.px_area[]
+    sx = Δx / pa.widths[1]
+    sy = Δy / pa.widths[2]
+    (dx_px * sx, dy_px * sy)
+end
+
+# ╔═╡ 5bc8d146-8efc-4a71-819e-27f97fb4c411
+# --- helpers: convert a vertical pixel lift to a data y, robust for linear/log10
+_y_with_px_lift(ax::Makie.Axis, y::Real; dy_px::Real, from::Symbol) = begin
+    # from = :bottom to lift up; :top to lift down
+    ymin, ymax = _axis_yrange(ax)
+    pa = ax.scene.px_area[]
+    hpx = pa.widths[2]               # plot-area height in pixels
+
+    # detect log scale (Makie uses Log10 transform object internally)
+    islog = try
+        (ax.yscale[] isa Makie.MakieLayout.Log10) || (ax.yscale[] isa Makie.Transforms.Log10)
+    catch
+        false
+    end
+
+    if !islog
+        # linear: dy_data per pixel
+        Δy = ymax - ymin
+        sy = Δy / hpx
+        return from === :bottom ? (y + dy_px*sy) : (y - dy_px*sy)
+    else
+        # log10: screen ~ log10(y); a pixel shift is additive in log space
+        lymin, lymax = (log10(ymin), log10(ymax))
+        b = hpx / (lymax - lymin)            # px per log10 unit
+        dlog = dy_px / b                     # log10 units to move
+        if from === :bottom
+            return 10^(log10(y) + dlog)
+        else
+            return 10^(log10(y) - dlog)
+        end
+    end
+end
+
+
+# ╔═╡ 06f41f8a-0086-4bce-8823-386cc2ab5ba4
+#=╠═╡
+_y_at(df::DataFrame, xcol::Symbol, ycol::Symbol, xt::Real) = begin
+    x = collect(df[!, xcol]); y = collect(df[!, ycol])
+    itp = interpolate((x,), y, Gridded(Linear())); itp(xt)
+end
+
+# -- Merge extra style fields into discovered transitions
+  ╠═╡ =#
+
+# ╔═╡ a772e64c-c684-47c8-9f5b-96a85a1917a4
+_apply_transition_styles(base::Dict{String,NamedTuple},
+                         styles::Dict{String,NamedTuple}) =
+    Dict(k => (; v..., get(styles, k, (;))...) for (k, v) in base)
+
+# -- Ensure enough headroom/footroom (relative to data range) before we add text
+
+# ╔═╡ dc5f2677-99b5-4411-8e09-31f56106adda
+ensure_axis_margins!(ax::Makie.Axis; bottom_rel::Float32 = 0.12f0, top_rel::Float32 = 0.08f0) = begin
+    Makie.autolimits!(ax)  # compute finallimits consistently
+    cur = ax.yautolimitmargin[]
+    ax.yautolimitmargin[] = (max(cur[1], bottom_rel), max(cur[2], top_rel))
+    Makie.autolimits!(ax)  # re-apply with new margins
+    return ax
+end
+
+# -- Draw vertical lines + labels at transition x; lift text in *pixels*
+
+# ╔═╡ 89c0a373-c9b9-420b-adb1-f21f4c5b2cc3
 #=╠═╡
 function _label_transitions!(ax::Makie.Axis, df::DataFrame;
         xcol::Symbol=:ΔT, ycol::Union{Nothing,Symbol}=nothing,
-        transitions,                               # Dict or Vector of NamedTuples
-        where::Symbol = :bottom,                   # default placement (per-transition override allowed)
+        transitions,                          # Dict or Vector of NamedTuples
+        where::Symbol = :bottom,              # default label stripe
         rotation_deg::Real = 90,
-        fontsize::Real = 12, textcolor=:gray10,    # default text style
-        vcolor=:gray40, vstyle=:dash, vwidth=1,    # default line style
-        # data-space padding fractions
+        fontsize::Real = 12, textcolor=:gray10,
+        vcolor=:gray40, vstyle=:dash, vwidth=1,
+        # small data-space pads (keeps anchor just inside the data box)
         x_data_pad_frac::Real = 0.015,
         y_data_pad_frac::Real = 0.02,
-        # extra pixel pads to keep labels clear of axes regardless of scale
+        # pixel pads (main clearance)
         x_px_pad::Real = 6, y_px_pad::Real = 10,
-        # switch from right→left alignment near the right edge
+        # switch to :left align near the right edge
         edge_margin::Real = 0.92
     )
 
-    angle = rotation_deg * π / 180
     xmin, xmax = _axis_xrange(ax); ymin, ymax = _axis_yrange(ax)
     Δx = xmax - xmin; Δy = ymax - ymin
 
-    # base data-space pads
-    xpad_d = x_data_pad_frac * Δx
-    ypad_d = y_data_pad_frac * Δy
-
-    # pixel→data pads (robust lift so text never hides behind x-axis)
-    xpad_px_d, ypad_px_d = _px_to_data(ax; dx_px=x_px_pad, dy_px=y_px_pad)
-
     iter = transitions isa AbstractDict ? values(transitions) : transitions
     for t in iter
-        # required fields
         xt    = t[:dT]
         label = t[:label]
 
-        # per-transition overrides (fall back to the call-site defaults)
-        t_where        = haskey(t, :where)         ? t[:where]         : where
-        t_rot          = haskey(t, :rotation_deg)  ? t[:rotation_deg]  : rotation_deg
-        t_size         = haskey(t, :fontsize)      ? t[:fontsize]      : fontsize
-        t_tcolor       = haskey(t, :textcolor)     ? t[:textcolor]     : textcolor
-        t_vcolor       = haskey(t, :vcolor)        ? t[:vcolor]        : vcolor
-        t_vstyle       = haskey(t, :vstyle)        ? t[:vstyle]        : vstyle
-        t_vwidth       = haskey(t, :vwidth)        ? t[:vwidth]        : vwidth
-        t_xpad_frac    = haskey(t, :x_data_pad_frac) ? t[:x_data_pad_frac] : x_data_pad_frac
-        t_ypad_frac    = haskey(t, :y_data_pad_frac) ? t[:y_data_pad_frac] : y_data_pad_frac
-        t_xpx          = haskey(t, :x_px_pad)      ? t[:x_px_pad]      : x_px_pad
-        t_ypx          = haskey(t, :y_px_pad)      ? t[:y_px_pad]      : y_px_pad
-        t_z_text       = haskey(t, :z_text)        ? t[:z_text]        : 100
-        t_z_line       = haskey(t, :z_line)        ? t[:z_line]        : 0
+        # per-transition overrides (fallback to call-site defaults)
+        t_where  = get(t, :where, where)
+        t_rot    = get(t, :rotation_deg, rotation_deg)
+        t_size   = get(t, :fontsize, fontsize)
+        t_tcolor = get(t, :textcolor, textcolor)
+        t_vcolor = get(t, :vcolor, vcolor)
+        t_vstyle = get(t, :vstyle, vstyle)
+        t_vwidth = get(t, :vwidth, vwidth)
 
-        # recompute pads if per-transition changed
-        xpad_d_t = t_xpad_frac * Δx + (_px_to_data(ax; dx_px=t_xpx, dy_px=0)[1])
-        ypad_d_t = t_ypad_frac * Δy + (_px_to_data(ax; dx_px=0, dy_px=t_ypx)[2])
+        t_xpad_d = get(t, :x_data_pad_frac, x_data_pad_frac) * Δx
+        t_ypad_d = get(t, :y_data_pad_frac, y_data_pad_frac) * Δy
+        t_xpx    = get(t, :x_px_pad, x_px_pad)
+        t_ypx    = get(t, :y_px_pad, y_px_pad)
 
-        # y placement
-        yt = if t_where === :curve && ycol !== nothing
-            _y_at(df, xcol, ycol, xt) + ypad_d_t
+        # --- Guide line (data space)
+        vlines!(ax, [xt]; color=t_vcolor, linestyle=t_vstyle, linewidth=t_vwidth)
+
+        # --- Safe anchor in data space (inside the box)
+        yt_base = if t_where === :curve && ycol !== nothing
+            _y_at(df, xcol, ycol, xt) + t_ypad_d
         elseif t_where === :top
-            ymax - ypad_d_t
+            ymax - max(t_ypad_d, 0.02*Δy)
         else
-            ymin + ypad_d_t               # <- lifted enough to clear the x-axis
+            ymin + max(t_ypad_d, 0.02*Δy)
         end
+        xlbl = xt + (xt > xmin + edge_margin*Δx ? +t_xpad_d : -t_xpad_d)
+        halign = (xt > xmin + edge_margin*Δx) ? :left : :right
+        # For vertical text near bottom, baseline grows upward; at top we flip so box stays inside
+        valign = (t_where === :top) ? :bottom : :baseline
 
-        # side & alignment
-        if xt > xmin + edge_margin*Δx
-            xlbl  = xt + xpad_d_t
-            align = ( :left,  t_where === :top ? :top : :bottom )
-        else
-            xlbl  = xt - xpad_d_t
-            align = ( :right, t_where === :top ? :top : :bottom )
-        end
-		
-		# 1) Guide line: keep using vlines! (no z)
-		vlines!(ax, [xt]; color=t_vcolor, linestyle=t_vstyle, linewidth=t_vwidth)
-		
-		# 2) Label: drop z=..., use overdraw=true so it draws above decorations
-		text!(ax, label;
-		      position=(xlbl, yt),
-		      align=align,
-		      rotation=t_rot * π / 180,
-		      fontsize=t_size,
-		      color=t_tcolor,
-		      space=:data,
-		      overdraw=true)   # <- instead of z=t_z_text
+        # --- Pixel lift so glyph box clears ticks/spine regardless of scale/backend
+        pixel_lift = ceil(Int, 0.70*t_size) + t_ypx
+        off_x = (xt > xmin + edge_margin*Δx) ? +t_xpx : -t_xpx
+        off_y = (t_where === :top) ? -pixel_lift : +pixel_lift
 
+        text!(ax, label;
+              position=(xlbl, yt_base),
+              align=(halign, valign),
+              rotation=t_rot * π/180,
+              fontsize=t_size,
+              color=t_tcolor,
+              space=:data,
+              offset=(off_x, off_y),
+              overdraw=true)
     end
-    ax
+    return ax
 end
-
   ╠═╡ =#
 
 # ╔═╡ 86429d81-3516-488f-be3d-df2d83bdbae8
@@ -4144,16 +4179,13 @@ end
 
 # ╔═╡ 4982df2c-016a-4136-a074-b39c1befffb7
 #=╠═╡
-
 function create_plots_by_dT(df::DataFrame;
     smooth_degree::Int=1,
     y_zero::Bool=false,
     re_thresholds::Dict{String, Tuple{Float64, Float64}} = Dict(
         "Re_bhe_leg1" => (2300, 4000),
-        "Re_bhe_leg2" => (2300, 4000),
-        "Re_phx"      => (100, 2000)
+        "Re_bhe_leg2" => (2300, 4000)
     ),
-    # saving options
     save_dir::Union{Nothing, AbstractString}=nothing,
     save_prefix::AbstractString = "",
     save_formats::Vector{Symbol} = [:svg],
@@ -4162,16 +4194,16 @@ function create_plots_by_dT(df::DataFrame;
     set_aog_theme!()
     sort!(df2, :ΔT)
 
-    # --- transitions (unchanged) ---
+    # --- find transition ΔT for Reynolds thresholds ---------------------------
     transition_points = Dict{String, NamedTuple}()
     re_cols   = ["Re_bhe_leg1", "Re_bhe_leg2", "Re_phx"]
     re_labels = Dict(
-        "Re_bhe_leg1" => "BHE Leg1",
-        "Re_bhe_leg2" => "BHE Leg2",
+        "Re_bhe_leg1" => "BHE Leg 1",
+        "Re_bhe_leg2" => "BHE Leg 2",
         "Re_phx"      => "Evaporator"
     )
     for col in re_cols
-        col ∈ names(df2) || continue   # now calls DataFrames.names
+        col ∈ names(df2) || continue
         x = df2.ΔT; y = df2[!, col]
         length(x) < 2 && error("Need ≥2 points for interpolation in $col")
         itp = interpolate((x,), y, Gridded(Linear()))
@@ -4183,58 +4215,61 @@ function create_plots_by_dT(df::DataFrame;
             root = find_zero(f, (a, b))
             key = "$col-$(thresh)"
             transition_points[key] = (dT = root,
-                                      label = "$(re_labels[col]) Re=$(thresh)",
+                                      label = "$(re_labels[col])  Re=$(thresh)",
                                       threshold = thresh)
         end
     end
 
-	# After you compute `transition_points` in create_plots_by_dT:
-	transition_styles = Dict(
-	    "Re_bhe_leg1-2300" => (
-	        label    = "Leg 1: Re=2300 (L→T)",
-	        vcolor   = :crimson, vstyle=:dash,  vwidth=2.0,
-	        textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
-	    ),
-	    "Re_bhe_leg1-4000" => (
-	        label    = "Leg 1: Re=4000 (T→Tu)",
-	        vcolor   = :crimson, vstyle=:dot,   vwidth=2.0,
-	        textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
-	    ),
-	    "Re_bhe_leg2-2300" => (
-	        label    = "Leg 2: Re=2300",
-	        vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
-	        textcolor=:blue,     where=:top, y_px_pad=12,
-	    ),
-	    "Re_bhe_leg2-4000" => (
-	        label    = "Leg 2: Re=4000",
-	        vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
-	        textcolor=:blue,     where=:top, y_px_pad=12,
-	    ),
-	)
-	
-	transition_points = _apply_transition_styles(transition_points, transition_styles)
+    # style overrides per transition (labels, colors, placement stripe, etc.)
+    transition_styles = Dict(
+        "Re_bhe_leg1-2300" => (
+            label    = "Leg 1: Re=2300 (Laminar→Trans.)",
+            vcolor   = :crimson, vstyle=:dash,  vwidth=2.0,
+            textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
+        ),
+        "Re_bhe_leg1-4000" => (
+            label    = "Leg 1: Re=4000 (Trans.→Turb.)",
+            vcolor   = :crimson, vstyle=:dot,   vwidth=2.0,
+            textcolor=:crimson, fontsize=11, where=:bottom, y_px_pad=14,
+        ),
+        "Re_bhe_leg2-2300" => (
+            label    = "Leg  2: Re=2300",
+            vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
+            textcolor=:blue,     where=:top, y_px_pad=12,
+        ),
+        "Re_bhe_leg2-4000" => (
+            label    = "Leg  2: Re=4000",
+            vcolor   = :blue,    vstyle=:dashdot, vwidth=2.0,
+            textcolor=:blue,     where=:top, y_px_pad=12,
+        ),
+    )
+    transition_points = _apply_transition_styles(transition_points, transition_styles)
 
-	
-    figures   = Vector{Figure}()
-    fig_names = String[]   # <-- renamed (no shadowing)
-
+    figures   = Figure[]
+    fig_names = String[]
 
     # 3) Temperature vs ΔT ------------------------------------------------------
     temp_long = stack(df2, [:T_wall, :T_in, :T_mid, :T_out, :T_bot, :T_evap, :T_comp_in],
                       variable_name=:temp_type, value_name=:temperature)
-    map_temp = Dict(
-        "T_wall"=>"Wall Temperature", "T_in"=>"BHE -> PHX Temperature",
-        "T_mid"=>"Mid Temperature", "T_bot"=>"BHE bottom Temperature",
-        "T_out"=>"PHX -> BHE Temperature", "T_evap"=>"Evaporation Temperature",
-        "T_comp_in"=>"Inlet Compressor Temperature"
+    rename_temp = Dict(
+        "T_wall"    => "BHE Wall",
+        "T_in"      => "BHE → PHX (sf)",
+        "T_mid"     => "SH entrance (sf)",
+        "T_out"     => "PHX → BHE (sf)",
+        "T_bot"     => "BHE bottom (sf)",
+        "T_evap"    => "Evaporation (r)",
+        "T_comp_in" => "Compressor inlet (r)"
     )
-    temp_long.temp_type .= map(s -> map_temp[s], temp_long.temp_type)
+    temp_long.temp_type .= map(s -> rename_temp[s], temp_long.temp_type)
 
     temp_plt = data(temp_long) *
-               mapping(:ΔT, :temperature, color=:temp_type=>nonnumeric) *
-               visual(Lines)
-    fig_temp, ax_temp = draw(temp_plt; axis=(; title="Temperature vs ΔT"),
-                                        legend=(position=:right,))
+               mapping(:ΔT, :temperature,
+                       color = :temp_type => nonnumeric => "Temperature series") *
+               visual(Lines, linewidth=2)
+    fig_temp, ax_temp = draw(temp_plt; axis=(; title="Temperature vs ΔT",
+                                             xlabel="ΔT (K)", ylabel="Temperature (°C)"),
+                                       legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_temp); bottom_rel=0.12f0, top_rel=0.08f0)
     _label_transitions!(_as_axis(ax_temp), df2; ycol=:T_out,
         transitions=transition_points, textcolor=:gray10, fontsize=12)
     push!(figures, fig_temp); push!(fig_names, "temperature_vs_dT")
@@ -4242,117 +4277,131 @@ function create_plots_by_dT(df::DataFrame;
     # 4) COP vs ΔT --------------------------------------------------------------
     cop_long = stack(df2, [:COP_1, :COP_2, :COP_3],
                      variable_name=:cop_type, value_name=:cop_value)
-    map_cop = Dict("COP_1"=>"COP 1", "COP_2"=>"COP 2", "COP_3"=>"COP 3")
-    cop_long.cop_type .= map(s -> map_cop[s], cop_long.cop_type)
+    rename_cop = Dict(
+		"COP_1"=>"COP1",
+		"COP_2"=>"COP2",
+		"COP_3"=>"COP3")
+    cop_long.cop_type .= map(s -> rename_cop[s], cop_long.cop_type)
 
     base_cop = data(cop_long) *
-               mapping(:ΔT=>"ΔT (K)", :cop_value=>"COP", color=:cop_type=>nonnumeric) *
+               mapping(:ΔT=>"ΔT (K)", :cop_value=>"COP",
+                       color=:cop_type => nonnumeric => "COP variant") *
                visual(Lines, linewidth=2)
-    fig_cop, ax_cop = draw(base_cop;
-        axis=(xlabel="ΔT (K)", ylabel="COP", title="COP vs ΔT",
-              limits=(y=(y_zero ? 0 : nothing, nothing))),
-        legend=(position=:right,))
+    fig_cop, ax_cop = draw(base_cop; axis=(; title="COP vs ΔT",
+                                           limits=(y=(y_zero ? 0 : nothing, nothing))),
+                           legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_cop); bottom_rel=0.12f0, top_rel=0.08f0)
     _label_transitions!(_as_axis(ax_cop), df2; ycol=:COP_3,
         transitions=transition_points)
     push!(figures, fig_cop);  push!(fig_names, "cop_vs_dT")
 
-    # 5) Power vs ΔT ------------------------------------------------------------
+    # 5) Power / Energy components vs ΔT ---------------------------------------
     power_long = stack(df2, [:Q_evap, :Q_cond, :W_comp, :P_pump, :P_aux_heating],
                        variable_name=:component, value_name=:power)
+    rename_power = Dict(
+        "Q_evap"=>"Q evap",
+        "Q_cond"=>"Q cond)",
+        "W_comp"=>"P comp",
+        "P_pump"=>"P pump",
+        "P_aux_heating"=>"P aux"
+    )
+    power_long.component .= map(s -> rename_power[s], power_long.component)
+
     base_power = data(power_long) *
-                 mapping(:ΔT=>"ΔT (K)", :power=>"Power (W)", color=:component=>nonnumeric) *
-                 visual(Lines)
-    fig_power, ax_power = draw(base_power;
-        axis=(xlabel="ΔT (K)", ylabel="Power (W)", title="Energy Components vs ΔT"),
-        legend=(position=:right,))
+                 mapping(:ΔT=>"ΔT (K)", :power=>"Power (W)",
+                         color=:component => nonnumeric => "Energy components") *
+                 visual(Lines, linewidth=2)
+    fig_power, ax_power = draw(base_power; axis=(; title="Energy Components vs ΔT"),
+                               legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_power); bottom_rel=0.12f0, top_rel=0.08f0)
     _label_transitions!(_as_axis(ax_power), df2; ycol=:Q_cond,
         transitions=transition_points)
     push!(figures, fig_power); push!(fig_names, "energy_components_vs_dT")
 
-    # 6) Pressure Drop vs ΔT ----------------------------------------------------
-	base_pres = data(df2) *
-    mapping(
-        :ΔT      => "ΔT (K)",
-        :Δp_tot  => (x -> x .* 1e5) => "Pressure (Pa)"   # bar → Pa
-    ) *
-    visual(Lines)
-
-	
-	fig_pres, ax_pres = draw(base_pres;
-	    axis=(; xlabel="ΔT (K)",
-	            ylabel=L"Pressure\ (Pa)",
-	            title="Hydraulic Resistance vs ΔT",
-	            yscale = log10,                 # <— log10 axis
-	            limits=(y=(y_zero ? 1.0 : nothing, nothing))),  # avoid 0 on log scale
-	    legend=(position=:right,))
-	
-	_label_transitions!(_as_axis(ax_pres), df2; transitions=transition_points, where=:bottom)
-	push!(figures, fig_pres);  push!(fig_names, "pressure_drop_vs_dT")
-
-
+    # 6) Pressure drop vs ΔT (log y) -------------------------------------------
+    base_pres = data(df2) *
+                mapping(:ΔT=>"ΔT (K)",
+                        :Δp_tot => (x -> x .* 1e5) => "Pressure (Pa)") *
+                visual(Lines, linewidth=2)
+    fig_pres, ax_pres = draw(base_pres;
+        axis=(; title="Hydraulic Resistance vs ΔT",
+                xlabel="ΔT (K)", ylabel=L"Pressure\ (Pa)", yscale = log10,
+                limits=(y=(y_zero ? 1.0 : nothing, nothing))),
+        legend=(; position=:right, framevisible=false))
+    ensure_axis_margins!(_as_axis(ax_pres); bottom_rel=0.12f0, top_rel=0.08f0)
+    _label_transitions!(_as_axis(ax_pres), df2; transitions=transition_points, where=:bottom)
+    push!(figures, fig_pres);  push!(fig_names, "pressure_drop_vs_dT")
 
     # 7) U-values vs ΔT ---------------------------------------------------------
     u_long = stack(df2, [:U_EV, :U_SH], variable_name=:u_type, value_name=:u_value)
-    map_u = Dict("U_EV"=>"U Evaporator", "U_SH"=>"U Superheat")
-    u_long.u_type .= map(s->map_u[s], u_long.u_type)
+    rename_u = Dict("U_EV"=>"Evaporation", "U_SH"=>"Superheat")
+    u_long.u_type .= map(s->rename_u[s], u_long.u_type)
+
     u_layer = data(u_long) *
-              mapping(:ΔT=>"ΔT (K)", :u_value=>"U (W/m²K)", color=:u_type=>nonnumeric) *
-              visual(Lines)
-    fig_u, ax_u = draw(u_layer;
-        axis=(xlabel="ΔT (K)", ylabel="U (W/m²K)", title="Heat Transfer Coefficients vs ΔT"),
-        legend=(position=:right,))
-    _label_transitions!(_as_axis(ax_u), df2; ycol=:U_EV,
-        transitions=transition_points)
+              mapping(:ΔT=>"ΔT (K)", :u_value=>"U (W·m⁻²·K⁻¹)",
+                      color=:u_type => nonnumeric => "Heat transfer coefficients") *
+              visual(Lines, linewidth=2)
+    fig_u, ax_u = draw(u_layer; axis=(; title="Overall Heat Transfer Coefficients vs ΔT"),
+                       legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_u); bottom_rel=0.12f0, top_rel=0.08f0)
+    _label_transitions!(_as_axis(ax_u), df2; ycol=:U_EV, transitions=transition_points)
     push!(figures, fig_u);     push!(fig_names, "u_values_vs_dT")
 
-    # 8) Section Lengths vs ΔT --------------------------------------------------
+    # 8) Section lengths vs ΔT --------------------------------------------------
     l_long = stack(df2, [:fr_EV, :fr_SH], variable_name=:l_type, value_name=:length)
-    map_l = Dict("fr_EV"=>"Evaporator Length", "fr_SH"=>"Superheat Length")
-    l_long.l_type .= map(s->map_l[s], l_long.l_type)
+    rename_l = Dict("fr_EV"=>"Evaporation", "fr_SH"=>"Superheat")
+    l_long.l_type .= map(s->rename_l[s], l_long.l_type)
+
     l_layer = data(l_long) *
-              mapping(:ΔT=>"ΔT (K)", :length=>"Length (m)", color=:l_type=>nonnumeric) *
-              visual(Lines)
-    fig_l1, ax_l1 = draw(l_layer;
-        axis=(xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
-        legend=(position=:right,))
-    _label_transitions!(_as_axis(ax_l1), df2; ycol=:fr_EV,
-        transitions=transition_points)
+              mapping(:ΔT=>"ΔT (K)", :length=>"Fraction (-)",
+                      color=:l_type => nonnumeric => "Section") *
+              visual(Lines, linewidth=2)
+    fig_l1, ax_l1 = draw(l_layer; axis=(; title="Evaporator fraction vs ΔT"),
+                         legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_l1); bottom_rel=0.12f0, top_rel=0.08f0)
+    _label_transitions!(_as_axis(ax_l1), df2; ycol=:fr_EV, transitions=transition_points)
     push!(figures, fig_l1);    push!(fig_names, "section_lengths_vs_dT")
 
-    # 9) Efficiency vs ΔT -------------------------------------------------------
-    l2_long = stack(df2, [:η_bh], variable_name=:l_type, value_name=:length)
-    map_l2 = Dict("η_bh"=>"BH efficiency")
-    l2_long.l_type .= map(s->map_l2[s], l2_long.l_type)
+    # 9) Borehole efficiency vs ΔT ---------------------------------------------
+    l2_long = stack(df2, [:η_bh], variable_name=:metric, value_name=:eta)
+    l2_long.metric .= "Borehole efficiency (η_bh)"
+
     l2_layer = data(l2_long) *
-               mapping(:ΔT=>"ΔT (K)", :length=>"Length (m)", color=:l_type=>nonnumeric) *
-               visual(Lines)
-    fig_l2, ax_l2 = draw(l2_layer;
-        axis=(xlabel="ΔT (K)", ylabel="Length (m)", title="Section Lengths vs ΔT"),
-        legend=(position=:right,))
-    _label_transitions!(_as_axis(ax_l2), df2; ycol=:η_bh,
-        transitions=transition_points)
+               mapping(:ΔT=>"ΔT (K)", :eta=>"η (–)",
+                       color=:metric => nonnumeric => "Metric") *
+               visual(Lines, linewidth=2)
+    # Single series: hide legend for cleanliness
+    fig_l2, ax_l2 = draw(l2_layer; axis=(; title="Borehole Efficiency vs ΔT"),
+                         legend=(; show=false))
+    ensure_axis_margins!(_as_axis(ax_l2); bottom_rel=0.12f0, top_rel=0.08f0)
+    _label_transitions!(_as_axis(ax_l2), df2; ycol=:η_bh, transitions=transition_points)
     push!(figures, fig_l2);    push!(fig_names, "bh_efficiency_vs_dT")
 
     # 10) Thermal resistances vs ΔT --------------------------------------------
-    r_long = stack(df2, [:R_1b, :R_2b, :R_12, :R_f1b, :R_f2b, :R_f1f2],
+    r_long = stack(df2, [:R_1b, :R_12, :R_f1b, :R_f2b, :R_f1f2],
                    variable_name=:r_type, value_name=:r_val)
-    map_r = Dict("R_1b"=>"R pipe 1 wall", "R_2b"=>"R pipe 2 wall",
-                 "R_12"=>"R pipe 1 ↔ 2", "R_f1b"=>"R fluid 1 ↔ wall",
-                 "R_f2b"=>"R fluid 2 ↔ wall", "R_f1f2"=>"R fluid 1 ↔ 2")
-    r_long.r_type .= map(s->map_r[s], r_long.r_type)
+    rename_r = Dict(
+        "R_1b"   => "P,1↔w",
+        #"R_2b"   => "P,2↔w",
+        "R_12"   => "P,1↔2",
+        "R_f1b"  => "F,1↔w",
+        "R_f2b"  => "F,2↔w",
+        "R_f1f2" => "F,1↔2"
+    )
+    r_long.r_type .= map(s->rename_r[s], r_long.r_type)
+
     r_layer = data(r_long) *
-              mapping(:ΔT=>"ΔT (K)", :r_val=>"R (K/W)", color=:r_type=>nonnumeric) *
-              visual(Lines)
-    fig_r, ax_r = draw(r_layer;
-        axis=(xlabel="ΔT (K)", ylabel="R (K/W)", title="Thermal Resistances vs ΔT"),
-        legend=(position=:right,))
-    # anchor on one available resistance for y (fallback if missing)
+              mapping(:ΔT=>"ΔT (K)", :r_val=>"R (K·W⁻¹)",
+                      color=:r_type => nonnumeric => "Thermal resistance") *
+              visual(Lines, linewidth=2)
+    fig_r, ax_r = draw(r_layer; axis=(; title="Thermal Resistances vs ΔT"),
+                       legend=(; position=:right))
+    ensure_axis_margins!(_as_axis(ax_r); bottom_rel=0.12f0, top_rel=0.08f0)
     anchor_y = :R_1b ∈ names(df2) ? :R_1b : first(Symbol.(names(df2, r"^R_")))
-    _label_transitions!(_as_axis(ax_r), df2; ycol=anchor_y,
-        transitions=transition_points)
+    _label_transitions!(_as_axis(ax_r), df2; ycol=anchor_y, transitions=transition_points)
     push!(figures, fig_r);     push!(fig_names, "thermal_resistances_vs_dT")
 
-    # --- save if requested ---
+    # --- save if requested -----------------------------------------------------
     if save_dir !== nothing
         mkpath(save_dir)
         for (fig, nm) in zip(figures, fig_names)
@@ -4364,9 +4413,9 @@ function create_plots_by_dT(df::DataFrame;
         end
     end
 
-
     return figures
 end
+
   ╠═╡ =#
 
 # ╔═╡ c18c39fe-6896-433e-90d4-4a8149ae9b5b
@@ -4377,10 +4426,13 @@ df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sy
 # ╔═╡ ce0ce754-c26a-4b8d-81d9-8234a165a0c6
 new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.))
 
+# ╔═╡ bbf5b367-b6c9-4185-9641-d711914892b6
+image_dir = normpath(joinpath(pwd(), "..", "..", "notebooks", "images"))
+
 # ╔═╡ bed552fa-1a51-492b-8552-81186c96c6a1
 # ╠═╡ show_logs = false
 #=╠═╡
-plot_A_ΔT, plot_B_ΔT, plot_C_ΔT, plot_D_ΔT, plot_E_ΔT, plot_F_ΔT, plot_G_ΔT , plot_H_ΔT = create_plots_by_dT(df; re_thresholds=new_thresh)
+plot_A_ΔT, plot_B_ΔT, plot_C_ΔT, plot_D_ΔT, plot_E_ΔT, plot_F_ΔT, plot_G_ΔT , plot_H_ΔT = create_plots_by_dT(df; re_thresholds=new_thresh, save_dir=image_dir)
   ╠═╡ =#
 
 # ╔═╡ 473f4d2b-92a3-495c-975d-38738f714fb9
@@ -4457,11 +4509,11 @@ const OI_MAGENTA    = RGBf(0.800, 0.475, 0.655)  # #CC79A7
 # ╔═╡ a3fe0b30-007d-415d-af04-f5712e3d0489
 const CHARCOAL      = RGBf(0.100, 0.100, 0.100)
 
-# ╔═╡ 298f0a4b-d6e7-4772-9862-54895ba7aab8
-
-
 # ╔═╡ ea33f723-8f17-4000-b483-eb8f1f9354f3
 md" # Comparison BH efficiency"
+
+# ╔═╡ 75878c2e-4909-4c6e-8d44-164502edede0
+md" # Comparison T inlet BH"
 
 # ╔═╡ dc7866d3-68e8-40de-b82d-26717fff53d9
 md" # Comparison T outlet BH"
@@ -4470,7 +4522,7 @@ md" # Comparison T outlet BH"
 md" # Comparison T evap"
 
 # ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
-md" # Comparison COP3"
+md" # Comparison COP2"
 
 # ╔═╡ 5ce8337c-aae0-476f-914b-854a054b26db
 md" # Comparison ridge position"
@@ -4514,7 +4566,7 @@ base_params_water = [
     :λ_pitch => 4e-3,
 	:λ_grout => 1.5,
 	:λ_soil => 3.5,
-    :χ => 0.15,
+    :χ => 0.0,
     :L => 0.60,
     :L_BHE => 150.0,
     :f_ => 50.0,
@@ -4536,7 +4588,7 @@ base_params_pipe = [
     :λ_pitch => 4e-3,
 	:λ_grout => 1.5,
 	:λ_soil => 3.5,
-    :χ => 0.15,
+    :χ => 0.28,
     :L => 0.60,
     :L_BHE => 150.0,
     :f_ => 50.0,
@@ -4565,7 +4617,7 @@ base_params_long = [
     :λ_pitch => 4e-3,
 	:λ_grout => 1.5,
 	:λ_soil => 3.5,
-    :χ => 0.15,
+    :χ => 0.28,
     :L => 0.60,
     :L_BHE => 200.0,
     :f_ => 50.0,
@@ -4587,105 +4639,6 @@ log_msf_values = log.(collect(range(0.1, 2.0, length = Npoints)))
 # ╔═╡ 08d88b40-980e-4d17-91d1-2b1a06180bdd
 T_wall_values = 273.15 .+ collect(range(5, 10, length = Npoints))
 
-# ╔═╡ f0e43670-bbd9-487a-b8b6-8b5d6804039c
-# ╠═╡ show_logs = false
-# ╠═╡ disabled = true
-#=╠═╡
-sols_thermal_wall, sols_hydraulic_wall = multithreaded_grid_sweep(
-    thermal_prob, hydraulic_prob, sys_thermal,
-    base_params, :log_ΔTSF_, log_ΔTSF_values, :T_wall, T_wall_values, solvers;
-    previous_sol_thermal=nothing,
-    previous_sol_hydraulic=nothing
-)
-  ╠═╡ =#
-
-# ╔═╡ d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
-#=╠═╡
-df_grid_wall = process_grid_results(
-    log_ΔTSF_values, T_wall_values,
-    sols_thermal_wall, sols_hydraulic_wall,
-    sys_thermal2, sys_hydraulic2;
-    name1 = :log_ΔTSF_,
-    name2 = :T_wall,
-	target_Q_cond = 5000
-);
-  ╠═╡ =#
-
-# ╔═╡ 09952ea8-ef5d-414f-ac15-478ad8ea6343
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:η_bh, levels = 0.0:0.05:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=false),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=false),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=false),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 16868428-1547-4b8d-a900-5e5120f38088
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:fr_EV, levels = 0:0.1:1.0,
-    overlays=[
-        (z=:N_pump,       levels=83 .*(0.3:0.1:1),       color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1,  levels=[2300, 4000],     color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2,  levels=[2300, 4000],     color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-  ╠═╡ =#
-
-# ╔═╡ 62b6a403-53ac-42c1-9fff-055a9b7a478b
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_1,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 849d55d9-3e76-4ccb-8635-c8b70376d0b1
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 34ed86a4-20e9-4b2b-9344-7ec6dfaab815
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_3,
-    levels=2.0:0.1:4.0,
-    overlays=[
-        (z=:N_pump,      levels=83 .* (0.3:0.1:1.0), color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 41fe5c48-3b28-4d41-8969-e3d59a84cbfa
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Q_cond,
-    overlays=ovs_plots_2
-)
-
-  ╠═╡ =#
-
 # ╔═╡ 54809c43-f7c3-493b-b06a-a13bf0a44bc6
 
 ovs_plots_2 = [
@@ -4694,26 +4647,6 @@ ovs_plots_2 = [
         (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
     ]
 
-
-# ╔═╡ bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:Δp_tot,
-    levels=range(0.1^0.5, 5^0.5, length = 15).^2, xlabel = "ΔT Secondary Fluid [K]", ylabel = "Borehole wall temperature [K]", zlabel = "Pressure drop [bar]", title = "",
-    overlays=ovs_plots_2
-)
-
-  ╠═╡ =#
-
-# ╔═╡ c8c35ed3-bd6c-40ac-8049-b603b003f603
-#=╠═╡
-plot_contourf(
-    df_grid_wall;  xcol=:log_ΔTSF_, ycol=:T_wall, xlogbase=:log, zcol=:COP_2,
-    levels=2.0:0.1:4.0,
-    overlays=ovs_plots_3
-)
-
-  ╠═╡ =#
 
 # ╔═╡ 33c1996a-aade-400a-9b2f-259db12c0835
 #=╠═╡
@@ -5516,7 +5449,10 @@ function plot_contourf(df::DataFrame;
     base_style::Symbol = :filled,    # :filled | :lines | :none
     show_colorbar::Bool = true,
     line_width::Real = 1.2,          # for :lines
-    line_color::Union{Nothing,Symbol,RGBAf,RGBf} = nothing  # single color if set
+    line_color::Union{Nothing,Symbol,RGBAf,RGBf} = nothing,  # single color if set
+	save_path::Union{Nothing,AbstractString}=nothing,
+    save_px::Union{Nothing,Tuple{Int,Int}}=nothing,   # optional raster size, e.g. (1600, 1200)
+    transparent::Bool=false                            # optional transparent background
 )
     invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     xlab_default = (invx === identity) ? string(xcol) : "ΔTSF"
@@ -5700,6 +5636,26 @@ function plot_contourf(df::DataFrame;
 	end
 
     resize_to_layout!(fig)
+
+
+    # --- NEW: optional saving ---
+    if save_path !== nothing
+        p = String(save_path)
+        d = dirname(p)
+        if !isempty(d) && d != "."
+            mkpath(d)
+        end
+        # optional: set explicit pixel size for raster formats (png, jpg)
+        if save_px !== nothing
+            resize!(fig, save_px...)   # e.g., (1600, 1200)
+        end
+        if transparent
+            fig.scene.backgroundcolor[] = RGBAf(1,1,1,0)
+        end
+        # Use Makie.save (delegates to CairoMakie/WGL/etc. correctly)
+        Makie.save(p, fig)
+    end
+	
     return return_axis ? (fig, ax) : fig
 end
 
@@ -5816,7 +5772,7 @@ function process_grid_results(
 		
 		pump_compressor = P_pump/W_comp
 
-        COP_2      = Q_cond / (W_comp + P_pump)
+        COP_2      = Q_cond / (W_comp + abs(P_pump))
 
         # — PHX Reynolds number —
         ρ_phx, μ_phx, ṁ_phx = hyd[sys_hydraulic.phx.props.ρ],
@@ -6283,7 +6239,19 @@ plot_contourf(
     df_grid; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Borehole effectiveness [-]", title = "Base scenario",
-    overlays=ovs_plots
+    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "2d_base", "bh_efficiency.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 82682ded-a94f-485b-a927-c9d62ef9d424
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:T_out, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    		
+	overlays=ovs_plots,
+	save_path = joinpath(image_dir, "2d_base", "T_inlet.svg")
 )
   ╠═╡ =#
 
@@ -6292,7 +6260,8 @@ plot_contourf(
 plot_contourf(
     df_grid; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    overlays=ovs_plots
+    zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "2d_base", "T_outlet.svg")
 )
   ╠═╡ =#
 
@@ -6301,39 +6270,17 @@ plot_contourf(
 plot_contourf(
     df_grid; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Evaporation temperature [°C]", title = "Base Scenario",    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 16928040-8730-4f0c-a67c-50f9d1ae852b
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
+    zlabel = "Evaporation temperature [°C]", title = "Base Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "2d_base", "T_evap.svg")
 )
   ╠═╡ =#
 
 # ╔═╡ 05d571f0-c990-430e-971c-965ba527e814
 #=╠═╡
 plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.0,
+    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
+    zlabel = "COP 2 [-]", title = "",
     overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
@@ -6348,6 +6295,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "2d_base", "COP2.svg")
 )
   ╠═╡ =#
 
@@ -6491,7 +6439,18 @@ plot_contourf(
     df_grid_cold; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Borehole effectiveness [-]", title = "Cold ground scenario",
-    overlays=ovs_plots
+    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "cold", "bh_efficiency.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 0caf8f7c-5354-49b1-b202-03ce25b4e32d
+#=╠═╡
+plot_contourf(
+    df_grid_cold; xlogbase=:log, zcol=:T_out, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Cold ground scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "cold", "T_inlet.svg")
 )
   ╠═╡ =#
 
@@ -6500,7 +6459,8 @@ plot_contourf(
 plot_contourf(
     df_grid_cold; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Outlet BH temperature [°C]", title = "Cold ground scenario",    overlays=ovs_plots
+    zlabel = "Outlet BH temperature [°C]", title = "Cold ground scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "cold", "T_outlet.svg")
 )
   ╠═╡ =#
 
@@ -6510,16 +6470,17 @@ plot_contourf(
     df_grid_cold; xlogbase=:log, zcol=:T_evap, levels = -10:0.5:0, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Cold ground scenario",
-    overlays=ovs_plots_2
+    overlays=ovs_plots_2,
+	save_path = joinpath(image_dir, "cold", "T_evap.svg")
 )
   ╠═╡ =#
 
 # ╔═╡ 6ae2052e-907c-49b9-bb51-e2e3b0c641bc
 #=╠═╡
 plot_contourf(
-    df_grid_cold; xlogbase=:log, zcol=:COP_3, levels=2.5:0.1:4.0, palette=:viridis,
+    df_grid_cold; xlogbase=:log, zcol=:COP_2, levels=2.5:0.1:4.0, palette=:viridis,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "Cold ground scenario",
+    zlabel = "COP 2 [-]", title = "Cold ground scenario",
     overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
@@ -6534,6 +6495,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "cold", "COP2.svg")
 )
   ╠═╡ =#
 
@@ -6618,7 +6580,18 @@ plot_contourf(
     df_grid_water; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Borehole effectiveness [-]", title = "Pure water scenario",
-    overlays=ovs_plots
+    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "water", "bh_efficiency.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 5583b4c0-ef58-4c2e-a748-29d6715af892
+#=╠═╡
+plot_contourf(
+    df_grid_water; xlogbase=:log, zcol=:T_out, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Pure Water Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "water", "T_inlet.svg")
 )
   ╠═╡ =#
 
@@ -6627,7 +6600,8 @@ plot_contourf(
 plot_contourf(
     df_grid_water; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Outlet BH temperature [°C]", title = "Pure Water Scenario",    overlays=ovs_plots
+    zlabel = "Outlet BH temperature [°C]", title = "Pure Water Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "water", "T_outlet.svg")
 )
   ╠═╡ =#
 
@@ -6637,7 +6611,8 @@ plot_contourf(
     df_grid_water; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Pure water scenario",
-    overlays=ovs_plots
+    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "water", "T_evap.svg")
 )
   ╠═╡ =#
 
@@ -6646,7 +6621,7 @@ plot_contourf(
 plot_contourf(
     df_grid_water; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "Pure water scenario",
+    zlabel = "COP 2 [-]", title = "Pure water scenario",
     overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
@@ -6661,6 +6636,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "water", "COP2.svg")
 )
   ╠═╡ =#
 
@@ -6684,7 +6660,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
-) |> x -> save("cop3_pure_water_scenario.svg", x)
+)# |> x -> save("cop3_pure_water_scenario.svg", x)
   ╠═╡ =#
 
 # ╔═╡ 9beedddb-8b5a-4811-98cb-9a26ecd77b52
@@ -6733,7 +6709,18 @@ plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Borehole effectiveness [-]", title = "Wider pipe scenario",
-    overlays=ovs_plots
+    #overlays=ovs_plots
+	save_path = joinpath(image_dir, "wide", "bh_efficiency.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 1a532924-5f18-49d2-8bed-1451216cdd02
+#=╠═╡
+plot_contourf(
+    df_grid_pipe; xlogbase=:log, zcol=:T_out, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Wider Pipe Scenario",    #overlays=ovs_plots,
+	save_path = joinpath(image_dir, "wide", "T_inlet.svg")
 )
   ╠═╡ =#
 
@@ -6742,7 +6729,8 @@ plot_contourf(
 plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Outlet BH temperature [°C]", title = "Wider Pipe Scenario",    overlays=ovs_plots
+    zlabel = "Outlet BH temperature [°C]", title = "Wider Pipe Scenario",    #overlays=ovs_plots,
+	save_path = joinpath(image_dir, "wide", "T_outlet.svg")
 )
   ╠═╡ =#
 
@@ -6752,7 +6740,7 @@ plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Wider pipe scenario",
-    overlays=ovs_plots,
+    #overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
     zridge_mode   = :max,
@@ -6766,16 +6754,16 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "wide", "T_evap.svg")
 )
   ╠═╡ =#
 
 # ╔═╡ 387e3115-866a-4831-bb59-a18edf749375
 #=╠═╡
 plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:COP_3, levels=3.0:0.1:4.0, palette=:viridis,
+    df_grid_pipe; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0, palette=:viridis,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "Wider pipe scenario",
-    overlays=ovs_plots,
+    zlabel = "COP 2 [-]", title = "Wider pipe scenario",
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
     zridge_mode   = :max,
@@ -6789,6 +6777,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "wide", "COP2.svg")
 )
   ╠═╡ =#
 
@@ -6798,7 +6787,7 @@ plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Relative COP 3 deficit [-]", title = "Wider pipe scenario",
-    overlays=ovs_plots,
+    #overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
     zridge_mode   = :max,
@@ -6813,25 +6802,26 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
-) |> x -> save("cop3_wider_pipe_scenario.svg", x)
+) 
   ╠═╡ =#
 
-# ╔═╡ 5eed01c3-561f-490b-80d5-23db0846bfe3
+# ╔═╡ 3862aa96-e219-4d7d-9556-aacf28049d5e
 #=╠═╡
 plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:η_pump, levels = 0.0:0.05:1.0,
+    df_grid_pipe; xlogbase=:log, zcol=:η_pump,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Pump efficiency [-]", title = "Wider pipe scenario"
+    zlabel = "Pump efficiency [-]", title = "Wider pipe scenario",
+    #overlays=ovs_plots
 )
   ╠═╡ =#
 
 # ╔═╡ 8bc61318-43a1-447d-81a5-d2fed06799b2
 #=╠═╡
 plot_contourf(df_grid_pipe;
-    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:6.8,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
+    #overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
     zridge_method   = :parabolic,  # <- smoother than :resample
@@ -6860,12 +6850,54 @@ df_grid_long = process_grid_results(
 );
   ╠═╡ =#
 
+# ╔═╡ 75c8b9a8-942f-4dd3-b0a9-afd0cf462469
+#=╠═╡
+plot_contourf(
+    df_grid_long; xlogbase=:log, zcol=:η_bh, levels = 0.0:0.1:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Borehole effectiveness [-]", title = "Long Borehole scenario",
+    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "long", "bh_efficiency.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 0151c5f2-20e8-41ec-9b26-4d7187c64bc6
+#=╠═╡
+plot_contourf(
+    df_grid_long; xlogbase=:log, zcol=:T_out, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Long Borehole Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "long", "T_inlet.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ f4cd0268-7dab-4bac-90b5-db61cedfebb3
+#=╠═╡
+plot_contourf(
+    df_grid_long; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Outlet BH temperature [°C]", title = "Long Borehole Scenario",    overlays=ovs_plots,
+	save_path = joinpath(image_dir, "long", "T_outlet.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ a1d20318-072f-4b6c-9718-f33d733a1408
+#=╠═╡
+plot_contourf(
+    df_grid_long; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Evaporation temperature [°C]", title = "Long BH scenario",
+    overlays=ovs_plots_2,
+	save_path = joinpath(image_dir, "long", "T_evap.svg")
+)
+  ╠═╡ =#
+
 # ╔═╡ d9a2618d-e923-4370-a20d-b8faf44bf06c
 #=╠═╡
 plot_contourf(
     df_grid_long; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "Pure water scenario",
+    zlabel = "COP 2 [-]", title = "Longer BH scenario",
     overlays=ovs_plots,
     zridge_enable = true,
     zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
@@ -6880,6 +6912,7 @@ plot_contourf(
     zridge_limit_col   = :r_N_pump,
     zridge_min = 0.3, zridge_max = 1.0,
     zridge_limit_interp = true,
+	save_path = joinpath(image_dir, "long", "COP2.svg")
 )
   ╠═╡ =#
 
@@ -11461,18 +11494,22 @@ version = "4.1.0+0"
 # ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
 # ╠═5575055e-9136-4b4e-925a-ddf82ca1156c
 # ╠═4412cbfc-d470-4003-a2bd-606df1be7022
-# ╠═f100b275-2eb2-4d10-93e2-8954f314ae9e
+# ╠═5bc8d146-8efc-4a71-819e-27f97fb4c411
 # ╠═f8b2fee6-eb35-493c-ac30-331176d9a795
-# ╠═058c533c-104d-4ae9-80e3-f356787d0d13
-# ╠═4899159f-1c86-478c-b874-ef8db1808bc5
-# ╠═c8044a03-837b-411c-8919-7d47f83111c3
-# ╠═b220d228-e3cb-4dd2-843e-03db76f46fe9
 # ╠═d7384891-c5c0-4614-99cf-0f1cf58f759c
-# ╠═9b2f80c6-18d0-4b10-827a-b9a665f7f1c4
+# ╠═2a40d270-cfbd-4b79-b54b-301db14a7163
+# ╠═8622c9e6-db4a-49de-8a8a-c08dda988556
+# ╠═b451ced6-8933-4c55-9618-089a389a12a4
+# ╠═10e4d4f7-3446-4ba3-8bb2-e311e7e6d51f
+# ╠═06f41f8a-0086-4bce-8823-386cc2ab5ba4
+# ╠═a772e64c-c684-47c8-9f5b-96a85a1917a4
+# ╠═dc5f2677-99b5-4411-8e09-31f56106adda
+# ╠═89c0a373-c9b9-420b-adb1-f21f4c5b2cc3
 # ╠═86429d81-3516-488f-be3d-df2d83bdbae8
 # ╠═4982df2c-016a-4136-a074-b39c1befffb7
 # ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
 # ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
+# ╠═bbf5b367-b6c9-4185-9641-d711914892b6
 # ╠═bed552fa-1a51-492b-8552-81186c96c6a1
 # ╟─473f4d2b-92a3-495c-975d-38738f714fb9
 # ╠═c2755bcf-548b-47ff-be58-b6cbfda319f7
@@ -11513,23 +11550,30 @@ version = "4.1.0+0"
 # ╠═1320fac5-2cf2-484d-a01e-98ecd559588d
 # ╠═a3fe0b30-007d-415d-af04-f5712e3d0489
 # ╠═c21e1161-99f5-4d15-adb8-7f7c669eadb0
-# ╠═298f0a4b-d6e7-4772-9862-54895ba7aab8
 # ╟─ea33f723-8f17-4000-b483-eb8f1f9354f3
 # ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
+# ╠═75c8b9a8-942f-4dd3-b0a9-afd0cf462469
 # ╠═b72f0888-4716-48ec-8a99-fc068a988abf
 # ╠═e086552e-9ce0-4353-a16b-395d2986d1a9
 # ╠═dfc85639-a09b-44fa-99af-61706a192549
-# ╠═dc7866d3-68e8-40de-b82d-26717fff53d9
+# ╟─75878c2e-4909-4c6e-8d44-164502edede0
+# ╠═82682ded-a94f-485b-a927-c9d62ef9d424
+# ╠═5583b4c0-ef58-4c2e-a748-29d6715af892
+# ╠═0151c5f2-20e8-41ec-9b26-4d7187c64bc6
+# ╠═1a532924-5f18-49d2-8bed-1451216cdd02
+# ╠═0caf8f7c-5354-49b1-b202-03ce25b4e32d
+# ╟─dc7866d3-68e8-40de-b82d-26717fff53d9
 # ╠═5e034021-1116-4d1d-8034-d582c8a9643f
 # ╠═e6a2deea-3658-42b3-8ef9-83e31be5a300
+# ╠═f4cd0268-7dab-4bac-90b5-db61cedfebb3
 # ╠═99e84662-a903-424d-b270-d665a52f479f
 # ╠═4217415e-772c-44d2-8c3d-2e85cf01fb1e
 # ╠═21a3e541-8ad9-41de-995a-e2b43221d15a
 # ╠═1ce3b2c5-71ba-4a1f-ab48-961585e57943
 # ╠═5d5f3c09-164b-4a55-9bf1-b2bb90221465
 # ╠═4175c8ba-346c-4afa-9267-ed7e689cff35
+# ╠═a1d20318-072f-4b6c-9718-f33d733a1408
 # ╠═629aaec1-eca1-4b91-910d-5579b49c8df2
-# ╠═16928040-8730-4f0c-a67c-50f9d1ae852b
 # ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
 # ╠═05d571f0-c990-430e-971c-965ba527e814
 # ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
@@ -11545,8 +11589,8 @@ version = "4.1.0+0"
 # ╠═e2504f4a-6606-4051-b91e-189bbd218edf
 # ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
 # ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
-# ╟─9beedddb-8b5a-4811-98cb-9a26ecd77b52
-# ╠═5eed01c3-561f-490b-80d5-23db0846bfe3
+# ╠═9beedddb-8b5a-4811-98cb-9a26ecd77b52
+# ╠═3862aa96-e219-4d7d-9556-aacf28049d5e
 # ╠═6ebdb8db-d5cc-4d02-a471-1e29a29ab42b
 # ╠═1a9a9e58-41ac-45fb-9891-2e2e531621e5
 # ╠═97b66208-6b79-40dd-bfd9-b710807a4e3f
@@ -11572,7 +11616,7 @@ version = "4.1.0+0"
 # ╠═8a1007ab-a556-4670-a2a6-18292d721c89
 # ╠═cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
 # ╠═6011e1fa-1058-4bce-bb65-fcdf25951bfa
-# ╠═0d69490f-83ee-46fc-b034-8370e8a66361
+# ╟─0d69490f-83ee-46fc-b034-8370e8a66361
 # ╠═6d9c073c-e05b-45ec-a4b4-1b47c43cc5ba
 # ╠═f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
 # ╠═941dcb04-88be-43ae-bc21-ae3ef9dd0db0
@@ -11584,17 +11628,7 @@ version = "4.1.0+0"
 # ╠═acbfba23-bbb5-4d9e-93b7-1120677332bd
 # ╠═b0b5c52c-a795-40a0-9c8d-f678010c454a
 # ╠═08d88b40-980e-4d17-91d1-2b1a06180bdd
-# ╠═f0e43670-bbd9-487a-b8b6-8b5d6804039c
-# ╠═d7d4f78c-a845-42ae-86ac-1fbca7c3cfcb
-# ╠═09952ea8-ef5d-414f-ac15-478ad8ea6343
-# ╠═16868428-1547-4b8d-a900-5e5120f38088
-# ╠═62b6a403-53ac-42c1-9fff-055a9b7a478b
-# ╠═849d55d9-3e76-4ccb-8635-c8b70376d0b1
-# ╠═34ed86a4-20e9-4b2b-9344-7ec6dfaab815
-# ╠═41fe5c48-3b28-4d41-8969-e3d59a84cbfa
 # ╠═54809c43-f7c3-493b-b06a-a13bf0a44bc6
-# ╠═bf3a0c4a-5fea-465d-a3ca-e742b74dc78f
-# ╠═c8c35ed3-bd6c-40ac-8049-b603b003f603
 # ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 # ╠═33c1996a-aade-400a-9b2f-259db12c0835
