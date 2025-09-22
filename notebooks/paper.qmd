@@ -159,15 +159,25 @@ The model calculates multiple performance indicators:
 
 Position of the boundary within the evaporator The faster the compressor runs, the more evaporation fraction is used
 
-This figure show that all the convective thermal resistances are lower at low delta T, which is expected.
+![Thermal resistances vs. temperature difference showing the effect of flow regime on BHE performance](images/thermal_resistances_vs_dt.svg){#fig-thermal-resistances}
+
+@fig-thermal-resistances shows that all the convective thermal resistances are lower at low delta T, which is expected.
 
 Focusing on the borehole heat exchanger (BHE) efficiency, defined as: $$
 1 - \frac{T_{\text{out}} - T_{\text{wall}}}{T_{\text{in}} - T_{\text{wall}}}
 $$
 
+![Borehole heat exchanger efficiency vs. temperature difference](images/bh_efficiency_vs_dt.svg){#fig-bh-efficiency}
+
+@fig-bh-efficiency demonstrates how BHE efficiency varies with the temperature difference control parameter.
+
 Schematically, this better efficiency leads to higher evaporation temperature:
 
+![Temperature profiles showing the effect of improved BHE efficiency](images/temperature_vs_dt.svg){#fig-temperature-profiles}
+
 Then, this higher temperature leads to a better capacity:
+
+![Energy components breakdown showing capacity improvements](images/energy_components_vs_dt.svg){#fig-energy-components}
 
 When factoring in the pumpin pwer, we therefore obtain the COP 3 figure:
 
@@ -175,7 +185,9 @@ We observe a clear peak around 3K Delta T. This is in line with the standard pra
 
 ## COPs vs. ΔT
 
-This first figure shows the main metrics we are considering: COPs against the control strategy under investigation: constant temperature difference across the evaporator/BHE.
+![System performance metrics showing COP variations with temperature difference control strategy](images/cop_vs_dt.svg){#fig-cop-vs-dt}
+
+@fig-cop-vs-dt shows the main metrics we are considering: COPs against the control strategy under investigation: constant temperature difference across the evaporator/BHE.
 
 The COP 3 is calculated such that the delivered heat is the heat delivered at the maximum case for this frequency.
 
@@ -197,9 +209,7 @@ We can see clearly that there is an optimal at 3.0K, around when the flow is ful
 
 ### Partial load
 
-![Test](images/cop3_pure_water_scenario.svg){#fig-pure_water_cop3}
-
-@fig-pure_water_cop3 is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
+is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
 
 On the diagram, several isolines are represented:
 
@@ -254,6 +264,26 @@ It is important to remember the model's assumptions when discussing these aspect
 To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?
 
 The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
+
+
+### Optimal operation
+
+In this part, we used the simulation results of the forward problem to find the maximum using interpolation. We fulcate the COP3 that can be realized and then optimization routines are used to find it.
+
+@fig-overlay_cop3 shows this maximum overlayed onto the COP2 graph. What we see is that the pump envelope constrains the system at low Q heat. The "laminar optimum" is not reachable, but the lowest pump speed is nonetheless the optimal achieveble point. Then there is a point where the system stops chjasing the "laminar optimum" and switches instead to the "turbulent optimum". In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.
+
+
+The ensemble of figures @fig-optimal shows both the maximum COP3 achievable for a given heat need as well as \Delta T, pump anjd compressor speeds. The figures represents both the base scenario as well as thee 3 variants we run. The pattern we see is as follow:
+
+- First for low demand, the system operates at a constant operating point: it is "stuck" at minimum compressor speed and minimum pump speed.
+
+- Then , once the capacity of this minimum speed is reached, the compressor speed is ramped up in a very linear way up to its maximum value. In parallel, we see that the pump stays at minimum speed, and then slowly ramps up to chase the 
+
+- First for low demand, the system operates at a constant operating point: it is "stuck" minimum compressor speed.
+
+- Then there can be a zone with constant Delta T or slightly sloped Delta T vs Pump speed/Delta T. This is when the system follows the turbulent optimum.
+
+- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating.
 
 # Conclusions
 
