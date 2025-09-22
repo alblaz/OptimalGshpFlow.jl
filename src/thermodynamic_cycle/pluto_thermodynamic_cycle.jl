@@ -4539,6 +4539,9 @@ md" # Comparison ridge position"
 # ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
 
 
+# ╔═╡ 75653ae3-55e8-4703-8c09-9dcf7ecc1505
+md" # Optimal control"
+
 # ╔═╡ fdfb7456-6d8e-44c8-a883-1d1faeb96ede
 md" # Comparison pump efficiency"
 
@@ -4687,170 +4690,169 @@ function save_figure(fig; save_path::AbstractString, force_create_path::Bool=tru
     return save_path
 end
 
-# ╔═╡ 8cc18375-13b9-41ec-b162-dc3650d51e7f
-
-
-# ╔═╡ 6fefe780-17cc-425c-b6c3-4b960f0e1665
-function plot_multi_axes(
+# ╔═╡ 5b3a3a8d-ed44-4565-8dae-2f215d5f4939
+#=╠═╡
+function plot_multi_axes_simple(
     df;
-    x::Symbol = :Qsp,
-    y_groups::Vector{Vector{Symbol}},
-    sides::Vector{Bool},
-    labels::AbstractDict{Symbol,<:AbstractString} = Dict{Symbol,String}(),
-    ylabels::Vector{<:AbstractString} = fill("", length(y_groups)),
-    lw::Real = 2,
-    palette = :tab10,
-    linestyles::AbstractDict{Symbol,Symbol} = Dict{Symbol,Symbol}(),
-    y0_groups::Vector{Bool} = fill(false, length(y_groups)),
+    x::Symbol,
+    y_series::Vector{Symbol},          # one series per axis
+    sides::Vector{Bool},               # false = left, true = right
+    ylabels::Vector{<:AbstractString}, # one per axis
     xlabel::AbstractString = string(x),
-    title::AbstractString = "",
-    legend_position = :right,
-    diag_y_eq_x::Bool = false,
-    diag_style::NamedTuple = (; color=:gray, linestyle=:dash, linewidth=1.5),
+    title::AbstractString  = "",
+    size = (900, 550),
+    lw::Real = 2,
+    fontsize = 12, ticksize = 10, titlesize = 14,
+    palette = :tab10,
+
+    # spacing knobs (Float64!)
+    ylabel_padding_left::Real  = 8.0,
+    ylabel_padding_right::Real = 8.0,
+    yticklabelspace_left_base::Real  = 30.0,
+    yticklabelspace_left_step::Real  = 44.0,
+    yticklabelspace_right_base::Real = 36.0,
+    yticklabelspace_right_step::Real = 50.0,
+
+    y_limits::AbstractVector{<:Union{Nothing, Missing, Tuple{<:Real,<:Real}}} =
+        fill(nothing, length(y_series)),
+
+    # saving
     save_path::Union{Nothing,AbstractString} = nothing,
     force_create_path::Bool = true,
 )
-    @assert length(y_groups) == length(sides) "y_groups and sides must match in length"
-    @assert length(ylabels)  == length(y_groups) "ylabels must match y_groups length"
-    @assert length(y0_groups)== length(y_groups) "y0_groups must match y_groups length"
+    @assert length(y_series) == length(sides)  "y_series and sides must match"
+    @assert length(ylabels)  == length(sides)  "ylabels must match sides"
+    @assert all(s ∈ Symbol.(names(df)) for s in y_series)
 
     xs = df[!, x]
-    all_syms = reduce(vcat, y_groups; init=Symbol[])
-    nseries = max(length(all_syms), 1)
-    cm = cgrad(palette, nseries; categorical=true)
-    color_map = Dict(s => cm[i] for (i,s) in enumerate(all_syms))
 
-    # ### NEW: detect “one series per axis” mode
-    one_per_axis = all(length.(y_groups) .== 1)
+    # stable categorical colors
+    cm = cgrad(palette, max(length(y_series),1); categorical=true)
+    color_map = Dict(s => cm[i] for (i, s) in enumerate(y_series))
 
-	fig = Figure()
-	
-	# --- NEW: wrap the plot area in its own 3-column GridLayout
-	gl = GridLayout(fig[1,1])
-	# base axis will live in the center column:
-	ax_base = Axis(gl[1,2]; xlabel=xlabel, ylabel="", title=title)
-	# after: ax_base = Axis(gl[1,2]; xlabel=xlabel, ylabel="", title=title)
+    # figure + inner grid; a little figure padding so outer labels aren’t cut
+    fig = Figure(size = size, fontsize = fontsize, figure_padding = (10, 10, 8, 8))  # L,R,B,T
+    rowsize!(fig.layout, 1, Relative(1.0))
+    gl = GridLayout(fig[1,1])
+    rowsize!(gl, 1, Relative(1.0))
 
-	axes_left  = Axis[]              # track all left-side axes (include base first)
-	axes_right = Axis[]              # track all right-side axes
-	push!(axes_left, ax_base)
+    # base axis (center column)
+    ax_base = Axis(gl[1,2];
+        xlabel=xlabel, ylabel="", title=title,
+        xticklabelsize=ticksize, yticklabelsize=ticksize,
+        xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
+    ax_base.aspect = nothing
+    ax_base.autolimitaspect = nothing
+    ax_base.height = Relative(1.0)
 
-	# ... (unchanged: build axes_left / axes_right by calling _new_axis)
-	# but make _new_axis place axes into gl[1,2] instead of fig[1,1]:
-	function _new_axis(; right::Bool, ylabel::AbstractString)
-	    ax = Axis(gl[1,2]; yaxisposition = right ? :right : :left, ylabel = ylabel)
-	    if right
-	        hidespines!(ax, :l, :t, :b)
-	    else
-	        hidespines!(ax, :r, :t, :b)
-	    end
-	    hidexdecorations!(ax, grid=false)
-	    hideydecorations!(ax; minorticks=true, grid=true)
-	    linkxaxes!(ax_base, ax)
-	    return ax
-	end
-	
+    axes_left  = Axis[ax_base]
+    axes_right = Axis[]
+    axis_for_i = Axis[]
 
-    left_count, right_count = 0, 0
-    axis_for_group = Axis[]
-    for (i, right_side) in enumerate(sides)
-        if right_side
-            ax = _new_axis(right=true,  ylabel=ylabels[i])
-            push!(axes_right, ax); push!(axis_for_group, ax); right_count += 1
+    # overlays in same cell; hide x-decorations on overlays; link x
+    function _new_axis(; right::Bool, ylabel::AbstractString)
+        ax = Axis(gl[1,2];
+            yaxisposition = right ? :right : :left, ylabel = ylabel,
+            xticklabelsize=ticksize, yticklabelsize=ticksize,
+            xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
+        ax.aspect = nothing
+        ax.autolimitaspect = nothing
+        ax.height = Relative(1.0)
+        if right; hidespines!(ax, :l, :t, :b) else; hidespines!(ax, :r, :t, :b) end
+        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=false)
+        linkxaxes!(ax_base, ax)
+        ax
+    end
+
+    # build axes & plot
+    left_count = 0; right_count = 0
+    for (i, (s, on_right)) in enumerate(zip(y_series, sides))
+        ax = if on_right
+            a = _new_axis(right=true,  ylabel=ylabels[i]); push!(axes_right, a); a
         else
             if left_count == 0
-                ax_base.ylabel = ylabels[i]                   # first left group uses base axis
-                ax = ax_base
+                ax_base.ylabel = ylabels[i]
+                ax_base
             else
-                ax = _new_axis(right=false, ylabel=ylabels[i])
-                push!(axes_left, ax)
-            end
-            push!(axis_for_group, ax); left_count += 1
-        end
-    end
-
-	# --- NEW: add left/right spacer columns sized for stacked ticklabels
-	if left_count > 1
-	    Label(gl[1,1], " "; tellwidth=false)  # just a spacer
-	    # first left axis is the base; extra left axes are (left_count-1)
-	    colsize!(gl, 1, Fixed(28 + 40*(left_count-1 - 1)))  # base 28 + 40px per extra
-	end
-	if right_count > 0
-	    Label(gl[1,3], " "; tellwidth=false)
-	    colsize!(gl, 3, Fixed(36 + 40*(right_count-1)))     # base 36 + 40px per extra
-	end
-	
-    function _space_stacks!(axes::Vector{Axis}; base_space=28.0, step=36.0, right::Bool=false)
-        for (k, ax) in enumerate(axes)
-            ax.yticklabelspace[] = base_space + (k-1)*step     # stagger labels
-            ax.ylabelpadding[]   = 8.0
-            # color spines to match yticklabelcolor (we’ll set that below)
-            c = ax.yticklabelcolor[]
-            c = (c isa Symbol || c isa AbstractString) ? to_color(c) : c
-            if right
-                ax.rightspinecolor[] = c
-            else
-                ax.leftspinecolor[]  = c
+                a = _new_axis(right=false, ylabel=ylabels[i]); push!(axes_left, a); a
             end
         end
+        push!(axis_for_i, ax)
+
+        col = color_map[s]
+        lines!(ax, xs, df[!, s]; linewidth=lw, color=col)
+		if y_limits[i] !== nothing
+		    ylims!(ax, y_limits[i]...)
+		end
+
+        ax.yticklabelcolor[] = col
+        ax.ytickcolor[]      = col
+        ax.ylabelcolor[]     = col
+        if on_right; ax.rightspinecolor[] = col else; ax.leftspinecolor[] = col end
+
+        if on_right; right_count += 1 else; left_count += 1 end
     end
 
-    _space_stacks!(axes_left;  base_space=28.0, step=40.0, right=false)
-    _space_stacks!(axes_right; base_space=36.0, step=40.0, right=true)
+    # real side margins: create columns whenever that side has ≥1 axis
+    if left_count > 0
+        Label(gl[1,1], " "; tellwidth=false)
+        colsize!(gl, 1, Fixed(max(28.0, 32.0 + 44.0*(left_count-1))))
+    else
+        colsize!(gl, 1, Fixed(0))
+    end
+    if right_count > 0
+        Label(gl[1,3], " "; tellwidth=false)
+        colsize!(gl, 3, Fixed(40.0 + 50.0*(right_count-1)))
+    else
+        colsize!(gl, 3, Fixed(0))
+    end
+    colsize!(gl, 2, Relative(1.0))
 
-    legend_entries = NamedTuple[]
-    for (i, grp) in enumerate(y_groups)
-        ax = axis_for_group[i]
-
-        for s in grp
-            @assert s ∈ Symbol.(names(df)) "column $(s) not found in DataFrame"
-            p = lines!(ax, xs, df[!, s];
-                       linewidth=lw,
-                       color=color_map[s],
-                       linestyle=get(linestyles, s, :solid))
-
-            # ### NEW (only when one_per_axis): tint the whole y-axis with the series color
-            if one_per_axis
-                col = color_map[s]
-                ax.yticklabelcolor[] = col                    # tick label color (Axis attribute). :contentReference[oaicite:2]{index=2}
-                ax.ytickcolor[]      = col                    # tick mark color. :contentReference[oaicite:3]{index=3}
-                ax.ylabelcolor[]     = col                    # label color. :contentReference[oaicite:4]{index=4}
-                if sides[i]
-                    ax.rightspinecolor[] = col
-                else
-                    ax.leftspinecolor[]  = col
-                end
-                # If no explicit y-label provided, use series label to remove need for legend:
-                if isempty(ylabels[i])
-                    ax.ylabel[] = get(labels, s, String(s))
-                end
-            else
-                # keep legend entries in multi-series-per-axis case
-                push!(legend_entries, (; handle=p, name=get(labels, s, String(s))))
-            end
+    # y-tick label offsets + ylabel padding
+    if left_count == 1
+        ax = axes_left[1]
+        ax.yticklabelspace[] = 14.0
+        ax.ylabelpadding[]   = float(ylabel_padding_left)
+    else
+        for (k, ax) in enumerate(axes_left)
+            ax.yticklabelspace[] = float(yticklabelspace_left_base + (k-1)*yticklabelspace_left_step)
+            ax.ylabelpadding[]   = float(ylabel_padding_left)
         end
-
-        if y0_groups[i]
-            yl = ylimits(ax); ylims!(ax, 0, yl[2])
-        end
-        if diag_y_eq_x && !sides[i]
-            lines!(ax, xs, xs; color=diag_style.color, linestyle=diag_style.linestyle, linewidth=diag_style.linewidth)
+    end
+    if right_count == 1
+        ax = axes_right[1]
+        ax.yticklabelspace[] = 18.0
+        ax.ylabelpadding[]   = float(ylabel_padding_right)
+    else
+        for (k, ax) in enumerate(axes_right)
+            ax.yticklabelspace[] = float(yticklabelspace_right_base + (k-1)*yticklabelspace_right_step)
+            ax.ylabelpadding[]   = float(ylabel_padding_right)
         end
     end
 
-    # ### NEW: drop legend entirely when one_per_axis
-    if !one_per_axis && !isempty(legend_entries)
-        Legend(fig[1,2], getfield.(legend_entries, :handle), getfield.(legend_entries, :name);
-               framevisible=false, position=legend_position)
+    # overlays: still hide x-decorations (base already shows them)
+    for (k, ax) in enumerate(axes_left)
+        if k > 1
+            hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
+        end
+    end
+    for ax in axes_right
+        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
     end
 
-    resize_to_layout!(fig)
+    # save
     if save_path !== nothing
-        save_figure(fig; save_path=String(save_path), force_create_path=force_create_path)
+        if @isdefined(save_figure)
+            save_figure(fig; save_path=String(save_path), force_create_path=force_create_path)
+        else
+            save(String(save_path), fig)
+        end
     end
-    return fig
+
+    fig
 end
 
+  ╠═╡ =#
 
 # ╔═╡ e2db4d18-bc58-43ef-b003-e9bc10f7c89c
 function _fill_line!(v::AbstractVector{T}) where {T<:Real}
@@ -6655,92 +6657,6 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ ff524033-5adc-4235-8891-bdb16d2dda97
-#=╠═╡
-# Build once from your df_grid (already produced by process_grid_results)
-setup_cop3 = make_splines(df_grid; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
-
-# Quick single setpoint view (NaNs show light gray):
-  ╠═╡ =#
-
-# ╔═╡ a8bc2934-c96e-4475-ae2c-74ec8b665020
-#=╠═╡
-df_details = sweep_best_with_details(setup_cop3; Qs, nx=401, ny=401,
-                                     do_refine=true, cop=:masked_hard,
-                                     N_bounds=(0.3,1.0), Pmax=1.0)
-
-  ╠═╡ =#
-
-# ╔═╡ 323226f6-60be-436e-ac4d-fa96aedeff3d
-#=╠═╡
-fig_duty   = plot_duty_paux(df_details)
-  ╠═╡ =#
-
-# ╔═╡ 745782e7-bf79-47a1-a2b8-41f99a9778a3
-#=╠═╡
-fig_cap    = plot_capacity_context(df_details)
-  ╠═╡ =#
-
-# ╔═╡ 589dd8ae-cae7-42d6-b895-e2c0621ddf85
-#=╠═╡
-fig_power  = plot_power_breakdown(df_details)
-  ╠═╡ =#
-
-# ╔═╡ ce13e549-9f33-40f2-95e0-0af622786a5d
-#=╠═╡
-fig_pump  = plot_pump(df_details)
-  ╠═╡ =#
-
-# ╔═╡ 1b47efdc-b242-4ead-bc6b-c6291a7582b6
-#=╠═╡
-fig_8 = plot_qsp_with_three_yaxes(df_details; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
-  ╠═╡ =#
-
-# ╔═╡ f8a74235-7a3e-4cb8-aa37-945e08e332e7
-#=╠═╡
-fig_3axis = plot_multi_axes(df_details;
-    x=:Qsp,
-    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
-    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
-    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
-    labels   = Dict(:N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
-    title    = "Pump operation",
-    lw       = 2,
-    save_path = joinpath(image_dir, "base", "pump_speed.svg"),
-    force_create_path = true,
-)
-
-  ╠═╡ =#
-
-# ╔═╡ e10d9806-5475-44be-bc89-641f1137875d
-#=╠═╡
-# df_details is what you got from sweep_best_with_details or optimal_controls
-fig = plot_effective_cop3_for_Qsp(setup_cop3, df_details;
-    Qsp=2000,                # <- pick the setpoint you care about
-    cop=:masked_hard,        # same evaluator as the optimizer
-    nx=401, ny=401,          # grid density for smooth contours
-    levels=3.6:0.01:3.9,               # number or vector of levels
-    xlogbase=:log            # matches your ΔT axis convention
-)
-
-  ╠═╡ =#
-
-# ╔═╡ c3ad5a50-5f48-49ee-b3fa-032ae47d4402
-#=╠═╡
-fig_rN = plot_rN_contour(setup_cop3;
-    xlogbase=:log,          # matches your other plots
-    levels=0.2:0.05:1.2,    # or just an integer like 12
-    N_bounds=(0.3, 1.0)     # dashed overlays at the feasibility limits
-)
-  ╠═╡ =#
-
-# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
-#=╠═╡
-fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
-    levels= 20, color_by=:Qsp, arrows_every=75)
-  ╠═╡ =#
-
 # ╔═╡ 42f382a4-7820-4d98-b2ac-ca1ec8a2497b
 #=╠═╡
 plot_contourf(df_grid;
@@ -6759,6 +6675,54 @@ plot_contourf(df_grid;
     zlabel = "COP 3 [-]", title = "",
     overlays=ovs_plots,
 			 )
+  ╠═╡ =#
+
+# ╔═╡ ff524033-5adc-4235-8891-bdb16d2dda97
+#=╠═╡
+# Build once from your df_grid (already produced by process_grid_results)
+setup_cop3 = make_splines(df_grid; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
+
+# Quick single setpoint view (NaNs show light gray):
+  ╠═╡ =#
+
+# ╔═╡ c3ad5a50-5f48-49ee-b3fa-032ae47d4402
+#=╠═╡
+fig_rN = plot_rN_contour(setup_cop3;
+    xlogbase=:log,          # matches your other plots
+    levels=0.2:0.05:1.2,    # or just an integer like 12
+    N_bounds=(0.3, 1.0)     # dashed overlays at the feasibility limits
+)
+  ╠═╡ =#
+
+# ╔═╡ a8bc2934-c96e-4475-ae2c-74ec8b665020
+#=╠═╡
+df_details = sweep_best_with_details(setup_cop3; Qs, nx=401, ny=401,
+                                     do_refine=true, cop=:masked_hard,
+                                     N_bounds=(0.3,1.0), Pmax=1.0);
+
+  ╠═╡ =#
+
+# ╔═╡ 47f7d78a-4076-4974-a6ad-3a1ea3164713
+#=╠═╡
+plot_multi_axes_simple(df_details;
+    x=:Qsp,
+    y_series = [:N, :ΔT, :f, :COP3],
+	sides    = [true, false, true, false],
+    ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
+	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+    xlabel   = "Qsp",
+    title    = "Base scenarioPure Water",
+    size     = (600, 400),
+    lw       = 2,
+	save_path = joinpath(image_dir, "base", "optimal.svg")
+)
+  ╠═╡ =#
+
+# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
+#=╠═╡
+fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
+    levels= 20, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ 195ab453-b1f2-4632-9420-091f7f702ed7
@@ -6874,24 +6838,20 @@ df_details_cold = sweep_best_with_details(setup_cold; Qs, nx=401, ny=401,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
-# ╔═╡ 8188a79f-a596-40bd-aec7-fb61fa8d5572
+# ╔═╡ 9cf486c2-64da-4560-82ae-d1167165a7c7
 #=╠═╡
-fig_duty_cold   = plot_duty_paux(df_details_cold)
-  ╠═╡ =#
-
-# ╔═╡ 9f035aec-df45-42da-85f5-c539de5cbe89
-#=╠═╡
-fig_cap_cold    = plot_capacity_context(df_details_cold)
-  ╠═╡ =#
-
-# ╔═╡ 82e5e279-6937-4273-bf2f-75c91b7bac35
-#=╠═╡
-fig_power_cold  = plot_power_breakdown(df_details_cold)
-  ╠═╡ =#
-
-# ╔═╡ 685e2cdb-a684-4bda-a8e7-49e0eed7a7d9
-#=╠═╡
-fig_pump_cold  = plot_pump(df_details_cold)
+plot_multi_axes_simple(df_details_cold;
+    x=:Qsp,
+    y_series = [:N, :ΔT, :f, :COP3],
+	sides    = [true, false, true, false],
+    ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
+    xlabel   = "Qsp",
+	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+    title    = "Cold borehole",
+    size     = (600, 400),
+    lw       = 2,
+	save_path = joinpath(image_dir, "cold", "optimal.svg")
+)
   ╠═╡ =#
 
 # ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
@@ -7019,29 +6979,20 @@ df_details_water = sweep_best_with_details(setup_water; Qs, nx=401, ny=401,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
-# ╔═╡ b62c8dd4-15b4-44c5-bc9a-09cd9da3fbfb
+# ╔═╡ 2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
 #=╠═╡
-fig_duty_water   = plot_duty_paux(df_details_water)
-  ╠═╡ =#
-
-# ╔═╡ fb38ea9c-236e-4a2b-b356-7058d1c61b25
-#=╠═╡
-fig_cap_water    = plot_capacity_context(df_details_water)
-  ╠═╡ =#
-
-# ╔═╡ 216362b8-4d6b-4711-adfa-75c2fc491097
-#=╠═╡
-fig_power_water  = plot_power_breakdown(df_details_water)
-  ╠═╡ =#
-
-# ╔═╡ 1c847476-b7e6-4ff9-815a-1057552ce133
-#=╠═╡
-fig_pump_water  = plot_pump(df_details_water)
-  ╠═╡ =#
-
-# ╔═╡ 3fee863e-871f-4c2d-bc2f-d2550b02bf4b
-#=╠═╡
-fig_3axis_water = plot_qsp_with_three_yaxes(df_details_water; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+plot_multi_axes_simple(df_details_water;
+    x=:Qsp,
+    y_series = [:N, :ΔT, :f, :COP3],
+	sides    = [true, false, true, false],
+    ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
+	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+    xlabel   = "Qsp",
+    title    = "Pure Water",
+    size     = (600, 400),
+    lw       = 2,
+	save_path = joinpath(image_dir, "water", "optimal.svg")
+)
   ╠═╡ =#
 
 # ╔═╡ 2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
@@ -7254,22 +7205,19 @@ df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
-# ╔═╡ 0f8ed2e7-1631-4dc3-a759-7500a978806e
+# ╔═╡ 70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
 #=╠═╡
-fig_duty_long   = plot_duty_paux(df_details_long)
-  ╠═╡ =#
-
-# ╔═╡ 24590765-e788-4796-85ba-5002c65e35bb
-# ╠═╡ disabled = true
-#=╠═╡
-fig_power_long  = plot_power_breakdown(df_details_long)
-  ╠═╡ =#
-
-# ╔═╡ be554cbf-008a-4cc4-a6ad-98bfb6580623
-#=╠═╡
-save_figure(fig_3axis_long;
-    save_path=joinpath(image_dir, "long", "opt_controls_three_axes.svg"),
-    force_create_path=true,
+plot_multi_axes_simple(df_details_long;
+    x=:Qsp,
+    y_series = [:N, :ΔT, :f, :COP3],
+	sides    = [true, false, true, false],
+    ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
+	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+    xlabel   = "Qsp",
+    title    = "Long borehole",
+    size     = (600, 400),
+    lw       = 2,
+	save_path = joinpath(image_dir, "long", "optimal.svg")
 )
   ╠═╡ =#
 
@@ -8225,94 +8173,6 @@ end
 # ╔═╡ 37e3be87-dff9-456d-b921-e0e1ecbb4909
 
 TableOfContents()
-
-# ╔═╡ 4cc59ad3-c3dd-4f41-8c04-03277bf547b4
-#=╠═╡
-fig_pump_long = plot_multi_axes(df_details_long;
-    x=:Qsp,
-    y_groups = [[:N]],                      # relative pump speed
-    sides    = [false],                     # left axis
-    ylabels  = ["Relative pump speed (–)"],
-    labels   = Dict(:N => "N/Nₘₐₓ"),
-    title    = "Pump operation",
-    lw       = 2,
-    save_path = joinpath(image_dir, "long", "pump_speed.svg"),
-    force_create_path = true,
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 1188e133-946a-44c3-b6ff-3935557eb245
-#=╠═╡
-fig_3axis_long = plot_multi_axes(df_details_long;
-    x=:Qsp,
-    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
-    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
-    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
-    labels   = Dict(:N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
-    title    = "Pump operation",
-    lw       = 2,
-    save_path = joinpath(image_dir, "long", "pump_speed.svg"),
-    force_create_path = true,
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
-# ╠═╡ disabled = true
-#=╠═╡
-fig_pump_long  = plot_pump(df_details_long)
-  ╠═╡ =#
-
-# ╔═╡ fb92dcb7-a6ce-4874-b718-78b6f55ce4be
-#=╠═╡
-fig_cap_long = plot_multi_axes(df_details_long;
-    x=:Qsp,
-    y_groups = [[:Qhat; :Qsp]],                   # model capacity
-    sides    = [false],                     # left axis
-    ylabels  = ["Heat (W)"],
-    labels   = Dict(:Qhat => "Q̂(ΔT*, f*)"),
-    title    = "Capacity at (ΔT*, f*) vs set-point",
-    lw       = 2,
-    save_path = joinpath(image_dir, "long", "capacity_context.svg"),
-    force_create_path = true,
-)
-
-  ╠═╡ =#
-
-# ╔═╡ d792ed77-c90e-4ba3-9882-31e41db558e1
-# ╠═╡ disabled = true
-#=╠═╡
-fig_3axis_long = plot_qsp_with_three_yaxes(df_details_long; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
-  ╠═╡ =#
-
-# ╔═╡ 14478ade-6a70-45fd-9d42-b60ae73c5aa0
-# ╠═╡ disabled = true
-#=╠═╡
-fig_3axis_cold = plot_qsp_with_three_yaxes(df_details_cold; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
-  ╠═╡ =#
-
-# ╔═╡ fc91bbbe-845a-472a-8551-98411a06c6af
-#=╠═╡
-fig_3axis_cold = plot_multi_axes(df_details_cold;
-    x=:Qsp,
-    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
-    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
-    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
-    labels   = Dict(:Qsp => "Heating demand [W]", :N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
-    title    = "Cold borehole",
-    lw       = 2,
-    save_path = joinpath(image_dir, "base", "pump_speed.svg"),
-    force_create_path = true,
-)
-
-  ╠═╡ =#
-
-# ╔═╡ 5c0d6e1e-78ed-41c1-8a75-cfcdbeef476b
-# ╠═╡ disabled = true
-#=╠═╡
-fig_cap_long    = plot_capacity_context(df_details_long)
-  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -12057,6 +11917,11 @@ version = "4.1.0+0"
 # ╠═a966eea4-f3e4-46f9-8230-7ab19eb7f905
 # ╠═a7e7ede3-1caa-4483-91f3-c26393f2b45a
 # ╠═e2504f4a-6606-4051-b91e-189bbd218edf
+# ╠═75653ae3-55e8-4703-8c09-9dcf7ecc1505
+# ╠═47f7d78a-4076-4974-a6ad-3a1ea3164713
+# ╠═9cf486c2-64da-4560-82ae-d1167165a7c7
+# ╠═70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
+# ╠═2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
 # ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
 # ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
 # ╠═9beedddb-8b5a-4811-98cb-9a26ecd77b52
@@ -12104,50 +11969,30 @@ version = "4.1.0+0"
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 # ╠═33c1996a-aade-400a-9b2f-259db12c0835
 # ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
+# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
+# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
+# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
+# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
+# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
 # ╠═033594e2-7f94-4b32-b7fa-23490e087918
 # ╠═ff524033-5adc-4235-8891-bdb16d2dda97
 # ╠═8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
 # ╠═a8bc2934-c96e-4475-ae2c-74ec8b665020
-# ╠═323226f6-60be-436e-ac4d-fa96aedeff3d
-# ╠═745782e7-bf79-47a1-a2b8-41f99a9778a3
-# ╠═589dd8ae-cae7-42d6-b895-e2c0621ddf85
-# ╠═ce13e549-9f33-40f2-95e0-0af622786a5d
-# ╠═1b47efdc-b242-4ead-bc6b-c6291a7582b6
 # ╠═48478706-2c6a-4bba-a63d-e8ebf8baafee
 # ╠═f6b0d2b6-4f87-453d-8439-ef12d8e05d85
 # ╠═dfd1908d-5abc-4d6e-9149-bc27fd2940c2
-# ╠═b62c8dd4-15b4-44c5-bc9a-09cd9da3fbfb
-# ╠═fb38ea9c-236e-4a2b-b356-7058d1c61b25
-# ╠═216362b8-4d6b-4711-adfa-75c2fc491097
-# ╠═1c847476-b7e6-4ff9-815a-1057552ce133
-# ╠═3fee863e-871f-4c2d-bc2f-d2550b02bf4b
 # ╠═ff4149ab-7af1-4b9b-8f26-70c52930150d
 # ╠═7f0d2585-4675-4a23-830b-1e677da6ff3a
 # ╠═3e4b6ca8-55e6-48d5-a71f-25f62fcafd51
-# ╠═8188a79f-a596-40bd-aec7-fb61fa8d5572
-# ╠═9f035aec-df45-42da-85f5-c539de5cbe89
-# ╠═82e5e279-6937-4273-bf2f-75c91b7bac35
-# ╠═685e2cdb-a684-4bda-a8e7-49e0eed7a7d9
-# ╠═14478ade-6a70-45fd-9d42-b60ae73c5aa0
 # ╠═9f3f5b7d-8a4d-4bd5-a7b9-1926d3087c72
 # ╠═cfe9ff8b-6cf5-43a0-bc07-4c77e860c236
 # ╠═80e3b2c3-8791-48f5-92be-658578f564e0
-# ╠═0f8ed2e7-1631-4dc3-a759-7500a978806e
-# ╠═5c0d6e1e-78ed-41c1-8a75-cfcdbeef476b
-# ╠═24590765-e788-4796-85ba-5002c65e35bb
-# ╠═59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
-# ╠═d792ed77-c90e-4ba3-9882-31e41db558e1
-# ╠═1188e133-946a-44c3-b6ff-3935557eb245
-# ╠═f8a74235-7a3e-4cb8-aa37-945e08e332e7
-# ╠═fc91bbbe-845a-472a-8551-98411a06c6af
-# ╠═fb92dcb7-a6ce-4874-b718-78b6f55ce4be
-# ╠═4cc59ad3-c3dd-4f41-8c04-03277bf547b4
-# ╠═be554cbf-008a-4cc4-a6ad-98bfb6580623
 # ╟─b9613755-4061-4aec-a50f-b5d739b9df25
 # ╠═769f3480-9062-402b-a43e-9c98e9b63cde
 # ╠═db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
-# ╠═8cc18375-13b9-41ec-b162-dc3650d51e7f
-# ╠═6fefe780-17cc-425c-b6c3-4b960f0e1665
+# ╠═5b3a3a8d-ed44-4565-8dae-2f215d5f4939
 # ╠═40d4651c-93c5-41b5-aa2c-685f471d7a02
 # ╠═cb7178e5-9bc6-45c3-aa11-52972df91fac
 # ╠═639e359f-5760-4adb-9258-967d5db2eea4
@@ -12173,14 +12018,6 @@ version = "4.1.0+0"
 # ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 # ╠═3ec7080c-2972-484b-805e-3d9fe0a7d9d1
 # ╠═7148e421-b7e8-4f3c-a0a9-da3d14dd32e5
-# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
-# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
-# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
-# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
-# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
-# ╠═e10d9806-5475-44be-bc89-641f1137875d
-# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
-# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
 # ╠═869c2c91-5716-49d6-add8-5c9053aea261
 # ╠═62b31b42-f81a-4370-a61d-8c9bc8ffbd72
 # ╠═88c2db40-b214-46db-9a82-5b67760443c8
