@@ -1,29 +1,5 @@
 ---
-title: "Insights into the Optimal Flow Rule for GSH## Modeling framework:
-
-We decided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similaOn-   "Cold wall", T wall is set to 5°C instead of 10°C
-
--   "Pure Water", the secondary fluid is pure water
-
--   "Bigger pipes", the OD of the collector pipes is set to 40 instead of 32mm
-
--   "Longer collector", the collector is 200m instead of 150magram, The ridge line in red correspoIdea: show allIt is im# Conclusions
-
-It seems that the widespread rule-based control performs decently in the test case, however, it remains to be seen if the same heuristic does as well when it comes to e.g. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.tant to remember the model's assumptions when discussing these aspects. In the transition region, the behavior is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not uniform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule-based control strategies cannot track this transition point in a satisfactory manner.on different graphs, only the rules without the efficiency
-
-Conclusion is that nothing seems to be able to capture the complex interplay of the different effects.
-
-Looking at the graph, theo the location of this maximum used for the auxiliary heating calculation. The ridge line presents 2 regions:
-
--   In the top part, there is a clear ridge
-
--   In the bottom part, a hockey stick ridge is presental isolines are represented:
-
--   The iso pump speed are represented in black. The 30% and 100% speeds are represented in thick and each 10% step in between is a thinner line. Beyond these two boundaries, the physical system can actually not be operated.
-
--   Similarly, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.
-
--   The different laminar to turbulent transitions of each leg of the BHE are represented by the onset and full transition iso Reynolds number (2300 and 4000).inciple to Modelica: an acausal component-based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.ystems"
+title: "Insights into the Optimal Flow Rule for GSHP Systems"
 format:
   acs-pdf:
     journal:
@@ -40,9 +16,9 @@ format:
       tbl-title: Table
       eq-title: Equation
 author: 
-  - name: "Your Name"
-    affiliation: "Your Institution"
-    email: "your.email@institution.edu"
+  - name: "Adrien Vautrin"
+    affiliation: "KTH - Royal Institute of Technology"
+    email: "adriv@kth.se"
 abstract: |
   This paper investigates the question of flow control in ground source heat pump (GSHP) systems. We focus on systems with a single heat pump connected hydraulically to a borehole without decoupling tanks. The study develops a coupled thermal-hydraulic model that considers steady-state conditions with the borehole wall as the boundary condition. The model incorporates principles of fluid mechanics and heat transfer while accounting for thermal properties of both ground and heat pump components.
 keywords: [Ground Source Heat Pump, Flow Control, Thermal-Hydraulic Coupling, Optimization]
@@ -79,7 +55,7 @@ Several tools exist to model GSHP:
 
 ## Modeling framework:
 
-We dedided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similar in principle to Modelica: an acausal component based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.
+We decided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similar in principle to Modelica: an acausal component-based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.
 
 The GSHP system model consists of three coupled submodels that are solved together: thermodynamic cycle (thermal system), borehole heat exchanger, and pump hydraulics (hydraulic system). The steady-state system is solved using ModelingToolkit.jl with symbolic manipulation and NonlinearSolve.jl library for the solvers.
 
@@ -100,7 +76,7 @@ A moving-boundary plate heat exchanger evaporator with dynamically allocated reg
 -   **Geometric modeling**: Chevron plate geometry with adjustable plate spacing (b), number of plates (np), width (W), enlargement factor (ϕ), and chevron angle (β)
 -   **Two-zone heat transfer**: The evaporator length is split between evaporation and superheating zones. The fraction of the HX occupied by each zone is a variable.
 -   **Heat transfer correlations**:
-    -   Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (avergaed ovr a vapor quality range)
+    -   Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (averaged over a vapor quality range)
     -   Superheating region: Martin correlations for single-phase plate heat exchanger flow with laminar-turbulent (smooth) transition
 -   **Boundary conditions**: Fixed superheat degree (ΔTSH) and secondary fluid temperature difference (ΔTSF) as control variables
 
@@ -164,9 +140,9 @@ The centrifugal pump follows dimensionless performance curves based on affinity 
 
 The model calculates multiple performance indicators:
 
--   **Thermal COP**: $COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$ (refrigeration cycle only)
--   **System COP**: $COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$ (including pump power)
--   COP 3 (includes auxiliary heating)
+-   **COP 1**: $COP_1 = \frac{\dot{Q}_{cond}}{W_{comp}}$ (refrigeration cycle only)
+-   **COP 2**: $COP_2 = \frac{\dot{Q}_{cond}}{P_{comp} + P_{pump}}$ (including pump power)
+-   **COP 3**: $COP_2 = \frac{\dot{Q}_{cond} + P_{aux}}{P_{comp} + P_{pump} + P_{aux}}$ (including pump power)
 
 ### Numerical Implementation:
 
@@ -221,17 +197,16 @@ We can see clearly that there is an optimal at 3.0K, around when the flow is ful
 
 ### Partial load
 
-![Test](images/cop3_pure_water_scenario.svg){#fig-pure_water_cop3}
 
-@fig-pure_water_cop3 is a contour plot representing a 2D parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: This COP3 is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to choose a target Q cond.
+XXXX is a contour plot representing a 2D parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: This COP3 is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to choose a target Q cond.
 
 On the diagram, several isolines are represented:
 
--   The iso pump speed are represented in black. The 30% and 100% speeds are represented in thick and each 10% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.
+-   The iso pump speed are represented in black. The 30\% and 100\% speeds are represented in thick and each 10\% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.
 
 -   Similarily, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.
 
--   The different kaminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso rteynolds number (2300 and 4000).
+-   The different laminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso rteynolds number (2300 and 4000).
 
 In order to better visualize these ridges, we have calculated a relative COP 3 deficit for a given compressor frequency. NEEDS explanation
 
@@ -259,7 +234,7 @@ Looking at the graph and coming back to the different ways to control a GSHP SF 
 
 -   A constant compressor speed to pump speed ratio
 
--   A constant mass flow ratio could also be devised (however in practice sensors are never installed for cost efficiency reasons. Maybe a s
+-   A constant mass flow ratio could also be devised (however in practice sensors are never installed for cost efficiency reasons. Maybe a s)
 
 Idea: show all on different graphs, only the rules without the effiency
 
@@ -271,13 +246,27 @@ NEW GRAPH AT DIFFERENT T WALL
 
 The figure XX shows that the ridge
 
-It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
+It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is in reality somewhat complicated. For example, some entry length effect happens in reality and also the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Beyond these modelling limitations, turbulence itself is not easy to predict and for given conditions, we can observe different regimes, in an oscillating way, or with an hysteresis \[REF NEEDED\].
 
 ### Variations
 
-To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?
 
 The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
+
+### Optimal operation for a given demand
+
+To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions? We chose the COP3 ad a KPIs, with its limits.
+
+fig XXX shows the optimal operation for the base case. A maximum seeking algortihm has been applied to the interpolated results. There are several regions in this plot that suggest different operating regimes, closely connected to the flow regime in the BHE collector. At low Q_heat, the optimal operation is "as low pump speed as possible", essentially "not trying to chase a too costly turbulence compared to the capacity required". Then, the operation follows the "laminar optimum", and later when it becomes advantageaous to go turbulent, the optimal follows the best trade-off. There is no auxiliary heating until the capacity if capped, which is in line with the expected behaviour of a HP. It seems that the choice of pump was probabaly not optimal: the optimal is sometimes capped by the minimum pump speed (30\%).
+
+The same plot is shown for the variants.
+
+It is clear from these optimal curves that the optimal can not be reached with traditional rule-of-thumd control.
+
+We plot a comparison of the plot achieved with different rules \[TODO\]. We see that over the range, the COP3 is inferior to the optimal we found.
+
+% Regardless of these limitations, it does seem that the optimal flow is located "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
+
 
 # Conclusions
 
