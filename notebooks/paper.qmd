@@ -146,9 +146,7 @@ Despite significant progress in GSHP flow control optimization, several critical
 
 The present study addresses these gaps by developing a comprehensive thermal-hydraulic model that couples detailed thermodynamic cycle analysis with borehole heat exchanger physics and pump hydraulics, enabling systematic investigation of optimal flow control strategies across different system configurations and operating conditions.
 
-# Methods
-
-## Modeling Framework Selection
+## Modeling Frameworks
 
 The complexity of GSHP systems has necessitated careful selection of modeling tools and frameworks. Various options exist, each with distinct advantages and limitations:
 
@@ -156,11 +154,15 @@ The complexity of GSHP systems has necessitated careful selection of modeling to
 
 **Modelica Ecosystem** tools, including commercial solutions like Modelon VCL and TIL Suite, as well as open-source libraries such as ThermoCycle, Buildings, and AixLib, provide sophisticated moving-boundary heat exchanger models with geometry-based heat transfer coefficient and pressure drop correlations. However, commercial libraries come with significant licensing costs and proprietary restrictions.
 
-**TRNSYS with Type 557 (DST)** has established itself as a standard tool for building and ground source heat pump studies, particularly excelling in seasonal GSHP simulations, though it relies on lumped/empirical cycle models rather than detailed moving-boundary heat exchanger physics.
+**TRNSYS (Type 557)** has established itself as a standard tool for building and ground source heat pump studies, particularly excelling in seasonal GSHP simulations, though it relies on lumped/empirical cycle models rather than detailed moving-boundary heat exchanger physics.
 
 **Python-based tools** have emerged as popular open-source alternatives, with CoolProp providing thermophysical properties, TESPy enabling process modeling for steady-state heat pump cycles, and pygfunction offering state-of-the-art borefield modeling capabilities.
 
 We decided to implement the model from scratch using ModelingToolkit.jl. This ecosystem exists as part of the Julia programming language and is similar in principle to Modelica: an acausal component-based framework. Key reasons for this choice include: free and open source nature, excellent symbolic computation capabilities, and seamless integration with advanced optimization and machine learning ecosystems.
+
+
+# Methods
+
 
 ## System Model Architecture
 
