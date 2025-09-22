@@ -209,11 +209,11 @@ We can see clearly that there is an optimal at 3.0K, around when the flow is ful
 
 ### Partial load
 
-is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
+is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f) (see @sec- ), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
 
 On the diagram, several isolines are represented:
 
--   The iso pump speed are represented in black. The 30% and 100% speeds are represented in thick and each 10% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.
+-   The iso pump speed are represented in black. The 30\% and 100\% speeds are represented in thick and each 10\% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.
 
 -   Similarily, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.
 
@@ -235,17 +235,17 @@ When
 
 Focusing on the position of the ridge, one can see that, in the colder wall collector scenario, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.
 
-Looking at the graph and coming back the the different ways to control as GSHP SF pump, we can make the following remarks:
+Looking at the graph and coming back the the different ways to control as GSHP SF pump, we can make the following remarks about the following constant heuristic strategies:
 
--   A constant Delta T / strategy necessarily fails at keeping the system on the ridge.
+-   *Delta T:* It necessarily fails at keeping the system on the ridge.
 
--   A constant pressure drop strategy could be
+-   *Pressure drop:*  strategy could be
 
--   A constant pump speed strategy can not track the change either
+-   *Pump speed:* It can not track the change either
 
--   A constant compressor speed to pump speed ratio
+-   *Compressor speed to pump speed ratio:* performs decently well over the transition, TODO
 
--   A constant mass flow ratio could also be devised (however in practice sensors are never installed for cost effieicncy reaspons. Maybe a s
+-   *Mass flow:* 
 
 
 ### Variations
@@ -274,13 +274,15 @@ The ensemble of figures @fig-optimal shows both the maximum COP3 achievable for 
 
 - Then there can be a zone with constant Delta T or slightly sloped Delta T vs Pump speed/Delta T. This is when the system follows the turbulent optimum.
 
-- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating. Hoever, this change is more subtle, 
+- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating. Hoever, this change is more subtle (between 0.1K and 1K of difference compared to the previous optimal detla T).
 
 # Conclusions
 
-It seems that the widespread rule based controll perform decently in the test case, however, it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.
+It seems that the widespread rule based controll perform decently in some test cases, however, theree is considerable potential to increasee the performances.
 
 # Discussion
+
+it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.
 
 It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
 
@@ -411,29 +413,81 @@ It is important to remember the model's assumptions when discussing these aspect
 
 ## Borehole Heat Exchanger Specifications
 
-**Geometric Parameters:** - Borehole depth: $L_b = 250$ m - Pipe outer diameter: $D_{pipe,o} = 32$ mm - Pipe inner diameter: $D_{pipe,i} = 28.24$ mm - Pipe wall thickness: $t_{pipe} = 1.88$ mm - Borehole diameter: $D_{bh} = 115$ mm - Shank spacing: $s = 75$ mm
+**Geometric Parameters:**
 
-**Thermal Properties:** - Pipe thermal conductivity: $\lambda_{pipe} = 0.4$ W/(m·K) - Grout thermal conductivity: $\lambda_{grout} = 1.5$ W/(m·K) - Ground thermal conductivity: $\lambda_{soil} = 2.0$ W/(m·K) - Boundary condition: $T_{wall} = 283.15$ K (constant)
+- Borehole depth: $L_b = 250$ m
+
+- Pipe outer diameter: $D_{pipe,o} = 32$ mm
+
+- Pipe inner diameter: $D_{pipe,i} = 28.24$ mm
+
+- Pipe wall thickness: $t_{pipe} = 1.88$ mm
+
+- Borehole diameter: $D_{bh} = 115$ mm
+
+- Shank spacing: $s = 75$ mm
+
+**Thermal Properties:**
+
+- Pipe thermal conductivity: $\lambda_{pipe} = 0.4$ W/(m·K)
+
+- Grout thermal conductivity: $\lambda_{grout} = 1.5$ W/(m·K)
+
+- Ground thermal conductivity: $\lambda_{soil} = 2.0$ W/(m·K)
+
+- Boundary condition: $T_{wall} = 283.15$ K (if not specified otherwise)
 
 ## Heat Pump System Parameters
 
-**Working Fluids:** - Primary refrigerant: R134A - Secondary fluid: MEA aqueous solution with mass fraction $\chi = 0.28$
+**Working Fluids:**
 
-**Compressor Specifications:** - Isentropic efficiency: $\eta_{is} = 0.7$ - Operating frequency: $f = 50$ Hz - Electrical motor efficiency: $\eta_{motor} = 0.9$
+- Primary refrigerant: R134A
+
+- Secondary fluid: MEA aqueous solution with mass fraction $\chi = 0.28$
+
+**Compressor Specifications:**
+
+- Isentropic efficiency: $\eta_{is} = 0.7$
+
+- Operating frequency: $f = 50$ Hz
+
+- Electrical motor efficiency: $\eta_{motor} = 0.9$
 
 ## Plate Heat Exchanger (Evaporator) Specifications
 
-**Geometric Parameters:** - Number of plates: $N_{plates} = 20$ - Plate width: $W = 0.1$ m - Plate length: $L = 0.3$ m - Channel spacing: $b = 1.5$ mm - Chevron angle: $\beta = \pi/6$ rad $(30°)$ - Plate thickness: $t_{plate} = 0.5$ mm - Plate thermal conductivity: $\lambda_{plate} = 16$ W/(m·K)
+**Geometric Parameters:**
+
+- Number of plates: $N_{plates} = 20$
+
+- Plate width: $W = 0.1$ m
+
+- Plate length: $L = 0.3$ m
+
+- Channel spacing: $b = 1.5$ mm
+
+- Chevron angle: $\beta = \pi/6$ rad $(30°)$
+
+- Plate thickness: $t_{plate} = 0.5$ mm
+
+- Plate thermal conductivity: $\lambda_{plate} = 16$ W/(m·K)
 
 ## Operating Conditions (test_GSHP Reference Case)
 
-**Temperature Differences:** - Secondary fluid temperature difference: $\Delta T_{SF} = 3.5$ K - Superheating temperature difference: $\Delta T_{SH} = 7$ K - Subcooling temperature difference: $\Delta T_{SC} = 5$ K
+**Temperature Differences:** 
 
-**Pressure Conditions:** - High-side pressure: $P_{high} = 14$ bar - Secondary fluid mass fraction: $\chi = 0.28$
+- Superheating temperature difference: $\Delta T_{SH} = 7$ K
+
+- Subcooling temperature difference: $\Delta T_{SC} = 5$ K
+
+**Pressure Conditions:**
+
+- High-side pressure: $P_{high} = 14$ bar - Secondary fluid mass fraction: $\chi = 0.28$
 
 ## Mathematical Correlations
 
-**Pump Performance:** - Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
+**Pump Performance:**
+
+- Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
 
 -   Dimensionless flow coefficient: $$\phi = \frac{\dot{V}}{N \cdot D^3}$$
 
@@ -443,16 +497,24 @@ It is important to remember the model's assumptions when discussing these aspect
 
 where $N$ is rotational speed \[rpm\], $D$ is impeller diameter \[m\], $\dot{V}$ is volumetric flow rate \[m³/s\], $H$ is pump head \[m\], $\eta_{max}$ is maximum efficiency, and $\phi_{BEP}$ is flow coefficient at best efficiency point.
 
-**Power Consumption:** - Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
+**Power Consumption:**
+
+- Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
 
 -   Electrical power: $$P_{elec} = \frac{P_{shaft}}{\eta_{motor}}$$
 
-**Compressor Work:** - Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
+**Compressor Work:**
+
+- Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
 
 where $\dot{m}_{ref}$ is refrigerant mass flow rate \[kg/s\], $h_{in}$ and $h_{out,s}$ are inlet and isentropic outlet specific enthalpies \[kJ/kg\], respectively.
 
-**Coefficient of Performance:** - Thermal COP: $$COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$$
+**Coefficient of Performance:**
 
--   System COP: $$COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$$
+- $$COP_1 = \frac{\dot{Q}_{cond}}{W_{comp}}$$
 
-where $\dot{Q}_{evap}$ is evaporator heat transfer rate \[W\].
+- $$COP_2 = \frac{\dot{Q}_{cond}}{W_{comp} + P_{pump}}$$
+
+- $$COP_3(Q_{SP}) = \frac{\dot{Q}_{cond} + P_{aux}}{W_{comp} + P_{pump} + P_{aux}}$$
+
+where $\dot{Q}_{evap}$ is evaporator heat transfer rate \[W\] and $P_{aux}=max(0.0, Q_{SP} - Q_{cond})$
