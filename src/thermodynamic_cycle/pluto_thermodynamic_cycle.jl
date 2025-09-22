@@ -4542,11 +4542,11 @@ md" # Comparison ridge position"
 # ╔═╡ fdfb7456-6d8e-44c8-a883-1d1faeb96ede
 md" # Comparison pump efficiency"
 
-# ╔═╡ 1a9a9e58-41ac-45fb-9891-2e2e531621e5
-
-
 # ╔═╡ 8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
 md" # Other explorations"
+
+# ╔═╡ 6e2dd049-c583-4e2d-95ec-90796f38732d
+
 
 # ╔═╡ 4e1204d9-eab8-4890-a957-92341c8edfc4
 md" # 2D Parametric Simulations"
@@ -4659,346 +4659,630 @@ ovs_plots_2 = [
 df_grid_wall|> names
   ╠═╡ =#
 
-# ╔═╡ 79b17009-14ee-422e-8eb6-9e81c270b602
-#=╠═╡
-begin
-	# --- 1) Pack the SR grid with the same keys as df_grid_wall -------------------
-	df_sr_grid_wall = DataFrame()
-	df_sr_grid_wall[!, xcol] = Xgrid_ord[!, xcol]
-	df_sr_grid_wall[!, ycol] = Xgrid_ord[!, ycol]
-	for t in targets
-	    df_sr_grid_wall[!, t] = Ygrid_hat[!, t]         # unitless during math is OK
-	end
-	
-	# --- 2) Join and build error columns (unit-safe) ------------------------------
-	true_tbl = select(df_grid_wall, vcat([xcol, ycol], targets))
-	pred_tbl = select(df_sr_grid_wall, vcat([xcol, ycol], targets))
-	
-	rename!(true_tbl, Dict(t => Symbol(t, "_true") for t in targets))
-	rename!(pred_tbl, Dict(t => Symbol(t, "_sr")   for t in targets))
-	
-	cmp = innerjoin(true_tbl, pred_tbl, on=[xcol, ycol])
-	
-	for t in targets
-	    y  = ustrip.(cmp[!, Symbol(t, "_true")])
-	    ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
-	    cmp[!, Symbol(t, "_Δ")]    = ŷ .- y
-	    cmp[!, Symbol(t, "_rel%")] = 100 .* (cmp[!, Symbol(t, "_Δ")] ./ max.(abs.(y), eps()))
-	end
-	
-	# --- 3) Summary table of metrics ---------------------------------------------
-	function grid_metrics(cmp, targets)
-	    rows = NamedTuple[]
-	    for t in targets
-	        y  = ustrip.(cmp[!, Symbol(t, "_true")])
-	        ŷ  = ustrip.(cmp[!, Symbol(t, "_sr")])
-	        e  = ŷ .- y
-	        push!(rows, (target=t,
-	                     RMSE = sqrt(mean(e.^2)),
-	                     MAE  = mean(abs.(e)),
-	                     MAPE = 100*mean(abs.(e) ./ max.(abs.(y), eps())),
-	                     R2   = 1 - sum(e.^2) / max(sum((y .- mean(y)).^2), eps())))
-	    end
-	    DataFrame(rows)
-	end
-	
-	metrics_tbl = grid_metrics(cmp, targets)  # ← tidy numeric comparison
-	
-	# --- 4) A few “shape” comparisons --------------------------------------------
-	# Peak shift between true and SR fields
-	function peak_shift(cmp, xcol, ycol, z::Symbol)
-	    yt = ustrip.(cmp[!, Symbol(z, "_true")]); it = argmax(yt)
-	    yp = ustrip.(cmp[!, Symbol(z, "_sr")]);   ip = argmax(yp)
-	    (; Δx = ustrip(cmp[ip, xcol] - cmp[it, xcol]),
-	       Δy = ustrip(cmp[ip, ycol] - cmp[it, ycol]),
-	       max_true = yt[it], max_sr = yp[ip])
-	end
-	peak_Q_cond = peak_shift(cmp, xcol, ycol, :Q_cond)
-	
-	# Dice coefficient for superlevel sets (iso-contour agreement)
-	function dice_at(cmp, z::Symbol, τ::Real)
-	    A = ustrip.(cmp[!, Symbol(z, "_true")]) .>= τ
-	    B = ustrip.(cmp[!, Symbol(z, "_sr")])   .>= τ
-	    2*sum(A .& B) / max(sum(A) + sum(B), 1)
-	end
-	dice_Q5000 = dice_at(cmp, :Q_cond, 5_000.0)
-	
-	# Gradient-direction alignment (cosine similarity of ∇Z)
-	function grad_alignment(cmp, xcol, ycol, z::Symbol, nx::Int, ny::Int)
-	    Zt = reshape(ustrip.(cmp[!, Symbol(z, "_true")]), ny, nx)
-	    Zp = reshape(ustrip.(cmp[!, Symbol(z, "_sr")]),   ny, nx)
-	    ∂x(A) = @views 0.5 .* (A[:,3:end] .- A[:,1:end-2])
-	    ∂y(A) = @views 0.5 .* (A[3:end,:] .- A[1:end-2,:])
-	    gx_t, gy_t = ∂x(Zt)[2:end-1,:], ∂y(Zt)[:,2:end-1]
-	    gx_p, gy_p = ∂x(Zp)[2:end-1,:], ∂y(Zp)[:,2:end-1]
-	    num = gx_t .* gx_p .+ gy_t .* gy_p
-	    den = sqrt.(gx_t.^2 .+ gy_t.^2) .* sqrt.(gx_p.^2 .+ gy_p.^2) .+ eps()
-	    mean(num ./ den)
-	end
-	cos_grad_Q = grad_alignment(cmp, xcol, ycol, :Q_cond, length(xvals), length(yvals))
-	
-end
-  ╠═╡ =#
-
 # ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
 md" # COP3 interpolation"
 
-# ╔═╡ 682f4fc9-e4c5-4c5a-b872-f901388e1992
-image_dir
+# ╔═╡ 033594e2-7f94-4b32-b7fa-23490e087918
+md" ## Base scenario"
 
-# ╔═╡ 778d8c9e-2762-44d6-b8c0-318196498304
-function _auto_s(z::AbstractMatrix; frac::Real = 0.01)
-    v = var(skipmissing(vec(z)))
-    isnan(v) && (v = 0.0)
-    return frac * v * length(z)
+# ╔═╡ 8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
+Qs = 100:50:8500
+
+# ╔═╡ 48478706-2c6a-4bba-a63d-e8ebf8baafee
+md" ## Pure water"
+
+# ╔═╡ ff4149ab-7af1-4b9b-8f26-70c52930150d
+md" ## Colder wall"
+
+# ╔═╡ 9f3f5b7d-8a4d-4bd5-a7b9-1926d3087c72
+md" ## Longer borehole"
+
+# ╔═╡ b9613755-4061-4aec-a50f-b5d739b9df25
+md"---"
+
+# ╔═╡ 769f3480-9062-402b-a43e-9c98e9b63cde
+function save_figure(fig; save_path::AbstractString, force_create_path::Bool=true)
+    force_create_path && mkpath(dirname(save_path))
+    CairoMakie.save(save_path, fig)
+    return save_path
 end
 
-# ╔═╡ 23ce92ed-6f53-4f1c-9896-b9280e08b272
-# --- 1) Smooth max helper (softplus) -----------------------------------------
-# tau controls the "softness": smaller tau ~ sharper kink (tau≈5–20 is usually good)
-softmax0(x; tau::Real=10.0) = (1/tau) * log1p(exp(tau * x))
+# ╔═╡ 8cc18375-13b9-41ec-b162-dc3650d51e7f
 
-# --- 2) cop3_at with smooth Paux ---------------------------------------------
 
-# ╔═╡ 92502f92-9e37-43a3-bf33-cc795218f98e
-function cop3_at(spl::NamedTuple, x::Real, y::Real; Qsp::Real, tau::Real=12.0)
+# ╔═╡ 6fefe780-17cc-425c-b6c3-4b960f0e1665
+function plot_multi_axes(
+    df;
+    x::Symbol = :Qsp,
+    y_groups::Vector{Vector{Symbol}},
+    sides::Vector{Bool},
+    labels::AbstractDict{Symbol,<:AbstractString} = Dict{Symbol,String}(),
+    ylabels::Vector{<:AbstractString} = fill("", length(y_groups)),
+    lw::Real = 2,
+    palette = :tab10,
+    linestyles::AbstractDict{Symbol,Symbol} = Dict{Symbol,Symbol}(),
+    y0_groups::Vector{Bool} = fill(false, length(y_groups)),
+    xlabel::AbstractString = string(x),
+    title::AbstractString = "",
+    legend_position = :right,
+    diag_y_eq_x::Bool = false,
+    diag_style::NamedTuple = (; color=:gray, linestyle=:dash, linewidth=1.5),
+    save_path::Union{Nothing,AbstractString} = nothing,
+    force_create_path::Bool = true,
+)
+    @assert length(y_groups) == length(sides) "y_groups and sides must match in length"
+    @assert length(ylabels)  == length(y_groups) "ylabels must match y_groups length"
+    @assert length(y0_groups)== length(y_groups) "y0_groups must match y_groups length"
+
+    xs = df[!, x]
+    all_syms = reduce(vcat, y_groups; init=Symbol[])
+    nseries = max(length(all_syms), 1)
+    cm = cgrad(palette, nseries; categorical=true)
+    color_map = Dict(s => cm[i] for (i,s) in enumerate(all_syms))
+
+    fig = Figure()
+    ax_base = Axis(fig[1,1]; xlabel=xlabel, ylabel="", title=title)
+    axes_left  = Axis[]     # includes base first
+    axes_right = Axis[]
+    push!(axes_left, ax_base)
+
+    function _new_axis(; right::Bool, ylabel::AbstractString)
+        ax = Axis(fig[1,1];
+                  yaxisposition = right ? :right : :left,
+                  ylabel = ylabel)
+        if right
+            hidespines!(ax, :l, :t, :b)
+        else
+            hidespines!(ax, :r, :t, :b)
+        end
+        hidexdecorations!(ax, grid=false)
+        linkxaxes!(ax_base, ax)
+        return ax
+    end
+
+    left_count, right_count = 0, 0
+    axis_for_group = Axis[]
+    for (i, right_side) in enumerate(sides)
+        if right_side
+            ax = _new_axis(right=true,  ylabel=ylabels[i])
+            push!(axes_right, ax); push!(axis_for_group, ax); right_count += 1
+        else
+            if left_count == 0
+                ax_base.ylabel = ylabels[i]  # first left group uses base axis
+                ax = ax_base
+            else
+                ax = _new_axis(right=false, ylabel=ylabels[i])
+                push!(axes_left, ax)
+            end
+            push!(axis_for_group, ax); left_count += 1
+        end
+    end
+
+	function _space_stacks!(axes::Vector{Axis}; base_space=28.0, step=36.0, right::Bool=false)
+	    for (k, ax) in enumerate(axes)
+	        ax.yticklabelspace[] = base_space + (k-1)*step
+	        ax.ylabelpadding[]   = 8.0
+	
+	        # yticklabelcolor[] might be a Symbol or a Colorant; normalize
+	        c = ax.yticklabelcolor[]
+	        c = (c isa Symbol || c isa AbstractString) ? to_color(c) : c
+	
+	        if right
+	            ax.rightspinecolor[] = c
+	        else
+	            ax.leftspinecolor[]  = c
+	        end
+	    end
+	end
+
+	
+    _space_stacks!(axes_left;  base_space=28.0, step=40.0, right=false)
+    _space_stacks!(axes_right; base_space=36.0, step=40.0, right=true)
+
+    legend_entries = NamedTuple[]
+    for (i, grp) in enumerate(y_groups)
+        ax = axis_for_group[i]
+        for s in grp
+            @assert s ∈ Symbol.(names(df)) "column $(s) not found in DataFrame"
+            p = lines!(ax, xs, df[!, s];
+                       linewidth=lw,
+                       color=color_map[s],
+                       linestyle=get(linestyles, s, :solid))
+            push!(legend_entries, (; handle=p, name=get(labels, s, String(s))))
+        end
+        if y0_groups[i]
+            yl = ylimits(ax); ylims!(ax, 0, yl[2])
+        end
+        if diag_y_eq_x && !sides[i]   # draw diagonal once on a left axis
+            lines!(ax, xs, xs; color=diag_style.color,
+                   linestyle=diag_style.linestyle, linewidth=diag_style.linewidth)
+        end
+    end
+
+    if !isempty(legend_entries)
+        Legend(fig[1,2], getfield.(legend_entries, :handle), getfield.(legend_entries, :name);
+               framevisible=false, position=legend_position)
+    end
+
+    resize_to_layout!(fig)
+    if save_path !== nothing
+        save_figure(fig; save_path=String(save_path), force_create_path=force_create_path)
+    end
+    return fig
+end
+
+
+# ╔═╡ e2db4d18-bc58-43ef-b003-e9bc10f7c89c
+function _fill_line!(v::AbstractVector{T}) where {T<:Real}
+    n = length(v); n == 0 && return v
+    m = .!isnan.(v); count(m) == 0 && return v
+    i1 = findfirst(m); i2 = findlast(m)
+    i1 > 1 && (v[1:i1-1] .= v[i1])
+    i2 < n && (v[i2+1:end] .= v[i2])
+    i = i1
+    while i <= i2
+        if !isnan(v[i]); i += 1; continue; end
+        s = i
+        while i <= i2 && isnan(v[i]); i += 1; end
+        e = i - 1
+        yL, yR = v[s-1], v[e+1]
+        L = e - s + 1
+        @inbounds for k in 0:L-1
+            v[s+k] = yL + (yR - yL) * ((k+1)/(L+1))
+        end
+    end
+    v
+end
+
+# 2D rectangular fill (columns, then rows, final fallback)
+
+# ╔═╡ f605308a-47a5-49e5-bda4-763350e21748
+function _fill_nans_rect!(Z::AbstractMatrix{T}) where {T<:Real}
+    Zf = copy(Z)
+    for j in axes(Zf,2); _fill_line!(view(Zf, :, j)); end
+    for i in axes(Zf,1); _fill_line!(view(Zf, i, :)); end
+    v = vec(Zf); m = .!isnan.(v)
+    if any(.!m)
+        μ = count(m) > 0 ? mean(v[m]) : 0.0
+        Zf[.!isfinite.(Zf)] .= μ
+        Zf[isnan.(Zf)] .= μ
+    end
+    Zf
+end
+
+# ╔═╡ dace0a13-ba22-49b3-b349-45090e15486b
+# ╠═╡ disabled = true
+#=╠═╡
+_safecolorrange(Z) = begin
+    v = vec(Z); m = .!isnan.(v)
+    !any(m) ? nothing : (extrema(v[m]) |> x -> x[1]==x[2] ? (x[1]-1e-6, x[2]+1e-6) : x)
+end
+
+# ---------- splines ----------
+  ╠═╡ =#
+
+# ╔═╡ d87aec62-0109-4ab8-a313-a339b1b6efb6
+function cop3_at_hard(spl::NamedTuple, x::Real, y::Real; Qsp::Real)
     Ŵ = max(0.0, spl.W(x, y))
     P̂ = max(0.0, spl.P(x, y))
     Q̂ = max(0.0, spl.Q(x, y))
-    # smooth approximation of max(0, Qsp - Q̂)
-    Paux = softmax0(Qsp - Q̂; tau=tau)
+    Paux = max(0.0, Qsp - Q̂)
     return (Q̂ + Paux) / (Ŵ + P̂ + Paux)
 end
 
-# ╔═╡ d4f3ac34-65e1-404b-8ca8-6ca09e0b466a
-function optimal_cop3_from_splines_robust(setup::NamedTuple; Qsp::Real,
-    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    coarse_nx::Int=61, coarse_ny::Int=61,     # a bit denser coarse grid
-    Kstarts::Int=6,                            # multistart count (top-K coarse points)
-    tau::Real=12.0,                            # softplus sharpness
-    shrink_frac::Real=1e-3,                    # avoid exact boundary eval
-    optimizer=Fminbox(NelderMead()),
-    maxiters::Int=2_000,                       # more room than default
-    inner_options::Optim.Options=Optim.Options(g_tol=1e-8, f_tol=1e-10, iterations=2_000),
-    warm_start::Union{Nothing,Tuple{Float64,Float64}}=nothing
-)
-    X, Y, spl = setup.X, setup.Y, setup.spl
+# ╔═╡ 66c14835-9ebe-479b-82ef-637b7ca8651b
+"""
+    sample_splines_grid(setup; nx=401, ny=401,
+                        xbounds=nothing, ybounds=nothing,
+                        fields=(:W, :P, :Q, :N, :rP))
 
+Evaluate the fitted splines on a rectilinear grid.
+Returns `(xs, ys, Z::NamedTuple)` where each `Z[field]` is `nx×ny`.
+"""
+function sample_splines_grid(setup; nx::Int=401, ny::Int=401,
+                             xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+                             ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+                             fields::Tuple=(:W, :P, :Q, :N, :rP))
+
+    X, Y, spl = setup.X, setup.Y, setup.spl
     xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
     ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
 
-    # shrink to interior to reduce 2D spline extrapolation weirdness near edges
-    dx = shrink_frac * (xmax - xmin)
-    dy = shrink_frac * (ymax - ymin)
-    xmin_, xmax_ = xmin + dx, xmax - dx
-    ymin_, ymax_ = ymin + dy, ymax - dy
-
-    clampxy(x, y) = (clamp(x, xmin_, xmax_), clamp(y, ymin_, ymax_))
-
-    fmin(v) = begin
-        x, y = clampxy(v[1], v[2])
-        -cop3_at(spl, x, y; Qsp=Qsp, tau=tau)
+    Zpairs = Vector{Pair{Symbol,Matrix{Float64}}}()
+    for f in fields
+        hasproperty(spl, f) || error("setup.spl has no field $(f)")
+        s = getproperty(spl, f)
+        Z = [s(x,y) for x in xs, y in ys]
+        push!(Zpairs, f => Z)
     end
-
-    # --- coarse grid scan
-    xs = range(xmin_, xmax_; length=coarse_nx)
-    ys = range(ymin_, ymax_; length=coarse_ny)
-    coarse = Tuple{Float64,Float64,Float64}[]
-    @inbounds for yy in ys, xx in xs
-        c = cop3_at(spl, xx, yy; Qsp=Qsp, tau=tau)
-        if isfinite(c)
-            push!(coarse, (c, xx, yy))
-        end
-    end
-    isempty(coarse) && error("No finite COP₃ over the search grid; check bounds/splines.")
-    sort!(coarse, by = first, rev = true)
-
-    # seed list = (optional warm start first) + top-K coarse
-    seeds = Vector{SVector{2,Float64}}()
-    if warm_start !== nothing
-        x0, y0 = clampxy(warm_start[1], warm_start[2])
-        push!(seeds, SVector(x0, y0))
-    end
-    for i in 1:min(Kstarts, length(coarse))
-        _, xx, yy = coarse[i]
-        push!(seeds, SVector(xx, yy))
-    end
-
-    # run locals and keep best
-    best_val = -Inf
-    best_v   = seeds[1]
-    for s in seeds
-        res = Optim.optimize(fmin,
-            [xmin_, ymin_], [xmax_, ymax_], collect(s),
-            optimizer; iterations = maxiters, optimizer_o = inner_options)
-        v̂ = Optim.minimizer(res)
-        x̂, ŷ = clampxy(v̂[1], v̂[2])
-        ĉ = cop3_at(spl, x̂, ŷ; Qsp=Qsp, tau=tau)
-        if isfinite(ĉ) && ĉ > best_val
-            best_val = ĉ
-            best_v   = SVector(x̂, ŷ)
-        end
-    end
-
-    x̂, ŷ = best_v
-    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
-    Paux̂ = softmax0(Qsp - Q̂; tau=tau)
-
-    return (ΔT=x̂, f=ŷ, COP3=best_val, Q_cond=Q̂, W_comp=Ŵ, P_pump=P̂, P_aux=Paux̂)
+    return xs, ys, NamedTuple(Zpairs)
 end
 
-# ╔═╡ 3d1c09c9-9144-4ceb-82da-ee9d50ed108c
-"""
-    optimal_cop3_from_splines(setup; Qsp, xbounds=nothing, ybounds=nothing,
-                              coarse_nx=41, coarse_ny=41,
-                              optimizer=Fminbox(NelderMead()); maxiters=1_000)
 
-Same as `optimal_cop3`, but takes the output of `make_splines` to reuse splines.
-"""
-function optimal_cop3_from_splines(setup::NamedTuple; Qsp::Real,
+# ╔═╡ 94fa6d40-53ae-43f5-a388-e713c00c4b18
+# Evaluate raw spline fields at (ΔT,f)
+function fields_at(spl, ΔT::Real, f::Real)
+    W = max(0.0, spl.W(ΔT,f))
+    P = max(0.0, spl.P(ΔT,f))
+    Q = max(0.0, spl.Q(ΔT,f))
+    N = spl.N(ΔT,f)
+    rP = max(0.0, spl.rP(ΔT,f))
+    return (; W, P, Q, N, rP)
+end
+
+# Add duty/Paux and a few convenience metrics (does not affect optimization)
+
+# ╔═╡ 8a415054-b012-4705-bf24-6268c05cbec4
+function _segments_avoiding_jumps(v::AbstractVector; thresh=:auto)
+    n = length(v); n ≤ 1 && return UnitRange{Int}[]
+    d = abs.(diff(v))
+    if thresh === :auto
+        # robust threshold using median absolute deviation of diffs
+        md = median(d[isfinite.(d)])
+        thresh = 5md   # tweak if needed
+        if !isfinite(thresh) || thresh == 0
+            thresh = maximum(d) * 0.0  # no splits
+        end
+    end
+    brks = findall(d .> thresh)
+    segs = UnitRange{Int}[]
+    s = 1
+    for b in brks
+        push!(segs, s:b)      # inclusive
+        s = b + 1
+    end
+    push!(segs, s:n)
+    segs
+end
+
+# simple centered rolling window (odd width), mean/median
+
+# ╔═╡ 96c15321-842a-4f66-926d-de1638cec610
+function _roll1(v::AbstractVector{<:Real}, method::Symbol, width::Int)
+    @assert isodd(width) "width should be odd"
+    n = length(v); k = (width-1) ÷ 2
+    out = similar(float.(v))
+    @inbounds for i in 1:n
+        lo = max(1, i-k); hi = min(n, i+k)
+        wv = @view v[lo:hi]
+        out[i] = method === :median ? median(wv) :
+                 method === :mean   ? mean(wv)   :
+                 error("method must be :median or :mean")
+    end
+    out
+end
+
+# jump-aware smoothing of selected columns
+
+# ╔═╡ 73744de2-af34-46be-8be6-b12ebbf00b73
+#=╠═╡
+function _smooth_columns(df::DataFrame; cols=Symbol[:ΔT, :f],
+                         method::Symbol=:median, width::Int=7,
+                         jump_thresh=:auto)
+    @assert width ≥ 1 && isodd(width)
+    for c in cols
+        v = collect(df[!, c])
+        segs = _segments_avoiding_jumps(v; thresh=jump_thresh)
+        sm = similar(float.(v))
+        for r in segs
+            sm[r] = _roll1(view(v, r), method, width)
+        end
+        df[!, c] = sm
+    end
+    return df
+end
+  ╠═╡ =#
+
+# ╔═╡ cbef6827-61cc-4c0b-b779-57ac14e28982
+function metrics_at(spl, ΔT::Real, f::Real; Qsp::Real)
+    F = fields_at(spl, ΔT, f)
+    Qhat, W, P = F.Q, F.W, F.P
+    if Qhat >= Qsp
+        duty = Qsp / Qhat
+        Paux = 0.0
+    else
+        duty = 1.0
+        Paux = Qsp - Qhat      # aux heat (and power, since COP_aux = 1)
+    end
+    COP_noaux = Qhat / max(1e-12, (W + P))                # machine-only COP
+    COP3      = (Qhat + Paux) / max(1e-12, (W + P + Paux))# your objective
+    Pin_total = W + P + Paux
+    cap_margin = Qhat - Qsp
+    return merge(F, (; duty, Paux, COP_noaux, COP3, Pin_total, cap_margin,
+                      Qhat=Qhat, meets = Qhat >= Qsp))
+end
+
+# ╔═╡ e63c52e0-678a-4673-a65a-62c422680e2d
+# hard masks; infeasible returns either NaN (for "holes") or 0.0
+function cop3_masked_hard_at(spl::NamedTuple, x::Real, y::Real;
+    Qsp::Real,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
+    Pmax::Real=1.0
+)
+    # feasibility checks
+    if N_bounds !== nothing
+        N̂ = spl.N(x, y)
+        lo, hi = N_bounds
+        if (N̂ < lo) || (N̂ > hi)
+            return 0.0
+        end
+    end
+
+    P̂ = max(0.0, spl.rP(x, y))
+    if isfinite(Pmax) && (P̂ > Pmax)
+        return 0.0
+    end
+
+    # feasible -> base COP3 with hard Paux
+    return cop3_at_hard(spl, x, y; Qsp=Qsp)
+end
+
+
+# ╔═╡ de4fb33c-7af3-4593-bc68-79558eb34f26
+function sample_masked_cop3_hard(setup; Qsp::Real,
+    nx::Int=401, ny::Int=401,
     xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
     ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    coarse_nx::Int=41, coarse_ny::Int=41,
-    optimizer=Fminbox(NelderMead()), maxiters::Int=1_000)
-
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
+    Pmax::Real=1.0, margin::Real=0.0
+)
     X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
+    Z  = [cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
+                               N_bounds=N_bounds, Pmax=Pmax)
+          for x in xs, y in ys]
+    xs, ys, Z
+end
 
+
+# ╔═╡ c472a38d-369c-4f33-b6ec-708e792ba1e6
+# ╠═╡ disabled = true
+#=╠═╡
+# compute a safe colorrange for a set of matrices (ignore NaNs)
+_safecolorrange_set(Zs::Vector{<:AbstractMatrix}) = begin
+    vals = reduce(vcat, map(vec, Zs))
+    m = .!isnan.(vals)
+    if !any(m)
+        nothing
+    else
+        lo, hi = extrema(vals[m])
+        lo == hi ? (lo-1e-6, hi+1e-6) : (lo, hi)
+    end
+end
+  ╠═╡ =#
+
+# ╔═╡ 899d157e-a242-41bf-92da-466f50e72588
+# pick the right evaluator based on `cop`
+# cop = :plain         -> cop3_at (soft Paux)
+# cop = :masked        -> cop3_masked_at (soft masks + soft Paux)
+# cop = :masked_hard   -> cop3_masked_hard_at (hard masks + hard Paux)
+function _make_cop_eval(spl; cop::Symbol= :masked_hard, Qsp::Real, N_bounds, Pmax::Real)
+    if cop === :masked_hard
+        return (x,y) -> cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
+                                            N_bounds=N_bounds, Pmax=Pmax)
+    else
+        error("cop must be one of :masked_hard; got $cop")
+    end
+end
+
+
+# ╔═╡ cb7178e5-9bc6-45c3-aa11-52972df91fac
+function brute_opt_cop3(setup; Qsp::Real,
+    nx::Int=201, ny::Int=201,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    cop::Symbol=:masked_hard,
+    tau::Real=12.0,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    Pmax::Real=Inf, kN::Real=30, kP::Real=30,
+    return_field::Bool=false
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
+
+    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp,
+                              N_bounds=N_bounds, Pmax=Pmax)
+
+    Z = [eval_cop(x,y) for x in xs, y in ys]
+
+    Zsafe = copy(Z)
+    @inbounds for j in axes(Zsafe,2), i in axes(Zsafe,1)
+        if !isfinite(Zsafe[i,j]); Zsafe[i,j] = -Inf; end
+    end
+    all(isinf, Zsafe) && error("No finite COP₃ on the grid; adjust bounds or inputs.")
+
+    k = argmax(Zsafe)
+    Ii, Jj = Tuple(CartesianIndices(Zsafe)[k])
+    x̂ = xs[Ii]; ŷ = ys[Jj]; ĉ = Z[Ii,Jj]
+
+    out = (; ΔT=x̂, f=ŷ, COP3=ĉ, Qsp=Qsp, idx=(Ii,Jj), xs, ys)
+    return return_field ? (; out..., Z) : out
+end
+
+
+# ╔═╡ 639e359f-5760-4adb-9258-967d5db2eea4
+function refine_opt_cop3(setup; Qsp::Real,
+    start::Tuple{<:Real,<:Real}, 
+    xbounds=nothing, ybounds=nothing,
+    cop::Symbol=:masked_hard, tau::Real=12.0,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
+    Pmax::Real=1.0, kN::Real=30, kP::Real=30,
+    iterations::Int=10_000,
+    kstarts::Int=10,    # try >1 for multi-start
+    jitter::Real=5e-2  # fraction of range for random nudges
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
     xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
     ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
     clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
 
-    xs = range(xmin, xmax; length=coarse_nx)
-    ys = range(ymin, ymax; length=coarse_ny)
-    best_cop, x0, y0 = -Inf, NaN, NaN
-    @inbounds for yy in ys, xx in xs
-        c = cop3_at(spl, xx, yy; Qsp=Qsp)
-        if isfinite(c) && c > best_cop
-            best_cop = c; x0 = xx; y0 = yy
+    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp, N_bounds=N_bounds, Pmax=Pmax)
+
+    fneg(v) = begin
+        x, y = clampxy(v[1], v[2])
+        -eval_cop(x, y)
+    end
+
+    # generate kstarts seeds (small interior jitters help escape local traps)
+    rx, ry = (xmax - xmin), (ymax - ymin)
+    seeds = Vector{Vector{Float64}}()
+    x0, y0 = clampxy(start[1], start[2])
+    push!(seeds, [x0, y0])
+    for _ in 2:kstarts
+        δx = (2rand()-1) * jitter * rx
+        δy = (2rand()-1) * jitter * ry
+        push!(seeds, [clamp(x0+δx, xmin, xmax), clamp(y0+δy, ymin, ymax)])
+    end
+
+    best_res, best_val, best_xy = nothing, Inf, (x0,y0)
+    for s in seeds
+        res = Optim.optimize(fneg, s, NelderMead(),
+                             Optim.Options(iterations=iterations, show_trace=false))
+        v̂ = Optim.minimizer(res)
+        x̂, ŷ = clampxy(v̂[1], v̂[2])
+        val = fneg(v̂)
+        if val < best_val
+            best_val, best_res, best_xy = val, res, (x̂,ŷ)
         end
     end
-    isnan(x0) && error("No finite COP3 over the search grid; check bounds")
-
-    fmin(v) = begin
-        x, y = clampxy(v[1], v[2])
-        -cop3_at(spl, x, y; Qsp=Qsp)
-    end
-    lower = [xmin, ymin]; upper = [xmax, ymax]; init = [x0, y0]
-    res = Optim.optimize(fmin, lower, upper, init, optimizer)
-
-    v̂ = Optim.minimizer(res)
-    x̂, ŷ = clampxy(v̂[1], v̂[2])
-    COP̂ = cop3_at(spl, x̂, ŷ; Qsp=Qsp)
-
-    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
-    Paux̂ = max(0.0, Qsp - Q̂)
-
-    return (ΔT=x̂, f=ŷ, COP3=COP̂, Q_cond=Q̂, W_comp=Ŵ, P_pump=P̂, P_aux=Paux̂, result=res)
+    x̂, ŷ = best_xy
+    COP̂ = eval_cop(x̂, ŷ)
+    return (; ΔT=x̂, f=ŷ, COP3=COP̂, Qsp=Qsp, result=best_res, start=(x0,y0))
 end
 
 
-# ╔═╡ 381c94cb-10a0-424d-bbfd-999f71ce5df2
+# ╔═╡ 40d4651c-93c5-41b5-aa2c-685f471d7a02
+"""
+    best_cop_point(setup; Qsp, nx=401, ny=401, do_refine=true, kwargs...)
+
+Return the maximum COP₃ and its location (ΔT*, f*) for a single setpoint `Qsp`.
+
+Arguments
+---------
+* `setup` : output of `make_splines`
+* `Qsp`   : heat set-point (W)
+* `nx,ny` : grid resolution for the brute-force pre-scan
+* `do_refine` : if true, refine with Optim starting from the coarse maximum
+* `kwargs...` : forwarded to `brute_opt_cop3` and `refine_opt_cop3`
+                (e.g. `cop=:masked_hard, N_bounds=(0.3,1.0), Pmax=180.0`)
+
+Returns
+-------
+NamedTuple `(COP3 = …, ΔT = …, f = …)`.
+"""
+function best_cop_point(setup; Qsp::Real,
+                        nx::Int=401, ny::Int=401,
+                        do_refine::Bool=true,
+                        kwargs...)
+    # coarse brute-force scan
+    brute = brute_opt_cop3(setup; Qsp=Qsp, nx=nx, ny=ny, kwargs...)
+    if do_refine
+        ref   = refine_opt_cop3(setup; Qsp=Qsp,
+                                start=(brute.ΔT, brute.f), kwargs...)
+        return (COP3 = ref.COP3, ΔT = ref.ΔT, f = ref.f)
+    else
+        return (COP3 = brute.COP3, ΔT = brute.ΔT, f = brute.f)
+    end
+end
+
+
+# ╔═╡ db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
 #=╠═╡
-
-"""
-    sweep_optimal_curve(setup; Qs, show_cop3=true, save_path=nothing, transparent=false)
-
-For each setpoint in `Qs` (vector of Real), compute the optimal (ΔT*, f*, COP3)
-using `optimal_cop3_from_splines(setup; Qsp=...)`.
-
-Returns `(fig, df)` where `df` has columns: `:Qsp, :ΔT, :f, :COP3`.
-
-If `save_path` is given, saves the figure (dir is created if needed).
-"""
-function sweep_optimal_curve(setup; Qs::AbstractVector,
-                             show_cop3::Bool=true,
-                             save_path::Union{Nothing,AbstractString}=nothing,
-                             transparent::Bool=false)
-
+function sweep_best_cop_points(setup; Qs::AbstractVector{<:Real},
+                               nx::Int=401, ny::Int=401,
+                               do_refine::Bool=true,
+                               kwargs...)
     rows = NamedTuple[]
-    @inbounds for q in Qs
-        r = optimal_cop3_from_splines(setup; Qsp=q)
-        push!(rows, (; Qsp=float(q), ΔT=float(r.ΔT), f=float(r.f), COP3=float(r.COP3)))
+    for q in Qs
+        best = best_cop_point(setup; Qsp=q, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
+        push!(rows, (; Qsp=float(q), ΔT=float(best.ΔT), f=float(best.f), COP3=float(best.COP3)))
     end
-    df = DataFrame(rows)
-    sort!(df, :Qsp)
-
-    # --- figure & axes
-    fig = Figure(backgroundcolor = (transparent ? :transparent : :white))
-
-    # top panel: ΔT* (left) and f* (right) vs Qsp
-    axL = Axis(fig[1, 1]; xlabel = "Qₛₚ (W)", ylabel = "ΔT* (K)")
-    axR = Axis(fig[1, 1]; yaxisposition = :right, ylabel = "f* (Hz)")
-    # overlay trick: hide spines/decorations on the right axis, share x
-    hidespines!(axR)
-    hidexdecorations!(axR, grid=false)
-    linkxaxes!(axL, axR)
-
-    # plots (keep the handles for the legend)
-    pΔT = lines!(axL, df.Qsp, df.ΔT)
-    pf  = lines!(axR, df.Qsp, df.f)
-
-    # legend collecting both plot objects
-    Legend(fig[1, 2], [pΔT, pf], ["ΔT*", "f*"]; tellheight=false)
-
-    # optional bottom panel: COP3 vs Qsp
-    if show_cop3
-        axC = Axis(fig[2, 1]; xlabel="Qₛₚ (W)", ylabel="COP₃ (–)", title="Optimal COP₃")
-        lines!(axC, df.Qsp, df.COP3)
-    end
-
-    resize_to_layout!(fig)
-
-    # save if requested
-    if save_path !== nothing
-        p = String(save_path)
-        d = dirname(p); if !isempty(d) && d != "."; mkpath(d); end
-        save(p, fig)  # CairoMakie.save behind the scenes
-    end
-
-    return fig, df
+    DataFrame(rows)
 end
 
   ╠═╡ =#
 
+# ╔═╡ d3d4578d-03c9-4ff8-af77-f84a2b52babe
+function best_cop_point_details(setup; Qsp::Real,
+                                nx::Int=401, ny::Int=401,
+                                do_refine::Bool=true, kwargs...)
+    b = best_cop_point(setup; Qsp=Qsp, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
+    M = metrics_at(setup.spl, b.ΔT, b.f; Qsp=Qsp)
+    return merge((; Qsp=float(Qsp), ΔT=float(b.ΔT), f=float(b.f), COP3=float(b.COP3)), M)
+end
+
+# ╔═╡ ef4aa4e8-aca5-4798-ae3b-bc179fa3480b
+#=╠═╡
+"""
+    sweep_best_with_details(setup; Qs, nx=401, ny=401, do_refine=true;
+                            smooth=nothing, smooth_cols=Symbol[:ΔT, :f],
+                            smooth_method=:median, smooth_width=7, jump_thresh=:auto,
+                            kwargs...)
+
+If `smooth` is not `nothing`, apply a centered rolling filter to `smooth_cols`
+without smoothing across large jumps (detected automatically).
+"""
+function sweep_best_with_details(setup; Qs::AbstractVector{<:Real},
+                                 nx::Int=401, ny::Int=401,
+                                 do_refine::Bool=true,
+                                 smooth::Union{Nothing,Bool}=true,
+                                 smooth_cols::Vector{Symbol}=Symbol[:ΔT, :f],
+                                 smooth_method::Symbol=:median,
+                                 smooth_width::Int=7,
+                                 jump_thresh=:auto,
+                                 kwargs...)
+    rows = NamedTuple[]
+    for q in Qs
+        push!(rows, best_cop_point_details(setup; Qsp=q, nx=nx, ny=ny,
+                                           do_refine=do_refine, kwargs...))
+    end
+    df = DataFrame(rows)
+    if !(smooth === nothing || smooth == false)
+        _smooth_columns(df; cols=smooth_cols,
+                           method=smooth_method,
+                           width=smooth_width,
+                           jump_thresh=jump_thresh)
+    end
+    return df
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 15f52274-d66b-46f2-8b4f-dac7ca039ccb
+#=╠═╡
+"""
+    optimal_controls(setup; Qs, grid_nx=201, grid_ny=201, do_refine=true, kwargs...)
+
+For each setpoint in `Qs`, do a brute grid search (and optional refine).
+Returns a DataFrame with columns: :Qsp, :ΔT, :f, :COP3.
+"""
+function optimal_controls(setup; Qs::AbstractVector{<:Real},
+    grid_nx::Int=201, grid_ny::Int=201, do_refine::Bool=true, kwargs...
+)
+    rows = NamedTuple[]
+    for q in Qs
+        brute = brute_opt_cop3(setup, Qsp=q, nx=grid_nx, ny=grid_ny, kwargs...)
+        if do_refine
+            ref = refine_opt_cop3(setup; Qsp=q, start=(brute.ΔT, brute.f), kwargs...)
+            push!(rows, (; Qsp=float(q), ΔT=float(ref.ΔT), f=float(ref.f), COP3=float(ref.COP3)))
+        else
+            push!(rows, (; Qsp=float(q), ΔT=float(brute.ΔT), f=float(brute.f), COP3=float(brute.COP3)))
+        end
+    end
+    DataFrame(rows)
+end
+  ╠═╡ =#
+
 # ╔═╡ 94138b2d-0fd6-494e-9fd1-ef5aecadaabf
 md" # Plotting functions"
-
-# ╔═╡ 2097d037-7f79-4fe2-b683-b74b77d98752
-function plot_pred_vs_actual_long(df_long; markersize=2, width=1200, row_height=240, band_pct=0.10)
-    targets = collect(unique(df_long.target))
-    n = length(targets)
-    fig = Figure(resolution=(width, max(200, row_height*n)))
-    colsize!(fig.layout, 1, Relative(1.0))
-
-    for (i, t) in enumerate(targets)
-        df_t = df_long[df_long.target .== t, :]
-
-        # let AoG handle plotting of unitful columns
-        ax = Axis(fig[i, 1]; title=string(t), aspect=1)
-        draw!(ax, data(df_t) * mapping(:actual, :predicted) *
-                  visual(Scatter; markersize=markersize, strokewidth=0))
-
-        # compute numeric limits from data (unit-safe)
-        a = ustrip.(df_t.actual)
-        p = ustrip.(df_t.predicted)
-        lo = min(minimum(a), minimum(p))
-        hi = max(maximum(a), maximum(p))
-        pad = (hi - lo == 0) ? 1e-6 : 0.02*(hi - lo)
-        lo -= pad;  hi += pad
-
-        xlims!(ax, lo, hi)   # Makie’s documented API for setting limits
-        ylims!(ax, lo, hi)   # (no xlimits/ylimits field access)  ⟵
-
-        # 1:1 and ±band overlays (numeric)
-        lines!(ax, [lo, hi], [lo, hi], linewidth=2)
-        lines!(ax, [lo, hi], [(1+band_pct)*lo, (1+band_pct)*hi], linestyle=:dash)
-        lines!(ax, [lo, hi], [(1-band_pct)*lo, (1-band_pct)*hi], linestyle=:dash)
-    end
-
-    resize_to_layout!(fig)
-    fig
-end
 
 # ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 #=╠═╡
@@ -5030,105 +5314,50 @@ function _grid_from_df(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
 end
   ╠═╡ =#
 
-# ╔═╡ 9ef98f84-be67-42f2-9304-5f48e706e394
+# ╔═╡ edabd9cc-7d11-4f5c-ba60-7ddca8346078
 #=╠═╡
 function make_splines(df::DataFrame;
     xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_,
-    zcols::NamedTuple=(W=:W_comp, P=:P_pump, Q=:Q_cond),
+    zcols::NamedTuple=(W=:W_comp, P=:P_pump, Q=:Q_cond, N=:r_N_pump, r_P=:P_pump_P_max),
     xlogbase::Symbol=:log10,
     kx::Integer=3, ky::Integer=3,
-    s::Union{NamedTuple,Nothing}=nothing,     # <— allow auto
-    s_frac::Real = 0.01                       # <— ~1% smoothing by default
-)
-    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
 
+					  
+    s::Union{NamedTuple,Nothing}=nothing, s_frac::Real=1e-7
+)
+
+
+
+	
+    invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     X, Y, ZW = _grid_from_df(df, xcol, ycol, zcols.W; invx=invx)
     _, _, ZP = _grid_from_df(df, xcol, ycol, zcols.P; invx=invx)
     _, _, ZQ = _grid_from_df(df, xcol, ycol, zcols.Q; invx=invx)
+    _, _, ZN = _grid_from_df(df, xcol, ycol, zcols.N; invx=invx)
+    _, _, ZrP = _grid_from_df(df, xcol, ycol, zcols.r_P; invx=invx)
 
-    sW = s === nothing ? _auto_s(ZW; frac=s_frac) : s.W
-    sP = s === nothing ? _auto_s(ZP; frac=s_frac) : s.P
-    sQ = s === nothing ? _auto_s(ZQ; frac=s_frac) : s.Q
-
-    sW2 = Dierckx.Spline2D(X, Y, ZW; kx=kx, ky=ky, s=sW)
-    sP2 = Dierckx.Spline2D(X, Y, ZP; kx=kx, ky=ky, s=sP)
-    sQ2 = Dierckx.Spline2D(X, Y, ZQ; kx=kx, ky=ky, s=sQ)
-
-    return (X=X, Y=Y, spl=(W=sW2, P=sP2, Q=sQ2))
+    ZWf, ZPf, ZQf, ZNf, ZrPf = _fill_nans_rect!(ZW), _fill_nans_rect!(ZP),
+                         _fill_nans_rect!(ZQ), _fill_nans_rect!(ZN), _fill_nans_rect!(ZrP)
+	# after computing ZWf, ZPf, ZQf, ZNf, ZrPf ...
+	_autos(Z) = begin
+	    v = vec(Z); m = .!isnan.(v)
+	    count(m) == 0 ? 0.0 : s_frac * var(v[m]) * length(v)
+	end
+	
+	sW  = s === nothing ? _autos(ZWf)  : s.W
+	sP  = s === nothing ? _autos(ZPf)  : s.P
+	sQ  = s === nothing ? _autos(ZQf)  : s.Q
+	sN  = s === nothing ? _autos(ZNf)  : s.N
+	srP = s === nothing ? _autos(ZrPf) : s.rP
+	
+	sW2  = Dierckx.Spline2D(X, Y, ZWf;  kx=kx, ky=ky, s=sW)
+	sP2  = Dierckx.Spline2D(X, Y, ZPf;  kx=kx, ky=ky, s=sP)
+	sQ2  = Dierckx.Spline2D(X, Y, ZQf;  kx=kx, ky=ky, s=sQ)
+	sN2  = Dierckx.Spline2D(X, Y, ZNf;  kx=kx, ky=ky, s=sN)
+	srP2 = Dierckx.Spline2D(X, Y, ZrPf; kx=kx, ky=ky, s=srP)
+	
+	return (X=X, Y=Y, spl=(W=sW2, P=sP2, Q=sQ2, N=sN2, rP=srP2))
 end
-  ╠═╡ =#
-
-# ╔═╡ 0786c7cc-d7c1-403d-a442-bafdcd6fccb4
-#=╠═╡
-"""
-    optimal_cop3(df; Qsp,
-                 xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log10,
-                 zW=:W_comp, zP=:P_pump, zQ=:Q_cond,
-                 kx=3, ky=3, sW=0.0, sP=0.0, sQ=0.0,
-                 xbounds=nothing, ybounds=nothing,
-                 coarse_nx=41, coarse_ny=41,
-                 optimizer=Fminbox(NelderMead());
-                 maxiters=1_000)
-
-Find (ΔT*, f*) that maximizes COP₃ at set-point Qsp. Returns a NamedTuple with
-the optimum, diagnostics, and the Optim.jl result object.
-"""
-function optimal_cop3(df::DataFrame; Qsp::Real,
-    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, xlogbase::Symbol=:log10,
-    zW::Symbol=:W_comp, zP::Symbol=:P_pump, zQ::Symbol=:Q_cond,
-    kx::Integer=3, ky::Integer=3, sW::Real=0.0, sP::Real=0.0, sQ::Real=0.0,
-    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    coarse_nx::Int=41, coarse_ny::Int=41,
-    optimizer=Fminbox(NelderMead()),
-    maxiters::Int=1_000,
-)
-    setup = make_splines(df; xcol=xcol, ycol=ycol,
-                         zcols=(W=zW, P=zP, Q=zQ), xlogbase=xlogbase,
-                         kx=kx, ky=ky, s=(W=sW, P=sP, Q=sQ))
-    X, Y, spl = setup.X, setup.Y, setup.spl
-
-    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
-    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
-    clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
-
-    # coarse start
-    xs = range(xmin, xmax; length=coarse_nx)
-    ys = range(ymin, ymax; length=coarse_ny)
-    best_cop, x0, y0 = -Inf, NaN, NaN
-    @inbounds for yy in ys, xx in xs
-        c = cop3_at(spl, xx, yy; Qsp=Qsp)
-        if isfinite(c) && c > best_cop
-            best_cop = c; x0 = xx; y0 = yy
-        end
-    end
-    isnan(x0) && error("No finite COP3 over the search grid; check data/splines/bounds")
-
-    # refine (maximize COP => minimize -COP)
-    fmin(v) = begin
-        x, y = clampxy(v[1], v[2])
-        -cop3_at(spl, x, y; Qsp=Qsp)
-    end
-    lower = [xmin, ymin]; upper = [xmax, ymax]; init = [x0, y0]
-
-    res = Optim.optimize(fmin, lower, upper, init, optimizer; iterations=maxiters)
-    v̂  = Optim.minimizer(res)
-    x̂, ŷ = clampxy(v̂[1], v̂[2])
-    COP̂ = cop3_at(spl, x̂, ŷ; Qsp=Qsp)
-
-    # diagnostics
-    Ŵ = spl.W(x̂, ŷ); P̂ = spl.P(x̂, ŷ); Q̂ = spl.Q(x̂, ŷ)
-    Paux̂ = max(0.0, Qsp - Q̂)
-
-    return (
-        ΔT = x̂, f = ŷ, COP3 = COP̂,
-        Q_cond = Q̂, W_comp = Ŵ, P_pump = P̂, P_aux = Paux̂,
-        start = (x0=x0, y0=y0, COP3=best_cop),
-        bounds = (x=(xmin, xmax), y=(ymin, ymax)),
-        result = res
-    )
-end
-
   ╠═╡ =#
 
 # ╔═╡ 3ec7080c-2972-484b-805e-3d9fe0a7d9d1
@@ -5228,6 +5457,78 @@ ovs_plots_3 = [
 ]
 
 
+# ╔═╡ 869c2c91-5716-49d6-add8-5c9053aea261
+#=╠═╡
+# --- 1) Build a DF from the N-spline (r_N_pump) ------------------------------
+function rN_grid_df(setup;
+    nx::Int=401, ny::Int=401,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    xlogbase::Symbol=:log,           # :log or :log10 (to match your plots)
+)
+    # sample the spline on a rect grid
+    xs, ys, Zs = sample_splines_grid(setup; nx=nx, ny=ny,
+                                     xbounds=xbounds, ybounds=ybounds,
+                                     fields=(:N,))
+    Z = Zs.N
+    rows = NamedTuple[]
+    @inbounds for j in eachindex(ys), i in eachindex(xs)
+        x = xs[i]; y = ys[j]; v = Z[i,j]
+        if isfinite(v)
+            logx = xlogbase === :log   ? (x > 0 ? log(x)   : continue) :
+                   xlogbase === :log10 ? (x > 0 ? log10(x) : continue) :
+                   error("xlogbase must be :log or :log10")
+            push!(rows, (; log_ΔTSF_=logx, f_=y, r_N_pump=v))
+        end
+    end
+    DataFrame(rows)
+end
+
+# --- 2) Plot contours of r_N_pump (with optional N-bounds overlays) ----------
+  ╠═╡ =#
+
+# ╔═╡ 88c2db40-b214-46db-9a82-5b67760443c8
+#=╠═╡
+function cop3_grid_df(setup;
+    Qsp::Real, nx::Int=401, ny::Int=401,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    cop::Symbol=:masked_hard, xlogbase::Symbol=:log,
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = collect(range(xmin, xmax; length=nx))
+    ys = collect(range(ymin, ymax; length=ny))
+
+    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp,                               N_bounds=(0.3,1.0), Pmax=1.0,)
+
+    rows = NamedTuple[]
+    @inbounds for y in ys, x in xs
+        c = eval_cop(x, y)
+        # keep finite values, including zeros (masked areas)
+        if isfinite(c)
+            # guard the log transform
+            if xlogbase === :log
+                x <= 0 && continue
+                logx = log(x)
+            elseif xlogbase === :log10
+                x <= 0 && continue
+                logx = log10(x)
+            else
+                error("xlogbase must be :log or :log10")
+            end
+            push!(rows, (; log_ΔTSF_=logx, f_=y, COP_3=c))
+        end
+    end
+    df = DataFrame(rows)
+    nrow(df) > 0 || error("No finite COP₃ values for this Qₛₚ; field fully masked. \
+Try relaxing N_bounds/Pmax or adjusting x/y bounds.")
+    df
+end
+
+  ╠═╡ =#
+
 # ╔═╡ 23f9f68a-9e3c-4bbe-8abe-1b851206162f
 #=╠═╡
 function _add_isolines!(ax::Makie.Axis, df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
@@ -5288,443 +5589,6 @@ _normalize_labelmap(x)::Dict{Symbol,String} = begin
     out
 end
 
-# ╔═╡ 3afecaa8-1c77-4b26-b534-2c419ddfb027
-#=╠═╡
-# pick a ridge curve by optimizing z over the *other* axis
-# wrt = :x  -> for each x, choose y that extremizes z  (y = y*(x))   [old behavior]
-# wrt = :y  -> for each y, choose x that extremizes z  (x = x*(y))   [what you want]
-function _ridge(df::DataFrame, xcol::Symbol, ycol::Symbol, zcol::Symbol;
-                invx = identity, mode::Symbol = :max, wrt::Symbol = :x)
-    X, Y, Z = _grid_from_df(df, xcol, ycol, zcol; invx=invx)  # size(Z) == (length(X), length(Y))
-
-    xs = Float64[]; ys = Float64[]
-    if wrt === :x
-        # iterate over x-slices -> y*(x)
-        for i in eachindex(X)
-            best = (mode === :max) ? -Inf : Inf
-            bestj = 0
-            col = @view Z[i, :]
-            @inbounds for j in eachindex(Y)
-                v = col[j]
-                if isfinite(v) && ((mode === :max && v > best) || (mode === :min && v < best))
-                    best = v; bestj = j
-                end
-            end
-            bestj != 0 && (push!(xs, X[i]); push!(ys, Y[bestj]))
-        end
-    elseif wrt === :y
-        # iterate over y-slices -> x*(y)
-        for j in eachindex(Y)
-            best = (mode === :max) ? -Inf : Inf
-            besti = 0
-            row = @view Z[:, j]
-            @inbounds for i in eachindex(X)
-                v = row[i]
-                if isfinite(v) && ((mode === :max && v > best) || (mode === :min && v < best))
-                    best = v; besti = i
-                end
-            end
-            besti != 0 && (push!(xs, X[besti]); push!(ys, Y[j]))
-        end
-    else
-        error("zridge_wrt must be :x or :y")
-    end
-    return xs, ys
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 2164a2d3-59a0-4573-bd12-b62431f46c04
-# Dense max/min over x for each fixed y using Interpolations.jl (linear, irregular grid OK)
-function _ridge_resample_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
-                               mode::Symbol=:max, nsamples::Int=401)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        sel = isfinite.(Z[:, j])
-        if count(sel) ≥ 2
-            xj = X[sel]; zj = Z[sel, j]
-            itp = interpolate((xj,), zj, Gridded(Linear()))  # linear on irregular grid
-            xd = range(first(xj), last(xj), length=nsamples)
-            vals = itp.(xd)
-            k = (mode === :max) ? argmax(vals) : argmin(vals)
-            push!(xs, xd[k]); push!(ys, Y[j])
-        end
-    end
-    xs, ys
-end
-
-# Same, but per-slice smoothing spline with Dierckx (cubic), then dense evaluate
-# Requires: using Dierckx
-
-# ╔═╡ 318a7ca3-1d6a-4a32-9fc7-c2a0072c92d3
-function _ridge_spline_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
-                             mode::Symbol=:max, nsamples::Int=401, s::Real=0.0)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        sel = isfinite.(Z[:, j])
-        if count(sel) ≥ 2
-            xj = X[sel]; zj = Z[sel, j]
-            spl = Dierckx.Spline1D(xj, zj; k=3, s=s)     # smoothing s≥0
-            xd  = range(first(xj), last(xj), length=nsamples)
-            vals = spl.(xd)
-            k = (mode === :max) ? argmax(vals) : argmin(vals)
-            push!(xs, xd[k]); push!(ys, Y[j])
-        end
-    end
-    xs, ys
-end
-
-# Optional post-smoothing of the ridge path x*(y)
-# Requires: using Dierckx
-
-# ╔═╡ c1333a2c-28a8-4a31-a049-8479e43f6c0e
-# Vertex (x at extremum) of quadratic through three points (x1,y1),(x2,y2),(x3,y3)
-# Works for non-uniform spacing. Returns NaN if the fit is degenerate.
-function _parabolic_vertex(x1,y1,x2,y2,x3,y3)
-    denom = (x1 - x2) * (x1 - x3) * (x2 - x3)
-    if denom == 0
-        return NaN
-    end
-    a = (x1*(y3 - y2) + x2*(y1 - y3) + x3*(y2 - y1)) / denom
-    b = (x1^2*(y2 - y3) + x2^2*(y3 - y1) + x3^2*(y1 - y2)) / denom
-    if a == 0
-        return NaN
-    end
-    return -b / (2a)  # x at extremum
-end
-
-# Parabolic refinement for wrt=:y  (x* as a smooth function of y)
-
-# ╔═╡ 1177eea2-1d56-4090-8b70-a636f404b4fb
-function _ridge_parabolic_wrt_y_mask_interp(X::AbstractVector, Y::AbstractVector,
-                                            Z::AbstractMatrix, W::AbstractMatrix;
-                                            mode::Symbol=:max, wmin::Real=-Inf, wmax::Real=Inf)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        mj = isfinite.(Z[:,j]) .& isfinite.(W[:,j])
-        idxs = findall(mj)
-        length(idxs) < 2 && continue
-
-        xi, zi, wi = X[idxs], Z[idxs, j], W[idxs, j]
-        w_itp = interpolate((xi,), wi, Gridded(Linear()))
-
-        # pick best grid point
-        k = mode === :max ? argmax(zi) : argmin(zi)
-        x̂ = xi[k]
-
-        # parabolic refinement if neighbors exist
-        if 1 < k < length(xi)
-            x1,y1 = xi[k-1], zi[k-1]
-            x2,y2 = xi[k],   zi[k]
-            x3,y3 = xi[k+1], zi[k+1]
-            xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
-            if isfinite(xv) && (min(x1,x3)-eps() ≤ xv ≤ max(x1,x3)+eps())
-                curv = (y1 - 2y2 + y3)
-                if (mode === :max && curv < 0) || (mode === :min && curv > 0)
-                    x̂ = xv
-                end
-            end
-        end
-
-        # interpolated limiter check
-        ŵ = w_itp(x̂)
-        if isfinite(ŵ) && (wmin ≤ ŵ ≤ wmax)
-            push!(xs, x̂); push!(ys, Y[j])
-        end
-    end
-    xs, ys
-end
-
-
-# ╔═╡ 1d782694-8f7d-4d1f-a1bc-b7646ac01b23
-function _ridge_parabolic_wrt_y(X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix;
-                                mode::Symbol=:max)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        zcol = view(Z, :, j)
-        m = isfinite.(zcol)
-        n = count(m)
-        n < 2 && continue
-        xi = X[m]; zi = zcol[m]
-
-        k = (mode === :max) ? argmax(zi) : argmin(zi)
-        x̂ = xi[k]  # fallback = grid point
-
-        if 1 < k < length(xi)  # have neighbors
-            x1,y1 = xi[k-1], zi[k-1]
-            x2,y2 = xi[k],   zi[k]
-            x3,y3 = xi[k+1], zi[k+1]
-            xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
-            if isfinite(xv) && min(x1,x3) - eps() ≤ xv ≤ max(x1,x3) + eps()
-                # ensure it's the right extremum shape
-                # For maxima we expect concave (a<0); for minima convex (a>0).
-                # We approximatively check by central second diff sign.
-                curv = (y1 - 2y2 + y3)
-                if (mode === :max && curv < 0) || (mode === :min && curv > 0)
-                    x̂ = xv
-                end
-            end
-        end
-        push!(xs, x̂); push!(ys, Y[j])
-    end
-    xs, ys
-end
-
-# Optional post-smoothing of the ridge path: x(y) -> smooth cubic spline
-# (Requires: using Dierckx)
-
-# ╔═╡ a35e92ea-bee1-4117-9ccf-f2016be29dc3
-function _smooth_path(xs::AbstractVector, ys::AbstractVector; s::Real=0.0)
-    spl = Dierckx.Spline1D(ys, xs; k=3, s=s)
-    return spl.(ys), ys
-end
-
-# ╔═╡ 17aa8588-7089-4247-aaad-0ca54e1d888a
-# Split ridge into continuous segments by jump/Gap/slope rules
-function _split_discontinuities(xs::AbstractVector, ys::AbstractVector;
-        xjump_frac::Real = 0.08,      # break if |Δx| > xjump_frac * (xmax-xmin)
-        ygap_factor::Real = 3.0,      # break if |Δy| > ygap_factor * median(Δy)
-        slope_max::Real = Inf)        # break if |Δx/Δy| > slope_max
-
-    n = length(xs)
-    n ≥ 2 || return Vector{UnitRange{Int}}()
-
-    # basic scales
-    xr = maximum(xs) - minimum(xs)
-    dy = diff(ys)
-    dx = diff(xs)
-    med_dy = median(abs.(dy[isfinite.(dy)]))
-    med_dy = (isfinite(med_dy) && med_dy > 0) ? med_dy : 1.0
-
-    segs = Vector{UnitRange{Int}}()
-    s = 1
-    for k in 1:n-1
-        jump_x  = xr > 0 ? abs(dx[k]) > xjump_frac * xr : false
-        gap_y   = abs(dy[k]) > ygap_factor * med_dy
-        steep   = (slope_max < Inf) ? (abs(dx[k]) / max(abs(dy[k]), eps()) > slope_max) : false
-        if jump_x || gap_y || steep || !isfinite(dx[k]) || !isfinite(dy[k])
-            if k >= s+1
-                push!(segs, s:k)
-            end
-            s = k + 1
-        end
-    end
-    if n >= s+1
-        push!(segs, s:n)
-    end
-    segs
-end
-
-# Optional: discard ridge points too close to left/right edges
-
-# ╔═╡ 286269bd-f4db-4690-81f4-b4c45edeb24d
-function _exclude_edge_points!(xs::Vector{Float64}, ys::Vector{Float64}; edge_frac=0.0)
-    edge_frac ≤ 0 && return xs, ys
-    xmin, xmax = minimum(xs), maximum(xs)
-    pad = edge_frac * (xmax - xmin)
-    keep = @. (xs > xmin + pad) & (xs < xmax - pad) & isfinite(xs) & isfinite(ys)
-    return xs[keep], ys[keep]
-end
-
-# ╔═╡ 34522b07-e28b-4fa6-b2bf-2c7c73895aa2
-# contiguous True-runs helper (if you don't already have it)
-function _true_runs(b::AbstractVector{Bool})
-    runs = Vector{UnitRange{Int}}()
-    i = 1
-    while i <= length(b)
-        if b[i]
-            s = i
-            while i <= length(b) && b[i]
-                i += 1
-            end
-            push!(runs, s:(i-1))
-        else
-            i += 1
-        end
-    end
-    return runs
-end
-
-# ╔═╡ 599e27a4-1aba-4de4-a76d-fb09511de993
-function _mask_intervals_spline(xmin::Real, xmax::Real, sw::Dierckx.Spline1D;
-                                wmin::Real, wmax::Real, nsamples::Int=401)
-    xd = range(xmin, xmax; length=nsamples)
-    w  = sw.(xd)
-    keep = (w .>= wmin) .& (w .<= wmax)
-    runs = _true_runs(keep)
-    isempty(runs) && return Tuple{Float64,Float64}[]
-
-    intervals = Tuple{Float64,Float64}[]
-    for r in runs
-        # crude ends
-        a0, b0 = xd[first(r)], xd[last(r)]
-        # refine left edge if we have a sample just before the run
-        al = a0
-        if first(r) > 1
-            xl = xd[first(r)-1]
-            # which boundary did we cross?
-            wl = sw(xl)
-            if wl < wmin
-                al = try find_zero(x -> sw(x) - wmin, (xl, a0), Bisection()) catch; a0 end
-            elseif wl > wmax
-                al = try find_zero(x -> sw(x) - wmax, (xl, a0), Bisection()) catch; a0 end
-            end
-        end
-        # refine right edge if we have a sample just after the run
-        br = b0
-        if last(r) < length(xd)
-            xr = xd[last(r)+1]
-            wr = sw(xr)
-            if wr < wmin
-                br = try find_zero(x -> sw(x) - wmin, (b0, xr), Bisection()) catch; b0 end
-            elseif wr > wmax
-                br = try find_zero(x -> sw(x) - wmax, (b0, xr), Bisection()) catch; b0 end
-            end
-        end
-        (al < br) && push!(intervals, (al, br))
-    end
-    intervals
-end
-
-# Smooth constrained ridge: for each fixed y, maximize/minimize z(x) s.t. w(x)∈[wmin,wmax].
-# z and w are smoothed with cubic splines on irregular x; optimization is Brent on each interval.
-
-# ╔═╡ 4b5d8e48-6775-4ec6-ab28-3e96b9954af3
-function _ridge_spline_opt_wrt_y_mask(
-    X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix, W::AbstractMatrix;
-    mode::Symbol=:max, s_z::Real=0.0, s_w::Real=0.0, nsamples_mask::Int=401
-)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        sel = isfinite.(Z[:,j]) .& isfinite.(W[:,j])
-        count(sel) ≥ 2 || continue
-        xj, zj, wj = X[sel], Z[sel,j], W[sel,j]
-
-        # smooth splines (cubic; s>0 to denoise)
-        sz = Dierckx.Spline1D(xj, zj; k=3, s=s_z)
-        sw = Dierckx.Spline1D(xj, wj; k=3, s=s_w)
-
-        # feasible intervals from mask spline
-        intervals = _mask_intervals_spline(first(xj), last(xj), sw, zridge_min, zridge_max;
-                                           nsamples=nsamples_mask)
-        isempty(intervals) && continue
-
-        best_v = (mode === :max) ? -Inf : Inf
-        best_x = NaN
-        for (a,b) in intervals
-            # Brent 1D (bounded)
-            obj = mode === :max ? (x->-sz(x)) : (x->sz(x))
-            res = Optim.optimize(obj, a, b, Brent())
-            x̂  = Optim.minimizer(res)
-            v̂  = sz(x̂)
-            if (mode === :max && v̂ > best_v) || (mode === :min && v̂ < best_v)
-                best_v = v̂; best_x = x̂
-            end
-        end
-        isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
-    end
-    xs, ys
-end
-
-# ╔═╡ c9aa37be-53b4-4f23-9898-b5179f7117f2
-# smooth, interpolated-mask ridge: maximize/minimize z(x) for each fixed y,
-# but only where w(x) lies in [wmin, wmax].
-function _ridge_resample_wrt_y_mask_interp(X::AbstractVector, Y::AbstractVector,
-                                           Z::AbstractMatrix, W::AbstractMatrix;
-                                           mode::Symbol=:max, nsamples::Int=401,
-                                           wmin::Real=-Inf, wmax::Real=Inf)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        m = isfinite.(Z[:, j]) .& isfinite.(W[:, j])
-        if count(m) ≥ 2
-            xj, zj, wj = X[m], Z[m, j], W[m, j]
-
-            # linear on irregular grids
-            z_itp = interpolate((xj,), zj, Gridded(Linear()))
-            w_itp = interpolate((xj,), wj, Gridded(Linear()))
-
-            xd   = range(first(xj), last(xj), length=nsamples)
-            wd   = w_itp.(xd)
-            keep = (wd .>= wmin) .& (wd .<= wmax)
-
-            runs = _true_runs(keep)
-            isempty(runs) && continue
-
-            best_val = mode === :max ? -Inf : Inf
-            best_x   = NaN
-            for r in runs
-                # need ≥2 points in a sub-interval to be meaningful
-                if length(r) < 2; continue; end
-                vals = z_itp.(xd[r])
-                k    = mode === :max ? argmax(vals) : argmin(vals)
-                v    = vals[k]
-                if (mode === :max && v > best_val) || (mode === :min && v < best_val)
-                    best_val = v
-                    best_x   = xd[r[k]]
-                end
-            end
-            isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
-        end
-    end
-    xs, ys
-end
-
-
-# ╔═╡ 9d0ffbe1-deff-4de9-a0d7-9e7c8df5bfaf
-function _ridge_parabolic_resample_wrt_y_mask_interp(
-    X::AbstractVector, Y::AbstractVector, Z::AbstractMatrix, W::AbstractMatrix;
-    mode::Symbol=:max, nsamples::Int=601, wmin::Real=-Inf, wmax::Real=Inf
-)
-    xs = Float64[]; ys = Float64[]
-    for j in eachindex(Y)
-        # finite pairs only
-        sel = isfinite.(Z[:, j]) .& isfinite.(W[:, j])
-        count(sel) ≥ 2 || continue
-
-        xj = X[sel]; zj = Z[sel, j]; wj = W[sel, j]
-
-        z_itp = interpolate((xj,), zj, Gridded(Linear()))
-        w_itp = interpolate((xj,), wj, Gridded(Linear()))
-
-        xd   = range(first(xj), last(xj), length=nsamples)
-        keep = (w_itp.(xd) .>= wmin) .& (w_itp.(xd) .<= wmax)
-        runs = _true_runs(keep)
-        isempty(runs) && continue
-
-        best_val = mode === :max ? -Inf : Inf
-        best_x   = NaN
-
-        for r in runs
-            # sample z on this allowed sub-interval
-            vals = z_itp.(xd[r])
-            k    = mode === :max ? argmax(vals) : argmin(vals)
-            xi   = xd[r[k]]; zi = vals[k]
-
-            # parabolic refine if we have neighbors inside the run
-            if 1 < k < length(r)
-                x1, x2, x3 = xd[r[k-1]], xd[r[k]], xd[r[k+1]]
-                y1, y2, y3 = z_itp(x1), z_itp(x2), z_itp(x3)
-                xv = _parabolic_vertex(x1,y1,x2,y2,x3,y3)
-                # keep refinement only if inside the allowed sub-interval AND still allowed by w
-                if isfinite(xv) && x1 - eps() ≤ xv ≤ x3 + eps()
-                    wv = w_itp(xv)
-                    if isfinite(wv) && (wmin ≤ wv ≤ wmax)
-                        xi = xv; zi = z_itp(xv)
-                    end
-                end
-            end
-
-            if (mode === :max && zi > best_val) || (mode === :min && zi < best_val)
-                best_val = zi
-                best_x   = xi
-            end
-        end
-
-        isfinite(best_x) && (push!(xs, best_x); push!(ys, Y[j]))
-    end
-    return xs, ys
-end
-
 # ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 #=╠═╡
 function plot_contourf(df::DataFrame;
@@ -5733,54 +5597,33 @@ function plot_contourf(df::DataFrame;
     levels=10,
     palette=:viridis, lowclip=nothing, highclip=nothing,
     labels_for_lines::Bool=false,
-    overlays::Vector = Vector{Any}(),
+    overlays::Vector = Vector{Any}(),      # (kept) extra isolines from same df
     return_axis::Bool=false,
 
-    # labeling options
+    # labeling
     xlabel::Union{Nothing,AbstractString}=nothing,
     ylabel::Union{Nothing,AbstractString}=nothing,
     zlabel::Union{Nothing,AbstractString}=nothing,
     title::Union{Nothing,AbstractString}=nothing,
     labelmap::Union{AbstractDict,NamedTuple}=Dict(),
 
-    # ridge (extremum curve of z)
-    zridge_enable::Bool = false,
-    zridge_wrt::Symbol  = :x,        # :x | :y
-    zridge_mode::Symbol = :max,      # :max | :min
-    zridge_color::Union{Symbol,RGBAf,RGBf} = :red,
-    zridge_linestyle::Symbol = :solid,
-    zridge_linewidth::Real = 2.0,
-    zridge_halo::Bool = false,
-    zridge_halowidth::Real = 1.5,
-    zridge_halocolor::Union{Symbol,RGBAf,RGBf} = :white,
-    zridge_labels::Bool = false,
-    zridge_label::Union{Nothing,AbstractString} = nothing,
-    zridge_labelsize::Int = 14,
-    zridge_method::Symbol = :resample,
-    zridge_nsamples::Int = 401,
-    zridge_spline_s::Real = 0.0,
-    zridge_postsmooth::Bool = false,
-    zridge_post_s::Real = 0.0,
-    zridge_xjump_frac::Real = 0.08,
-    zridge_ygap_factor::Real = 3.0,
-    zridge_slope_max::Real = Inf,
-    zridge_exclude_edge_frac::Real = 0.0,
-	
-    # ridge domain limit via *interpolated* limiter column (e.g. :r_N_pump)
-    zridge_limit_col::Union{Nothing,Symbol} = nothing,
-    zridge_min::Real = -Inf,
-    zridge_max::Real =  Inf,
-    zridge_limit_interp::Bool = true,   # use the interpolated-mask variant
+    # optional second DF overlay (e.g., COP₃ contours from another grid)
+    overlay_df::Union{Nothing,DataFrame}=nothing,
+    overlay_zcol::Symbol=:COP_3,
+    overlay_levels=nothing,
+    overlay_color::Union{Symbol,RGBAf,RGBf}=:black,
+    overlay_linestyle::Symbol=:dash,
+    overlay_linewidth::Real=1.5,
+    overlay_labels::Bool=false,
 
-
-    # base rendering mode
-    base_style::Symbol = :filled,    # :filled | :lines | :none
-    show_colorbar::Bool = true,
-    line_width::Real = 1.2,          # for :lines
-    line_color::Union{Nothing,Symbol,RGBAf,RGBf} = nothing,  # single color if set
-	save_path::Union{Nothing,AbstractString}=nothing,
-    save_px::Union{Nothing,Tuple{Int,Int}}=nothing,   # optional raster size, e.g. (1600, 1200)
-    transparent::Bool=false                            # optional transparent background
+    # base rendering
+    base_style::Symbol=:filled,           # :filled | :lines | :none
+    show_colorbar::Bool=true,
+    line_width::Real=1.2,
+    line_color::Union{Nothing,Symbol,RGBAf,RGBf}=nothing,
+    save_path::Union{Nothing,AbstractString}=nothing,
+    save_px::Union{Nothing,Tuple{Int,Int}}=nothing,
+    transparent::Bool=false
 )
     invx = xlogbase === :log10 ? exp10 : xlogbase === :log ? exp : identity
     xlab_default = (invx === identity) ? string(xcol) : "ΔTSF"
@@ -5793,30 +5636,26 @@ function plot_contourf(df::DataFrame;
 
     fig = Figure()
     ax  = Axis(fig[1,1]; xlabel=xname, ylabel=yname, title=plt_title)
-    if hasproperty(ax, :clip)
-        ax.clip = true
-    elseif hasproperty(ax, :scene) && hasproperty(ax.scene, :clip)
-        ax.scene.clip = true
+    if hasproperty(ax, :clip); ax.clip = true
+    elseif hasproperty(ax, :scene) && hasproperty(ax.scene, :clip); ax.scene.clip = true
     end
 
-    # grid + helpers
+    # grid for base field
     Xg, Yg, Zg = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
     zmin, zmax = extrema(vec(Zg))
     levs = levels isa Integer ? levels : collect(levels)
     bfmt(x) = @sprintf("%.4g", x)
 
     if base_style === :filled
-        # filled bands via AoG
         pal = (lowclip !== nothing || highclip !== nothing) ?
               clipped(from_continuous(palette); low=lowclip, high=highclip) :
               from_continuous(palette)
         base  = data(df) * mapping(xcol => invx => xname, ycol, zcol)
-        fc    = levels isa Integer ? filled_contours(bands=levels) : filled_contours(levels=collect(levels))
-        specs = base * fc
-        sc    = scales(Color=(; palette=pal))
-        draw!(ax, specs, sc)
+        fc    = levels isa Integer ? filled_contours(bands=levels) :
+                                     filled_contours(levels=collect(levels))
+        draw!(ax, base * fc, scales(Color=(; palette=pal)))
 
-        # outline boundaries
+        # white boundaries for readability
         boundaries = levels isa Integer ?
                      collect(range(zmin, zmax; length=levels+1)) :
                      collect(sort(levels))
@@ -5827,43 +5666,37 @@ function plot_contourf(df::DataFrame;
             boundaries = sort!(boundaries)
             nbands = max(length(boundaries)-1, 1)
             cm = cgrad(palette, nbands; categorical=true)
-            Colorbar(fig[1,2];
-                colormap=cm,
-                limits=(first(boundaries), last(boundaries)),
-                ticks=(boundaries, map(bfmt, boundaries)),
-                label=zname, vertical=true, lowclip=lowclip, highclip=highclip)
+            Colorbar(fig[1,2]; colormap=cm,
+                     limits=(first(boundaries), last(boundaries)),
+                     ticks=(boundaries, map(bfmt, boundaries)),
+                     label=zname, vertical=true, lowclip=lowclip, highclip=highclip)
         end
 
     elseif base_style === :lines
-        # contour lines only
         if line_color === nothing
             cm = cgrad(palette)
-            contour!(ax, Xg, Yg, Zg;
-                levels=levs, colormap=cm, colorrange=(zmin, zmax),
-                linewidth=line_width,
-                labels=labels_for_lines, labelformatter=bfmt, labelsize=18)
+            contour!(ax, Xg, Yg, Zg; levels=levs, colormap=cm, colorrange=(zmin, zmax),
+                     linewidth=line_width, labels=labels_for_lines,
+                     labelformatter=bfmt, labelsize=18)
             if show_colorbar
-                chosen = levels isa Integer ? collect(range(zmin, zmax; length=levels)) : Float64.(levs)
-                Colorbar(fig[1,2];
-                    colormap=cm, limits=(zmin, zmax),
-                    ticks=(chosen, map(bfmt, chosen)),
-                    label=zname, vertical=true)
+                chosen = levels isa Integer ? collect(range(zmin, zmax; length=levels)) :
+                                              Float64.(levs)
+                Colorbar(fig[1,2]; colormap=cm, limits=(zmin, zmax),
+                         ticks=(chosen, map(bfmt, chosen)),
+                         label=zname, vertical=true)
             end
         else
-            contour!(ax, Xg, Yg, Zg;
-                levels=levs, color=line_color, linewidth=line_width,
-                labels=labels_for_lines, labelformatter=bfmt, labelsize=18)
-            # (no colorbar by default)
+            contour!(ax, Xg, Yg, Zg; levels=levs, color=line_color,
+                     linewidth=line_width, labels=labels_for_lines,
+                     labelformatter=bfmt, labelsize=18)
         end
-
     elseif base_style === :none
-        # draw nothing; overlays/ridge only
-        # (no colorbar)
+        # nothing; rely on overlays/overlay_df
     else
         error("base_style must be :filled, :lines, or :none")
     end
 
-    # overlays
+    # user overlays from SAME df (kept)
     for ov in overlays
         zsym = get(ov, :z, nothing); zsym === nothing && error("overlay missing :z")
         _add_isolines!(ax, df, xcol, ycol, zsym;
@@ -5880,113 +5713,177 @@ function plot_contourf(df::DataFrame;
             halocolor       = get(ov, :halocolor, :white))
     end
 
-	if zridge_enable
-	    Xg, Yg, Zg = _grid_from_df(df, xcol, ycol, zcol; invx=invx)
-	
-	    Wg = nothing
-	    if zridge_limit_col !== nothing
-	        _, _, Wg = _grid_from_df(df, xcol, ycol, zridge_limit_col; invx=invx)
-	    end
-	
-	    if zridge_wrt === :y
-	        if zridge_method === :resample
-	            if zridge_limit_interp && Wg !== nothing
-	                xs, ys = _ridge_resample_wrt_y_mask_interp(
-	                    Xg, Yg, Zg, Wg; mode=zridge_mode,
-	                    nsamples=zridge_nsamples,
-	                    wmin=zridge_min, wmax=zridge_max)
-	            else
-	                # your previous (discrete-mask) path:
-	                allow = Wg === nothing ? nothing :
-	                        @. isfinite(Wg) & (Wg >= zridge_min) & (Wg <= zridge_max)
-	                xs, ys = _ridge_resample_wrt_y(
-	                    Xg, Yg, Zg; mode=zridge_mode,
-	                    nsamples=zridge_nsamples, allow=allow)
-	            end
-				elseif zridge_method === :parabolic
-			    if zridge_limit_interp && Wg !== nothing
-			        xs, ys = _ridge_parabolic_resample_wrt_y_mask_interp(
-			            Xg, Yg, Zg, Wg; mode=zridge_mode,
-			            nsamples=zridge_nsamples,             # e.g. 601
-			            wmin=zridge_min, wmax=zridge_max
-			        )
-			    else
-			        # (fallbacks unchanged)
-			        allow = Wg === nothing ? nothing :
-			                @. isfinite(Wg) & (Wg >= zridge_min) & (Wg <= zridge_max)
-			        xs, ys = _ridge_parabolic_wrt_y(Xg, Yg, Zg; mode=zridge_mode)  # or a discrete-mask variant if you keep one
-			    end
-
-	        else
-	            error("zridge_method must be :resample or :parabolic for wrt=:y")
-	        end
-	    else
-	        # (wrt=:x variant unchanged; add a similar mask if you ever need it)
-	        xs, ys = _ridge(df, xcol, ycol, zcol; invx=invx, mode=zridge_mode, wrt=:x)
-	    end
-	    # 2) optional path smoothing of x*(y)
-	    if zridge_postsmooth && !isempty(xs)
-	        xs, ys = _smooth_path(xs, ys; s=zridge_post_s)  # requires Dierckx
-	    end
-	
-	    # 3) drop edge-hugging points (optional)
-	    xs, ys = _exclude_edge_points!(collect(xs), collect(ys);
-	                                   edge_frac = zridge_exclude_edge_frac)
-	
-	    # 4) split into continuous segments (jump/gap/slope rules)
-	    segs = _split_discontinuities(xs, ys;
-	        xjump_frac = zridge_xjump_frac,
-	        ygap_factor = zridge_ygap_factor,
-	        slope_max = zridge_slope_max)
-	
-	    # 5) draw each continuous segment (with optional halo)
-	    for r in segs
-	        if zridge_halo
-	            lines!(ax, xs[r], ys[r]; color=zridge_halocolor,
-	                   linewidth = zridge_linewidth + zridge_halowidth,
-	                   linestyle = zridge_linestyle)
-	        end
-	        lines!(ax, xs[r], ys[r]; color=zridge_color,
-	               linewidth = zridge_linewidth, linestyle = zridge_linestyle)
-	    end
-	
-	    # 6) optional label at the end of last segment
-	    if zridge_labels && !isempty(segs)
-	        r = last(segs)
-	        lbl = zridge_label === nothing ?
-	            string(zridge_mode == :max ? "max " : "min ", zname, " wrt ",
-	                   (zridge_wrt == :x ? xname : yname)) :
-	            String(zridge_label)
-	        text!(ax, lbl; position=(xs[last(r)], ys[last(r)]),
-	              align=(:left, :center), offset=(8, 0),
-	              color=zridge_color, fontsize=zridge_labelsize)
-	    end
-	end
+    # --- NEW: overlay contours from a SECOND grid df (e.g., another COP₃) ---
+    if overlay_df !== nothing
+        X2, Y2, Z2 = _grid_from_df(overlay_df, xcol, ycol, overlay_zcol; invx=invx)
+        lev2 = overlay_levels === nothing ? _default_iso_levels(Z2) :
+               (overlay_levels isa AbstractVector ? Float64.(collect(overlay_levels)) :
+                                                    overlay_levels)
+        contour!(ax, X2, Y2, Z2; levels=lev2, color=overlay_color,
+                 linestyle=overlay_linestyle, linewidth=overlay_linewidth,
+                 labels=overlay_labels)
+    end
 
     resize_to_layout!(fig)
 
-
-    # --- NEW: optional saving ---
     if save_path !== nothing
-        p = String(save_path)
-        d = dirname(p)
-        if !isempty(d) && d != "."
-            mkpath(d)
-        end
-        # optional: set explicit pixel size for raster formats (png, jpg)
-        if save_px !== nothing
-            resize!(fig, save_px...)   # e.g., (1600, 1200)
-        end
-        if transparent
-            fig.scene.backgroundcolor[] = RGBAf(1,1,1,0)
-        end
-        # Use Makie.save (delegates to CairoMakie/WGL/etc. correctly)
-        Makie.save(p, fig)
+        if save_px !== nothing; resize!(fig, save_px...); end
+        if transparent; fig.scene.backgroundcolor[] = RGBAf(1,1,1,0); end
+        Makie.save(String(save_path), fig)
     end
-	
+
     return return_axis ? (fig, ax) : fig
 end
 
+  ╠═╡ =#
+
+# ╔═╡ 62b31b42-f81a-4370-a61d-8c9bc8ffbd72
+#=╠═╡
+function plot_rN_contour(setup;
+    nx::Int=401, ny::Int=401,
+    xbounds=nothing, ybounds=nothing,
+    xlogbase::Symbol=:log,
+    levels=12,                         # Int or vector of levels
+    palette=:viridis,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0)  # set to nothing to hide
+)
+    df = rN_grid_df(setup; nx=nx, ny=ny, xbounds=xbounds, ybounds=ybounds, xlogbase=xlogbase)
+
+    # Optional dashed overlays at the bounds (e.g., 0.3 and 1.0)
+    ovs = N_bounds === nothing ? Any[] : Any[
+        (; z=:r_N_pump, levels=[N_bounds[1]], color=:black, linestyle=:dash, linewidth=1.8, labels=true),
+        (; z=:r_N_pump, levels=[N_bounds[2]], color=:black, linestyle=:dash, linewidth=1.8, labels=true),
+    ]
+
+    fig = plot_contourf(df;
+        xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_N_pump, xlogbase=xlogbase,
+        levels=levels, palette=palette, overlays=ovs,
+        labelmap=(log_ΔTSF_ = "ΔT (K)", f_ = "f (Hz)", r_N_pump = "r_N_pump (–)"),
+        title="Relative pump speed r_N_pump"
+    )
+    fig
+end
+  ╠═╡ =#
+
+# ╔═╡ ba43cfb0-0148-40ed-920d-7aa03a02fe27
+#=╠═╡
+"""
+    plot_effective_cop3_for_Qsp(setup, df_details; Qsp,
+                                cop=:masked_hard, nx=401, ny=401,
+                                levels=12, xlogbase=:log, palette=:viridis,
+                                point_color=:red, star_size=14, kwargs...)
+
+Show the effective COP₃ contour for the given `Qsp`, overlay the full optimal
+trajectory from `df_details`, and highlight the *current* optimal point.
+"""
+function plot_effective_cop3_for_Qsp(setup, df_details::DataFrame;
+    Qsp::Real,
+    cop::Symbol=:masked_hard,
+    nx::Int=401, ny::Int=401,
+    xbounds=nothing, ybounds=nothing,
+    levels=12, xlogbase::Symbol=:log, palette=:viridis,
+    point_color=:red, star_size::Real=14,
+    kwargs... # forwarded to best_cop_point (e.g. N_bounds, Pmax, etc.)
+)
+    # 1) build the COP₃ field for THIS Qsp
+    df_grid = cop3_grid_df(setup; Qsp=Qsp, nx=nx, ny=ny,
+                           xbounds=xbounds, ybounds=ybounds,
+                           cop=cop, xlogbase=xlogbase)
+
+    # 2) base contour (effective COP₃)
+    fig, ax = plot_contourf(df_grid;
+        xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_3, xlogbase=xlogbase,
+        base_style=:filled, levels=levels, palette=palette,
+        labelmap=(log_ΔTSF_="ΔT (K)", f_="f (Hz)", COP_3="effective COP₃"),
+        show_colorbar=true, return_axis=true)
+
+    # 3) overlay the full optimal trajectory (all Qsp)
+    xs = df_details.ΔT
+    ys = df_details.f
+    lines!(ax, xs, ys; color=:black, linewidth=3)
+    scatter!(ax, xs, ys; color=df_details.Qsp, colormap=:plasma, markersize=5)
+    Colorbar(fig[1,3]; colormap=:plasma, limits=extrema(df_details.Qsp),
+             label="Qₛₚ (W)", vertical=true)
+
+    # 4) compute & highlight the optimal point for THIS Qsp
+    best = best_cop_point(setup; Qsp=Qsp, do_refine=true, cop = cop, kwargs...)
+    scatter!(ax, [best.ΔT], [best.f];
+             marker=:star5, markersize=star_size, strokecolor=:black,
+             color=point_color) # <- not really working
+
+    # label the star with COP and setpoint (optional but handy)
+    text!(ax, best.ΔT, best.f;
+          text = @sprintf("Qₛₚ=%.0f W\nCOP₃=%.2f", Qsp, best.COP3),
+          align = (:left, :bottom), offset=(6,6), color=:black)
+
+    resize_to_layout!(fig)
+    fig
+end
+  ╠═╡ =#
+
+# ╔═╡ de3d0381-3be0-4c0e-965c-878b0e9634be
+#=╠═╡
+
+"""
+    plot_cop3_with_trajectory(df_grid, df_details;
+        xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_3, xlogbase=:log,
+        levels=12, palette=:viridis, lw=3,
+        color_by::Union{Nothing,Symbol}=:Qsp,  # color points by this column, or `nothing`
+        arrows_every::Union{Nothing,Int}=50,   # put arrows every N points, or `nothing`
+        save_path=nothing, save_px=nothing)
+
+Draw COP₃ field and overlay the optimal (ΔT*, f*) trajectory from `df_details`.
+"""
+function plot_cop3_with_trajectory(df_grid::DataFrame, df_details::DataFrame;
+        xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_3, xlogbase=:log,
+        levels=12, palette=:viridis, lw=3,
+        color_by::Union{Nothing,Symbol}=:Qsp,
+        arrows_every::Union{Nothing,Int}=50,
+        save_path=nothing, save_px=nothing
+    )
+
+    # 1) base: COP₃ field
+    fig, ax = plot_contourf(df_grid;
+        xcol, ycol, zcol, xlogbase,
+        base_style = :filled, levels = levels, palette = palette,
+        labelmap   = (log_ΔTSF_ = "ΔT (K)", f_ = "f (Hz)", COP_3 = "COP₃"),
+        show_colorbar = true,
+        return_axis = true)
+
+    # 2) overlay the optimal path ΔT*(Qsp), f*(Qsp)
+    xs = df_details.ΔT
+    ys = df_details.f
+
+    # halo for readability
+    lines!(ax, xs, ys; color=:black, linewidth=lw+2)
+
+    # optional: color points by Qsp (or another column)
+    if color_by !== nothing && hasproperty(df_details, color_by)
+        cs = df_details[!, color_by]
+        scatter!(ax, xs, ys; color=cs, colormap=:plasma, markersize=5)
+        Colorbar(fig[1, 3]; colormap=:plasma, limits=extrema(cs),
+                 label=String(color_by), vertical=true)
+    end
+
+    # optional: directional arrows along the path
+    if arrows_every !== nothing && length(xs) >= 2
+        idx = 1:arrows_every:(length(xs)-1)
+        pos = Point2f.(xs[idx], ys[idx])
+        dir = Vec2f.(xs[idx .+ 1] .- xs[idx], ys[idx .+ 1] .- ys[idx])
+        arrows!(ax, pos, dir; linewidth=1.5, arrowsize=10, color=:white)  # docs: arrows!. :contentReference[oaicite:0]{index=0}
+    end
+
+    resize_to_layout!(fig)
+
+    # optional saving
+    if save_path !== nothing
+        if save_px !== nothing
+            resize!(fig, save_px...)
+        end
+        Makie.save(String(save_path), fig)
+    end
+    fig
+end
   ╠═╡ =#
 
 # ╔═╡ b570d453-43f2-4a12-a9d6-889752dd5aeb
@@ -6610,19 +6507,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "2d_base", "COP2.svg")
 )
   ╠═╡ =#
@@ -6634,19 +6518,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Relative COP 3 deficit [-]", title = "Base scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 )
   ╠═╡ =#
 
@@ -6669,6 +6540,15 @@ plot_contourf(
 )
   ╠═╡ =#
 
+# ╔═╡ 1a9a9e58-41ac-45fb-9891-2e2e531621e5
+#=╠═╡
+plot_contourf(
+    df_grid; xlogbase=:log, zcol=:Q_cond, levels = 20,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "Relative COP 3 [-]", title = ""
+)
+  ╠═╡ =#
+
 # ╔═╡ 97b66208-6b79-40dd-bfd9-b710807a4e3f
 #=╠═╡
 plot_contourf(df_grid;
@@ -6676,13 +6556,7 @@ plot_contourf(df_grid;
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 3 [-]", title = "",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 4.0,
-    zridge_labels = false)
-
+			 )
   ╠═╡ =#
 
 # ╔═╡ 960c408c-3040-4a00-b285-c01080cb1c02
@@ -6741,35 +6615,94 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 7ad3f8c8-2847-4992-a08e-81a12d6b60d4
+# ╔═╡ ff524033-5adc-4235-8891-bdb16d2dda97
 #=╠═╡
-# 1) Build splines once
+# Build once from your df_grid (already produced by process_grid_results)
 setup_cop3 = make_splines(df_grid; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
 
+# Quick single setpoint view (NaNs show light gray):
   ╠═╡ =#
 
-# ╔═╡ 8343400c-daf3-48b0-91d0-2ec6d06c5c92
+# ╔═╡ a8bc2934-c96e-4475-ae2c-74ec8b665020
 #=╠═╡
-res = optimal_cop3_from_splines(setup_cop3; Qsp=4500.0)
+df_details = sweep_best_with_details(setup_cop3; Qs, nx=401, ny=401,
+                                     do_refine=true, cop=:masked_hard,
+                                     N_bounds=(0.3,1.0), Pmax=1.0)
+
   ╠═╡ =#
 
-# ╔═╡ fe843e78-b91f-4cbe-bc72-77c90658bc96
+# ╔═╡ 323226f6-60be-436e-ac4d-fa96aedeff3d
 #=╠═╡
-begin
-	Qs = 3000:10:6000           # pick your setpoint grid
-	fig, dfopt = sweep_optimal_curve(setup_cop3; Qs=Qs,
-	                                 show_cop3=true,
-	                                 save_path=nothing,      # e.g. "figs/opt_curve.svg"
-	                                 transparent=false)
-	fig
-#	first(dfopt, 5)              # peek at the numbers
-	
-end
+fig_duty   = plot_duty_paux(df_details)
   ╠═╡ =#
 
-# ╔═╡ 2f015541-ce60-4975-80ab-1ce26c0cdfc0
+# ╔═╡ 745782e7-bf79-47a1-a2b8-41f99a9778a3
 #=╠═╡
-Makie.save(joinpath(image_dir, "optimal_control.svg"), fig)
+fig_cap    = plot_capacity_context(df_details)
+  ╠═╡ =#
+
+# ╔═╡ 589dd8ae-cae7-42d6-b895-e2c0621ddf85
+#=╠═╡
+fig_power  = plot_power_breakdown(df_details)
+  ╠═╡ =#
+
+# ╔═╡ ce13e549-9f33-40f2-95e0-0af622786a5d
+#=╠═╡
+fig_pump  = plot_pump(df_details)
+  ╠═╡ =#
+
+# ╔═╡ 1b47efdc-b242-4ead-bc6b-c6291a7582b6
+#=╠═╡
+fig_8 = plot_qsp_with_three_yaxes(df_details; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ e10d9806-5475-44be-bc89-641f1137875d
+#=╠═╡
+# df_details is what you got from sweep_best_with_details or optimal_controls
+fig = plot_effective_cop3_for_Qsp(setup_cop3, df_details;
+    Qsp=2000,                # <- pick the setpoint you care about
+    cop=:masked_hard,        # same evaluator as the optimizer
+    nx=401, ny=401,          # grid density for smooth contours
+    levels=3.6:0.01:3.9,               # number or vector of levels
+    xlogbase=:log            # matches your ΔT axis convention
+)
+
+  ╠═╡ =#
+
+# ╔═╡ c3ad5a50-5f48-49ee-b3fa-032ae47d4402
+#=╠═╡
+fig_rN = plot_rN_contour(setup_cop3;
+    xlogbase=:log,          # matches your other plots
+    levels=0.2:0.05:1.2,    # or just an integer like 12
+    N_bounds=(0.3, 1.0)     # dashed overlays at the feasibility limits
+)
+  ╠═╡ =#
+
+# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
+#=╠═╡
+fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
+    levels= 20, color_by=:Qsp, arrows_every=75)
+  ╠═╡ =#
+
+# ╔═╡ 42f382a4-7820-4d98-b2ac-ca1ec8a2497b
+#=╠═╡
+plot_contourf(df_grid;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+			 )
+  ╠═╡ =#
+
+# ╔═╡ beb5c52e-e951-467e-822f-62a4dea6b69c
+#=╠═╡
+plot_contourf(df_grid;
+    xlogbase=:log, zcol=:r_N_pump, levels=0.3:0.05:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+			 )
   ╠═╡ =#
 
 # ╔═╡ 195ab453-b1f2-4632-9420-091f7f702ed7
@@ -6841,19 +6774,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Cold ground scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "cold", "COP2.svg")
 )
   ╠═╡ =#
@@ -6865,19 +6785,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Relative COP 3 deficit [-]", title = "Colder wall scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 )
   ╠═╡ =#
 
@@ -6886,13 +6793,7 @@ plot_contourf(
 plot_contourf(df_grid_cold;
     xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 4.0,
-    zridge_labels = false)
+			  )
 
   ╠═╡ =#
 
@@ -6901,16 +6802,52 @@ plot_contourf(df_grid_cold;
 plot_contourf(df_grid_cold;
     xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :white,
-    zridge_linestyle = :dot,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 4.0,
-    zridge_labels = false)
+			  )
 
+  ╠═╡ =#
+
+# ╔═╡ 7f0d2585-4675-4a23-830b-1e677da6ff3a
+#=╠═╡
+setup_cold = make_splines(df_grid_cold; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
+  ╠═╡ =#
+
+# ╔═╡ 3e4b6ca8-55e6-48d5-a71f-25f62fcafd51
+#=╠═╡
+df_details_cold = sweep_best_with_details(setup_cold; Qs, nx=401, ny=401,
+                                     do_refine=true, cop=:masked_hard,
+                                     N_bounds=(0.3,1.0), Pmax=1.0);
+  ╠═╡ =#
+
+# ╔═╡ 8188a79f-a596-40bd-aec7-fb61fa8d5572
+#=╠═╡
+fig_duty_cold   = plot_duty_paux(df_details_cold)
+  ╠═╡ =#
+
+# ╔═╡ 9f035aec-df45-42da-85f5-c539de5cbe89
+#=╠═╡
+fig_cap_cold    = plot_capacity_context(df_details_cold)
+  ╠═╡ =#
+
+# ╔═╡ 82e5e279-6937-4273-bf2f-75c91b7bac35
+#=╠═╡
+fig_power_cold  = plot_power_breakdown(df_details_cold)
+  ╠═╡ =#
+
+# ╔═╡ 685e2cdb-a684-4bda-a8e7-49e0eed7a7d9
+#=╠═╡
+fig_pump_cold  = plot_pump(df_details_cold)
+  ╠═╡ =#
+
+# ╔═╡ 14478ade-6a70-45fd-9d42-b60ae73c5aa0
+#=╠═╡
+fig_3axis_cold = plot_qsp_with_three_yaxes(df_details_cold; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
+#=╠═╡
+fig_traj_cold = plot_cop3_with_trajectory(df_grid_cold, df_details_cold;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=12, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
@@ -6982,19 +6919,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Pure water scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "water", "COP2.svg")
 )
   ╠═╡ =#
@@ -7006,19 +6930,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Relative COP 3 deficit [-]", title = "Pure Water scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 )# |> x -> save("cop3_pure_water_scenario.svg", x)
   ╠═╡ =#
 
@@ -7040,6 +6951,53 @@ plot_contourf(
     zlabel = "Evaporation fraction [-]", title = "Pure water scenario", 
     overlays=ovs_plots
 )
+  ╠═╡ =#
+
+# ╔═╡ f6b0d2b6-4f87-453d-8439-ef12d8e05d85
+#=╠═╡
+# Build once from your df_grid (already produced by process_grid_results)
+setup_water = make_splines(df_grid_water; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
+
+# Quick single setpoint view (NaNs show light gray):
+  ╠═╡ =#
+
+# ╔═╡ dfd1908d-5abc-4d6e-9149-bc27fd2940c2
+#=╠═╡
+df_details_water = sweep_best_with_details(setup_water; Qs, nx=401, ny=401,
+                                     do_refine=true, cop=:masked_hard,
+                                     N_bounds=(0.3,1.0), Pmax=1.0);
+  ╠═╡ =#
+
+# ╔═╡ b62c8dd4-15b4-44c5-bc9a-09cd9da3fbfb
+#=╠═╡
+fig_duty_water   = plot_duty_paux(df_details_water)
+  ╠═╡ =#
+
+# ╔═╡ fb38ea9c-236e-4a2b-b356-7058d1c61b25
+#=╠═╡
+fig_cap_water    = plot_capacity_context(df_details_water)
+  ╠═╡ =#
+
+# ╔═╡ 216362b8-4d6b-4711-adfa-75c2fc491097
+#=╠═╡
+fig_power_water  = plot_power_breakdown(df_details_water)
+  ╠═╡ =#
+
+# ╔═╡ 1c847476-b7e6-4ff9-815a-1057552ce133
+#=╠═╡
+fig_pump_water  = plot_pump(df_details_water)
+  ╠═╡ =#
+
+# ╔═╡ 3fee863e-871f-4c2d-bc2f-d2550b02bf4b
+#=╠═╡
+fig_3axis_water = plot_qsp_with_three_yaxes(df_details_water; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ 2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+#=╠═╡
+fig_traj_water = plot_cop3_with_trajectory(df_grid_water, df_details_water;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=12, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
@@ -7123,19 +7081,6 @@ plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0, palette=:viridis,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Wider pipe scenario",
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "wide", "COP2.svg")
 )
   ╠═╡ =#
@@ -7147,20 +7092,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Relative COP 3 deficit [-]", title = "Wider pipe scenario",
     #overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-	
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 ) 
   ╠═╡ =#
 
@@ -7181,12 +7112,7 @@ plot_contourf(df_grid_pipe;
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 3 [-]", title = "",
     #overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 4.0,
-    zridge_labels = false,)
+			  )
   ╠═╡ =#
 
 # ╔═╡ 592a2cfb-9d8a-481e-a39d-3147dc76b643
@@ -7258,21 +7184,49 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Longer BH scenario",
     overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "long", "COP2.svg")
 )
+  ╠═╡ =#
+
+# ╔═╡ cfe9ff8b-6cf5-43a0-bc07-4c77e860c236
+#=╠═╡
+# Build once from your df_grid (already produced by process_grid_results)
+setup_long = make_splines(df_grid_long; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
+
+# Quick single setpoint view (NaNs show light gray):
+  ╠═╡ =#
+
+# ╔═╡ 80e3b2c3-8791-48f5-92be-658578f564e0
+#=╠═╡
+df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
+                                     do_refine=true, cop=:masked_hard,
+                                     N_bounds=(0.3,1.0), Pmax=1.0);
+  ╠═╡ =#
+
+# ╔═╡ 0f8ed2e7-1631-4dc3-a759-7500a978806e
+#=╠═╡
+fig_duty_long   = plot_duty_paux(df_details_long)
+  ╠═╡ =#
+
+# ╔═╡ d792ed77-c90e-4ba3-9882-31e41db558e1
+# ╠═╡ disabled = true
+#=╠═╡
+fig_3axis_long = plot_qsp_with_three_yaxes(df_details_long; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ be554cbf-008a-4cc4-a6ad-98bfb6580623
+#=╠═╡
+save_figure(fig_3axis_long;
+    save_path=joinpath(image_dir, "long", "opt_controls_three_axes.svg"),
+    force_create_path=true,
+)
+  ╠═╡ =#
+
+# ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
+#=╠═╡
+fig_traj_long = plot_cop3_with_trajectory(df_grid_long, df_details_long;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=3.2:0.1:4.4, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
@@ -8220,6 +8174,111 @@ end
 # ╔═╡ 37e3be87-dff9-456d-b921-e0e1ecbb4909
 
 TableOfContents()
+
+# ╔═╡ 4cc59ad3-c3dd-4f41-8c04-03277bf547b4
+#=╠═╡
+fig_pump_long = plot_multi_axes(df_details_long;
+    x=:Qsp,
+    y_groups = [[:N]],                      # relative pump speed
+    sides    = [false],                     # left axis
+    ylabels  = ["Relative pump speed (–)"],
+    labels   = Dict(:N => "N/Nₘₐₓ"),
+    title    = "Pump operation",
+    lw       = 2,
+    save_path = joinpath(image_dir, "long", "pump_speed.svg"),
+    force_create_path = true,
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 24590765-e788-4796-85ba-5002c65e35bb
+# ╠═╡ disabled = true
+#=╠═╡
+fig_power_long  = plot_power_breakdown(df_details_long)
+  ╠═╡ =#
+
+# ╔═╡ b304acb6-3534-404f-b4f2-3fc98d07c17a
+#=╠═╡
+fig_power_long = plot_multi(df_details_long;
+    x=:Qsp,
+    y_left=[:W, :P, :Paux, :Pin_total],
+    labels=Dict(:W=>"W_comp", :P=>"P_pump", :Paux=>"Pₐᵤₓ", :Pin_total=>"Total in"),
+    linestyles=Dict(:Paux=>:dash),
+    ylabel_left="Power (W)",
+    title="Input power at optimum",
+    lw=2,
+    save_path=joinpath(image_dir, "long", "optimal_power_breakdown.svg"),
+    force_create_path=true,
+)
+
+# 3) Pump speed
+  ╠═╡ =#
+
+# ╔═╡ 59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
+# ╠═╡ disabled = true
+#=╠═╡
+fig_pump_long  = plot_pump(df_details_long)
+  ╠═╡ =#
+
+# ╔═╡ fb92dcb7-a6ce-4874-b718-78b6f55ce4be
+#=╠═╡
+fig_cap_long = plot_multi_axes(df_details_long;
+    x=[:Qsp;:Qhat] ,
+    y_groups = [],                   # model capacity
+    sides    = [false],                     # left axis
+    ylabels  = ["Heat (W)"],
+    labels   = Dict(:Qhat => "Q̂(ΔT*, f*)"),
+    diag_y_eq_x = true,                     # draw y=x on the left axis
+    title    = "Capacity at (ΔT*, f*) vs set-point",
+    lw       = 2,
+    save_path = joinpath(image_dir, "long", "capacity_context.svg"),
+    force_create_path = true,
+)
+
+  ╠═╡ =#
+
+# ╔═╡ 972e586c-3f95-4a2c-bfda-716373ad24cc
+# ╠═╡ disabled = true
+#=╠═╡
+# assumes `image_dir` exists (string or path)
+# 1) Capacity context (Q̂ vs Qsp) with y = x reference
+fig_cap_long = plot_multi(df_details_long;
+    x=:Qsp,
+    y_left=[:Qhat],
+    labels=Dict(:Qhat=>"Q̂ at (ΔT*, f*)"),
+    ylabel_left="Heat (W)",
+    title="Capacity at (ΔT*, f*) vs set-point",
+    diag_y_eq_x=true,
+    lw=2,
+    save_path=joinpath(image_dir, "long", "optimal_capacity_context.svg"),
+    force_create_path=true,
+)
+
+# 2) Power breakdown
+  ╠═╡ =#
+
+# ╔═╡ 5c0d6e1e-78ed-41c1-8a75-cfcdbeef476b
+# ╠═╡ disabled = true
+#=╠═╡
+fig_cap_long    = plot_capacity_context(df_details_long)
+  ╠═╡ =#
+
+# ╔═╡ 74c3066b-6167-49ea-9e72-9e5dd97de6dd
+# ╠═╡ disabled = true
+#=╠═╡
+fig_pump_long = plot_multi(df_details_long;
+    x=:Qsp,
+    y_left=[:N],
+    labels=Dict(:N=>"Relative pump speed"),
+    ylabel_left="Relative pump speed (–)",
+    title="Pump operation",
+    lw=2,
+    save_path=joinpath(image_dir, "long", "optimal_pump_speed.svg"),
+    force_create_path=true,
+)
+
+# 4) Three-axis special stays as-is; just save it with the helper
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -11982,6 +12041,7 @@ version = "4.1.0+0"
 # ╠═bb90f897-17d3-4a9d-a462-fd6d3f4d98e7
 # ╠═6acbadd7-94f6-4399-ac5f-3a2724ce641c
 # ╠═29e4a45f-7a0b-425b-90d5-b2fc84f43d10
+# ╠═6e2dd049-c583-4e2d-95ec-90796f38732d
 # ╠═4e1204d9-eab8-4890-a957-92341c8edfc4
 # ╟─987290e0-8b32-481a-85a0-442b075463cb
 # ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
@@ -12009,43 +12069,92 @@ version = "4.1.0+0"
 # ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 # ╠═33c1996a-aade-400a-9b2f-259db12c0835
-# ╠═79b17009-14ee-422e-8eb6-9e81c270b602
 # ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
-# ╠═7ad3f8c8-2847-4992-a08e-81a12d6b60d4
-# ╠═8343400c-daf3-48b0-91d0-2ec6d06c5c92
-# ╠═fe843e78-b91f-4cbe-bc72-77c90658bc96
-# ╠═2f015541-ce60-4975-80ab-1ce26c0cdfc0
-# ╠═682f4fc9-e4c5-4c5a-b872-f901388e1992
-# ╠═778d8c9e-2762-44d6-b8c0-318196498304
-# ╠═23ce92ed-6f53-4f1c-9896-b9280e08b272
-# ╠═92502f92-9e37-43a3-bf33-cc795218f98e
-# ╠═d4f3ac34-65e1-404b-8ca8-6ca09e0b466a
-# ╠═9ef98f84-be67-42f2-9304-5f48e706e394
-# ╠═0786c7cc-d7c1-403d-a442-bafdcd6fccb4
-# ╠═3d1c09c9-9144-4ceb-82da-ee9d50ed108c
-# ╠═381c94cb-10a0-424d-bbfd-999f71ce5df2
+# ╠═033594e2-7f94-4b32-b7fa-23490e087918
+# ╠═ff524033-5adc-4235-8891-bdb16d2dda97
+# ╠═8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
+# ╠═a8bc2934-c96e-4475-ae2c-74ec8b665020
+# ╠═323226f6-60be-436e-ac4d-fa96aedeff3d
+# ╠═745782e7-bf79-47a1-a2b8-41f99a9778a3
+# ╠═589dd8ae-cae7-42d6-b895-e2c0621ddf85
+# ╠═ce13e549-9f33-40f2-95e0-0af622786a5d
+# ╠═1b47efdc-b242-4ead-bc6b-c6291a7582b6
+# ╠═48478706-2c6a-4bba-a63d-e8ebf8baafee
+# ╠═f6b0d2b6-4f87-453d-8439-ef12d8e05d85
+# ╠═dfd1908d-5abc-4d6e-9149-bc27fd2940c2
+# ╠═b62c8dd4-15b4-44c5-bc9a-09cd9da3fbfb
+# ╠═fb38ea9c-236e-4a2b-b356-7058d1c61b25
+# ╠═216362b8-4d6b-4711-adfa-75c2fc491097
+# ╠═1c847476-b7e6-4ff9-815a-1057552ce133
+# ╠═3fee863e-871f-4c2d-bc2f-d2550b02bf4b
+# ╠═ff4149ab-7af1-4b9b-8f26-70c52930150d
+# ╠═7f0d2585-4675-4a23-830b-1e677da6ff3a
+# ╠═3e4b6ca8-55e6-48d5-a71f-25f62fcafd51
+# ╠═8188a79f-a596-40bd-aec7-fb61fa8d5572
+# ╠═9f035aec-df45-42da-85f5-c539de5cbe89
+# ╠═82e5e279-6937-4273-bf2f-75c91b7bac35
+# ╠═685e2cdb-a684-4bda-a8e7-49e0eed7a7d9
+# ╠═14478ade-6a70-45fd-9d42-b60ae73c5aa0
+# ╠═9f3f5b7d-8a4d-4bd5-a7b9-1926d3087c72
+# ╠═cfe9ff8b-6cf5-43a0-bc07-4c77e860c236
+# ╠═80e3b2c3-8791-48f5-92be-658578f564e0
+# ╠═0f8ed2e7-1631-4dc3-a759-7500a978806e
+# ╠═5c0d6e1e-78ed-41c1-8a75-cfcdbeef476b
+# ╠═24590765-e788-4796-85ba-5002c65e35bb
+# ╠═59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
+# ╠═d792ed77-c90e-4ba3-9882-31e41db558e1
+# ╠═972e586c-3f95-4a2c-bfda-716373ad24cc
+# ╠═b304acb6-3534-404f-b4f2-3fc98d07c17a
+# ╠═74c3066b-6167-49ea-9e72-9e5dd97de6dd
+# ╠═fb92dcb7-a6ce-4874-b718-78b6f55ce4be
+# ╠═4cc59ad3-c3dd-4f41-8c04-03277bf547b4
+# ╠═be554cbf-008a-4cc4-a6ad-98bfb6580623
+# ╟─b9613755-4061-4aec-a50f-b5d739b9df25
+# ╠═769f3480-9062-402b-a43e-9c98e9b63cde
+# ╠═db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
+# ╠═8cc18375-13b9-41ec-b162-dc3650d51e7f
+# ╠═6fefe780-17cc-425c-b6c3-4b960f0e1665
+# ╠═40d4651c-93c5-41b5-aa2c-685f471d7a02
+# ╠═cb7178e5-9bc6-45c3-aa11-52972df91fac
+# ╠═639e359f-5760-4adb-9258-967d5db2eea4
+# ╠═15f52274-d66b-46f2-8b4f-dac7ca039ccb
+# ╠═e2db4d18-bc58-43ef-b003-e9bc10f7c89c
+# ╠═f605308a-47a5-49e5-bda4-763350e21748
+# ╠═dace0a13-ba22-49b3-b349-45090e15486b
+# ╠═edabd9cc-7d11-4f5c-ba60-7ddca8346078
+# ╠═d87aec62-0109-4ab8-a313-a339b1b6efb6
+# ╠═66c14835-9ebe-479b-82ef-637b7ca8651b
+# ╠═94fa6d40-53ae-43f5-a388-e713c00c4b18
+# ╠═d3d4578d-03c9-4ff8-af77-f84a2b52babe
+# ╠═8a415054-b012-4705-bf24-6268c05cbec4
+# ╠═96c15321-842a-4f66-926d-de1638cec610
+# ╠═73744de2-af34-46be-8be6-b12ebbf00b73
+# ╠═ef4aa4e8-aca5-4798-ae3b-bc179fa3480b
+# ╠═cbef6827-61cc-4c0b-b779-57ac14e28982
+# ╠═e63c52e0-678a-4673-a65a-62c422680e2d
+# ╠═de4fb33c-7af3-4593-bc68-79558eb34f26
+# ╠═c472a38d-369c-4f33-b6ec-708e792ba1e6
+# ╠═899d157e-a242-41bf-92da-466f50e72588
 # ╟─94138b2d-0fd6-494e-9fd1-ef5aecadaabf
-# ╟─2097d037-7f79-4fe2-b683-b74b77d98752
-# ╠═599e27a4-1aba-4de4-a76d-fb09511de993
-# ╠═4b5d8e48-6775-4ec6-ab28-3e96b9954af3
-# ╠═c9aa37be-53b4-4f23-9898-b5179f7117f2
 # ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 # ╠═3ec7080c-2972-484b-805e-3d9fe0a7d9d1
 # ╠═7148e421-b7e8-4f3c-a0a9-da3d14dd32e5
+# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
+# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
+# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
+# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╠═e10d9806-5475-44be-bc89-641f1137875d
+# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
+# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
+# ╠═869c2c91-5716-49d6-add8-5c9053aea261
+# ╠═62b31b42-f81a-4370-a61d-8c9bc8ffbd72
+# ╠═88c2db40-b214-46db-9a82-5b67760443c8
+# ╠═ba43cfb0-0148-40ed-920d-7aa03a02fe27
+# ╠═de3d0381-3be0-4c0e-965c-878b0e9634be
 # ╠═23f9f68a-9e3c-4bbe-8abe-1b851206162f
 # ╠═7520ab74-810f-431a-b24e-724e24595b13
 # ╠═1d8f15e6-0462-4f86-9a97-3364e3e73bc0
-# ╠═3afecaa8-1c77-4b26-b534-2c419ddfb027
-# ╠═2164a2d3-59a0-4573-bd12-b62431f46c04
-# ╠═318a7ca3-1d6a-4a32-9fc7-c2a0072c92d3
-# ╠═c1333a2c-28a8-4a31-a049-8479e43f6c0e
-# ╠═1177eea2-1d56-4090-8b70-a636f404b4fb
-# ╠═1d782694-8f7d-4d1f-a1bc-b7646ac01b23
-# ╠═a35e92ea-bee1-4117-9ccf-f2016be29dc3
-# ╠═17aa8588-7089-4247-aaad-0ca54e1d888a
-# ╠═286269bd-f4db-4690-81f4-b4c45edeb24d
-# ╠═34522b07-e28b-4fa6-b2bf-2c7c73895aa2
-# ╠═9d0ffbe1-deff-4de9-a0d7-9e7c8df5bfaf
 # ╠═bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 # ╟─b570d453-43f2-4a12-a9d6-889752dd5aeb
 # ╠═21cd24f0-4d8b-4298-89e1-7ba7817c2eef
