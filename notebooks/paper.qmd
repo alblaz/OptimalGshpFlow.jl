@@ -20,7 +20,7 @@ author:
     affiliation: "Your Institution"
     email: "your.email@institution.edu"
 abstract: |
-  This paper investigates the question of flow control in ground source heat pump (GSHP) systems. We focus on systems with a single heat pump connected hydraulically to a borehole without decoupling tanks. The study develops a coupled thermal-hydraulic model that considers steady-state conditions with the borehole wall as the boundary condition. The model incorporates principles of fluid mechanics and heat transfer while accounting for thermal properties of both ground and heat pump components.
+  This paper investigates the question of flow control in ground source heat pump (GSHP) systems. We focus on systems with a single heat pumpd hydraulically to a borehole without decoupling tanks. The study develops a coupled thermal-hydraulic model that considers steady-state conditions with the borehole wall as the boundary condition. The model incorporates principles of fluid mechanics and heat transfer while accounting for thermal properties of both ground and heat pump components.
 keywords: [Ground Source Heat Pump, Flow Control, Thermal-Hydraulic Coupling, Optimization]
 bibliography: bibliography/export.bib
 csl: https://www.zotero.org/styles/american-chemical-society
@@ -33,9 +33,9 @@ This paper will look into the question of the flow control in GSHP systems. We w
 
 # Introduction
 
-Heat pump in genreal and GSHP in particular are essential tools allowing for the decarbonization of the heating sector. The question of the flow control in GSHP systems is a central one, as it allows for the optimization of the system performance and the reduction of energy consumption. The cost of changing a few variables in a control algorithm is minimal. Therefore, it is important to understand the hydraulic aspects of GSHP systems in order to design effective control strategies. The flow control in GSHP systems is a complex problem that involves the interaction between the heat pump, the borehole, and the ground. The flow rate through the borehole is influenced by several factors, including the temperature difference between the fluid entering and leaving the borehole, the thermal conductivity of the ground, and the pressure drop across the borehole. In addition, the flow rate is also affected by the control strategy used to operate the heat pump.
+Heat pumps in general and GSHP in particular are essential tools allowing for the decarbonization of the heating sector. The question of the flow control in GSHP systems is a central one, as it allows for the optimization of the system performance and the reduction of energy consumption. The cost of changing a few variables in a control algorithm is minimal. Therefore, it is important to understand the hydraulic aspects of GSHP systems in order to design effective control strategies. The flow control in GSHP systems is a complex problem that involves the interaction between the heat pump, the borehole, and the ground. The flow rate through the borehole is influenced by several factors, including the temperature difference between the fluid entering and leaving the borehole, the thermal conductivity of the ground, and the pressure drop across the borehole. In addition, the flow rate is also affected by the control strategy used to operate the heat pump.
 
-In this paper, we will focus on the hydraulic aspects of GSHP systems, specifically on the flow control in systems with a single heat pump connected hydraulically to a borehole. The model developped considers a steady state model of the inner problem, and sets the borehole wall as the boundary condition. The model is implemented in ModelingToolkit.jl, a Julia package for modeling and simulation of dynamic systems. The model is based on the principles of fluid mechanics and heat transfer, and takes into account the thermal properties of the ground and the heat pump.
+In this paper, we will focus on the hydraulic aspects of GSHP systems, specifically on the flow control in systems with a single heat pump connected hydraulically to a borehole. The model developed considers a steady state model of the inner problem, and sets the borehole wall as the boundary condition. The model is implemented in ModelingToolkit.jl, a Julia package for modeling and simulation of dynamic systems. The model is based on the principles of fluid mechanics and heat transfer, and takes into account the thermal properties of the ground and the heat pump.
 
 # Literature Review
 
@@ -55,7 +55,7 @@ Several tools exist to model GSHP:
 
 ## Modeling framework:
 
-We dedided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similar in principle to Modelica: an acausal component based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.
+We decided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similar in principle to Modelica: an acausal component based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.
 
 The GSHP system model consists of three coupled submodels that are solved together: thermodynamic cycle (thermal system), borehole heat exchanger, and pump hydraulics (hydraulic system). The steady-state system is solved using ModelingToolkit.jl with symbolic manipulation and NonlinearSolve.jl library for the solvers.
 
@@ -67,7 +67,15 @@ Clapeyron.jl and EntropyScaling are used for determining the properties of the r
 
 ### Thermodynamic Cycle:
 
-The thermodynamic cycle implements a R134A cycle with the following components:
+The thermodynamic cycle implements a R134A cycle with the following components governed by fundamental thermodynamic relationships:
+
+$$\dot{Q}_{evap} = \dot{m}_{ref} (h_{evap,out} - h_{evap,in})$$
+
+$$COP_{thermal} = \frac{\dot{Q}_{evap}}{W_{comp}}$$
+
+where $W_{comp}$ is the compressor work calculated from isentropic efficiency:
+
+$$W_{comp} = \dot{m}_{ref} \frac{h_{comp,out,s} - h_{comp,in}}{\eta_{is}}$$
 
 #### Evaporator:
 
@@ -76,7 +84,7 @@ A moving-boundary plate heat exchanger evaporator with dynamically allocated reg
 -   **Geometric modeling**: Chevron plate geometry with adjustable plate spacing (b), number of plates (np), width (W), enlargement factor (ϕ), and chevron angle (β)
 -   **Two-zone heat transfer**: The evaporator length is split between evaporation and superheating zones. The fraction of the HX occupied by each zone is a variable.
 -   **Heat transfer correlations**:
-    -   Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (avergaed ovr a vapor quality range)
+    -   Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (averaged over a vapor quality range)
     -   Superheating region: Martin correlations for single-phase plate heat exchanger flow with laminar-turbulent (smooth) transition
 -   **Boundary conditions**: Fixed superheat degree (ΔTSH) and secondary fluid temperature difference (ΔTSF) as control variables
 
@@ -104,7 +112,17 @@ Simplified model assuming constant condensing temperature and specified subcooli
 
 ### Borehole Heat Exchanger:
 
-The U-tube grouted borehole is simulated by two different models:
+The U-tube grouted borehole is simulated using coupled thermal-hydraulic models. The thermal model employs analytical solutions for temperature profiles along the borehole depth:
+
+$$\frac{d}{dz}\begin{bmatrix} T_1(z) \\ T_2(z) \end{bmatrix} = \mathbf{A} \begin{bmatrix} T_1(z) \\ T_2(z) \end{bmatrix} + \mathbf{B} T_{wall}$$
+
+where $T_1(z)$ and $T_2(z)$ are fluid temperatures in the downward and upward legs, and the coefficient matrix **A** incorporates thermal resistances between pipes and to the borehole wall.
+
+The hydraulic model calculates pressure drops using the Darcy-Weisbach equation:
+
+$$\Delta P = f \frac{L}{D} \frac{\rho v^2}{2}$$
+
+with smooth transitions between laminar and turbulent regimes using error function blending.
 
 #### Thermal:
 
@@ -124,25 +142,33 @@ The borehole thermal model is connected to the hydraulic system through temperat
 
 ## Pump
 
-Since the hydraulic mode is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performances are expected in reality thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.
+Since the hydraulic model is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performances are expected thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.
 
 ### Pump Performance:
 
 The centrifugal pump follows dimensionless performance curves based on affinity laws:
 
--   **Head coefficient**: $\psi = \psi_0 - K \cdot \varphi^2$ where $\varphi$ is the flow coefficient
+$$\psi = \psi_0 - K \cdot \varphi^2$$
 
--   **Efficiency**: $\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)$ with parabolic efficiency curve around the best efficiency point (BEP)
+where $\varphi = \dot{V}/(N \cdot D^3)$ is the flow coefficient and $\psi = gH/(N^2 \cdot D^2)$ is the head coefficient.
 
--   **Power calculation**: Electrical power including motor efficiency
+Pump efficiency follows a parabolic curve around the best efficiency point:
+
+$$\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)$$
+
+Electrical power consumption is calculated as:
+
+$$P_{elec} = \frac{\rho g \dot{V} H}{\eta_{pump} \eta_{motor}}$$
 
 ## Performance Metrics:
 
 The model calculates multiple performance indicators:
 
 -   **Thermal COP**: $COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$ (refrigeration cycle only)
--   **System COP**: $COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$ (including pump power)
--   COP 3 (includes auxiliary heating)
+-   **System COP**: $COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$ (including pump power)  
+-   **Auxiliary-adjusted COP**: $COP_3 = \frac{\dot{Q}_{cond} + P_{aux}}{W_{comp} + P_{pump} + P_{aux}}$ (includes auxiliary heating)
+
+where $P_{aux} = \max(0, Q_{SP} - Q_{cond})$ represents auxiliary heating power when heat pump capacity is insufficient.
 
 ### Numerical Implementation:
 
@@ -151,13 +177,13 @@ The model calculates multiple performance indicators:
 -   **Automatic differentiation**: Forward-mode AD for enhanced convergence properties
 -   **Continuation methods**: Built-in parameter sweep capabilities with automatic stepping and convergence control
 
-*Detailed system parameters and correlations are provided in Appendix A.*
+*Detailed system base parameters and correlations are provided in @sec-appendix-parameters.*
 
 # Results:
 
 ## Insights into the physical process
 
-Position of the boundary within the evaporator The faster the compressor runs, the more evaporation fraction is used
+In this section, we'll outline the case of a single simulation with the parameters described in @sec-appendix-parameters.
 
 ![Thermal resistances vs. temperature difference showing the effect of flow regime on BHE performance](images/thermal_resistances_vs_dt.svg){#fig-thermal-resistances}
 
@@ -179,9 +205,9 @@ Then, this higher temperature leads to a better capacity:
 
 ![Energy components breakdown showing capacity improvements](images/energy_components_vs_dt.svg){#fig-energy-components}
 
-When factoring in the pumpin pwer, we therefore obtain the COP 3 figure:
+When factoring in the pumping power, we therefore obtain the COP 3 figure:
 
-We observe a clear peak around 3K Delta T. This is in line with the standard practice accross the field.
+We observe a clear peak around 3K Delta T. This is in line with the standard practice across the field.
 
 ## COPs vs. ΔT
 
@@ -191,57 +217,56 @@ We observe a clear peak around 3K Delta T. This is in line with the standard pra
 
 The COP 3 is calculated such that the delivered heat is the heat delivered at the maximum case for this frequency.
 
-We can see clearly that there is an optimal at 3.0K, around when the flow is fully turbulent in both legs of the BHE (see appendix for explanations)
+We can see clearly that there is an optimal at 3.0K, around when the flow is fully turbulent in both legs of the BHE (see @sec-appendix-parameters for explanations)
 
 ## Robustness
 
 ### Scenarios
 
-4 additional scenarios have been simulated with one difference for each variant:
+3 additional scenarios have been simulated with one difference for each variant:
 
 -   "Cold wall", T wall is set to 5C instead of 10C
 
 -   "Pure Water", the secondary fluid is pure water
 
--   "Bigger pipes", the OD of the collector pipes is set to 40 instead of 32mm
+%-   "Bigger pipes", the OD of the collector pipes is set to 40 instead of 32mm
 
 -   "Longer collector", the collector is 200m instead of 150m
 
 ### Partial load
 
-is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f) (see @sec- ), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
+is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f) (see @sec- ), calculated as so: This COP3 is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to choose a target Q cond.
 
 On the diagram, several isolines are represented:
 
--   The iso pump speed are represented in black. The 30\% and 100\% speeds are represented in thick and each 10\% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.
+-   The iso pump speed are represented in black. The 30% and 100% speeds are represented in thick and each 10% step in between is a thinner line. Beyond these two boundaries, the physical system can actually not be operated.
 
--   Similarily, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.
+-   Similarly, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.
 
--   The different kaminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso rteynolds number (2300 and 4000).
+-   The different laminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso Reynolds number (2300 and 4000).
 
-In order to better visualize these ridges, we have calculated a relatrive COP 3 deficit for a given compressor frequency. NEEDS explanation
+In order to better visualize these ridges, we have calculated a relative COP 3 deficit for a given compressor frequency. NEEDS explanation
 
 The ridge line in red corresponds to the location of this maximum used for the auxiliary heating calculation. The ridge line presents 2 regions:
 
--   In the ttop part, there is a clear ridge
+-   In the top part, there is a clear ridge
 
 -   In the bottom part, a hockey stick ridge is present
 
-In the lower region, the behaviour of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumpng power is justified: it allows achieveing turbulence in the collector, and therefore better BH efficiency. Conversely, achieveing turbulence at low compressor speed is not worth the extra pumping power. In some sense, achiveing turbulence is "having a high speed", regardless of the thermal load.
+In the lower region, the behaviour of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumping power is justified: it allows achieving turbulence in the collector, and therefore better BH efficiency. Conversely, achieving turbulence at low compressor speed is not worth the extra pumping power. In some sense, achieving turbulence is "having a high speed", regardless of the thermal load.
 
 This second region is often not reachable in the base scenario: the pump minimum speed being too high and therefore does not allow for a low enough SF flow.
 
-When
 
 Focusing on the position of the ridge, one can see that, in the colder wall collector scenario, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.
 
-Looking at the graph and coming back the the different ways to control as GSHP SF pump, we can make the following remarks about the following constant heuristic strategies:
+Looking at the graph and coming back to the different ways to control a GSHP SF pump, we can make the following remarks about the following constant heuristic strategies:
 
 -   *Delta T:* It necessarily fails at keeping the system on the ridge.
 
 -   *Pressure drop:*  strategy could be
 
--   *Pump speed:* It can not track the change either
+-   *Pump speed:* It cannot track the change either
 
 -   *Compressor speed to pump speed ratio:* performs decently well over the transition, TODO
 
@@ -252,39 +277,61 @@ Looking at the graph and coming back the the different ways to control as GSHP S
 
 To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?
 
-The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
+The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 32mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in @sec-appendix-parameters.
 
 
 ### Optimal operation
 
-In this part, we used the simulation results of the forward problem to find the maximum using interpolation. We fulcate the COP3 that can be realized and then optimization routines are used to find it.
+In this part, we used the simulation results of the forward problem to find the maximum using interpolation. We calculate the COP3 that can be realized and then optimization routines are used to find it.
 
 
+![COP2 and optimal COP3 trajectory for the base case](images/base/overlay_optimal.svg){#fig-overlay_cop3}
 
-@fig-overlay_cop3 shows this maximum overlayed onto the COP2 graph. What we see is that the pump envelope constrains the system at low Q heat. The "laminar optimum" is not reachable, but the lowest pump speed is nonetheless the optimal achieveble point. Then there is a point where the system stops chjasing the "laminar optimum" and switches instead to the "turbulent optimum". In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.
+@fig-overlay_cop3 shows this maximum overlaid onto the COP2 graph. What we see is that the pump envelope constrains the system at low Q heat. The "laminar optimum" is not reachable, but the lowest pump speed is nonetheless the optimal achievable point. Then there is a point where the system stops chasing the "laminar optimum" and switches instead to the "turbulent optimum". In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.
 
+::: {layout-ncol=2, #fig-optimal}
+
+![](images/base/optimal.svg){#fig-optimal_base}
+
+![](images/long/optimal.svg){#fig-optimal_long}
+
+![](images/cold/optimal.svg){#fig-optimal_cold}
+
+![](images/water/optimal.svg){#fig-optimal_water}
+
+Optimal strategies for the 4 study cases
+
+:::
 
 The ensemble of figures @fig-optimal shows both the maximum COP3 achievable for a given heat need as well as \Delta T, pump anjd compressor speeds. The figures represents both the base scenario as well as thee 3 variants we run. The pattern we see is as follow:
 
 - First for low demand, the system operates at a constant operating point: it is "stuck" at minimum compressor speed and minimum pump speed.
 
-- Then , once the capacity of this minimum speed is reached, the compressor speed is ramped up in a very linear way up to its maximum value. In parallel, we see that the pump stays at minimum speed, and then slowly ramps up to chase the 
+- Then, once the capacity of this minimum speed is reached, the compressor speed is ramped up in a very linear way up to its maximum value. In parallel, we see that the pump stays at minimum speed, and then slowly ramps up to chase the optimum.
 
-- First for low demand, the system operates at a constant operating point: it is "stuck" minimum compressor speed.
+- First for low demand, the system operates at a constant operating point: it is "stuck" at minimum compressor speed.
 
 - Then there can be a zone with constant Delta T or slightly sloped Delta T vs Pump speed/Delta T. This is when the system follows the turbulent optimum.
 
-- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating. Hoever, this change is more subtle (between 0.1K and 1K of difference compared to the previous optimal detla T).
+- When the system reaches the maximum capacity, the system settles in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penalty due to the auxiliary heating. However, this change is more subtle (between 0.1K and 1K of difference compared to the previous optimal delta T).
 
 # Conclusions
 
-It seems that the widespread rule based controll perform decently in some test cases, however, theree is considerable potential to increasee the performances.
+It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.
 
 # Discussion
 
-it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.
+It remains to be seen if the same heuristic does as well when it comes to e.g. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.
 
-It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
+It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happens in reality, the temperature is not uniform in each leg (-> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies cannot track this transition point in a satisfactory manner.
+
+This is a physics based model, however, even if the correlations used here are somewhat valiadted, comparing this model to true experimental data would be valuable. Fitting/identifacation techniques could also be employed to narrow down on parameters which are not easy to measure/known with certainty.
+
+This paper has focused on creating a better understanding of the mechanism leading to an optimal operation for GSHP systems. However, there is considerable limitations in this study, eg. the condensation pressure is not varied once. The operating space has many dimensions, which makes it challenging to sample. Therefore, surrogates should be used in order to make the task of finding the optimal operating point doable. Ideeally, the model should be surrogatizeed after the experimental fitting, this way
+
+FInally, there are some limitations which can not be addreessed with the techniques suggesteed above. The model is steady state, however, the borehole dynamics is paramount. A type of question to which we cannot answer is forr example "is it worth operating a little bit faster and letting it rest a fraction of the time?". The optimal dispatch problem is also completely overlooked here, since 
+
+All in all, this paper contributes to advancing the understanding of optimal operation of GSHP, but more work is necessary in order to provide more actionable recommendations to manufacturer and practitioners.
 
 
 # Nomenclature
@@ -437,7 +484,33 @@ It is important to remember the model's assumptions when discussing these aspect
 -   $R134A$ = 1,1,1,2-Tetrafluoroethane (refrigerant)
 -   $MEA$ = Monoethanolamine ($C_2H_7NO$)
 
-#Appendix: Model Parameters and Technical Specifications
+# Appendix: Model Parameters and Technical Specifications {#sec-appendix-parameters}
+
+## Detailed Mathematical Correlations
+
+**Pump Performance Correlations:**
+
+- Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
+
+- Dimensionless flow coefficient: $$\phi = \frac{\dot{V}}{N \cdot D^3}$$
+
+- Dimensionless head coefficient: $$\psi = \frac{g \cdot H}{N^2 \cdot D^2}$$
+
+- Pump efficiency: $$\eta_{pump} = \eta_{max} \left(1 - \left(\frac{\phi - \phi_{BEP}}{\phi_{BEP}}\right)^2\right)$$
+
+where $N$ is rotational speed [rpm], $D$ is impeller diameter [m], $\dot{V}$ is volumetric flow rate [m³/s], $H$ is pump head [m], $\eta_{max}$ is maximum efficiency, and $\phi_{BEP}$ is flow coefficient at best efficiency point.
+
+**Power Consumption:**
+
+- Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
+
+- Electrical power: $$P_{elec} = \frac{P_{shaft}}{\eta_{motor}}$$
+
+**Compressor Work:**
+
+- Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
+
+where $\dot{m}_{ref}$ is refrigerant mass flow rate [kg/s], $h_{in}$ and $h_{out,s}$ are inlet and isentropic outlet specific enthalpies [kJ/kg], respectively.
 
 ## Borehole Heat Exchanger Specifications
 
@@ -511,38 +584,3 @@ It is important to remember the model's assumptions when discussing these aspect
 
 - High-side pressure: $P_{high} = 14$ bar - Secondary fluid mass fraction: $\chi = 0.28$
 
-## Mathematical Correlations
-
-**Pump Performance:**
-
-- Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
-
--   Dimensionless flow coefficient: $$\phi = \frac{\dot{V}}{N \cdot D^3}$$
-
--   Dimensionless head coefficient: $$\psi = \frac{g \cdot H}{N^2 \cdot D^2}$$
-
--   Pump efficiency: $$\eta_{pump} = \eta_{max} \left(1 - \left(\frac{\phi - \phi_{BEP}}{\phi_{BEP}}\right)^2\right)$$
-
-where $N$ is rotational speed \[rpm\], $D$ is impeller diameter \[m\], $\dot{V}$ is volumetric flow rate \[m³/s\], $H$ is pump head \[m\], $\eta_{max}$ is maximum efficiency, and $\phi_{BEP}$ is flow coefficient at best efficiency point.
-
-**Power Consumption:**
-
-- Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
-
--   Electrical power: $$P_{elec} = \frac{P_{shaft}}{\eta_{motor}}$$
-
-**Compressor Work:**
-
-- Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
-
-where $\dot{m}_{ref}$ is refrigerant mass flow rate \[kg/s\], $h_{in}$ and $h_{out,s}$ are inlet and isentropic outlet specific enthalpies \[kJ/kg\], respectively.
-
-**Coefficient of Performance:**
-
-- $$COP_1 = \frac{\dot{Q}_{cond}}{W_{comp}}$$
-
-- $$COP_2 = \frac{\dot{Q}_{cond}}{W_{comp} + P_{pump}}$$
-
-- $$COP_3(Q_{SP}) = \frac{\dot{Q}_{cond} + P_{aux}}{W_{comp} + P_{pump} + P_{aux}}$$
-
-where $\dot{Q}_{evap}$ is evaporator heat transfer rate \[W\] and $P_{aux}=max(0.0, Q_{SP} - Q_{cond})$
