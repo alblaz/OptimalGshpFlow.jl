@@ -247,17 +247,6 @@ Looking at the graph and coming back the the different ways to control as GSHP S
 
 -   A constant mass flow ratio could also be devised (however in practice sensors are never installed for cost effieicncy reaspons. Maybe a s
 
-Idea: show all on different graphs, only the rules without the effiency
-
-Conslusion is that nothing seems to be able to capture the complex interplay of the different effects.
-
-Lookking at the graph, the
-
-NEW GRAOH AT DIFFERENT T WALL
-
-The figure XX shows that the ridge
-
-It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
 
 ### Variations
 
@@ -269,6 +258,8 @@ The test case represents a typical Swedish GSHP installation. The system feature
 ### Optimal operation
 
 In this part, we used the simulation results of the forward problem to find the maximum using interpolation. We fulcate the COP3 that can be realized and then optimization routines are used to find it.
+
+
 
 @fig-overlay_cop3 shows this maximum overlayed onto the COP2 graph. What we see is that the pump envelope constrains the system at low Q heat. The "laminar optimum" is not reachable, but the lowest pump speed is nonetheless the optimal achieveble point. Then there is a point where the system stops chjasing the "laminar optimum" and switches instead to the "turbulent optimum". In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.
 
@@ -283,28 +274,100 @@ The ensemble of figures @fig-optimal shows both the maximum COP3 achievable for 
 
 - Then there can be a zone with constant Delta T or slightly sloped Delta T vs Pump speed/Delta T. This is when the system follows the turbulent optimum.
 
-- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating.
+- When the system reaches the maximum capacity, the system settls in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for relatively less penality due to the auxiliary heating. Hoever, this change is more subtle, 
 
 # Conclusions
 
 It seems that the widespread rule based controll perform decently in the test case, however, it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.
 
-## Nomenclature
+# Discussion
 
-### Symbols
+It is important to remember the model's assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-\> some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is "right after the transition". However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.
 
-**Geometric Parameters:** - $D$ = Impeller diameter \[m\] - $D_{bh}$ = Borehole diameter \[m\]\
-- $D_{pipe,i}$ = Pipe inner diameter \[m\] - $D_{pipe,o}$ = Pipe outer diameter \[m\] - $H$ = Pump head \[m\] - $L$ = Plate length \[m\] - $L_b$ = Borehole depth \[m\] - $N_{plates}$ = Number of plates \[-\] - $W$ = Plate width \[m\] - $b$ = Channel spacing \[m\] - $s$ = Shank spacing \[m\] - $t_{pipe}$ = Pipe wall thickness \[m\] - $t_{plate}$ = Plate thickness \[m\]
 
-**Thermophysical Properties:** - $\lambda$ = Thermal conductivity \[W/(m·K)\] - $\rho$ = Density \[kg/m³\] - $\chi$ = Mass fraction \[-\] - $\beta$ = Chevron angle \[rad\] - $h$ = Specific enthalpy \[kJ/kg\]
+# Nomenclature
 
-**Flow and Transport Variables:** - $\dot{V}$ = Volumetric flow rate \[m³/s\] - $\dot{m}$ = Mass flow rate \[kg/s\] - $\dot{Q}$ = Heat transfer rate \[W\] - $N$ = Rotational speed \[rpm\] - $P$ = Pressure \[bar, Pa\] - $T$ = Temperature \[K, °C\] - $\Delta T$ = Temperature difference \[K\]
+## Symbols
 
-**Dimensionless Parameters:** - $\phi$ = Flow coefficient, $\dot{V}/(N \cdot D^3)$ \[-\] - $\psi$ = Head coefficient, $g \cdot H/(N^2 \cdot D^2)$ \[-\] - $\psi_0$ = Shutoff head coefficient \[-\] - $K$ = Head curve slope parameter \[-\]
+**Geometric Parameters:**
 
-**Performance Parameters:** - $COP$ = Coefficient of performance \[-\] - $W$ = Work/Power \[W\] - $\eta$ = Efficiency \[-\] - $f$ = Frequency \[Hz\] - $g$ = Gravitational acceleration \[m/s²\]
+- $D$ = Impeller diameter \[m\]
 
-### Subscripts
+- $D_{bh}$ = Borehole diameter \[m\]\
+
+- $D_{pipe,i}$ = Pipe inner diameter \[m\]
+
+- $D_{pipe,o}$ = Pipe outer diameter \[m\]
+
+- $H$ = Pump head \[m\]
+
+- $L$ = Plate length \[m\]
+
+- $L_b$ = Borehole depth \[m\]
+
+- $N_{plates}$ = Number of plates \[-\]
+
+- $W$ = Plate width \[m\]
+
+- $b$ = Channel spacing \[m\]
+
+- $s$ = Shank spacing \[m\]
+
+- $t_{pipe}$ = Pipe wall thickness \[m\]
+
+- $t_{plate}$ = Plate thickness \[m\]
+
+**Thermophysical Properties:**
+
+- $\lambda$ = Thermal conductivity \[W/(m·K)\]
+
+- $\rho$ = Density \[kg/m³\]
+
+- $\chi$ = Mass fraction \[-\]
+
+- $\beta$ = Chevron angle \[rad\]
+
+- $h$ = Specific enthalpy \[kJ/kg\]
+
+**Flow and Transport Variables:**
+
+- $\dot{V}$ = Volumetric flow rate \[m³/s\]
+
+- $\dot{m}$ = Mass flow rate \[kg/s\]
+
+- $\dot{Q}$ = Heat transfer rate \[W\]
+
+- $N$ = Rotational speed \[rpm\]
+
+- $P$ = Pressure \[bar, Pa\]
+
+- $T$ = Temperature \[K, °C\]
+
+- $\Delta T$ = Temperature difference \[K\]
+
+**Dimensionless Parameters:**
+
+- $\phi$ = Flow coefficient, $\dot{V}/(N \cdot D^3)$ \[-\]
+
+- $\psi$ = Head coefficient, $g \cdot H/(N^2 \cdot D^2)$ \[-\]
+
+- $\psi_0$ = Shutoff head coefficient \[-\]
+
+- $K$ = Head curve slope parameter \[-\]
+
+**Performance Parameters:**
+
+- $COP$ = Coefficient of performance \[-\]
+
+- $W$ = Work/Power \[W\]
+
+- $\eta$ = Efficiency \[-\]
+
+- $f$ = Frequency \[Hz\]
+
+- $g$ = Gravitational acceleration \[m/s²\]
+
+## Subscripts
 
 -   $BEP$ = Best efficiency point
 -   $comp$ = Compressor
@@ -326,7 +389,7 @@ It seems that the widespread rule based controll perform decently in the test ca
 -   $soil$ = Soil/ground
 -   $wall$ = Wall condition
 
-### Abbreviations
+## Abbreviations
 
 -   $BHE$ = Borehole Heat Exchanger
 -   $COP$ = Coefficient of Performance\
@@ -339,38 +402,38 @@ It seems that the widespread rule based controll perform decently in the test ca
 -   $SF$ = Secondary Fluid
 -   $SH$ = Superheating
 
-### Chemical Notation
+## Chemical Notation
 
 -   $R134A$ = 1,1,1,2-Tetrafluoroethane (refrigerant)
 -   $MEA$ = Monoethanolamine ($C_2H_7NO$)
 
-## Appendix A: Model Parameters and Technical Specifications
+#Appendix: Model Parameters and Technical Specifications
 
-### A.1 Borehole Heat Exchanger Specifications
+## Borehole Heat Exchanger Specifications
 
 **Geometric Parameters:** - Borehole depth: $L_b = 250$ m - Pipe outer diameter: $D_{pipe,o} = 32$ mm - Pipe inner diameter: $D_{pipe,i} = 28.24$ mm - Pipe wall thickness: $t_{pipe} = 1.88$ mm - Borehole diameter: $D_{bh} = 115$ mm - Shank spacing: $s = 75$ mm
 
 **Thermal Properties:** - Pipe thermal conductivity: $\lambda_{pipe} = 0.4$ W/(m·K) - Grout thermal conductivity: $\lambda_{grout} = 1.5$ W/(m·K) - Ground thermal conductivity: $\lambda_{soil} = 2.0$ W/(m·K) - Boundary condition: $T_{wall} = 283.15$ K (constant)
 
-### A.2 Heat Pump System Parameters
+## Heat Pump System Parameters
 
 **Working Fluids:** - Primary refrigerant: R134A - Secondary fluid: MEA aqueous solution with mass fraction $\chi = 0.28$
 
 **Compressor Specifications:** - Isentropic efficiency: $\eta_{is} = 0.7$ - Operating frequency: $f = 50$ Hz - Electrical motor efficiency: $\eta_{motor} = 0.9$
 
-### A.3 Plate Heat Exchanger (Evaporator) Specifications
+## Plate Heat Exchanger (Evaporator) Specifications
 
 **Geometric Parameters:** - Number of plates: $N_{plates} = 20$ - Plate width: $W = 0.1$ m - Plate length: $L = 0.3$ m - Channel spacing: $b = 1.5$ mm - Chevron angle: $\beta = \pi/6$ rad $(30°)$ - Plate thickness: $t_{plate} = 0.5$ mm - Plate thermal conductivity: $\lambda_{plate} = 16$ W/(m·K)
 
-### A.4 Operating Conditions (test_GSHP Reference Case)
+## Operating Conditions (test_GSHP Reference Case)
 
 **Temperature Differences:** - Secondary fluid temperature difference: $\Delta T_{SF} = 3.5$ K - Superheating temperature difference: $\Delta T_{SH} = 7$ K - Subcooling temperature difference: $\Delta T_{SC} = 5$ K
 
 **Pressure Conditions:** - High-side pressure: $P_{high} = 14$ bar - Secondary fluid mass fraction: $\chi = 0.28$
 
-### A.5 Mathematical Correlations
+## Mathematical Correlations
 
-**A.5.1 Pump Performance:** - Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
+**Pump Performance:** - Dimensionless head coefficient: $$\psi = \psi_0 - K \cdot \phi^2$$
 
 -   Dimensionless flow coefficient: $$\phi = \frac{\dot{V}}{N \cdot D^3}$$
 
@@ -380,15 +443,15 @@ It seems that the widespread rule based controll perform decently in the test ca
 
 where $N$ is rotational speed \[rpm\], $D$ is impeller diameter \[m\], $\dot{V}$ is volumetric flow rate \[m³/s\], $H$ is pump head \[m\], $\eta_{max}$ is maximum efficiency, and $\phi_{BEP}$ is flow coefficient at best efficiency point.
 
-**A.5.2 Power Consumption:** - Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
+**Power Consumption:** - Shaft power: $$P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}$$
 
 -   Electrical power: $$P_{elec} = \frac{P_{shaft}}{\eta_{motor}}$$
 
-**A.5.3 Compressor Work:** - Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
+**Compressor Work:** - Isentropic compression work: $$W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}$$
 
 where $\dot{m}_{ref}$ is refrigerant mass flow rate \[kg/s\], $h_{in}$ and $h_{out,s}$ are inlet and isentropic outlet specific enthalpies \[kJ/kg\], respectively.
 
-**A.5.4 Coefficient of Performance:** - Thermal COP: $$COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$$
+**Coefficient of Performance:** - Thermal COP: $$COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}$$
 
 -   System COP: $$COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}$$
 

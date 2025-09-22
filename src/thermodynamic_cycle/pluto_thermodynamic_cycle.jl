@@ -4539,6 +4539,9 @@ md" # Comparison ridge position"
 # ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
 
 
+# ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
+md" # COP3 interpolation"
+
 # ╔═╡ 75653ae3-55e8-4703-8c09-9dcf7ecc1505
 md" # Optimal control"
 
@@ -4661,9 +4664,6 @@ ovs_plots_2 = [
 #=╠═╡
 df_grid_wall|> names
   ╠═╡ =#
-
-# ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
-md" # COP3 interpolation"
 
 # ╔═╡ 033594e2-7f94-4b32-b7fa-23490e087918
 md" ## Base scenario"
@@ -6563,6 +6563,26 @@ plot_contourf(
 )
   ╠═╡ =#
 
+# ╔═╡ 42f382a4-7820-4d98-b2ac-ca1ec8a2497b
+#=╠═╡
+plot_contourf(df_grid;
+    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+			 )
+  ╠═╡ =#
+
+# ╔═╡ beb5c52e-e951-467e-822f-62a4dea6b69c
+#=╠═╡
+plot_contourf(df_grid;
+    xlogbase=:log, zcol=:r_N_pump, levels=0.3:0.05:1.0,
+    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
+    zlabel = "COP 3 [-]", title = "",
+    overlays=ovs_plots,
+			 )
+  ╠═╡ =#
+
 # ╔═╡ 2f8b1672-934b-4b93-9e05-6169ba730cc8
 #=╠═╡
 plot_contourf(
@@ -6657,26 +6677,6 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 42f382a4-7820-4d98-b2ac-ca1ec8a2497b
-#=╠═╡
-plot_contourf(df_grid;
-    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
-			 )
-  ╠═╡ =#
-
-# ╔═╡ beb5c52e-e951-467e-822f-62a4dea6b69c
-#=╠═╡
-plot_contourf(df_grid;
-    xlogbase=:log, zcol=:r_N_pump, levels=0.3:0.05:1.0,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
-			 )
-  ╠═╡ =#
-
 # ╔═╡ ff524033-5adc-4235-8891-bdb16d2dda97
 #=╠═╡
 # Build once from your df_grid (already produced by process_grid_results)
@@ -6702,6 +6702,14 @@ df_details = sweep_best_with_details(setup_cop3; Qs, nx=401, ny=401,
 
   ╠═╡ =#
 
+# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
+#=╠═╡
+fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
+    levels= 20, color_by=:Qsp, arrows_every=7500,
+	save_path = joinpath(image_dir, "base", "overlay_optimal.svg"))
+  ╠═╡ =#
+
 # ╔═╡ 47f7d78a-4076-4974-a6ad-3a1ea3164713
 #=╠═╡
 plot_multi_axes_simple(df_details;
@@ -6709,20 +6717,13 @@ plot_multi_axes_simple(df_details;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
     xlabel   = "Qsp",
     title    = "Base scenarioPure Water",
     size     = (600, 400),
     lw       = 2,
 	save_path = joinpath(image_dir, "base", "optimal.svg")
 )
-  ╠═╡ =#
-
-# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
-#=╠═╡
-fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
-    levels= 20, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ 195ab453-b1f2-4632-9420-091f7f702ed7
@@ -6838,6 +6839,13 @@ df_details_cold = sweep_best_with_details(setup_cold; Qs, nx=401, ny=401,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
+# ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
+#=╠═╡
+fig_traj_cold = plot_cop3_with_trajectory(df_grid_cold, df_details_cold;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=12, color_by=:Qsp, arrows_every=75)
+  ╠═╡ =#
+
 # ╔═╡ 9cf486c2-64da-4560-82ae-d1167165a7c7
 #=╠═╡
 plot_multi_axes_simple(df_details_cold;
@@ -6846,19 +6854,12 @@ plot_multi_axes_simple(df_details_cold;
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
     xlabel   = "Qsp",
-	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
     title    = "Cold borehole",
     size     = (600, 400),
     lw       = 2,
 	save_path = joinpath(image_dir, "cold", "optimal.svg")
 )
-  ╠═╡ =#
-
-# ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
-#=╠═╡
-fig_traj_cold = plot_cop3_with_trajectory(df_grid_cold, df_details_cold;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=12, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ cf7f3e02-3ac6-495d-a6a8-81711ae0fe57
@@ -6979,6 +6980,13 @@ df_details_water = sweep_best_with_details(setup_water; Qs, nx=401, ny=401,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
+# ╔═╡ 2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+#=╠═╡
+fig_traj_water = plot_cop3_with_trajectory(df_grid_water, df_details_water;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=12, color_by=:Qsp, arrows_every=75)
+  ╠═╡ =#
+
 # ╔═╡ 2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
 #=╠═╡
 plot_multi_axes_simple(df_details_water;
@@ -6986,20 +6994,13 @@ plot_multi_axes_simple(df_details_water;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
     xlabel   = "Qsp",
     title    = "Pure Water",
     size     = (600, 400),
     lw       = 2,
 	save_path = joinpath(image_dir, "water", "optimal.svg")
 )
-  ╠═╡ =#
-
-# ╔═╡ 2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
-#=╠═╡
-fig_traj_water = plot_cop3_with_trajectory(df_grid_water, df_details_water;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=12, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ f28598ab-9f11-4bd5-b5e4-6e4ae2aea350
@@ -7059,20 +7060,6 @@ plot_contourf(
     df_grid_pipe; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Wider pipe scenario",
-    #overlays=ovs_plots,
-    zridge_enable = true,
-    zridge_wrt    = :y,     # <-- maximize over x for each y (x = x*(y))
-    zridge_mode   = :max,
-    zridge_color  = :red,
-    zridge_linestyle = :solid,
-    zridge_method   = :parabolic,  # <- smoother than :resample
-			  
-    zridge_linewidth = 3.0,
-    zridge_labels = false,
-    # smooth limiter on pump speed
-    zridge_limit_col   = :r_N_pump,
-    zridge_min = 0.3, zridge_max = 1.0,
-    zridge_limit_interp = true,
 	save_path = joinpath(image_dir, "wide", "T_evap.svg")
 )
   ╠═╡ =#
@@ -7205,6 +7192,13 @@ df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
                                      N_bounds=(0.3,1.0), Pmax=1.0);
   ╠═╡ =#
 
+# ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
+#=╠═╡
+fig_traj_long = plot_cop3_with_trajectory(df_grid_long, df_details_long;
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=3.2:0.1:4.4, color_by=:Qsp, arrows_every=75)
+  ╠═╡ =#
+
 # ╔═╡ 70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
 #=╠═╡
 plot_multi_axes_simple(df_details_long;
@@ -7212,20 +7206,13 @@ plot_multi_axes_simple(df_details_long;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0, 6), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
     xlabel   = "Qsp",
     title    = "Long borehole",
     size     = (600, 400),
     lw       = 2,
 	save_path = joinpath(image_dir, "long", "optimal.svg")
 )
-  ╠═╡ =#
-
-# ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
-#=╠═╡
-fig_traj_long = plot_cop3_with_trajectory(df_grid_long, df_details_long;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=3.2:0.1:4.4, color_by=:Qsp, arrows_every=75)
   ╠═╡ =#
 
 # ╔═╡ 698de8c1-b7a4-477c-ba42-88e78cabddf2
@@ -11917,6 +11904,14 @@ version = "4.1.0+0"
 # ╠═a966eea4-f3e4-46f9-8230-7ab19eb7f905
 # ╠═a7e7ede3-1caa-4483-91f3-c26393f2b45a
 # ╠═e2504f4a-6606-4051-b91e-189bbd218edf
+# ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
+# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
+# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
+# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
+# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
+# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
 # ╠═75653ae3-55e8-4703-8c09-9dcf7ecc1505
 # ╠═47f7d78a-4076-4974-a6ad-3a1ea3164713
 # ╠═9cf486c2-64da-4560-82ae-d1167165a7c7
@@ -11968,14 +11963,6 @@ version = "4.1.0+0"
 # ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 # ╠═33c1996a-aade-400a-9b2f-259db12c0835
-# ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
-# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
-# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
-# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
-# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
-# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
-# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
-# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
 # ╠═033594e2-7f94-4b32-b7fa-23490e087918
 # ╠═ff524033-5adc-4235-8891-bdb16d2dda97
 # ╠═8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
