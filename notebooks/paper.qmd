@@ -13,7 +13,7 @@ format:
   html:
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-section: true
     cross-ref:
       fig-title: Figure
       tbl-title: Table
@@ -271,16 +271,16 @@ The model calculates multiple performance indicators:
 
 ## Test case
 
-The test case represents a typical Swedish GSHP installation. The system features 150m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
+The test case represents a typical Swedish GSHP installation. The system features a 150m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.
 
 <!--  # KPIs
 
 To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?
 -->
 
-## \delta T influence
+## δT influence
 
-As a first step, we'll look at the effect of the main operating parameter: \Delta T on the overall process in order to gain a better understanding of the effects at play.
+As a first step, we'll look at the effect of the main operating parameter: ΔT on the overall process in order to gain a better understanding of the effects at play.
 
 ::: {#fig-pannel_1d layout-ncol=2}
 
@@ -294,20 +294,20 @@ As a first step, we'll look at the effect of the main operating parameter: \Delt
 
 :::
 
-Figure @fig-pannel_1d shows us the different effects contributing to the GSHP overall performance. The x axis represents the temperature difference accross the BHE (equivalently, accross the PHX since we neglect the pump effect on temperature). On each figure, the flow transition has been represented by vertical lines. Since we chose a smooth transition in the mdoelling, there are 2 such vertical lines for each leg. In this simulation, heat is extracted from the bortehole, therefore leg 1 is colder than leg 2. In addition to this temeprature difference between the 2 legs, the fact that the SF is more viscous at lower temperatures leads to a transition at lower mass flow for leg 1 (respectively at higher \delta T).
+Figure @fig-pannel_1d shows us the different effects contributing to the GSHP overall performance. The x axis represents the temperature difference across the BHE (equivalently, across the PHX since we neglect the pump effect on temperature). On each figure, the flow transition has been represented by vertical lines. Since we chose a smooth transition in the modeling, there are 2 such vertical lines for each leg. In this simulation, heat is extracted from the borehole, therefore leg 1 is colder than leg 2. In addition to this temperature difference between the 2 legs, the fact that the SF is more viscous at lower temperatures leads to a transition at lower mass flow for leg 1 (respectively at higher δT).
 
 <!-- The reason is that  - since we are considering extraction, - leg 1 is colder than leg 2, leading to a higher viscosity, therefore a transition at higher mass flow (lower delta t).-->
 
 
-Starting with @fig-res_1d, the y axis represents the thermal resistances between different regions fo teh BHE. Rp1,2 is for example the thermal resistance in the grout (calculated according to @#sec-method_thermal) between leg 1 and 2. The f subscript denotes the includion of the convective (fluid) resistance. So, on the graph, the grout resistance is unaffected by the flow, but the total resistance presents a clear transition with respect to the flow type. The shape of the transition is similar to the blending funciton chosen for the transition regime, which was expected. At low delta T, the rersistance is more imporrtant. Another aspect visible on the figure is that the transition order between leg 1 and 2 also affects the resistances in a given order.
+Starting with @fig-res_1d, the y axis represents the thermal resistances between different regions of the BHE. Rp1,2 is for example the thermal resistance in the grout (calculated according to @sec-method_thermal) between leg 1 and 2. The f subscript denotes the inclusion of the convective (fluid) resistance. So, on the graph, the grout resistance is unaffected by the flow, but the total resistance presents a clear transition with respect to the flow type. The shape of the transition is similar to the blending function chosen for the transition regime, which was expected. At low delta T, the resistance is more important. Another aspect visible on the figure is that the transition order between leg 1 and 2 also affects the resistances in a given order.
 
 @fig-bh_eff_1d displays the borehole heat exchanger (BHE) efficiency, defined as: $$
 1 - \frac{T_{\text{out}} - T_{\text{wall}}}{T_{\text{in}} - T_{\text{wall}}}
 $$ {#eq_efficiency}
 
-The borehole efficiency increases with \Delta T, but a local minimum occurs right at the limit of the laminar region, as a result of both the mass flow itself and the effect of the resistance (as seen in @fig-res_1d).
+The borehole efficiency increases with ΔT, but a local minimum occurs right at the limit of the laminar region, as a result of both the mass flow itself and the effect of the resistance (as seen in @fig-res_1d).
 
-@fig-temp_1d shows the different temperatures in the sysem. The 1D analysis was carried out with constant BHE wall temperature. It is the horizontal line at T = 10C at the top. Then, looking at the BHE temperatures - denoted with (b) - an overall trend appears: the higher the \delta t, the lower the temperaturers in the BHE. Focusing on the Schematically, this better efficiency leads to higher evaporation temperature:
+@fig-temp_1d shows the different temperatures in the system. The 1D analysis was carried out with constant BHE wall temperature. It is the horizontal line at T = 10°C at the top. Then, looking at the BHE temperatures - denoted with (b) - an overall trend appears: the higher the δT, the lower the temperatures in the BHE. Focusing on the Schematically, this better efficiency leads to higher evaporation temperature:
 
 Finally, @fig-energy_1d shows the result on the different capacities in the system. The colder evaporation temperature at higher delta T leads to a reduced refrigerant mass flow and therefore reduced condensation and evaporation capacities. The compresssor electrical power is relatively flat accross the range. In addition to these thermodynamic metrics, the pumping power is also represented. At low delta T, the high flow leads to a sharp increase of pumping power. The last capacity represented is the auxiliary capacity. It has been calculated by taking the maximum condenser capacity as the reference. If the delivered capacity was lower than this rerference, then auxiliary (Joule) heating was added in order to reach the same capacity. 
 
@@ -315,9 +315,9 @@ Finally, @fig-energy_1d shows the result on the different capacities in the syst
 
 ![](images/cop_vs_dt.svg){#fig-cop_1d}
 
-COP1 is the COP taking into account neither the pumpinng power nor the auxiliray heating. COP2 acconts for the pumping power. In turn, fr this 1D analysis, The COP3 is calculated including both pumping power and auxiliary heating.
+COP1 is the COP taking into account neither the pumping power nor the auxiliary heating. COP2 accounts for the pumping power. In turn, for this 1D analysis, the COP3 is calculated including both pumping power and auxiliary heating.
 
-@fig-cop_1d shows a clear COP3 peak around \Delta T = 3K. This is in line with the standard practice accross the field. However, this is a very partial view of the system, many more factors affect the shape of this curve and where the optimal lies.
+@fig-cop_1d shows a clear COP3 peak around ΔT = 3K. This is in line with the standard practice across the field. However, this is a very partial view of the system, many more factors affect the shape of this curve and where the optimal lies.
 
 ### Partial load
 
@@ -336,7 +336,7 @@ In the next figures, different system-related metrics have been overlaid in addi
 
 - Transition boundaries
 
-@fig-pure_water_cop3 is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to chose a target Q cond.
+@fig-pure_water_cop3 is a contour plot representing a 2D parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as follows: This COP3 is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It's a way to quantify the efficiency of the system while not having to choose a target Q cond.
 
 On the diagram, several isolines are represented:
 
@@ -354,7 +354,7 @@ The ridge line in red corresponds to the location of this maximum used for the a
 
 -   In the bottom part, a hockey stick ridge is present
 
-In the lower region, the behaviour of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumpng power is justified: it allows achieveing turbulence in the collector, and therefore better BH efficiency. Conversely, achieveing turbulence at low compressor speed is not worth the extra pumping power. In some sense, achiveing turbulence is "having a high speed", regardless of the thermal load.
+In the lower region, the behavior of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumping power is justified: it allows achieving turbulence in the collector, and therefore better BH efficiency. Conversely, achieving turbulence at low compressor speed is not worth the extra pumping power. In some sense, achieving turbulence is "having a high speed", regardless of the thermal load.
 
 This second region is often not reachable in the base scenario: the pump minimum speed being too high and therefore does not allow for a low enough SF flow.
 
@@ -390,9 +390,9 @@ By comparing the
 
 Conslusion is that nothing seems to be able to capture the complex interplay of the different effects.
 
-Lookking at the graph, the
+Looking at the graph, the
 
-NEW GRAOH AT DIFFERENT T WALL
+NEW GRAPH AT DIFFERENT T WALL
 
 The figure XX shows that the ridge
 

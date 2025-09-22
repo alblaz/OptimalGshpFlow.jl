@@ -4720,25 +4720,36 @@ function plot_multi_axes(
     cm = cgrad(palette, nseries; categorical=true)
     color_map = Dict(s => cm[i] for (i,s) in enumerate(all_syms))
 
-    fig = Figure()
-    ax_base = Axis(fig[1,1]; xlabel=xlabel, ylabel="", title=title)
-    axes_left  = Axis[]     # includes base first
-    axes_right = Axis[]
-    push!(axes_left, ax_base)
+    # ### NEW: detect “one series per axis” mode
+    one_per_axis = all(length.(y_groups) .== 1)
 
-    function _new_axis(; right::Bool, ylabel::AbstractString)
-        ax = Axis(fig[1,1];
-                  yaxisposition = right ? :right : :left,
-                  ylabel = ylabel)
-        if right
-            hidespines!(ax, :l, :t, :b)
-        else
-            hidespines!(ax, :r, :t, :b)
-        end
-        hidexdecorations!(ax, grid=false)
-        linkxaxes!(ax_base, ax)
-        return ax
-    end
+	fig = Figure()
+	
+	# --- NEW: wrap the plot area in its own 3-column GridLayout
+	gl = GridLayout(fig[1,1])
+	# base axis will live in the center column:
+	ax_base = Axis(gl[1,2]; xlabel=xlabel, ylabel="", title=title)
+	# after: ax_base = Axis(gl[1,2]; xlabel=xlabel, ylabel="", title=title)
+
+	axes_left  = Axis[]              # track all left-side axes (include base first)
+	axes_right = Axis[]              # track all right-side axes
+	push!(axes_left, ax_base)
+
+	# ... (unchanged: build axes_left / axes_right by calling _new_axis)
+	# but make _new_axis place axes into gl[1,2] instead of fig[1,1]:
+	function _new_axis(; right::Bool, ylabel::AbstractString)
+	    ax = Axis(gl[1,2]; yaxisposition = right ? :right : :left, ylabel = ylabel)
+	    if right
+	        hidespines!(ax, :l, :t, :b)
+	    else
+	        hidespines!(ax, :r, :t, :b)
+	    end
+	    hidexdecorations!(ax, grid=false)
+	    hideydecorations!(ax; minorticks=true, grid=true)
+	    linkxaxes!(ax_base, ax)
+	    return ax
+	end
+	
 
     left_count, right_count = 0, 0
     axis_for_group = Axis[]
@@ -4748,7 +4759,7 @@ function plot_multi_axes(
             push!(axes_right, ax); push!(axis_for_group, ax); right_count += 1
         else
             if left_count == 0
-                ax_base.ylabel = ylabels[i]  # first left group uses base axis
+                ax_base.ylabel = ylabels[i]                   # first left group uses base axis
                 ax = ax_base
             else
                 ax = _new_axis(right=false, ylabel=ylabels[i])
@@ -4758,48 +4769,77 @@ function plot_multi_axes(
         end
     end
 
-	function _space_stacks!(axes::Vector{Axis}; base_space=28.0, step=36.0, right::Bool=false)
-	    for (k, ax) in enumerate(axes)
-	        ax.yticklabelspace[] = base_space + (k-1)*step
-	        ax.ylabelpadding[]   = 8.0
-	
-	        # yticklabelcolor[] might be a Symbol or a Colorant; normalize
-	        c = ax.yticklabelcolor[]
-	        c = (c isa Symbol || c isa AbstractString) ? to_color(c) : c
-	
-	        if right
-	            ax.rightspinecolor[] = c
-	        else
-	            ax.leftspinecolor[]  = c
-	        end
-	    end
+	# --- NEW: add left/right spacer columns sized for stacked ticklabels
+	if left_count > 1
+	    Label(gl[1,1], " "; tellwidth=false)  # just a spacer
+	    # first left axis is the base; extra left axes are (left_count-1)
+	    colsize!(gl, 1, Fixed(28 + 40*(left_count-1 - 1)))  # base 28 + 40px per extra
 	end
-
+	if right_count > 0
+	    Label(gl[1,3], " "; tellwidth=false)
+	    colsize!(gl, 3, Fixed(36 + 40*(right_count-1)))     # base 36 + 40px per extra
+	end
 	
+    function _space_stacks!(axes::Vector{Axis}; base_space=28.0, step=36.0, right::Bool=false)
+        for (k, ax) in enumerate(axes)
+            ax.yticklabelspace[] = base_space + (k-1)*step     # stagger labels
+            ax.ylabelpadding[]   = 8.0
+            # color spines to match yticklabelcolor (we’ll set that below)
+            c = ax.yticklabelcolor[]
+            c = (c isa Symbol || c isa AbstractString) ? to_color(c) : c
+            if right
+                ax.rightspinecolor[] = c
+            else
+                ax.leftspinecolor[]  = c
+            end
+        end
+    end
+
     _space_stacks!(axes_left;  base_space=28.0, step=40.0, right=false)
     _space_stacks!(axes_right; base_space=36.0, step=40.0, right=true)
 
     legend_entries = NamedTuple[]
     for (i, grp) in enumerate(y_groups)
         ax = axis_for_group[i]
+
         for s in grp
             @assert s ∈ Symbol.(names(df)) "column $(s) not found in DataFrame"
             p = lines!(ax, xs, df[!, s];
                        linewidth=lw,
                        color=color_map[s],
                        linestyle=get(linestyles, s, :solid))
-            push!(legend_entries, (; handle=p, name=get(labels, s, String(s))))
+
+            # ### NEW (only when one_per_axis): tint the whole y-axis with the series color
+            if one_per_axis
+                col = color_map[s]
+                ax.yticklabelcolor[] = col                    # tick label color (Axis attribute). :contentReference[oaicite:2]{index=2}
+                ax.ytickcolor[]      = col                    # tick mark color. :contentReference[oaicite:3]{index=3}
+                ax.ylabelcolor[]     = col                    # label color. :contentReference[oaicite:4]{index=4}
+                if sides[i]
+                    ax.rightspinecolor[] = col
+                else
+                    ax.leftspinecolor[]  = col
+                end
+                # If no explicit y-label provided, use series label to remove need for legend:
+                if isempty(ylabels[i])
+                    ax.ylabel[] = get(labels, s, String(s))
+                end
+            else
+                # keep legend entries in multi-series-per-axis case
+                push!(legend_entries, (; handle=p, name=get(labels, s, String(s))))
+            end
         end
+
         if y0_groups[i]
             yl = ylimits(ax); ylims!(ax, 0, yl[2])
         end
-        if diag_y_eq_x && !sides[i]   # draw diagonal once on a left axis
-            lines!(ax, xs, xs; color=diag_style.color,
-                   linestyle=diag_style.linestyle, linewidth=diag_style.linewidth)
+        if diag_y_eq_x && !sides[i]
+            lines!(ax, xs, xs; color=diag_style.color, linestyle=diag_style.linestyle, linewidth=diag_style.linewidth)
         end
     end
 
-    if !isempty(legend_entries)
+    # ### NEW: drop legend entirely when one_per_axis
+    if !one_per_axis && !isempty(legend_entries)
         Legend(fig[1,2], getfield.(legend_entries, :handle), getfield.(legend_entries, :name);
                framevisible=false, position=legend_position)
     end
@@ -6656,6 +6696,22 @@ fig_pump  = plot_pump(df_details)
 fig_8 = plot_qsp_with_three_yaxes(df_details; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
   ╠═╡ =#
 
+# ╔═╡ f8a74235-7a3e-4cb8-aa37-945e08e332e7
+#=╠═╡
+fig_3axis = plot_multi_axes(df_details;
+    x=:Qsp,
+    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
+    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
+    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
+    labels   = Dict(:N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
+    title    = "Pump operation",
+    lw       = 2,
+    save_path = joinpath(image_dir, "base", "pump_speed.svg"),
+    force_create_path = true,
+)
+
+  ╠═╡ =#
+
 # ╔═╡ e10d9806-5475-44be-bc89-641f1137875d
 #=╠═╡
 # df_details is what you got from sweep_best_with_details or optimal_controls
@@ -6836,11 +6892,6 @@ fig_power_cold  = plot_power_breakdown(df_details_cold)
 # ╔═╡ 685e2cdb-a684-4bda-a8e7-49e0eed7a7d9
 #=╠═╡
 fig_pump_cold  = plot_pump(df_details_cold)
-  ╠═╡ =#
-
-# ╔═╡ 14478ade-6a70-45fd-9d42-b60ae73c5aa0
-#=╠═╡
-fig_3axis_cold = plot_qsp_with_three_yaxes(df_details_cold; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
   ╠═╡ =#
 
 # ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
@@ -7208,10 +7259,10 @@ df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
 fig_duty_long   = plot_duty_paux(df_details_long)
   ╠═╡ =#
 
-# ╔═╡ d792ed77-c90e-4ba3-9882-31e41db558e1
+# ╔═╡ 24590765-e788-4796-85ba-5002c65e35bb
 # ╠═╡ disabled = true
 #=╠═╡
-fig_3axis_long = plot_qsp_with_three_yaxes(df_details_long; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+fig_power_long  = plot_power_breakdown(df_details_long)
   ╠═╡ =#
 
 # ╔═╡ be554cbf-008a-4cc4-a6ad-98bfb6580623
@@ -8191,27 +8242,20 @@ fig_pump_long = plot_multi_axes(df_details_long;
 
   ╠═╡ =#
 
-# ╔═╡ 24590765-e788-4796-85ba-5002c65e35bb
-# ╠═╡ disabled = true
+# ╔═╡ 1188e133-946a-44c3-b6ff-3935557eb245
 #=╠═╡
-fig_power_long  = plot_power_breakdown(df_details_long)
-  ╠═╡ =#
-
-# ╔═╡ b304acb6-3534-404f-b4f2-3fc98d07c17a
-#=╠═╡
-fig_power_long = plot_multi(df_details_long;
+fig_3axis_long = plot_multi_axes(df_details_long;
     x=:Qsp,
-    y_left=[:W, :P, :Paux, :Pin_total],
-    labels=Dict(:W=>"W_comp", :P=>"P_pump", :Paux=>"Pₐᵤₓ", :Pin_total=>"Total in"),
-    linestyles=Dict(:Paux=>:dash),
-    ylabel_left="Power (W)",
-    title="Input power at optimum",
-    lw=2,
-    save_path=joinpath(image_dir, "long", "optimal_power_breakdown.svg"),
-    force_create_path=true,
+    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
+    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
+    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
+    labels   = Dict(:N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
+    title    = "Pump operation",
+    lw       = 2,
+    save_path = joinpath(image_dir, "long", "pump_speed.svg"),
+    force_create_path = true,
 )
 
-# 3) Pump speed
   ╠═╡ =#
 
 # ╔═╡ 59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
@@ -8223,12 +8267,11 @@ fig_pump_long  = plot_pump(df_details_long)
 # ╔═╡ fb92dcb7-a6ce-4874-b718-78b6f55ce4be
 #=╠═╡
 fig_cap_long = plot_multi_axes(df_details_long;
-    x=[:Qsp;:Qhat] ,
-    y_groups = [],                   # model capacity
+    x=:Qsp,
+    y_groups = [[:Qhat; :Qsp]],                   # model capacity
     sides    = [false],                     # left axis
     ylabels  = ["Heat (W)"],
     labels   = Dict(:Qhat => "Q̂(ΔT*, f*)"),
-    diag_y_eq_x = true,                     # draw y=x on the left axis
     title    = "Capacity at (ΔT*, f*) vs set-point",
     lw       = 2,
     save_path = joinpath(image_dir, "long", "capacity_context.svg"),
@@ -8237,47 +8280,38 @@ fig_cap_long = plot_multi_axes(df_details_long;
 
   ╠═╡ =#
 
-# ╔═╡ 972e586c-3f95-4a2c-bfda-716373ad24cc
+# ╔═╡ d792ed77-c90e-4ba3-9882-31e41db558e1
 # ╠═╡ disabled = true
 #=╠═╡
-# assumes `image_dir` exists (string or path)
-# 1) Capacity context (Q̂ vs Qsp) with y = x reference
-fig_cap_long = plot_multi(df_details_long;
+fig_3axis_long = plot_qsp_with_three_yaxes(df_details_long; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ 14478ade-6a70-45fd-9d42-b60ae73c5aa0
+# ╠═╡ disabled = true
+#=╠═╡
+fig_3axis_cold = plot_qsp_with_three_yaxes(df_details_cold; title="Optimal ΔT*, f*, COP₃ vs Qₛₚ")
+  ╠═╡ =#
+
+# ╔═╡ fc91bbbe-845a-472a-8551-98411a06c6af
+#=╠═╡
+fig_3axis_cold = plot_multi_axes(df_details_cold;
     x=:Qsp,
-    y_left=[:Qhat],
-    labels=Dict(:Qhat=>"Q̂ at (ΔT*, f*)"),
-    ylabel_left="Heat (W)",
-    title="Capacity at (ΔT*, f*) vs set-point",
-    diag_y_eq_x=true,
-    lw=2,
-    save_path=joinpath(image_dir, "long", "optimal_capacity_context.svg"),
-    force_create_path=true,
+    y_groups = [[:N], [:COP3], [:f], [:ΔT]],          # two groups
+    sides    = [false, true, true, false],            # N on left, COP3 on right (pick what you like)
+    ylabels  = ["Relative pump speed (–)", "COP₃ (–)", "frequency", "deltat"],
+    labels   = Dict(:Qsp => "Heating demand [W]", :N => "N/Nₘₐₓ", :COP3 => "COP₃", :f => "freq", :ΔT => "deltat"),
+    title    = "Cold borehole",
+    lw       = 2,
+    save_path = joinpath(image_dir, "base", "pump_speed.svg"),
+    force_create_path = true,
 )
 
-# 2) Power breakdown
   ╠═╡ =#
 
 # ╔═╡ 5c0d6e1e-78ed-41c1-8a75-cfcdbeef476b
 # ╠═╡ disabled = true
 #=╠═╡
 fig_cap_long    = plot_capacity_context(df_details_long)
-  ╠═╡ =#
-
-# ╔═╡ 74c3066b-6167-49ea-9e72-9e5dd97de6dd
-# ╠═╡ disabled = true
-#=╠═╡
-fig_pump_long = plot_multi(df_details_long;
-    x=:Qsp,
-    y_left=[:N],
-    labels=Dict(:N=>"Relative pump speed"),
-    ylabel_left="Relative pump speed (–)",
-    title="Pump operation",
-    lw=2,
-    save_path=joinpath(image_dir, "long", "optimal_pump_speed.svg"),
-    force_create_path=true,
-)
-
-# 4) Three-axis special stays as-is; just save it with the helper
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -12103,9 +12137,9 @@ version = "4.1.0+0"
 # ╠═24590765-e788-4796-85ba-5002c65e35bb
 # ╠═59d047c3-db5a-4f11-b24a-e6f38ec6a6c8
 # ╠═d792ed77-c90e-4ba3-9882-31e41db558e1
-# ╠═972e586c-3f95-4a2c-bfda-716373ad24cc
-# ╠═b304acb6-3534-404f-b4f2-3fc98d07c17a
-# ╠═74c3066b-6167-49ea-9e72-9e5dd97de6dd
+# ╠═1188e133-946a-44c3-b6ff-3935557eb245
+# ╠═f8a74235-7a3e-4cb8-aa37-945e08e332e7
+# ╠═fc91bbbe-845a-472a-8551-98411a06c6af
 # ╠═fb92dcb7-a6ce-4874-b718-78b6f55ce4be
 # ╠═4cc59ad3-c3dd-4f41-8c04-03277bf547b4
 # ╠═be554cbf-008a-4cc4-a6ad-98bfb6580623
