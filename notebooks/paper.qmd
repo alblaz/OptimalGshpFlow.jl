@@ -372,36 +372,64 @@ It is important to remember the model's assumptions when discussing these aspect
 ## Subscripts
 
 -   $BEP$ = Best efficiency point
+
 -   $comp$ = Compressor
+
 -   $elec$ = Electrical
+
 -   $evap$ = Evaporator
+
 -   $grout$ = Grout material
+
 -   $high$ = High pressure side
+
 -   $in$ = Inlet condition
+
 -   $is$ = Isentropic
+
 -   $max$ = Maximum
+
 -   $motor$ = Motor
+
 -   $out$ = Outlet condition
+
 -   $pipe$ = Pipe material
+
 -   $plate$ = Plate material\
+
 -   $pump$ = Pump
+
 -   $ref$ = Refrigerant
+
 -   $s$ = Isentropic condition
+
 -   $shaft$ = Shaft
+
 -   $soil$ = Soil/ground
+
 -   $wall$ = Wall condition
+
 
 ## Abbreviations
 
 -   $BHE$ = Borehole Heat Exchanger
--   $COP$ = Coefficient of Performance\
+
+-   $COP$ = Coefficient of Performance
+
 -   $GSHP$ = Ground Source Heat Pump
+
 -   $MEA$ = Monoethanolamine
+
 -   $OD$ = Outer Diameter
+
 -   $ID$ = Inner Diameter
+
 -   $PE$ = Polyethylene
+
 -   $SC$ = Subcooling
+
 -   $SF$ = Secondary Fluid
+
 -   $SH$ = Superheating
 
 ## Chemical Notation
