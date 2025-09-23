@@ -11,3 +11,4 @@ notebooks/paper.tex
 /notebooks/paper_files
 /notebooks/bibliography/papers
 src/thermodynamic_cycle/pluto_thermodynamic_cycle_propane.jl
+/notebooks/paper_files
