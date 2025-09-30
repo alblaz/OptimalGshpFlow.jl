@@ -1,0 +1,166 @@
+
+@article{martin_theoretical_nodate,
+	title = {A theoretical approach to predict the performance of chevron-type plate heat exchangers},
+	abstract = {Manufacturers of plate and frame heat exchangers nowadays mainly offer plates with chevron (or herringbone) corrugation patterns. The inclination angle 99 of the crests and furrows of that sinusoidal pattern relative to the main flow direction has been shown to be the most important design parameter with respect to fluid friction and heat transfer. Two kinds of flow may exist in the gap between two plates (pressed together with the chevron pattern of the second plate turned into the opposite direction): the crossing flow of small substreams following the furrows of the first and the second plate, respectively, over the whole width of the corrugation pattern, dominating at lower inclination angles (lower pressure drop); and the wavy longitudinal flow between two vertical rows of contact points, prevailing at high 99angles (high pressure drop). The combined effects of the longer flow paths along the furrows, the crossing of the substreams, flow reversal at the edges of the chevron pattern, and the competition between crossing and longitudinal flow are taken into account to derive a relatively simple but physically reasonable equation for the friction factor {\textasciitilde} as a function of the angle 99 and the Reynolds number Re. Heat-transfer coefficients are then obtained from a theoretical equation for developing thermal boundary layers in fully developed laminar or turbulent channel flow - - the generalized L6v{\textasciitilde}que equation - - predicting heat-transfer coefficients as being proportional to ({\textasciitilde}'Re2) {\textasciitilde}/3. It is shown, by comparison, that this prediction is in good agreement with experimental observations quoted in the literature.},
+	language = {en},
+	author = {Martin, Holger},
+	file = {PDF:/home/adrien/snap/zotero-snap/common/Zotero/storage/F2YQN3AQ/Martin - A theoretical approach to predict the performance of chevron-type plate heat exchangers.pdf:application/pdf},
+}
+
+@incollection{vdi_e_v_n6_2010,
+	address = {Berlin, Heidelberg},
+	title = {N6 {Pressure} {Drop} and {Heat} {Transfer} in {Plate} {Heat} {Exchangers}},
+	isbn = {978-3-540-77876-9 978-3-540-77877-6},
+	url = {http://link.springer.com/10.1007/978-3-540-77877-6_109},
+	language = {en},
+	urldate = {2025-09-30},
+	booktitle = {{VDI} {Heat} {Atlas}},
+	publisher = {Springer Berlin Heidelberg},
+	author = {Martin, Holger},
+	editor = {{VDI e. V.}},
+	year = {2010},
+	doi = {10.1007/978-3-540-77877-6_109},
+	pages = {1515--1522},
+	file = {PDF:/home/adrien/snap/zotero-snap/common/Zotero/storage/ARIPESYR/Martin - 2010 - N6 Pressure Drop and Heat Transfer in Plate Heat Exchangers.pdf:application/pdf},
+}
+
+@misc{sebastian_schmitt_se-schmittentropyscalingjl_2025,
+	title = {se-schmitt/{EntropyScaling}.jl: v0.3.5},
+	copyright = {MIT License},
+	shorttitle = {se-schmitt/{EntropyScaling}.jl},
+	url = {https://zenodo.org/doi/10.5281/zenodo.17097480},
+	abstract = {EntropyScaling v0.3.5
+
+Diff since v0.3.4
+
+Merged pull requests:
+
+
+
+CompatHelper: add new compat entry for Jutul in [weakdeps] at version 0.4, (keep existing compat) (\#39) (@github-actions[bot])
+
+CompatHelper: add new compat entry for JutulDarcy in [weakdeps] at version 0.2, (keep existing compat) (\#40) (@github-actions[bot])
+
+Plot extensions (\#41) (@se-schmitt)
+
+CompatHelper: add new compat entry for Makie in [weakdeps] at version 0.24, (keep existing compat) (\#42) (@github-actions[bot])
+
+Tests for plotting extension (\#43) (@se-schmitt)},
+	urldate = {2025-09-30},
+	publisher = {Zenodo},
+	author = {Sebastian Schmitt and Andrés Riedemann and Eduardo Bader Dalfovo Mohr Alves and LéoSchmider},
+	month = sep,
+	year = {2025},
+	doi = {10.5281/ZENODO.17097480},
+}
+
+@misc{andres_riedemann_clapeyronthermoclapeyronjl_2025,
+	title = {{ClapeyronThermo}/{Clapeyron}.jl: v0.6.16},
+	copyright = {MIT License},
+	shorttitle = {{ClapeyronThermo}/{Clapeyron}.jl},
+	url = {https://zenodo.org/doi/10.5281/zenodo.17066488},
+	abstract = {Clapeyron v0.6.16
+
+Diff since v0.6.15
+
+v0.6.16
+
+New Features
+
+
+
+New model type: Gibbs models (model {\textless}: GibbsBasedModel): EoS that use the gibbs energy as the main function. Properties and single component equilibria are implemented.
+
+Liquid Volume models are now a subtype of GibbsBasedModel
+
+New method: component\_list(model) that returns a vector of component names.
+
+New property method: sle\_solubility\_T
+
+New Gibbs EoS: IAPWS-06 standard for ice-ih (IAPWS06)
+
+New Gibbs EoS: Grenke-Elliott model for liquid water (GrenkeElliottWater)
+
+New Gibbs EoS: Holten 2-state model for liquid supercooled water (HoltenWater)
+
+New Gibbs EoS: Jäger and Span model for solid carbon dioxide (JagerSpanSolidCO2)
+
+New Activity model: Van Laar binary activity coefficient model (VanLaar)
+
+New Activity model: Margules binary activity coefficient model (Margules)
+
+New Activity model: Flory-Huggins activity coefficient model (FloryHuggins)
+
+New Correlation Model: Antoine saturation pressure correlation (AntoineEqSat)
+
+Reference State: new type: :ideal\_gas, that calculated the reference state only with the ideal gas model.
+
+Misc documentation improvements.
+
+
+Bug Fixes
+
+
+
+Volume solver: the solver now tries to detect if there was a "jump" in the chosen (liquid or vapour) branch being iterated. For EoS with more than two maxwell loops, branch jumps sometimes caused the final volume to be in a invalid branch.
+
+Misc improvements to the database.
+
+Fixed initialization for ReferenceState when H0 and S0 are vectors.
+
+improved initialization for electrolyte models.
+
+bubble/dew: improved handling of negative fractions.
+
+
+Merged pull requests:
+
+
+
+Fixes doc display in webpage (\#424) (@LeoSchmider)
+
+Creates .csv file for correlation with association NRTL results (\#425) (@LeoSchmider)
+
+Add more control over specifying parameters in electrolyte eos (\#430) (@pw0908)
+
+Dev new activity models for GammaPhi methods (\#431) (@LeoSchmider)
+
+Fix units for parameters in Schreckenberg model (\#432) (@spinnau)
+
+Bump actions/checkout from 4 to 5 (\#434) (@dependabot[bot])
+
+Gibbs models (\#439) (@longemen3000)
+
+Flory-Huggins (\#440) (@pw0908)
+
+assertions on bubble and dew methods (\#442) (@Sush1090)
+
+
+Closed issues:
+
+
+
+MissingException: cannot found values of canonicalsmiles for all input components. (\#423)
+
+Wrong units for d\_T and d\_V in documentation for Schreckenberg model (\#427)
+
+Composite model: water - melting data, sublimation data, triple point? (\#429)
+
+Gibbs-Based models (\#433)
+
+Multicomponentflash Ext. [Viscosity Calculation] (\#435)
+
+SAFTVREMie properties (\#436)
+
+WalkerIdeal MissingException (\#437)
+
+Computing Gibbs molar energy for water, hydrogen, and oxygen --- why is the result so strange? (\#443)
+
+Tproperty var not defined (\#444)},
+	urldate = {2025-09-30},
+	publisher = {Zenodo},
+	author = {Andrés Riedemann and Pierre Walker and Paul Yew and Lionel Zoubritzky and Gustavo Chaparro and Sebastian Schmitt and Mo-Gul and LéoSchmider and Sonja Smith and Luc and Ramesh Putalapattu and Alex Ames and ahaslam62 and karei and Tuomo Keskitalo and Sushrut Deshpande and Beom Seok Kang and Garren-H and Ian Bell and Kelethabetse and Sari Sakse Dalum and gregor-mendel and TJP-Karpowski and spinnau},
+	month = sep,
+	year = {2025},
+	doi = {10.5281/ZENODO.17066488},
+}

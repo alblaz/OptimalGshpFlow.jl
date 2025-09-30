@@ -6,10 +6,12 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Your Name">
+<meta name="author" content="Adrien Vautrin">
+<meta name="author" content="Alberto Lazzarotto">
+<meta name="author" content="Joachim Claesson">
 <meta name="keywords" content="Ground Source Heat Pump, Flow Control, Thermal-Hydraulic Coupling, Optimization">
 
-<title>Insights into the Optimal Flow Rule for GSHP Systems</title>
+<title>Insights into the Optimal Control of GSHP Systems</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -22,7 +24,27 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-</style>
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="paper_files/libs/clipboard/clipboard.min.js"></script>
@@ -77,54 +99,59 @@ window.Quarto = {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract"><span class="header-section-number">1</span> Abstract:</a></li>
-  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction"><span class="header-section-number">2</span> Introduction</a></li>
-  <li><a href="#literature-review" id="toc-literature-review" class="nav-link" data-scroll-target="#literature-review"><span class="header-section-number">3</span> Literature Review</a></li>
-  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods"><span class="header-section-number">4</span> Methods:</a>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#literature-review" id="toc-literature-review" class="nav-link" data-scroll-target="#literature-review"><span class="header-section-number">2</span> Literature Review</a>
   <ul class="collapse">
-  <li><a href="#modeling-framework" id="toc-modeling-framework" class="nav-link" data-scroll-target="#modeling-framework"><span class="header-section-number">4.1</span> Modeling framework:</a>
+  <li><a href="#theoretical-foundations-and-early-work" id="toc-theoretical-foundations-and-early-work" class="nav-link" data-scroll-target="#theoretical-foundations-and-early-work"><span class="header-section-number">2.1</span> Theoretical Foundations and Early Work</a></li>
+  <li><a href="#flow-control-optimization-studies" id="toc-flow-control-optimization-studies" class="nav-link" data-scroll-target="#flow-control-optimization-studies"><span class="header-section-number">2.2</span> Flow Control Optimization Studies</a>
   <ul class="collapse">
-  <li><a href="#thermophysical-properties" id="toc-thermophysical-properties" class="nav-link" data-scroll-target="#thermophysical-properties"><span class="header-section-number">4.1.1</span> Thermophysical properties:</a></li>
-  <li><a href="#thermodynamic-cycle" id="toc-thermodynamic-cycle" class="nav-link" data-scroll-target="#thermodynamic-cycle"><span class="header-section-number">4.1.2</span> Thermodynamic Cycle:</a></li>
-  <li><a href="#borehole-heat-exchanger" id="toc-borehole-heat-exchanger" class="nav-link" data-scroll-target="#borehole-heat-exchanger"><span class="header-section-number">4.1.3</span> Borehole Heat Exchanger:</a></li>
+  <li><a href="#groundbreaking-control-strategies" id="toc-groundbreaking-control-strategies" class="nav-link" data-scroll-target="#groundbreaking-control-strategies"><span class="header-section-number">2.2.1</span> Groundbreaking Control Strategies</a></li>
+  <li><a href="#empirical-optimization-methodologies" id="toc-empirical-optimization-methodologies" class="nav-link" data-scroll-target="#empirical-optimization-methodologies"><span class="header-section-number">2.2.2</span> Empirical Optimization Methodologies</a></li>
+  <li><a href="#simulation-based-analysis-of-control-strategies" id="toc-simulation-based-analysis-of-control-strategies" class="nav-link" data-scroll-target="#simulation-based-analysis-of-control-strategies"><span class="header-section-number">2.2.3</span> Simulation based analysis of control strategies</a></li>
+  <li><a href="#advanced-control-algorithms" id="toc-advanced-control-algorithms" class="nav-link" data-scroll-target="#advanced-control-algorithms"><span class="header-section-number">2.2.4</span> Advanced Control Algorithms</a></li>
   </ul></li>
-  <li><a href="#pump" id="toc-pump" class="nav-link" data-scroll-target="#pump"><span class="header-section-number">4.2</span> Pump</a>
+  <li><a href="#variable-speed-systems-and-advanced-technologies" id="toc-variable-speed-systems-and-advanced-technologies" class="nav-link" data-scroll-target="#variable-speed-systems-and-advanced-technologies"><span class="header-section-number">2.3</span> Variable Speed Systems and Advanced Technologies</a></li>
+  <li><a href="#system-integration-and-modeling" id="toc-system-integration-and-modeling" class="nav-link" data-scroll-target="#system-integration-and-modeling"><span class="header-section-number">2.4</span> System Integration and Modeling</a></li>
+  <li><a href="#comprehensive-reviews-and-recent-developments" id="toc-comprehensive-reviews-and-recent-developments" class="nav-link" data-scroll-target="#comprehensive-reviews-and-recent-developments"><span class="header-section-number">2.5</span> Comprehensive Reviews and Recent Developments</a>
   <ul class="collapse">
-  <li><a href="#pump-performance" id="toc-pump-performance" class="nav-link" data-scroll-target="#pump-performance"><span class="header-section-number">4.2.1</span> Pump Performance:</a></li>
+  <li><a href="#modeling-and-control-reviews" id="toc-modeling-and-control-reviews" class="nav-link" data-scroll-target="#modeling-and-control-reviews"><span class="header-section-number">2.5.1</span> Modeling and Control Reviews</a></li>
   </ul></li>
-  <li><a href="#performance-metrics" id="toc-performance-metrics" class="nav-link" data-scroll-target="#performance-metrics"><span class="header-section-number">4.3</span> Performance Metrics:</a>
+  <li><a href="#long-term-performance-analysis" id="toc-long-term-performance-analysis" class="nav-link" data-scroll-target="#long-term-performance-analysis"><span class="header-section-number">2.6</span> Long-term Performance Analysis</a></li>
+  <li><a href="#research-gaps-and-current-limitations" id="toc-research-gaps-and-current-limitations" class="nav-link" data-scroll-target="#research-gaps-and-current-limitations"><span class="header-section-number">2.7</span> Research Gaps and Current Limitations</a></li>
+  <li><a href="#modeling-frameworks" id="toc-modeling-frameworks" class="nav-link" data-scroll-target="#modeling-frameworks"><span class="header-section-number">2.8</span> Modeling Frameworks</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods"><span class="header-section-number">3</span> Methods</a>
   <ul class="collapse">
-  <li><a href="#numerical-implementation" id="toc-numerical-implementation" class="nav-link" data-scroll-target="#numerical-implementation"><span class="header-section-number">4.3.1</span> Numerical Implementation:</a></li>
-  </ul></li>
-  </ul></li>
-  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results"><span class="header-section-number">5</span> Results:</a>
+  <li><a href="#system-model-architecture" id="toc-system-model-architecture" class="nav-link" data-scroll-target="#system-model-architecture"><span class="header-section-number">3.1</span> System Model Architecture</a>
   <ul class="collapse">
-  <li><a href="#insights-into-the-physical-process" id="toc-insights-into-the-physical-process" class="nav-link" data-scroll-target="#insights-into-the-physical-process"><span class="header-section-number">5.1</span> Insights into the physical process</a></li>
-  <li><a href="#cops-vs.-δt" id="toc-cops-vs.-δt" class="nav-link" data-scroll-target="#cops-vs.-δt"><span class="header-section-number">5.2</span> COPs vs.&nbsp;ΔT</a></li>
-  <li><a href="#robustness" id="toc-robustness" class="nav-link" data-scroll-target="#robustness"><span class="header-section-number">5.3</span> Robustness</a>
+  <li><a href="#thermophysical-properties" id="toc-thermophysical-properties" class="nav-link" data-scroll-target="#thermophysical-properties"><span class="header-section-number">3.1.1</span> Thermophysical properties:</a></li>
+  <li><a href="#thermodynamic-cycle" id="toc-thermodynamic-cycle" class="nav-link" data-scroll-target="#thermodynamic-cycle"><span class="header-section-number">3.1.2</span> Thermodynamic Cycle:</a></li>
+  <li><a href="#borehole-heat-exchanger" id="toc-borehole-heat-exchanger" class="nav-link" data-scroll-target="#borehole-heat-exchanger"><span class="header-section-number">3.1.3</span> Borehole Heat Exchanger:</a></li>
+  </ul></li>
+  <li><a href="#pump" id="toc-pump" class="nav-link" data-scroll-target="#pump"><span class="header-section-number">3.2</span> Pump</a></li>
+  <li><a href="#performance-metrics" id="toc-performance-metrics" class="nav-link" data-scroll-target="#performance-metrics"><span class="header-section-number">3.3</span> Performance Metrics:</a>
   <ul class="collapse">
-  <li><a href="#scenarios" id="toc-scenarios" class="nav-link" data-scroll-target="#scenarios"><span class="header-section-number">5.3.1</span> Scenarios</a></li>
-  <li><a href="#partial-load" id="toc-partial-load" class="nav-link" data-scroll-target="#partial-load"><span class="header-section-number">5.3.2</span> Partial load</a></li>
-  <li><a href="#variations" id="toc-variations" class="nav-link" data-scroll-target="#variations"><span class="header-section-number">5.3.3</span> Variations</a></li>
+  <li><a href="#numerical-implementation" id="toc-numerical-implementation" class="nav-link" data-scroll-target="#numerical-implementation"><span class="header-section-number">3.3.1</span> Numerical Implementation:</a></li>
   </ul></li>
   </ul></li>
-  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">6</span> Conclusions</a>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results"><span class="header-section-number">4</span> Results:</a>
   <ul class="collapse">
-  <li><a href="#nomenclature" id="toc-nomenclature" class="nav-link" data-scroll-target="#nomenclature"><span class="header-section-number">6.1</span> Nomenclature</a>
+  <li><a href="#single-case-analysis-physical-process-insights" id="toc-single-case-analysis-physical-process-insights" class="nav-link" data-scroll-target="#single-case-analysis-physical-process-insights"><span class="header-section-number">4.1</span> Single Case Analysis: Physical Process Insights</a></li>
+  <li><a href="#two-dimensional-performance-maps" id="toc-two-dimensional-performance-maps" class="nav-link" data-scroll-target="#two-dimensional-performance-maps"><span class="header-section-number">4.2</span> Two-Dimensional Performance Maps</a>
   <ul class="collapse">
-  <li><a href="#symbols" id="toc-symbols" class="nav-link" data-scroll-target="#symbols"><span class="header-section-number">6.1.1</span> Symbols</a></li>
-  <li><a href="#subscripts" id="toc-subscripts" class="nav-link" data-scroll-target="#subscripts"><span class="header-section-number">6.1.2</span> Subscripts</a></li>
-  <li><a href="#abbreviations" id="toc-abbreviations" class="nav-link" data-scroll-target="#abbreviations"><span class="header-section-number">6.1.3</span> Abbreviations</a></li>
-  <li><a href="#chemical-notation" id="toc-chemical-notation" class="nav-link" data-scroll-target="#chemical-notation"><span class="header-section-number">6.1.4</span> Chemical Notation</a></li>
+  <li><a href="#base-case-analysis" id="toc-base-case-analysis" class="nav-link" data-scroll-target="#base-case-analysis"><span class="header-section-number">4.2.1</span> Base Case Analysis</a></li>
+  <li><a href="#scenario-variations" id="toc-scenario-variations" class="nav-link" data-scroll-target="#scenario-variations"><span class="header-section-number">4.2.2</span> Scenario Variations</a></li>
   </ul></li>
-  <li><a href="#appendix-a-model-parameters-and-technical-specifications" id="toc-appendix-a-model-parameters-and-technical-specifications" class="nav-link" data-scroll-target="#appendix-a-model-parameters-and-technical-specifications"><span class="header-section-number">6.2</span> Appendix A: Model Parameters and Technical Specifications</a>
-  <ul class="collapse">
-  <li><a href="#a.1-borehole-heat-exchanger-specifications" id="toc-a.1-borehole-heat-exchanger-specifications" class="nav-link" data-scroll-target="#a.1-borehole-heat-exchanger-specifications"><span class="header-section-number">6.2.1</span> A.1 Borehole Heat Exchanger Specifications</a></li>
-  <li><a href="#a.2-heat-pump-system-parameters" id="toc-a.2-heat-pump-system-parameters" class="nav-link" data-scroll-target="#a.2-heat-pump-system-parameters"><span class="header-section-number">6.2.2</span> A.2 Heat Pump System Parameters</a></li>
-  <li><a href="#a.3-plate-heat-exchanger-evaporator-specifications" id="toc-a.3-plate-heat-exchanger-evaporator-specifications" class="nav-link" data-scroll-target="#a.3-plate-heat-exchanger-evaporator-specifications"><span class="header-section-number">6.2.3</span> A.3 Plate Heat Exchanger (Evaporator) Specifications</a></li>
-  <li><a href="#a.4-operating-conditions-test_gshp-reference-case" id="toc-a.4-operating-conditions-test_gshp-reference-case" class="nav-link" data-scroll-target="#a.4-operating-conditions-test_gshp-reference-case"><span class="header-section-number">6.2.4</span> A.4 Operating Conditions (test_GSHP Reference Case)</a></li>
-  <li><a href="#a.5-mathematical-correlations" id="toc-a.5-mathematical-correlations" class="nav-link" data-scroll-target="#a.5-mathematical-correlations"><span class="header-section-number">6.2.5</span> A.5 Mathematical Correlations</a></li>
+  <li><a href="#optimal-operation-analysis" id="toc-optimal-operation-analysis" class="nav-link" data-scroll-target="#optimal-operation-analysis"><span class="header-section-number">4.3</span> Optimal Operation Analysis</a></li>
+  <li><a href="#comparison-to-popular-control-strategies" id="toc-comparison-to-popular-control-strategies" class="nav-link" data-scroll-target="#comparison-to-popular-control-strategies"><span class="header-section-number">4.4</span> Comparison to Popular Control Strategies</a></li>
   </ul></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">5</span> Conclusions</a></li>
+  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion"><span class="header-section-number">6</span> Discussion</a></li>
+  <li><a href="#sec-appendix-parameters" id="toc-sec-appendix-parameters" class="nav-link" data-scroll-target="#sec-appendix-parameters"><span class="header-section-number">7</span> Appendix: Model Parameters and Technical Specifications</a>
+  <ul class="collapse">
+  <li><a href="#system-parameters-and-nomenclature" id="toc-system-parameters-and-nomenclature" class="nav-link" data-scroll-target="#system-parameters-and-nomenclature"><span class="header-section-number">7.1</span> System Parameters and Nomenclature</a></li>
+  <li><a href="#subscripts-and-abbreviations" id="toc-subscripts-and-abbreviations" class="nav-link" data-scroll-target="#subscripts-and-abbreviations"><span class="header-section-number">7.2</span> Subscripts and Abbreviations</a></li>
+  <li><a href="#detailed-mathematical-correlations" id="toc-detailed-mathematical-correlations" class="nav-link" data-scroll-target="#detailed-mathematical-correlations"><span class="header-section-number">7.3</span> Detailed Mathematical Correlations</a></li>
   </ul></li>
   </ul>
 <div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="../paper.pdf"><i class="bi bi-file-pdf"></i>PDF (acs)</a></li></ul></div></nav>
@@ -133,20 +160,36 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Insights into the Optimal Flow Rule for GSHP Systems</h1>
+<h1 class="title">Insights into the Optimal Control of GSHP Systems</h1>
 </div>
 
 
 <div class="quarto-title-meta-author">
-  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Authors</div>
   <div class="quarto-title-meta-heading">Affiliation</div>
   
     <div class="quarto-title-meta-contents">
-    <p class="author">Your Name <a href="mailto:your.email@institution.edu" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+    <p class="author">Adrien Vautrin <a href="mailto:adriv@kth.se" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
   </div>
   <div class="quarto-title-meta-contents">
         <p class="affiliation">
-            Your Institution
+            KTH - Royal Institute of Technology
+          </p>
+      </div>
+    <div class="quarto-title-meta-contents">
+    <p class="author">Alberto Lazzarotto <a href="mailto:alaz@kth.se" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            KTH - Royal Institute of Technology
+          </p>
+      </div>
+    <div class="quarto-title-meta-contents">
+    <p class="author">Joachim Claesson <a href="mailto:joachim.claesson@energy.kth.se" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            KTH - Royal Institute of Technology
           </p>
       </div>
   </div>
@@ -161,7 +204,7 @@ window.Quarto = {
 <div>
   <div class="abstract">
     <div class="block-title">Abstract</div>
-    <p>This paper investigates the question of flow control in ground source heat pump (GSHP) systems. We focus on systems with a single heat pump connected hydraulically to a borehole without decoupling tanks. The study develops a coupled thermal-hydraulic model that considers steady-state conditions with the borehole wall as the boundary condition. The model incorporates principles of fluid mechanics and heat transfer while accounting for thermal properties of both ground and heat pump components.</p>
+    <p>Ground source heat pump (GSHP) systems offer significant potential for energy efficiency improvements through optimized flow control strategies. This study investigates optimal flow control in GSHP systems featuring a single heat pump directly connected to borehole heat exchangers without hydraulic decoupling. We develop a coupled thermal-hydraulic model using ModelingToolkit.jl that integrates steady-state thermodynamic cycle analysis with detailed borehole heat exchanger modeling and pump hydraulics. Results suggest a strong dependency between the global performances and the transition from laminar to turbulent flow in the BHE. However, the usual rules fail to capture this optimality in a robust way. These findings indicate that better simulation of given configurations may unlock better system performance while remaining practical for field implementation.</p>
   </div>
 </div>
 
@@ -175,326 +218,1062 @@ window.Quarto = {
 </header>
 
 
-<section id="abstract" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Abstract:</h1>
-<p>This paper will look into the question of the flow control in GSHP systems. We will focus on systems with a single heat pump connected hydraulically to a borehole in terms of hydraulics, no decoupling tank.</p>
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<!-- FEEDBACK: Strong opening paragraph that clearly establishes the importance and context. Good use of technical terminology. Consider adding a brief quantitative statement about the energy efficiency gains possible. -->
+<p>Ground source heat pumps (GSHPs) have emerged as essential technologies for decarbonizing the heating sector, offering superior energy efficiency compared to conventional heating systems by exploiting relatively stable underground temperatures. Central to maximizing the performance of these systems is the optimization of fluid flow rates through borehole heat exchangers (BHE), which directly influences both system efficiency therefore operational costs.</p>
+<!-- FEEDBACK: Good problem identification paragraph. The phrase "fragmented across different system configurations" could be more specific - what exactly is fragmented? Consider mentioning specific gaps in knowledge more clearly. -->
+<p>However, current understanding of optimal flow control in GSHP systems remains fragmented across different system configurations and operational conditions. Most existing studies focus on either empirical optimization of specific installations or theoretical analysis of idealized systems, with limited integration between fundamental heat transfer principles and practical implementations. Furthermore, the complex thermal-hydraulic coupling between heat pump performance, borehole heat exchanger effectiveness, and pump power consumption has not been systematically analyzed using physically-based models that can capture the nonlinear interactions between these subsystems.</p>
+<!-- FEEDBACK: Excellent paragraph that clearly states your contribution and approach. The sentence structure is good, though the second sentence is quite long - consider breaking it up for readability. Good use of technical terms like "equation-based modeling approach" and "subsystem boundaries." -->
+<p>To address these limitations, this study develops a comprehensive thermal-hydraulic model of GSHP systems that integrates detailed thermodynamic cycle analysis with BHE physics and pump hydraulics. Using the Julia ModelingToolkit ecosystem, we implement an equation-based modeling approach that enables simultaneous solution of all system equations. Our analysis focuses on systems with direct hydraulic coupling between the heat pump and ground heat exchanger, a configuration common in residential and small commercial applications. The main scenario is defined to reflect typical Swedish GSHP installations. Through parametric analysis of the coupled model, we identify fundamental relationships between flow rates, temperature differences, and system performance, providing insights that may inform both system design and control strategy development.</p>
 </section>
-<section id="introduction" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Introduction</h1>
-<p>Heat pump in genreal and GSHP in particular are essential tools allowing for the decarbonization of the heating sector. The question of the flow control in GSHP systems is a central one, as it allows for the optimization of the system performance and the reduction of energy consumption. The cost of changing a few variables in a control algorithm is minimal. Therefore, it is important to understand the hydraulic aspects of GSHP systems in order to design effective control strategies. The flow control in GSHP systems is a complex problem that involves the interaction between the heat pump, the borehole, and the ground. The flow rate through the borehole is influenced by several factors, including the temperature difference between the fluid entering and leaving the borehole, the thermal conductivity of the ground, and the pressure drop across the borehole. In addition, the flow rate is also affected by the control strategy used to operate the heat pump.</p>
-<p>In this paper, we will focus on the hydraulic aspects of GSHP systems, specifically on the flow control in systems with a single heat pump connected hydraulically to a borehole. The model developped considers a steady state model of the inner problem, and sets the borehole wall as the boundary condition. The model is implemented in ModelingToolkit.jl, a Julia package for modeling and simulation of dynamic systems. The model is based on the principles of fluid mechanics and heat transfer, and takes into account the thermal properties of the ground and the heat pump.</p>
+<section id="literature-review" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Literature Review</h1>
+<!-- MISSING CONTENT ANALYSIS:
+1. FLOW REGIME MODELING: The paper focuses on laminar-turbulent transition but lacks coverage of transition modeling approaches, entry length effects, and regime classification methods specifically for BHE applications.
+   - Need to cite: @salhein2022control (discusses optimal velocity ranges for different pipe diameters)
+   - Consider: @delcol2014experimental (experimental flow boiling and transition effects)
+
+2. PHYSICS-BASED BHE MODELS: Limited discussion of detailed thermal resistance networks, multipole method implementations, and analytical solutions for U-tube configurations that form the foundation for the thermal model used.
+   - Need to cite: @claesson2018explicit (explicit multipole formulas for U-tube thermal resistance)
+   - Need to cite: @Claesson2004 (plate heat exchanger modeling with flow regimes)
+
+3. EXPERIMENTAL VALIDATION: Missing comprehensive experimental studies validating coupled thermal-hydraulic models under varying flow conditions, especially in transition regimes.
+   - Need to cite: @li2024field (field test validation of GSHP systems)
+   - Need to cite: @bordignon2024evaluation (long-term performance evaluation)
+   - Need to cite: @benassi2015energy (experimental data on variable speed systems)
+
+4. FLUID PROPERTY EFFECTS: Insufficient coverage of secondary fluid property impacts (viscosity, thermal conductivity, heat capacity) on optimal flow rates, particularly for antifreeze solutions.
+   - Need to cite: @menegazzo2022state (discusses secondary fluids and nanofluids)
+   - Need to cite: @karlsson2006capacity (capacity control with different fluids)
+
+5. SYSTEM-LEVEL OPTIMIZATION: Limited discussion of simultaneous optimization across all subsystems (compressor frequency, pump speed, BHE sizing) and multi-objective approaches.
+   - Need to cite: @ma2020recent (comprehensive review of design and control optimization)
+   - Need to cite: @atam2015design (optimal design approaches)
+   - Need to cite: @gao2016optimization (optimization of small-scale systems)
+   - Need to cite: @ikeda2017optimization (multi-source operation optimization)
+
+6. REAL-TIME CONTROL: Missing coverage of adaptive control strategies that can respond to changing ground conditions, seasonal variations, and system degradation.
+   - Need to cite: @gao2022optimal (optimal control for thermal environment)
+   - Need to cite: @zhou2024study (operation optimization with dynamic conditions)
+   - Need to cite: @mu2015extremum (extremum seeking control)
+
+7. ECONOMIC ANALYSIS: Limited treatment of life-cycle cost optimization and trade-offs between energy savings and parasitic pumping power from economic perspectives.
+   - Need to cite: @mader2014capacity (total cost of ownership analysis)
+   - Need to cite: @capozza2015long (long-term economic analysis)
+
+8. FIELD PERFORMANCE: Insufficient data on long-term field performance validation of optimal flow control strategies across different climates and system configurations.
+   - Need to cite: @li2024field (field test results and validation)
+   - Need to cite: @somogyi2016scientific (European field performance review)
+   - Need to cite: @cervera2016control (experimental one-year operation results)
+
+9. HYBRID SYSTEMS: Limited coverage of GSHP integration with other renewable sources and storage systems where flow optimization becomes more complex.
+   - Need to cite: @bordignon2024evaluation (dual-source heat pump evaluation)
+   - Need to cite: @ikeda2017optimization (hybrid GSHP with multiple sources)
+
+10. MODELING TOOLS: Incomplete review of available modeling frameworks, their capabilities, limitations, and suitability for different types of flow optimization studies.
+    - Need to cite: @ma2020recent (review of modeling approaches)
+    - Need to cite: @atam2015ground (modeling and control challenges)
+    - Need to cite: @menegazzo2022state (state-of-art modeling tools)
+-->
+<section id="theoretical-foundations-and-early-work" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="theoretical-foundations-and-early-work"><span class="header-section-number">2.1</span> Theoretical Foundations and Early Work</h2>
+<!-- FEEDBACK: Good historical context paragraph. The technical content is solid. Consider mentioning the year more prominently and perhaps adding a sentence about how this work influenced subsequent research. -->
+<p>The theoretical foundations for optimal flow control in heat pump systems were established by Granryd<span class="citation" data-cites="granryd2010analytical"><sup><a href="#ref-granryd2010analytical" role="doc-biblioref">1</a></sup></span>, who derived analytical expressions for optimum flow rates in evaporators and condensers of heat pumping systems. This seminal work provided the mathematical framework for understanding how flow velocities on air or liquid sides significantly affect system performance, leading to design relations that maximize overall coefficient of performance (<span class="math inline">\(\text{COP}\)</span>) by considering energy demands for compressors, pumps, and fans. Granryd’s analytical approach demonstrated that optimal flow rates result from balancing increased heat transfer effectiveness against parasitic pumping power, establishing the theoretical basis for subsequent flow optimization research.</p>
 </section>
-<section id="literature-review" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Literature Review</h1>
-<p>Several tools exist to model GSHP:</p>
-<ul>
-<li><p>Modelica</p></li>
-<li><p>Trnsys</p></li>
-<li><p>EES</p></li>
-<li><p>Python</p></li>
-<li><p>Combinations of the above/co simulation</p></li>
-</ul>
+<section id="flow-control-optimization-studies" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="flow-control-optimization-studies"><span class="header-section-number">2.2</span> Flow Control Optimization Studies</h2>
+<section id="groundbreaking-control-strategies" class="level3" data-number="2.2.1">
+<h3 data-number="2.2.1" class="anchored" data-anchor-id="groundbreaking-control-strategies"><span class="header-section-number">2.2.1</span> Groundbreaking Control Strategies</h3>
+<!-- FEEDBACK: Good technical paragraph with specific quantitative results. The 20-40% improvement figure is impressive and well-contextualized. Consider adding a sentence about what made this approach "groundbreaking" beyond just being first. -->
+<p>Edwards and Finn<span class="citation" data-cites="edwards2015generalised"><sup><a href="#ref-edwards2015generalised" role="doc-biblioref">2</a></sup></span> developed a groundbreaking control strategy for predicting optimal ground source heat pump water flow rates under part load operation. Their work demonstrated that optimal flow rates could be calculated from available design data and minimal on-line measurements, resulting in seasonal system performance (<span class="math inline">\(\text{SPF}_3\)</span>) improvements of 20-40% compared to nominal flow rate operation, particularly beneficial for the prevalent low-load conditions during heating and cooling seasons. The study established that optimal internal water flow rate decreases as part load decreases, while optimal external water flow rate remains relatively constant.</p>
 </section>
-<section id="methods" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Methods:</h1>
-<section id="modeling-framework" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="modeling-framework"><span class="header-section-number">4.1</span> Modeling framework:</h2>
-<p>We dedided to implement the model from scratch using ModelingToolkit.jl. This ecosystem overlays onto Julia. It is very similar in principle to Modelica: an acausal component based framework. However, there are a few key reasons why this tool has been chosen over the alternatives: free, open source.</p>
-<p>The GSHP system model consists of three coupled submodels that are solved together: thermodynamic cycle (thermal system), borehole heat exchanger, and pump hydraulics (hydraulic system). The steady-state system is solved using ModelingToolkit.jl with symbolic manipulation and NonlinearSolve.jl library for the solvers.</p>
-<p>The model implementation prioritizes modularity and extensibility, allowing for easy modification of individual components while maintaining system-level coupling consistency. The thermal-hydraulic separation enables efficient parameter studies and optimization while ensuring physical consistency through the coupling interface. The model architecture employs a modular approach typical of ModelingToolkit, where fundamental components such as thermophysical properties are defined first and then used to build parent components like the pump and compressor. Both the thermal and hydraulic models are coupled through mass flow (the secondary fluid mass flow from the thermal system sets the design flow for the hydraulic system), temperature (borehole inlet/outlet temperatures link the thermal and hydraulic properties), and performance feedback (pump power from the hydraulic system feeds into overall system KPIs). The solution strategy follows a sequential approach: first, the thermodynamic cycle is solved for given boundary conditions; next, mass flows, temperatures, and thermal loads are extracted; then, the hydraulic system is solved using these outputs as boundary conditions; finally, thermal and hydraulic results are combined to compute overall system performance metrics, including auxiliary heating requirements if the heat pump capacity is insufficient.</p>
-<section id="thermophysical-properties" class="level3" data-number="4.1.1">
-<h3 data-number="4.1.1" class="anchored" data-anchor-id="thermophysical-properties"><span class="header-section-number">4.1.1</span> Thermophysical properties:</h3>
-<p>Clapeyron.jl and EntropyScaling are used for determining the properties of the refrigerant. CoolProp correlations are used for the secondary fluid.</p>
+<section id="empirical-optimization-methodologies" class="level3" data-number="2.2.2">
+<h3 data-number="2.2.2" class="anchored" data-anchor-id="empirical-optimization-methodologies"><span class="header-section-number">2.2.2</span> Empirical Optimization Methodologies</h3>
+<!-- FEEDBACK: Well-structured paragraph that clearly describes the methodology and results. Good use of specific numbers (28%, 32%). The progression from Montagud to Cervera-Vázquez shows good chronological development. -->
+<p>Montagud et al.<span class="citation" data-cites="montagud2013situ"><sup><a href="#ref-montagud2013situ" role="doc-biblioref">3</a></sup></span> developed a comprehensive in situ experimental methodology for optimizing water circulation pump frequencies in GSHP systems. Their three-step approach, involving experimental characterization, quasi-steady state performance mapping, and extrapolation to partial load conditions, demonstrated potential annual energy savings of up to 28%. This methodology was subsequently extended by Cervera-Vázquez et al.<span class="citation" data-cites="cervera2014situ"><sup><a href="#ref-cervera2014situ" role="doc-biblioref">4</a></sup></span> to multistage heat pump units, achieving even higher energy savings of up to 32% through optimized pump frequency control.</p>
+<!-- FEEDBACK: This paragraph lacks a citation for "Zarrella et al." - this needs to be fixed. The content is good but the missing reference weakens credibility. The comparison between constant speed vs variable flow is valuable. -->
 </section>
-<section id="thermodynamic-cycle" class="level3" data-number="4.1.2">
-<h3 data-number="4.1.2" class="anchored" data-anchor-id="thermodynamic-cycle"><span class="header-section-number">4.1.2</span> Thermodynamic Cycle:</h3>
+<section id="simulation-based-analysis-of-control-strategies" class="level3" data-number="2.2.3">
+<h3 data-number="2.2.3" class="anchored" data-anchor-id="simulation-based-analysis-of-control-strategies"><span class="header-section-number">2.2.3</span> Simulation based analysis of control strategies</h3>
+<p><span class="citation" data-cites="zarrella2016simulation"><sup><a href="#ref-zarrella2016simulation" role="doc-biblioref">5</a></sup></span> conducted a comprehensive simulation-based analysis of variable flow pumping in ground source heat pump systems with different types of borehole heat exchangers. Their study compared constant speed circulation pumps with variable flow controlled by maintaining constant temperature difference across the heat pump on the ground side. The analysis revealed that while constant speed pumps provided better heat pump energy performance, variable flow control with constant temperature difference offered optimal system-wide efficiency when considering parasitic pumping energy. This paper focuses on dynamic simulation and the performances of these heuristics over the operation time. The fluid’s properties as well as the flow regime where calculated dynamically, but no emphasis is put on this aspect in the study results. The ecosystem thatb the simulation runs on is not specified.</p>
+</section>
+<section id="advanced-control-algorithms" class="level3" data-number="2.2.4">
+<h3 data-number="2.2.4" class="anchored" data-anchor-id="advanced-control-algorithms"><span class="header-section-number">2.2.4</span> Advanced Control Algorithms</h3>
+<!-- FEEDBACK: Good technical content but both paragraphs are quite dense. The De Ridder paragraph could benefit from more explanation of what "dynamic programming techniques" means in this context. The Mu paragraph introduces ESC well but could explain why model-free optimization is significant. -->
+<p>De Ridder et al.<span class="citation" data-cites="de2011optimal"><sup><a href="#ref-de2011optimal" role="doc-biblioref">6</a></sup></span> presented an optimal control algorithm for borehole thermal energy storage systems using dynamic programming techniques. Their approach successfully managed system constraints while minimizing operation costs, demonstrating robustness across various weather scenarios. The study highlighted the importance of thermal storage management in optimizing overall system performance.</p>
+<p>Mu et al.&nbsp;introduced extremum seeking control (ESC) for efficient operation of hybrid ground source heat pump systems. Their self-optimizing control scheme eliminated the need for detailed plant models by using feedback of total power consumption and control inputs of relative flow rate and pump speed. The ESC approach achieved nearly optimal efficiency without requiring extensive system modeling, representing a significant advancement in model-free optimization methods.</p>
+</section>
+</section>
+<section id="variable-speed-systems-and-advanced-technologies" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="variable-speed-systems-and-advanced-technologies"><span class="header-section-number">2.3</span> Variable Speed Systems and Advanced Technologies</h2>
+<!-- FEEDBACK: Excellent paragraph with specific quantitative findings. The technical details about temperature differences (5K, 2.8K) are valuable. The 20% improvement figure is well-supported. Minor suggestion: "brushless DC motor" could be abbreviated as BLDC after first use. -->
+<p>Benassi and Mantovan<span class="citation" data-cites="benassi2015energy"><sup><a href="#ref-benassi2015energy" role="doc-biblioref">7</a></sup></span> conducted comprehensive experimental and modeling studies of a GSHP system with variable speed compressor, water pumps, and fans. Their work established that at higher load ratios, maximum <span class="math inline">\(\text{COP}_3\)</span> is obtained for a water temperature difference of about 5K at the condenser and 2.8K at the evaporator, while at partial loads, maximum efficiency is achieved at minimum water flow rates to both borehole heat exchangers and building circuits due to heat exchanger oversizing. The study demonstrated potential for 20% improvement in seasonal <span class="math inline">\(\text{COP}\)</span> when using brushless DC motor compressors instead of inverter-driven asynchronous motors.</p>
+<!-- FEEDBACK: Good economic analysis paragraph. The specific monetary figure (5000 EUR) and timeframe (15 years) make it concrete. The connection to climate zones adds practical relevance. Well-written and clear. -->
+<p>The economic viability of variable speed control was analyzed by Mader and Madani<span class="citation" data-cites="mader2014capacity"><sup><a href="#ref-mader2014capacity" role="doc-biblioref">8</a></sup></span>, who compared variable speed versus on/off control in air-water heat pumps across different climate zones. Their total cost of ownership analysis found that variable speed control becomes increasingly profitable in colder climates, with potential savings of up to 5000 EUR over 15 years of operation compared to on/off control.</p>
+</section>
+<section id="system-integration-and-modeling" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="system-integration-and-modeling"><span class="header-section-number">2.4</span> System Integration and Modeling</h2>
+<!-- FEEDBACK: Good technical content but the 5% per degree figure needs more context - is this linear? Over what temperature range? The paragraph structure is good but could benefit from a topic sentence that frames the importance of system integration. -->
+<p>Corberán et al.<span class="citation" data-cites="corberan2010quasi"><sup><a href="#ref-corberan2010quasi" role="doc-biblioref">9</a></sup></span> presented a quasi-steady state mathematical model of an integrated GSHP system for building space control. Their validated model revealed that higher water return temperatures reduce heat pump ON time operation and result in approximately 5% increase in daily heat pump seasonal performance factor per degree increase in building water return temperature. The study emphasized the critical importance of considering building circuit variables in overall system performance optimization.</p>
+<!-- FEEDBACK: Good specialized application paragraph. The specific 2°C temperature difference and 8-11% savings figures are concrete and useful. The connection to specialized GSHP configurations is valuable for completeness. -->
+<p>Beaudry et al.<span class="citation" data-cites="beaudry2022flow"><sup><a href="#ref-beaudry2022flow" role="doc-biblioref">10</a></sup></span> investigated flow rate control in standing column wells, showing that variable flow rate control maintaining a 2°C temperature difference across the plate heat exchanger can generate 8-11% annual energy savings while reducing groundwater usage. This work extended flow optimization concepts to open loop systems, beyond more conventional closed-loop GSHP configurations.</p>
+</section>
+<section id="comprehensive-reviews-and-recent-developments" class="level2" data-number="2.5">
+<h2 data-number="2.5" class="anchored" data-anchor-id="comprehensive-reviews-and-recent-developments"><span class="header-section-number">2.5</span> Comprehensive Reviews and Recent Developments</h2>
+<section id="modeling-and-control-reviews" class="level3" data-number="2.5.1">
+<h3 data-number="2.5.1" class="anchored" data-anchor-id="modeling-and-control-reviews"><span class="header-section-number">2.5.1</span> Modeling and Control Reviews</h3>
+<!-- FEEDBACK: Good review paragraph but quite technical. The 10% figure is useful for benchmarking. The second sentence about bottlenecks is important but could be clearer - what specifically makes borefield modeling challenging? Consider breaking this into two sentences for readability. -->
+<p>Atam and Helsen<span class="citation" data-cites="atam2015ground"><sup><a href="#ref-atam2015ground" role="doc-biblioref">11</a></sup></span> provided a comprehensive two-part review of modeling and optimal control challenges in ground-coupled heat pump systems. Their analysis highlighted that mathematical model-based control approaches achieve performance within 10% of dynamic programming-based optimal control. However, they identified control-oriented borefield modeling as a critical bottleneck, particularly for predicting thermal behavior accounting for thermal interaction between boreholes, groundwater flow effects, and multi-layer ground characteristics.</p>
+</section>
+</section>
+<section id="long-term-performance-analysis" class="level2" data-number="2.6">
+<h2 data-number="2.6" class="anchored" data-anchor-id="long-term-performance-analysis"><span class="header-section-number">2.6</span> Long-term Performance Analysis</h2>
+<!-- FEEDBACK: Good paragraph that introduces an important temporal dimension. The contrast between short-term vs long-term optimization is well-made. Could benefit from more specific details about what "long-term ground thermal evolution" means practically. -->
+<p>Capozza et al.<span class="citation" data-cites="capozza2015long"><sup><a href="#ref-capozza2015long" role="doc-biblioref">12</a></sup></span> conducted extensive analysis of two GSHP systems using validated numerical models, proposing optimization strategies for operating parameters. Their work emphasized the importance of considering seasonal variations and long-term ground thermal evolution in control strategy development, demonstrating that short-term optimization strategies may not be optimal over the system’s operational lifetime.</p>
+</section>
+<section id="research-gaps-and-current-limitations" class="level2" data-number="2.7">
+<h2 data-number="2.7" class="anchored" data-anchor-id="research-gaps-and-current-limitations"><span class="header-section-number">2.7</span> Research Gaps and Current Limitations</h2>
+<!-- FEEDBACK: Excellent structured summary. The numbered list format is clear and logical. Each gap is well-articulated with specific details. The transition to "The present study addresses these gaps..." is perfect. This effectively sets up your contribution. -->
+<p>Despite significant progress in GSHP flow control optimization, several critical gaps remain in the current literature:</p>
+<ol type="1">
+<li><p><strong>Integration of detailed physics-based models</strong>: Most optimization studies rely on empirical correlations or simplified models that may not capture the full complexity of thermal-hydraulic coupling in GSHP systems.</p></li>
+<li><p><strong>Comprehensive system-level optimization</strong>: While individual components have been optimized separately, few studies address the simultaneous optimization of all subsystem interactions including refrigerant cycle, borehole heat exchanger, and pumping system.</p></li>
+<li><p><strong>Validation under realistic conditions</strong>: Many theoretical studies lack validation against real system performance data under varying operational conditions and system configurations.</p></li>
+<li><p><strong>Generalizability across system types</strong>: Most studies focus on specific system configurations, limiting the applicability of findings to broader GSHP system designs.</p></li>
+</ol>
+<p>The present study addresses these gaps by developing a comprehensive thermal-hydraulic model that couples detailed thermodynamic cycle analysis with borehole heat exchanger physics and pump hydraulics, enabling systematic investigation of optimal flow control strategies across different system configurations and operating conditions.</p>
+</section>
+<section id="modeling-frameworks" class="level2" data-number="2.8">
+<h2 data-number="2.8" class="anchored" data-anchor-id="modeling-frameworks"><span class="header-section-number">2.8</span> Modeling Frameworks</h2>
+<!-- FEEDBACK: This is an excellent comprehensive review of modeling tools. The structured format with tool names in bold works well. Each tool description includes both capabilities and limitations, which is valuable. The justification for choosing ModelingToolkit.jl is well-reasoned. Consider adding a brief table summary if space permits. -->
+<p>The complexity of GSHP systems has necessitated careful selection of modeling tools and frameworks. Various options exist (the list is not meant to be exhaustive), each with distinct advantages and limitations:</p>
+<p><strong>EES (Engineering Equation Solver)</strong> represents the traditional approach to heat pump cycle modeling, offering rapid setup of steady-state vapor compression cycles with extensive built-in refrigerant property databases. While excellent for teaching and quick optimization studies, EES is primarily limited to steady-state analysis and lacks detailed borehole heat exchanger models.</p>
+<p><strong>Modelica Ecosystem</strong> tools, including commercial solutions like Modelon VCL and TIL Suite, as well as open-source libraries such as ThermoCycle, Buildings, and AixLib, provide sophisticated moving-boundary heat exchanger models with geometry-based heat transfer coefficient and pressure drop correlations. However, commercial libraries come with significant licensing costs and proprietary restrictions.</p>
+<p><strong>TRNSYS (Type 557)</strong> has established itself as a standard tool for building and ground source heat pump studies, particularly excelling in seasonal GSHP simulations, though it relies on lumped/empirical cycle models rather than detailed moving-boundary heat exchanger physics.</p>
+<p><strong>Python-based tools</strong> have emerged as popular open-source alternatives, with CoolProp providing thermophysical properties, TESPy enabling process modeling for steady-state heat pump cycles, and pygfunction offering state-of-the-art borefield modeling capabilities.</p>
+<p><strong>Other tools</strong>, such as <strong>CaRM</strong> are mentioned (see<span class="citation" data-cites="zarrella2016simulation"><sup><a href="#ref-zarrella2016simulation" role="doc-biblioref">5</a></sup></span>), but their use seems to be limited to research work and the way they are implemented is not clear.</p>
+<p>We decided to implement the model from scratch using ModelingToolkit.jl. This ecosystem exists as part of the Julia programming language and is similar in principle to Modelica: an acausal component-based framework. Key reasons for this choice include: free and open source nature, excellent symbolic computation capabilities, ease of reusability, and seamless integration with advanced optimization and machine learning ecosystems.</p>
+</section>
+</section>
+<section id="methods" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Methods</h1>
+<!-- FEEDBACK: The Methods section is generally well-structured but very dense. Consider breaking up some of the longer paragraphs and adding more equations in the main text. The writing is technical but accessible. -->
+<section id="system-model-architecture" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="system-model-architecture"><span class="header-section-number">3.1</span> System Model Architecture</h2>
+<!-- FEEDBACK: Good overview paragraph but extremely long (5+ sentences in one paragraph). Break this into 2-3 shorter paragraphs for better readability. The technical content is solid but the dense presentation makes it hard to follow. -->
+<p>The GSHP system model consists of three coupled component: thermodynamic cycle, borehole heat exchanger, and pump. The steady-state system is solved using ModelingToolkit.jl (MTK). The way MTK solves any system is by first leveraging symbolic manipulation to reduce the computaational burden (tearing, etc) and then downstream of this first processing, some solver is used. In the current case, we used solvers from NonlinearSolve.jl.</p>
+<!--solver_fast = FastShortcutNLLSPolyalg(autodiff=AutoFiniteDiff());
+
+solver_robust = RobustMultiNewton(autodiff=AutoFiniteDiff());
+
+solver_fallback = NewtonRaphson(autodiff=AutoForwardDiff());
+
+solvers = [solver_fast, solver_robust, solver_fallback];-->
+<p>We separated each sub component into a thermal and a hydraulic component, with the exception of the pump, where we neglected the thermal aspect (the pump does not inject heat into the system). This modular implementation allows for easy modification of individual components while maintaining system-level coupling consistency. The model architecture is typical of ModelingToolkit, where fundamental components such as thermo-physical properties are defined first and then used to build parent components like the pump and compressor. Though solved separately, both the thermal and hydraulic models are coupled through mass flow, temperature, and performance feedback.</p>
+<p>After the two simulations, results are combined to compute overall system performance metrics, including auxiliary heating requirements if the heat pump capacity is insufficient.</p>
+<section id="thermophysical-properties" class="level3" data-number="3.1.1">
+<h3 data-number="3.1.1" class="anchored" data-anchor-id="thermophysical-properties"><span class="header-section-number">3.1.1</span> Thermophysical properties:</h3>
+<p>Clapeyron.jl (<span class="citation" data-cites="andres_riedemann_clapeyronthermoclapeyronjl_2025"><sup><a href="#ref-andres_riedemann_clapeyronthermoclapeyronjl_2025" role="doc-biblioref">13</a></sup></span>) and EntropyScaling.jl (<span class="citation" data-cites="sebastian_schmitt_se-schmittentropyscalingjl_2025"><sup><a href="#ref-sebastian_schmitt_se-schmittentropyscalingjl_2025" role="doc-biblioref">14</a></sup></span>) are used for determining the properties of the refrigerant. CoolProp correlations are used for the secondary fluid.</p>
+</section>
+<section id="thermodynamic-cycle" class="level3" data-number="3.1.2">
+<h3 data-number="3.1.2" class="anchored" data-anchor-id="thermodynamic-cycle"><span class="header-section-number">3.1.2</span> Thermodynamic Cycle:</h3>
 <p>The thermodynamic cycle implements a R134A cycle with the following components:</p>
-<section id="evaporator" class="level4" data-number="4.1.2.1">
-<h4 data-number="4.1.2.1" class="anchored" data-anchor-id="evaporator"><span class="header-section-number">4.1.2.1</span> Evaporator:</h4>
+<section id="evaporator" class="level4" data-number="3.1.2.1">
+<h4 data-number="3.1.2.1" class="anchored" data-anchor-id="evaporator"><span class="header-section-number">3.1.2.1</span> Evaporator:</h4>
 <p>A moving-boundary plate heat exchanger evaporator with dynamically allocated regions for two-phase evaporation and single-phase superheating. The model features:</p>
 <ul>
-<li><strong>Geometric modeling</strong>: Chevron plate geometry with adjustable plate spacing (b), number of plates (np), width (W), enlargement factor (ϕ), and chevron angle (β)</li>
-<li><strong>Two-zone heat transfer</strong>: The evaporator length is split between evaporation and superheating zones. The fraction of the HX occupied by each zone is a variable.</li>
-<li><strong>Heat transfer correlations</strong>:
+<li><p><strong>Geometric modeling</strong>: Chevron plate geometry with adjustable plate spacing (b), number of plates (np), width (W), enlargement factor (ϕ), and chevron angle (β)</p></li>
+<li><p><strong>Two-zone heat transfer</strong>: The evaporator length is split between evaporation and superheating zones. The fraction of the HX occupied by each zone is a variable.</p></li>
+<li><p><strong>Heat transfer correlations</strong>:</p>
 <ul>
-<li>Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (avergaed ovr a vapor quality range)</li>
-<li>Superheating region: Martin correlations for single-phase plate heat exchanger flow with laminar-turbulent (smooth) transition</li>
+<li><p>Two-phase region: Amalfi correlation for convective boiling in plate heat exchangers (averaged over a vapor quality range)</p></li>
+<li><p>Superheating region: Martin correlations (<span class="citation" data-cites="vdi_e_v_n6_2010"><sup><a href="#ref-vdi_e_v_n6_2010" role="doc-biblioref">15</a></sup></span>) for single-phase plate heat exchanger flow with laminar-turbulent (smooth) transition</p></li>
 </ul></li>
-<li><strong>Boundary conditions</strong>: Fixed superheat degree (ΔTSH) and secondary fluid temperature difference (ΔTSF) as control variables</li>
+<li><p><strong>Boundary conditions</strong>: Fixed superheat degree (<span class="math inline">\(\Delta T_{SH}\)</span>) and secondary fluid temperature difference (<span class="math inline">\(\Delta T_{SF}\)</span>) as control variables</p></li>
+<li><p><strong>Friction</strong>: Darcy-Weisbach equations with smooth transition between laminar and turbulent regimes using error function blending</p></li>
 </ul>
-<p>The smooth transition is necessary for the solver to</p>
+<p>The smooth transition is helpful in helping the solver converge to a solution and contributes to its unicity. <!-- maybe add an explanation of the smooth transition? --></p>
 <ul>
-<li><strong>Friction</strong>: Darcy-Weisbach equations with smooth transition between laminar and turbulent regimes using error function blending</li>
-<li><strong>Friction factor</strong>: Enhanced Colebrook-White correlations</li>
-<li><strong>Heat exchanger losses</strong>: Chevron-plate correlations based on Martin’s work for pressure drop in plate heat exchangers</li>
+<li><strong>Heat exchanger losses</strong>: Chevron-plate correlations based on<span class="citation" data-cites="vdi_e_v_n6_2010"><sup><a href="#ref-vdi_e_v_n6_2010" role="doc-biblioref">15</a></sup></span> work for pressure drop in plate heat exchangers</li>
 </ul>
 </section>
-<section id="compressor" class="level4" data-number="4.1.2.2">
-<h4 data-number="4.1.2.2" class="anchored" data-anchor-id="compressor"><span class="header-section-number">4.1.2.2</span> Compressor:</h4>
-<p>The compressor model incorporates:</p>
+<section id="compressor" class="level4" data-number="3.1.2.2">
+<h4 data-number="3.1.2.2" class="anchored" data-anchor-id="compressor"><span class="header-section-number">3.1.2.2</span> Compressor:</h4>
+<p>The compressor model is relatively simple and incorporates:</p>
 <ol type="1">
-<li><p><strong>Volumetric displacement</strong>: Fixed displacement volume with frequency-controlled capacity -</p></li>
+<li><p><strong>Volumetric displacement</strong>: Fixed displacement volume with frequency-controlled capacity.</p></li>
 <li><p><strong>Isentropic efficiency</strong>: Constant isentropic efficiency</p></li>
 </ol>
 </section>
-<section id="expansion-valve" class="level4" data-number="4.1.2.3">
-<h4 data-number="4.1.2.3" class="anchored" data-anchor-id="expansion-valve"><span class="header-section-number">4.1.2.3</span> Expansion Valve:</h4>
-<p>Modeled as an isenthalpic expansion process. A constraint imposed in the solver is the superheating degree.</p>
+<section id="expansion-valve" class="level4" data-number="3.1.2.3">
+<h4 data-number="3.1.2.3" class="anchored" data-anchor-id="expansion-valve"><span class="header-section-number">3.1.2.3</span> Expansion Valve:</h4>
+<p>Modeled as an isenthalpic expansion process. Its action is however implemented in the simulation via the constraint on the superheating degree at the evaporator outlet.</p>
 </section>
-<section id="condenser" class="level4" data-number="4.1.2.4">
-<h4 data-number="4.1.2.4" class="anchored" data-anchor-id="condenser"><span class="header-section-number">4.1.2.4</span> Condenser:</h4>
-<p>Simplified model assuming constant condensing temperature and specified subcooling degree (ΔTSC). The detailed condenser heat transfer is not modeled, focusing on the evaporator side.</p>
+<section id="condenser" class="level4" data-number="3.1.2.4">
+<h4 data-number="3.1.2.4" class="anchored" data-anchor-id="condenser"><span class="header-section-number">3.1.2.4</span> Condenser:</h4>
+<p>Simplified model assuming constant condensing temperature and specified subcooling degree (<span class="math inline">\(\Delta T_{SC}\)</span>). The detailed condenser heat transfer is not modeled, focusing on the evaporator side.</p>
 </section>
 </section>
-<section id="borehole-heat-exchanger" class="level3" data-number="4.1.3">
-<h3 data-number="4.1.3" class="anchored" data-anchor-id="borehole-heat-exchanger"><span class="header-section-number">4.1.3</span> Borehole Heat Exchanger:</h3>
+<section id="borehole-heat-exchanger" class="level3" data-number="3.1.3">
+<h3 data-number="3.1.3" class="anchored" data-anchor-id="borehole-heat-exchanger"><span class="header-section-number">3.1.3</span> Borehole Heat Exchanger:</h3>
 <p>The U-tube grouted borehole is simulated by two different models:</p>
-<section id="thermal" class="level4" data-number="4.1.3.1">
-<h4 data-number="4.1.3.1" class="anchored" data-anchor-id="thermal"><span class="header-section-number">4.1.3.1</span> Thermal:</h4>
+<section id="sec-method_thermal" class="level4" data-number="3.1.3.1">
+<h4 data-number="3.1.3.1" class="anchored" data-anchor-id="sec-method_thermal"><span class="header-section-number">3.1.3.1</span> Thermal:</h4>
 <ul>
-<li><strong>Analytical solution</strong>: Uses eigenvalue decomposition of coupled 1D ODEs to solve the temperature profiles along the borehole depth</li>
-<li><strong>Multipole method</strong>: For the grout resistance, we implement thermal resistance calculations between pipes and to the borehole wall using multipole approximations for complex geometry effects <strong>ref needed</strong></li>
-<li><strong>Heat transfer coefficients</strong>: Derived from the borehole geometry and dynamical fluid properties</li>
-<li><strong>Boundary conditions</strong>: Uniform borehole wall temperature as the thermal boundary condition</li>
-<li><strong>Temperature profiles</strong>: Analytical expressions for fluid temperatures in both legs as functions of depth</li>
+<li><p><strong>Analytical solution</strong>: Uses eigenvalue decomposition of coupled 1D ODEs to solve the temperature profiles along the borehole depth</p></li>
+<li><p><strong>Multipole method</strong>: For the grout resistance, we implement thermal resistance calculations between pipes and to the borehole wall using multipole approximations for complex geometry effects</p></li>
+<li><p><strong>Heat transfer coefficients</strong>: Derived from the borehole geometry and dynamical fluid properties</p></li>
+<li><p><strong>Boundary conditions</strong>: Uniform borehole wall temperature as the thermal boundary condition</p></li>
 </ul>
 </section>
-<section id="hydraulic" class="level4" data-number="4.1.3.2">
-<h4 data-number="4.1.3.2" class="anchored" data-anchor-id="hydraulic"><span class="header-section-number">4.1.3.2</span> Hydraulic:</h4>
+<section id="hydraulic" class="level4" data-number="3.1.3.2">
+<h4 data-number="3.1.3.2" class="anchored" data-anchor-id="hydraulic"><span class="header-section-number">3.1.3.2</span> Hydraulic:</h4>
+<!-- FEEDBACK: Good overview but lacks detail. How exactly are temperature-dependent fluid properties incorporated? What's the computational approach for coupling? Do properties update iteratively? -->
 <p>The borehole thermal model is connected to the hydraulic system through temperature-dependent fluid properties.</p>
+<!-- FEEDBACK: Good technical details. Consider adding the Reynolds number ranges for transition (e.g., Re < 2300 for laminar, Re > 4000 for turbulent). What's the form of the error function blending? How smooth is the transition? -->
 <ul>
-<li><strong>Pipe friction</strong>: Darcy-Weisbach equations with smooth transition between laminar and turbulent regimes using smooth blending (erf)</li>
-<li><strong>Friction factor</strong>: Enhanced Colebrook-White correlations with automatic regime detection</li>
-<li><strong>Component-wise pressure drops</strong>: Individual calculation for each system component (evaporator, borehole, connecting pipes)</li>
+<li><p><strong>Friction factor</strong>: Darcy-Weisbach equations with smooth transition between laminar and turbulent regimes using smooth blending (erf)</p></li>
+<li><p><strong>Component-wise pressure drops</strong>: Individual calculation for each singular and linear losses (connecting pipes, borehole, bottom bend). The horizontal pipes between the evaporator and the BHE are neglected.</p></li>
 </ul>
 </section>
 </section>
 </section>
-<section id="pump" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="pump"><span class="header-section-number">4.2</span> Pump</h2>
-<p>Since the hydraulic mode is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performances are expected in reality thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.</p>
-<section id="pump-performance" class="level3" data-number="4.2.1">
-<h3 data-number="4.2.1" class="anchored" data-anchor-id="pump-performance"><span class="header-section-number">4.2.1</span> Pump Performance:</h3>
+<section id="pump" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="pump"><span class="header-section-number">3.2</span> Pump</h2>
+<!-- FEEDBACK: Good mathematical formulation. However, you define the equations but don't explain the physical meaning of the coefficients. What do ψ₀ and K represent physically? What are typical values for BEP conditions? Consider adding a brief explanation of affinity laws. -->
 <p>The centrifugal pump follows dimensionless performance curves based on affinity laws:</p>
 <ul>
 <li><p><strong>Head coefficient</strong>: <span class="math inline">\(\psi = \psi_0 - K \cdot \varphi^2\)</span> where <span class="math inline">\(\varphi\)</span> is the flow coefficient</p></li>
-<li><p><strong>Efficiency</strong>: <span class="math inline">\(\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)\)</span> with parabolic efficiency curve around the best efficiency point (BEP)</p></li>
-<li><p><strong>Power calculation</strong>: Electrical power including motor efficiency</p></li>
+<li><p><strong>Efficiency</strong>: <span class="math inline">\(\eta = \eta_{\text{max}} \left(1 - \left(\frac{\varphi - \varphi_{\text{BEP}}}{\varphi_{\text{BEP}}}\right)^2\right)\)</span> with parabolic efficiency curve around the best efficiency point (<span class="math inline">\(\text{BEP}\)</span>)</p></li>
+<li><p><strong>Power calculation</strong>: The efficiency is used to calculate the electrical power consumed by the pump (it includes all losses, including electrical ones).</p></li>
 </ul>
+<p>The pump parameters are selected based on the maximum flow rate at zero head (free discharge) and the shutoff head at zero flow (blocked outlet), as specified by the actual pump performance curve. The same values are taken for all simulations.</p>
 </section>
-</section>
-<section id="performance-metrics" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="performance-metrics"><span class="header-section-number">4.3</span> Performance Metrics:</h2>
+<section id="performance-metrics" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="performance-metrics"><span class="header-section-number">3.3</span> Performance Metrics:</h2>
+<!-- FEEDBACK: Good section but needs expansion. The COP definitions are clear but consider adding the auxiliary heating equation explicitly. Also, define what P_aux represents mathematically. -->
 <p>The model calculates multiple performance indicators:</p>
 <ul>
-<li><strong>Thermal COP</strong>: <span class="math inline">\(COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}\)</span> (refrigeration cycle only)</li>
-<li><strong>System COP</strong>: <span class="math inline">\(COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}\)</span> (including pump power)</li>
-<li>COP 3 (includes auxiliary heating)</li>
+<li><p><strong><span class="math inline">\(\text{COP}_1\)</span></strong>: <span class="math inline">\(\text{COP}_1 = \frac{\dot{Q}_{cond}}{W_{comp}}\)</span> (refrigeration cycle only)</p></li>
+<li><p><strong><span class="math inline">\(\text{COP}_2\)</span></strong>: <span class="math inline">\(\text{COP}_2 = \frac{\dot{Q}_{cond}}{P_{comp} + P_{pump}}\)</span> (including pump power)</p></li>
+<li><p><strong><span class="math inline">\(\text{COP}_3\)</span></strong>: <span class="math inline">\(\text{COP}_3 = \frac{\dot{Q}_{cond} + P_{aux}}{P_{comp} + P_{pump} + \dot{Q}_{aux}}\)</span> (including auxiliary heating)</p></li>
 </ul>
-<section id="numerical-implementation" class="level3" data-number="4.3.1">
-<h3 data-number="4.3.1" class="anchored" data-anchor-id="numerical-implementation"><span class="header-section-number">4.3.1</span> Numerical Implementation:</h3>
+<section id="numerical-implementation" class="level3" data-number="3.3.1">
+<h3 data-number="3.3.1" class="anchored" data-anchor-id="numerical-implementation"><span class="header-section-number">3.3.1</span> Numerical Implementation:</h3>
+<!-- FEEDBACK: Good technical details but very brief. Consider expanding on why these specific solvers were chosen and what makes the symbolic computation advantageous for this problem. What does "continuation methods" mean in this context? -->
 <ul>
-<li><strong>Symbolic computation</strong>: Full symbolic derivation of equations using ModelingToolkit.jl</li>
-<li><strong>Robust solvers</strong>: Multiple nonlinear solver options including RobustMultiNewton and TrustRegion methods</li>
-<li><strong>Automatic differentiation</strong>: Forward-mode AD for enhanced convergence properties</li>
-<li><strong>Continuation methods</strong>: Built-in parameter sweep capabilities with automatic stepping and convergence control</li>
+<li><p><strong>Symbolic computation</strong>: Full symbolic derivation of equations using ModelingToolkit.jl</p></li>
+<li><p><strong>Robust solvers</strong>: Multiple nonlinear solver options including RobustMultiNewton and TrustRegion methods</p></li>
+<li><p><strong>Automatic differentiation</strong>: Forward-mode AD for enhanced convergence properties</p></li>
+<li><p><strong>Continuation methods</strong>: Built-in parameter sweep capabilities with automatic stepping and convergence control</p></li>
 </ul>
-<p><em>Detailed system parameters and correlations are provided in Appendix A.</em></p>
+<!-- FEEDBACK: Good cross-reference to appendix. -->
+<p><em>Detailed system base parameters and correlations are provided in <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>.</em></p>
 </section>
 </section>
 </section>
-<section id="results" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Results:</h1>
-<section id="insights-into-the-physical-process" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="insights-into-the-physical-process"><span class="header-section-number">5.1</span> Insights into the physical process</h2>
-<p>Position of the boundary within the evaporator The faster the compressor runs, the more evaporation fraction is used</p>
-<p>This figure show that all the convective thermal resistances are lower at low delta T, which is expected.</p>
-<p>Focusing on the borehole heat exchanger (BHE) efficiency, defined as: <span class="math display">\[
-1 - \frac{T_{\text{out}} - T_{\text{wall}}}{T_{\text{in}} - T_{\text{wall}}}
-\]</span></p>
-<p>Schematically, this better efficiency leads to higher evaporation temperature:</p>
-<p>Then, this higher temperature leads to a better capacity:</p>
-<p>When factoring in the pumpin pwer, we therefore obtain the COP 3 figure:</p>
-<p>We observe a clear peak around 3K Delta T. This is in line with the standard practice accross the field.</p>
-</section>
-<section id="cops-vs.-δt" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="cops-vs.-δt"><span class="header-section-number">5.2</span> COPs vs.&nbsp;ΔT</h2>
-<p>This first figure shows the main metrics we are considering: COPs against the control strategy under investigation: constant temperature difference across the evaporator/BHE.</p>
-<p>The COP 3 is calculated such that the delivered heat is the heat delivered at the maximum case for this frequency.</p>
-<p>We can see clearly that there is an optimal at 3.0K, around when the flow is fully turbulent in both legs of the BHE (see appendix for explanations)</p>
-</section>
-<section id="robustness" class="level2" data-number="5.3">
-<h2 data-number="5.3" class="anchored" data-anchor-id="robustness"><span class="header-section-number">5.3</span> Robustness</h2>
-<section id="scenarios" class="level3" data-number="5.3.1">
-<h3 data-number="5.3.1" class="anchored" data-anchor-id="scenarios"><span class="header-section-number">5.3.1</span> Scenarios</h3>
-<p>4 scenarios have been simulated with one difference for each variant:</p>
-<ul>
-<li><p>Base</p></li>
-<li><p>“Cold wall”, T wall is set to 5C instead of 10C</p></li>
-<li><p>“Pure Water”, the secondary fluid is pure water</p></li>
-<li><p>“Bigger pipes”, the OD of the collector pipes is set to 40 instead of 32mm</p></li>
-</ul>
-</section>
-<section id="partial-load" class="level3" data-number="5.3.2">
-<h3 data-number="5.3.2" class="anchored" data-anchor-id="partial-load"><span class="header-section-number">5.3.2</span> Partial load</h3>
-<div id="fig-pure_water_cop3" class="quarto-float quarto-figure quarto-figure-center anchored">
+<section id="results" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Results:</h1>
+<!-- FEEDBACK: Results section has good structure but some figures are referenced without being visible in the text. Consider adding more quantitative analysis and discussion of uncertainty/limitations. Some paragraphs are incomplete or unclear. -->
+<section id="single-case-analysis-physical-process-insights" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="single-case-analysis-physical-process-insights"><span class="header-section-number">4.1</span> Single Case Analysis: Physical Process Insights</h2>
+<!-- REORGANIZATION COMMENT: This section establishes the baseline understanding using a single simulation case -->
+<!-- FEEDBACK: Good opening sentence but could be more specific about what "single simulation" means - what are the boundary conditions? -->
+<p>In this section, we outline a single simulation case representing a typical Swedish GSHP installation (with the exception of grouting), using the parameters and technical specifications detailed in <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>.</p>
+<div id="fig-thermal-resistances" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-pure_water_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/cop3_pure_water_scenario.svg" class="img-fluid figure-img">
+<div aria-describedby="fig-thermal-resistances-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/thermal_resistances_vs_dt.svg" class="img-fluid figure-img">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pure_water_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Test
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-thermal-resistances-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Thermal resistances in the BHE vs.&nbsp;temperature difference accross the BHE. P stands for pipe, it takes only conduction (pipes + grout) into account. F stands for fluid and includes the previous resistances as well as the convective resistances.
 </figcaption>
 </figure>
 </div>
-<p><a href="#fig-pure_water_cop3" class="quarto-xref">Figure&nbsp;1</a> is a contour plot representing a 2d parametric exploration. The x axis is the set delta T for the secondary fluid. The ordinates represent the compressor frequency. The contours represent the COP 3(f), calculated as so: Thjis COP3 is calculated for a given fgrequency, The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It’s a way to quantify the efficiency of the system while not having to chose a target Q cond.</p>
-<p>On the diagram, several isolines are represented:</p>
+<p><a href="#fig-thermal-resistances" class="quarto-xref">Figure&nbsp;1</a> shows that all the convective thermal resistances are lower at low <span class="math inline">\(\Delta T\)</span>, which is expected.</p>
+<p>Focusing on the borehole heat exchanger (BHE) efficiency, defined as:</p>
+<p><span class="math display">\[
+\epsilon = 1 - \frac{T_{out} - T_{wall}}{T_{in} - T_{wall}}
+\]</span></p>
+<div id="fig-bh-efficiency" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-bh-efficiency-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/bh_efficiency_vs_dt.svg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-bh-efficiency-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Borehole heat exchanger efficiency vs.&nbsp;temperature difference
+</figcaption>
+</figure>
+</div>
+<!-- FEEDBACK: Good explanation of the BHE efficiency curve. The physical reasoning is clear and the connection to flow regime transitions is well made. Consider clarifying why efficiency dips at the transition—mention the impact of increased thermal resistance in the laminar regime. The explanation of the local minimum at ΔT ≈ 4 K is helpful. For improved clarity, explicitly state that the efficiency penalty is due to the onset of laminar flow and higher convective resistance. -->
+<p><a href="#fig-bh-efficiency" class="quarto-xref">Figure&nbsp;2</a> shows how BHE efficiency varies with the temperature difference control parameter. The efficiency is low at low <span class="math inline">\(\Delta T\)</span> because of the high flow rates. The general trend is an increase in efficiency with increasing <span class="math inline">\(\Delta T\)</span>, since the fluid residency time in the BHE increases. At the transition though, the efficiency experiences a dip. When reaching the laminar region, the efficiency gets penalized by the higher resistances in the BHE. The same overall pattern of increasing efficiency with <span class="math inline">\(\Delta T\)</span> is still present in this second part, but the curveis shifted downwards compared to the turbulent region. This downward shifting leads to a local minimum at around Delta T = 4 K (last laminar region).</p>
+<p>Schematically, this better efficiency leads to higher evaporation temperature:</p>
+<div id="fig-temperature-profiles" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-temperature-profiles-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/temperature_vs_dt.svg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-temperature-profiles-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Temperature profiles showing the effect of improved BHE efficiency
+</figcaption>
+</figure>
+</div>
+<p>Then, this higher temperature leads to a better capacity (due to a higher density at the outlet of the evaporator):</p>
+<div id="fig-energy-components" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-energy-components-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/energy_components_vs_dt.svg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-energy-components-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Energy components breakdown vs.&nbsp;temperature difference
+</figcaption>
+</figure>
+</div>
+<!-- FEEDBACK: Good explanation of the COP3 calculation logic. The physical reasoning about left vs right degradation is sound but could be clearer. "comsumption" should be "consumption". Consider adding specific numbers to quantify the degradation. -->
+<p>We observe a clear peak around <span class="math inline">\(\Delta T = 3\)</span> K. On the left, the <span class="math inline">\(\text{COP}_3\)</span> is quickly degraded because of the pump consumption rising quickly. On the right of the optimum, the performances are degraded due to the transition towards a laminar regime in the BHE, which as explained previously degrades the performances of the system too.</p>
+<div id="fig-cop-vs-dt" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cop-vs-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/cop_vs_dt.svg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cop-vs-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: System performance metrics showing COP variations with temperature difference control strategy.
+</figcaption>
+</figure>
+</div>
+<p>Zooming in on the COP scale, <a href="#fig-cop-vs-dt" class="quarto-xref">Figure&nbsp;5</a> shows the main metrics we are considering: <span class="math inline">\(\text{COP}\)</span>s against the control strategy under investigation: constant temperature difference across the evaporator/BHE.</p>
+<p>The <span class="math inline">\(\text{COP}_3\)</span> is calculated such that the delivered heat is the heat delivered at the maximum case for this frequency (see <a href="#sec-method_thermal" class="quarto-xref">Section&nbsp;3.1.3.1</a>).</p>
+<p>We can see clearly that there is an optimal at <span class="math inline">\(\Delta T = 3.0\)</span> K, around where the flow is fully turbulent in both legs of the BHE.</p>
+</section>
+<section id="two-dimensional-performance-maps" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="two-dimensional-performance-maps"><span class="header-section-number">4.2</span> Two-Dimensional Performance Maps</h2>
+<section id="base-case-analysis" class="level3" data-number="4.2.1">
+<h3 data-number="4.2.1" class="anchored" data-anchor-id="base-case-analysis"><span class="header-section-number">4.2.1</span> Base Case Analysis</h3>
+<!-- REORGANIZATION COMMENT: This section shows the 2D parametric exploration for the base case -->
+<!-- TODO: Move and expand the partial load analysis content here -->
+<!-- FEEDBACK: Incomplete paragraph with placeholder text. "fig XXX" and "Fig YYY" need to be replaced with actual figure references. The Q_demand value (4000W) needs context - is this a typical heating load? What does "lower part of the range has been trimmed" mean exactly? -->
+<p>The following analysis presents a comprehensive 2D parametric exploration where the x-axis represents the set <span class="math inline">\(\Delta T\)</span> for the secondary fluid and the y-axis represents the compressor frequency. The contours represent the <span class="math inline">\(\text{COP}_3(f)\)</span> (see <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>), calculated as follows: This <span class="math inline">\(\text{COP}_3\)</span> is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It’s a way to quantify the efficiency of the system while not having to choose a target Q cond.</p>
+<div id="fig-2d-base" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-2d-base-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-2d-base" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-2d_base_bh_efficiency" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-2d_base_bh_efficiency-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/bh_efficiency.svg" id="fig-2d_base_bh_efficiency" class="img-fluid figure-img" data-ref-parent="fig-2d-base">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-2d_base_bh_efficiency-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(a)
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-2d-base" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-2d_base_T_evap" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-2d_base_T_evap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/T_evap.svg" id="fig-2d_base_T_evap" class="img-fluid figure-img" data-ref-parent="fig-2d-base">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-2d_base_T_evap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(b)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-2d-base" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-2d_base_cop2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-2d_base_cop2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/COP2.svg" id="fig-2d_base_cop2" class="img-fluid figure-img" data-ref-parent="fig-2d-base">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-2d_base_cop2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(c)
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-2d-base" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-2d_base_cop3" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-2d_base_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/COP3.svg" id="fig-2d_base_cop3" class="img-fluid figure-img" data-ref-parent="fig-2d-base">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-2d_base_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(d)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-2d-base-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: COP 2 and COP 3 contour maps for the base case scenario.
+</figcaption>
+</figure>
+</div>
+<!-- FEEDBACK: Good detailed description of the diagram elements, but it's hard to follow without seeing the figure. Consider reorganizing: first introduce the figure, then explain its elements. -->
+<p>On the figures <a href="#fig-2d-base" class="quarto-xref">Figure&nbsp;6</a>, several isolines are represented:</p>
+<!-- FEEDBACK: Good technical detail. What determines the 20% and 100% speed limits? Are these pump manufacturer constraints or physical limits? -->
 <ul>
-<li><p>The iso pump speed are represented in black. The 30% and 100% speeds are represented in thick and each 10% step in between is a thiner line. Beyond these two boundaries, the physical system can actually not be operated.</p></li>
-<li><p>Similarily, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.</p></li>
-<li><p>The different kaminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso rteynolds number (2300 and 4000).</p></li>
+<li>The iso pump speed are represented in black. The 20% and 100% speeds are represented in thick and each 10% step in between is a thinner line. Beyond these two boundaries, the physical system can actually not be operated.</li>
 </ul>
-<p>In order to better visualize these ridges, we have calculated a relatrive COP 3 deficit for a given compressor frequency. NEEDS explanation</p>
-<p>The ridge line in red corresponds to the location of this maximum used for the auxiliary heating calculation. The ridge line presents 2 regions:</p>
+<!-- FEEDBACK: Good point about electrical power constraint. What determines this maximum? Is it the total system power limit? -->
 <ul>
-<li><p>In the ttop part, there is a clear ridge</p></li>
-<li><p>In the bottom part, a hockey stick ridge is present</p></li>
+<li>Similarly, the maximum electrical power is also represented by such a line (dashed black). The operative envelope is also constrained by this additional parameter.</li>
 </ul>
-<p>In the lower region, the behaviour of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumpng power is justified: it allows achieveing turbulence in the collector, and therefore better BH efficiency. Conversely, achieveing turbulence at low compressor speed is not worth the extra pumping power. In some sense, achiveing turbulence is “having a high speed”, regardless of the thermal load.</p>
+<!-- FEEDBACK: Very good technical detail. These Reynolds numbers (2300, 4000) are standard transition values. Are these for the inside pipe diameter of the U-tube? -->
+<ul>
+<li>The different laminar to turbulent transitions of each legs of the BHE are represented by the onset and full transition iso Reynolds number (2300 and 4000). The dashed red lines are used to denote these 4 transition points.</li>
+</ul>
+<p>In the lower region, the behaviour of the system is dominated by the high borehole efficiency. In the top, the relative increase of pumping power is justified: it allows achieving turbulence in the collector, and therefore better BH efficiency. Conversely, achieving turbulence at low compressor speed is not worth the extra pumping power. In some sense, achieving turbulence is “having a high speed”, regardless of the thermal load.</p>
+<!-- FEEDBACK: Good practical insight. This suggests that pump sizing affects the accessible operating envelope. -->
 <p>This second region is often not reachable in the base scenario: the pump minimum speed being too high and therefore does not allow for a low enough SF flow.</p>
-<p>When</p>
-<p>Focusing on the position of the ridge, one can see that, in the colder wall collector scenario, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.</p>
-<p>Looking at the graph and coming back the the different ways to control as GSHP SF pump, we can make the following remarks:</p>
+<!-- FEEDBACK: Good transition to practical control strategies. -->
+<p>Focusing on the position of the ridge, one can see that, in the colder wall collector, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.</p>
+</section>
+<section id="scenario-variations" class="level3" data-number="4.2.2">
+<h3 data-number="4.2.2" class="anchored" data-anchor-id="scenario-variations"><span class="header-section-number">4.2.2</span> Scenario Variations</h3>
+<!-- REORGANIZATION COMMENT: This section shows how different system configurations affect the 2D performance maps -->
+<!-- FEEDBACK: Good parameter variations but need better justification. Why these specific changes? What do they represent physically? For example, why 5°C vs 10°C for wall temperature - what conditions does this represent? -->
+<p>To understand the generalizability of our findings, 3 additional scenarios have been simulated with one difference for each variant:</p>
 <ul>
-<li><p>A constant Delta T / strategy necessarily fails at keeping the system on the ridge.</p></li>
-<li><p>A constant pressure drop strategy could be</p></li>
-<li><p>A constant pump speed strategy can not track the change either</p></li>
-<li><p>A constant compressor speed to pump speed ratio</p></li>
-<li><p>A constant mass flow ratio could also be devised (however in practice sensors are never installed for cost effieicncy reaspons. Maybe a s</p></li>
+<li><p>“Cold wall”, <span class="math inline">\(T_{wall}\)</span> is set to 5°C instead of 10°C</p></li>
+<li><p>“Pure Water”, the secondary fluid is pure water</p></li>
+<li><p>“Longer collector”, the collector is 200 m instead of 150 m</p></li>
 </ul>
-<p>Idea: show all on different graphs, only the rules without the effiency</p>
-<p>Conslusion is that nothing seems to be able to capture the complex interplay of the different effects.</p>
-<p>Lookking at the graph, the</p>
-<p>NEW GRAOH AT DIFFERENT T WALL</p>
-<p>The figure XX shows that the ridge</p>
-<p>It is important to remember the model’s assumptions when discussing these aspects. In the transition region, the behaviour is somewhat unclear. There is some entry length effect that happen in reality, the temperature is not unform in each leg (-&gt; some part of the same leg can be turbulent while the other is laminar). Regardless of these limitations, it does seem that the optimal flow is “right after the transition”. However, as discussed, the classic rule based control strategies can not track this transition point in a satifactory manner.</p>
-</section>
-<section id="variations" class="level3" data-number="5.3.3">
-<h3 data-number="5.3.3" class="anchored" data-anchor-id="variations"><span class="header-section-number">5.3.3</span> Variations</h3>
-<p>To establish baseline performance characteristics, we initially examine a fundamental question: what constitutes the optimal rule-based control strategy under standard operating conditions?</p>
-<p>The test case represents a typical Swedish GSHP installation. The system features a 250m deep borehole with a 40mm outer diameter polyethylene single U-tube collector. Complete technical specifications and thermal properties are detailed in Appendix A.</p>
+<!-- TODO: Add the 2D contour plots for each scenario variant here -->
+<!-- TODO: Discuss how the ridge patterns change between scenarios -->
+<!-- TODO: Compare the iso-lines (pump speeds, Reynolds transitions) across scenarios -->
 </section>
 </section>
-</section>
-<section id="conclusions" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Conclusions</h1>
-<p>It seems that the widespread rule based controll perform decently in the test case, however, it remains to be seen if the same heuristic does as well when it comes to eg. coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.</p>
-<section id="nomenclature" class="level2" data-number="6.1">
-<h2 data-number="6.1" class="anchored" data-anchor-id="nomenclature"><span class="header-section-number">6.1</span> Nomenclature</h2>
-<section id="symbols" class="level3" data-number="6.1.1">
-<h3 data-number="6.1.1" class="anchored" data-anchor-id="symbols"><span class="header-section-number">6.1.1</span> Symbols</h3>
-<p><strong>Geometric Parameters:</strong> - <span class="math inline">\(D\)</span> = Impeller diameter [m] - <span class="math inline">\(D_{bh}\)</span> = Borehole diameter [m]<br>
-- <span class="math inline">\(D_{pipe,i}\)</span> = Pipe inner diameter [m] - <span class="math inline">\(D_{pipe,o}\)</span> = Pipe outer diameter [m] - <span class="math inline">\(H\)</span> = Pump head [m] - <span class="math inline">\(L\)</span> = Plate length [m] - <span class="math inline">\(L_b\)</span> = Borehole depth [m] - <span class="math inline">\(N_{plates}\)</span> = Number of plates [-] - <span class="math inline">\(W\)</span> = Plate width [m] - <span class="math inline">\(b\)</span> = Channel spacing [m] - <span class="math inline">\(s\)</span> = Shank spacing [m] - <span class="math inline">\(t_{pipe}\)</span> = Pipe wall thickness [m] - <span class="math inline">\(t_{plate}\)</span> = Plate thickness [m]</p>
-<p><strong>Thermophysical Properties:</strong> - <span class="math inline">\(\lambda\)</span> = Thermal conductivity [W/(m·K)] - <span class="math inline">\(\rho\)</span> = Density [kg/m³] - <span class="math inline">\(\chi\)</span> = Mass fraction [-] - <span class="math inline">\(\beta\)</span> = Chevron angle [rad] - <span class="math inline">\(h\)</span> = Specific enthalpy [kJ/kg]</p>
-<p><strong>Flow and Transport Variables:</strong> - <span class="math inline">\(\dot{V}\)</span> = Volumetric flow rate [m³/s] - <span class="math inline">\(\dot{m}\)</span> = Mass flow rate [kg/s] - <span class="math inline">\(\dot{Q}\)</span> = Heat transfer rate [W] - <span class="math inline">\(N\)</span> = Rotational speed [rpm] - <span class="math inline">\(P\)</span> = Pressure [bar, Pa] - <span class="math inline">\(T\)</span> = Temperature [K, °C] - <span class="math inline">\(\Delta T\)</span> = Temperature difference [K]</p>
-<p><strong>Dimensionless Parameters:</strong> - <span class="math inline">\(\phi\)</span> = Flow coefficient, <span class="math inline">\(\dot{V}/(N \cdot D^3)\)</span> [-] - <span class="math inline">\(\psi\)</span> = Head coefficient, <span class="math inline">\(g \cdot H/(N^2 \cdot D^2)\)</span> [-] - <span class="math inline">\(\psi_0\)</span> = Shutoff head coefficient [-] - <span class="math inline">\(K\)</span> = Head curve slope parameter [-]</p>
-<p><strong>Performance Parameters:</strong> - <span class="math inline">\(COP\)</span> = Coefficient of performance [-] - <span class="math inline">\(W\)</span> = Work/Power [W] - <span class="math inline">\(\eta\)</span> = Efficiency [-] - <span class="math inline">\(f\)</span> = Frequency [Hz] - <span class="math inline">\(g\)</span> = Gravitational acceleration [m/s²]</p>
-</section>
-<section id="subscripts" class="level3" data-number="6.1.2">
-<h3 data-number="6.1.2" class="anchored" data-anchor-id="subscripts"><span class="header-section-number">6.1.2</span> Subscripts</h3>
+<section id="optimal-operation-analysis" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="optimal-operation-analysis"><span class="header-section-number">4.3</span> Optimal Operation Analysis</h2>
+<!-- REORGANIZATION COMMENT: This section derives and compares optimal operation strategies across all scenarios -->
+<p>In this part, we used the 2D parametric simulation results of the forward problem (performance simulation for a certain operating point) to find the operating point with maximum <span class="math inline">\(\text{COP}_3\)</span> for a given heating demand. We used interpolations over the 2D grid instead of the model directly to run the optimization for performance reasons.</p>
+<div id="fig-overlay_cop3" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-overlay_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/overlay_optimal.svg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-overlay_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: COP2 and optimal COP3 trajectory for the base case
+</figcaption>
+</figure>
+</div>
+<p><a href="#fig-overlay_cop3" class="quarto-xref">Figure&nbsp;7</a> shows the position of this maximum <span class="math inline">\(\text{COP}_3\)</span> and overlays it on top of the <span class="math inline">\(\text{COP}_2\)</span> graph. The second color bar on the right denotes the heating demand associated with a particular <span class="math inline">\(\text{COP}_3\)</span> point. What we see is that the pump envelope constrains the system at low Q heat. The “laminar optimum” is not reachable, but the lowest pump speed is nonetheless the optimal achievable point. Then there is a point where the system stops chasing the “laminar optimum” and switches instead to the “turbulent optimum”. In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.</p>
+<p>We then unfolded the optimal operation onto a single graph, with the heating demand as the x axis.</p>
+<div id="fig-optimals" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-optimals-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-optimals" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-optimal_base" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-optimal_base-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/optimal.svg" id="fig-optimal_base" class="img-fluid figure-img" data-ref-parent="fig-optimals">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-optimal_base-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(a)
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-optimals" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-optimal_long" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-optimal_long-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/long/optimal.svg" id="fig-optimal_long" class="img-fluid figure-img" data-ref-parent="fig-optimals">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-optimal_long-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(b)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-optimals" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-optimal_cold" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-optimal_cold-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/cold/optimal.svg" id="fig-optimal_cold" class="img-fluid figure-img" data-ref-parent="fig-optimals">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-optimal_cold-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(c)
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-optimals" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-optimal_water" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-optimal_water-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/water/optimal.svg" id="fig-optimal_water" class="img-fluid figure-img" data-ref-parent="fig-optimals">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-optimal_water-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(d)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-optimals-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Optimal operation for the 4 study cases.
+</figcaption>
+</figure>
+</div>
+<p><a href="#fig-optimals" class="quarto-xref">Figure&nbsp;8</a> shows both the maximum <span class="math inline">\(\text{COP}_3\)</span> achievable for a given heat need as well as <span class="math inline">\(\Delta T\)</span>, pump and compressor speeds. The figures represent both the base scenario as well as the 3 variants we run.</p>
+<p>First, we can observe a few general trends:</p>
 <ul>
-<li><span class="math inline">\(BEP\)</span> = Best efficiency point</li>
-<li><span class="math inline">\(comp\)</span> = Compressor</li>
-<li><span class="math inline">\(elec\)</span> = Electrical</li>
-<li><span class="math inline">\(evap\)</span> = Evaporator</li>
-<li><span class="math inline">\(grout\)</span> = Grout material</li>
-<li><span class="math inline">\(high\)</span> = High pressure side</li>
-<li><span class="math inline">\(in\)</span> = Inlet condition</li>
-<li><span class="math inline">\(is\)</span> = Isentropic</li>
-<li><span class="math inline">\(max\)</span> = Maximum</li>
-<li><span class="math inline">\(motor\)</span> = Motor</li>
-<li><span class="math inline">\(out\)</span> = Outlet condition</li>
-<li><span class="math inline">\(pipe\)</span> = Pipe material</li>
-<li><span class="math inline">\(plate\)</span> = Plate material<br>
-</li>
-<li><span class="math inline">\(pump\)</span> = Pump</li>
-<li><span class="math inline">\(ref\)</span> = Refrigerant</li>
-<li><span class="math inline">\(s\)</span> = Isentropic condition</li>
-<li><span class="math inline">\(shaft\)</span> = Shaft</li>
-<li><span class="math inline">\(soil\)</span> = Soil/ground</li>
-<li><span class="math inline">\(wall\)</span> = Wall condition</li>
+<li><p>The <span class="math inline">\(\text{COP}_3\)</span> decreases monotonously with the demand: this is expected, since the system can be run intermittently. The plateau at the lowest heating demand is actually such a case: the systems runs at the same point until the capacity is reached.</p></li>
+<li><p>The <span class="math inline">\(\text{COP}_3\)</span> for the water filled collector are higher than in the base case. This is once again expected: it has better thermophysical properties compared to the MEA we use in the base simulation.</p></li>
+<li><p>The performance is also improved in the case of the longer collector. Two effects are occurring at the same time: there is more pressure drop for the same flow and thermal efficiency is enhanced for the same flow. Regardless, in this case it seems that the performance is slightly increased.</p></li>
+</ul>
+<p>Then, focusing on the patterns visible at different heating demand, we can distinguish:</p>
+<ul>
+<li><p>First for low demand, the system operates at a constant operating point: it is forced at minimum compressor speed and minimum pump speed.</p></li>
+<li><p>Then, once the capacity of this minimum speed is reached, the compressor speed is increased linearly to its maximum value. In parallel, we see that the pump stays at minimum speed, and then slowly ramps up to follow the optimum.</p></li>
+<li><p>Then there can be a range of heating demand where we observe a constant <span class="math inline">\(\Delta T\)</span> or slightly sloped <span class="math inline">\(\Delta T\)</span> vs Pump speed/<span class="math inline">\(\Delta T\)</span>. This is when the system follows the turbulent optimum.</p></li>
+<li><p>When the system reaches the maximum capacity, it settles in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for less penalty due to the auxiliary heating. However, this change is more subtle (between 0.1 K and 1 K of difference compared to the previous optimal <span class="math inline">\(\Delta T\)</span>).</p></li>
 </ul>
 </section>
-<section id="abbreviations" class="level3" data-number="6.1.3">
-<h3 data-number="6.1.3" class="anchored" data-anchor-id="abbreviations"><span class="header-section-number">6.1.3</span> Abbreviations</h3>
+<section id="comparison-to-popular-control-strategies" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="comparison-to-popular-control-strategies"><span class="header-section-number">4.4</span> Comparison to Popular Control Strategies</h2>
+<!-- REORGANIZATION COMMENT: This section compares conventional control strategies to the optimal operation -->
+<p>Focusing back on our base scenario, a range of control strategies families have been evaluated a similar way as for the optimal signals. In this case, we restrained the optimization space to a 1D subset of the parametric space. For example, looking at <a href="#fig-overlay_cop3" class="quarto-xref">Figure&nbsp;7</a>, a strategy “constant delta T” is restrained to a vertical line. Within this 1D space, the point giving the maximum COP3 for a given demand has been selected, exactly like for the general case.</p>
+<!-- FEEDBACK: Excellent analysis of control strategies. This is practically valuable. However, some strategies are incomplete (e.g., "strategy could be", "TODO"). Also, what does "SF" stand for? Secondary Fluid? Define acronyms on first use. -->
+<p>Looking at the graph and coming back to the different ways to control a GSHP secondary fluid (SF) pump, we can make the following remarks about the following constant heuristic strategies:</p>
 <ul>
-<li><span class="math inline">\(BHE\)</span> = Borehole Heat Exchanger</li>
-<li><span class="math inline">\(COP\)</span> = Coefficient of Performance<br>
-</li>
-<li><span class="math inline">\(GSHP\)</span> = Ground Source Heat Pump</li>
-<li><span class="math inline">\(MEA\)</span> = Monoethanolamine</li>
-<li><span class="math inline">\(OD\)</span> = Outer Diameter</li>
-<li><span class="math inline">\(ID\)</span> = Inner Diameter</li>
-<li><span class="math inline">\(PE\)</span> = Polyethylene</li>
-<li><span class="math inline">\(SC\)</span> = Subcooling</li>
-<li><span class="math inline">\(SF\)</span> = Secondary Fluid</li>
-<li><span class="math inline">\(SH\)</span> = Superheating</li>
+<li><p><em><span class="math inline">\(\Delta T\)</span>:</em> It necessarily fails at keeping the system on the ridge.</p></li>
+<li><p><em>Pressure drop:</em> strategy could be [TODO: Complete this analysis]</p></li>
+<li><p><em>Pump speed:</em> It cannot track the change either</p></li>
+<li><p><em>Compressor speed to pump speed ratio:</em> performs decently well over the transition [TODO: Add quantitative comparison]</p></li>
+<li><p><em>Mass flow:</em> [TODO: Add analysis]</p></li>
 </ul>
+<p>The results have been gathered together in <strong>fig-strategies</strong>. We see that _________. [TODO: Add figure and complete analysis] table-comparison summarizes the key differences. We see that the delta T = 3K performs ____. An “optimal” delta T at __K has been found to be better by XX% compared to the traditional value. However, this number is not entirely meaningful, since the “optimal” value depends heavily on the demand profile.</p>
+<p>As for the “constant pressure drop”, ______</p>
+<p>[TODO: Complete comparative analysis with specific quantitative results]</p>
 </section>
-<section id="chemical-notation" class="level3" data-number="6.1.4">
-<h3 data-number="6.1.4" class="anchored" data-anchor-id="chemical-notation"><span class="header-section-number">6.1.4</span> Chemical Notation</h3>
+</section>
+<section id="conclusions" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
+<!-- FEEDBACK: Very weak conclusions section. This is too brief and vague for a research paper. You need specific, quantitative conclusions. What exactly is the "considerable potential"? How much improvement is possible? What are the key findings? -->
+<p>It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.</p>
+<!-- comparison between our optimal signals and the rules: give percentages of increase and so on-->
+</section>
+<section id="discussion" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Discussion</h1>
+<p>It remains to be seen if the same heuristic does as well when it comes to e.g.&nbsp;coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.</p>
+<p>Regarding the role of the flow transition and generalization of these results to devise control heuristics, it is important to remember the present model’s assumptions. In reality, in the transition region, the behaviour is somewhat complicated and not necessarilly smooth. An example of such complexity is the non uniformity of the temperature in the legs of the collector. due to these temeprature differences, some region of the fluid could very well be turbulent while another is laminar. Beyond these thermophisical effects, there is of course some turbulence introduced at the top and bottom, du to the singularities in the piping. These turbulences either die out at some length or remain stable depending on th conditions.</p>
+<p>However, as shown in sec-comparison-constant, the classic rule based control strategies cannot track this transition point in a satisfactory manner.</p>
+<p>The model used here is physics based, however, even if the correlations used here are somewhat validated, comparing this model to true experimental data would be valuable. Beyond simple comparison, fitting/identification techniques could also be employed to narrow down on parameters which are not easy to measure/known with certainty (eg. compressor isentropic efficiency).</p>
+<p>This paper has focused on creating a better understanding of the mechanism leading to an optimal operation for GSHP systems. However, there are considerable limitations in this study, e.g.&nbsp;the effect of condensation has not been investigated. In general, the operating space has many dimensions, which makes it challenging to sample thoroughly. Therefore, surrogates should be used in order to make the task of finding the optimal operating point achievable.</p>
+<!--Ideally, the model should be surrogated after the experimental fitting, this way the surrogates can be trained on the calibrated model.-->
+<p>Finally, there are some limitations which cannot be addressed with the techniques suggested above. The model is steady state, however, the borehole dynamics is paramount. A type of question to which we cannot answer is for example “is it worth operating a little bit faster and letting it rest a fraction of the time?”. The optimal dispatch problem is also completely overlooked here, since the model cannot capture the temporal dynamics of ground thermal evolution.</p>
+<p>All in all, this paper contributes to advancing the understanding of optimal operation of GSHP, but more work is necessary in order to provide more actionable recommendations to manufacturers and practitioners.</p>
+<!-- also depends on the specific pump that is used, what range, how effective, etc -->
+<!--Since the hydraulic model is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performance is expected thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.-->
+<!--considerable uncertainty in the localization of the transitionsd, then any rule must take this into account.-->
+</section>
+<section id="sec-appendix-parameters" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Appendix: Model Parameters and Technical Specifications</h1>
+<section id="system-parameters-and-nomenclature" class="level2" data-number="7.1">
+<h2 data-number="7.1" class="anchored" data-anchor-id="system-parameters-and-nomenclature"><span class="header-section-number">7.1</span> System Parameters and Nomenclature</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 18%">
+<col style="width: 13%">
+<col style="width: 11%">
+<col style="width: 10%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Parameter</th>
+<th>Symbol</th>
+<th>Value</th>
+<th>Unit</th>
+<th>Definition/Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Borehole Heat Exchanger</strong></td>
+<td>Borehole depth</td>
+<td><span class="math inline">\(L_b\)</span></td>
+<td>250</td>
+<td>m</td>
+<td>Total vertical depth</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Pipe outer diameter</td>
+<td><span class="math inline">\(D_{pipe,o}\)</span></td>
+<td>32</td>
+<td>mm</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Pipe inner diameter</td>
+<td><span class="math inline">\(D_{pipe,i}\)</span></td>
+<td>28.24</td>
+<td>mm</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Pipe wall thickness</td>
+<td><span class="math inline">\(t_{pipe}\)</span></td>
+<td>1.88</td>
+<td>mm</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Borehole diameter</td>
+<td><span class="math inline">\(D_{bh}\)</span></td>
+<td>115</td>
+<td>mm</td>
+<td>Drilled diameter</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Shank spacing</td>
+<td><span class="math inline">\(s\)</span></td>
+<td>75</td>
+<td>mm</td>
+<td>Center-to-center distance between BHE legs</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Pipe thermal conductivity</td>
+<td><span class="math inline">\(\lambda_{pipe}\)</span></td>
+<td>0.4</td>
+<td>W/(m·K)</td>
+<td>Polyethylene</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Grout thermal conductivity</td>
+<td><span class="math inline">\(\lambda_{grout}\)</span></td>
+<td>1.5</td>
+<td>W/(m·K)</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Ground thermal conductivity</td>
+<td><span class="math inline">\(\lambda_{soil}\)</span></td>
+<td>2.0</td>
+<td>W/(m·K)</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Boundary condition</td>
+<td><span class="math inline">\(T_{wall}\)</span></td>
+<td>283.15</td>
+<td>K</td>
+<td>Uniform borehole wall temperature</td>
+</tr>
+<tr class="odd">
+<td><strong>Heat Pump System</strong></td>
+<td>Primary refrigerant</td>
+<td></td>
+<td>R134A</td>
+<td></td>
+<td>1,1,1,2-Tetrafluoroethane</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Secondary fluid</td>
+<td></td>
+<td>MEA aqueous</td>
+<td></td>
+<td>Monoethanolamine (<span class="math inline">\(C_2H_7NO\)</span>)</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Secondary fluid mass fraction</td>
+<td><span class="math inline">\(\chi\)</span></td>
+<td>0.28</td>
+<td>-</td>
+<td>MEA concentration</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Compressor isentropic efficiency</td>
+<td><span class="math inline">\(\eta_{is}\)</span></td>
+<td>0.7</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Compressor frequency</td>
+<td><span class="math inline">\(f\)</span></td>
+<td>50</td>
+<td>Hz</td>
+<td>Operating frequency</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Motor efficiency</td>
+<td><span class="math inline">\(\eta_{motor}\)</span></td>
+<td>0.9</td>
+<td>-</td>
+<td>Electrical motor</td>
+</tr>
+<tr class="odd">
+<td><strong>Plate Heat Exchanger</strong></td>
+<td>Number of plates</td>
+<td><span class="math inline">\(N_{plates}\)</span></td>
+<td>20</td>
+<td>-</td>
+<td>Evaporator</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Plate width</td>
+<td><span class="math inline">\(W\)</span></td>
+<td>0.1</td>
+<td>m</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Plate length</td>
+<td><span class="math inline">\(L\)</span></td>
+<td>0.3</td>
+<td>m</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Channel spacing</td>
+<td><span class="math inline">\(b\)</span></td>
+<td>1.5</td>
+<td>mm</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Chevron angle</td>
+<td><span class="math inline">\(\beta\)</span></td>
+<td><span class="math inline">\(\pi/6\)</span></td>
+<td>rad</td>
+<td>30°</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Plate thickness</td>
+<td><span class="math inline">\(t_{plate}\)</span></td>
+<td>0.5</td>
+<td>mm</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Plate thermal conductivity</td>
+<td><span class="math inline">\(\lambda_{plate}\)</span></td>
+<td>16</td>
+<td>W/(m·K)</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Operating Conditions</strong></td>
+<td>Superheating temperature diff.</td>
+<td><span class="math inline">\(\Delta T_{SH}\)</span></td>
+<td>7</td>
+<td>K</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Subcooling temperature diff.</td>
+<td><span class="math inline">\(\Delta T_{SC}\)</span></td>
+<td>5</td>
+<td>K</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>High-side pressure</td>
+<td><span class="math inline">\(P_{high}\)</span></td>
+<td>14</td>
+<td>bar</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Flow and Transport</strong></td>
+<td>Volumetric flow rate</td>
+<td><span class="math inline">\(\dot{V}\)</span></td>
+<td>-</td>
+<td>m³/s</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Mass flow rate</td>
+<td><span class="math inline">\(\dot{m}\)</span></td>
+<td>-</td>
+<td>kg/s</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Heat transfer rate</td>
+<td><span class="math inline">\(\dot{Q}\)</span></td>
+<td>-</td>
+<td>W</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Temperature</td>
+<td><span class="math inline">\(T\)</span></td>
+<td>-</td>
+<td>K, °C</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Temperature difference</td>
+<td><span class="math inline">\(\Delta T\)</span></td>
+<td>-</td>
+<td>K</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Pressure</td>
+<td><span class="math inline">\(P\)</span></td>
+<td>-</td>
+<td>bar, Pa</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Density</td>
+<td><span class="math inline">\(\rho\)</span></td>
+<td>-</td>
+<td>kg/m³</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Thermal conductivity</td>
+<td><span class="math inline">\(\lambda\)</span></td>
+<td>-</td>
+<td>W/(m·K)</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Specific enthalpy</td>
+<td><span class="math inline">\(h\)</span></td>
+<td>-</td>
+<td>kJ/kg</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Pump Performance</strong></td>
+<td>Impeller diameter</td>
+<td><span class="math inline">\(D\)</span></td>
+<td>-</td>
+<td>m</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Pump head</td>
+<td><span class="math inline">\(H\)</span></td>
+<td>-</td>
+<td>m</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Rotational speed</td>
+<td><span class="math inline">\(N\)</span></td>
+<td>-</td>
+<td>rpm</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Flow coefficient</td>
+<td><span class="math inline">\(\phi\)</span></td>
+<td>-</td>
+<td>-</td>
+<td><span class="math inline">\(\dot{V}/(N \cdot D^3)\)</span></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Head coefficient</td>
+<td><span class="math inline">\(\psi\)</span></td>
+<td>-</td>
+<td>-</td>
+<td><span class="math inline">\(g \cdot H/(N^2 \cdot D^2)\)</span></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Shutoff head coefficient</td>
+<td><span class="math inline">\(\psi_0\)</span></td>
+<td>-</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Head curve slope parameter</td>
+<td><span class="math inline">\(K\)</span></td>
+<td>-</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Efficiency</td>
+<td><span class="math inline">\(\eta\)</span></td>
+<td>-</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Work/Power</td>
+<td><span class="math inline">\(W\)</span></td>
+<td>-</td>
+<td>W</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Frequency</td>
+<td><span class="math inline">\(f\)</span></td>
+<td>-</td>
+<td>Hz</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Performance Metrics</strong></td>
+<td>Coefficient of performance</td>
+<td><span class="math inline">\(\text{COP}\)</span></td>
+<td>-</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>Gravitational acceleration</td>
+<td><span class="math inline">\(g\)</span></td>
+<td>9.81</td>
+<td>m/s²</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="subscripts-and-abbreviations" class="level2" data-number="7.2">
+<h2 data-number="7.2" class="anchored" data-anchor-id="subscripts-and-abbreviations"><span class="header-section-number">7.2</span> Subscripts and Abbreviations</h2>
+<p><strong>Common Subscripts:</strong> <span class="math inline">\(\text{BEP}\)</span> (best efficiency point), <span class="math inline">\(comp\)</span> (compressor), <span class="math inline">\(elec\)</span> (electrical), <span class="math inline">\(evap\)</span> (evaporator), <span class="math inline">\(cond\)</span> (condenser), <span class="math inline">\(grout\)</span> (grout material), <span class="math inline">\(in\)</span> (inlet), <span class="math inline">\(out\)</span> (outlet), <span class="math inline">\(is\)</span> (isentropic), <span class="math inline">\(\text{max}\)</span> (maximum), <span class="math inline">\(motor\)</span> (motor), <span class="math inline">\(pipe\)</span> (pipe material), <span class="math inline">\(plate\)</span> (plate material), <span class="math inline">\(pump\)</span> (pump), <span class="math inline">\(ref\)</span> (refrigerant), <span class="math inline">\(shaft\)</span> (shaft), <span class="math inline">\(soil\)</span> (soil/ground), <span class="math inline">\(wall\)</span> (wall condition)</p>
+<p><strong>Abbreviations:</strong> BHE (Borehole Heat Exchanger), <span class="math inline">\(\text{COP}\)</span> (Coefficient of Performance), GSHP (Ground Source Heat Pump), MEA (Monoethanolamine), OD (Outer Diameter), ID (Inner Diameter), PE (Polyethylene), SC (Subcooling), SF (Secondary Fluid), SH (Superheating)</p>
+</section>
+<section id="detailed-mathematical-correlations" class="level2" data-number="7.3">
+<h2 data-number="7.3" class="anchored" data-anchor-id="detailed-mathematical-correlations"><span class="header-section-number">7.3</span> Detailed Mathematical Correlations</h2>
+<p><strong>Pump Performance Correlations:</strong></p>
 <ul>
-<li><span class="math inline">\(R134A\)</span> = 1,1,1,2-Tetrafluoroethane (refrigerant)</li>
-<li><span class="math inline">\(MEA\)</span> = Monoethanolamine (<span class="math inline">\(C_2H_7NO\)</span>)</li>
-</ul>
-</section>
-</section>
-<section id="appendix-a-model-parameters-and-technical-specifications" class="level2" data-number="6.2">
-<h2 data-number="6.2" class="anchored" data-anchor-id="appendix-a-model-parameters-and-technical-specifications"><span class="header-section-number">6.2</span> Appendix A: Model Parameters and Technical Specifications</h2>
-<section id="a.1-borehole-heat-exchanger-specifications" class="level3" data-number="6.2.1">
-<h3 data-number="6.2.1" class="anchored" data-anchor-id="a.1-borehole-heat-exchanger-specifications"><span class="header-section-number">6.2.1</span> A.1 Borehole Heat Exchanger Specifications</h3>
-<p><strong>Geometric Parameters:</strong> - Borehole depth: <span class="math inline">\(L_b = 250\)</span> m - Pipe outer diameter: <span class="math inline">\(D_{pipe,o} = 32\)</span> mm - Pipe inner diameter: <span class="math inline">\(D_{pipe,i} = 28.24\)</span> mm - Pipe wall thickness: <span class="math inline">\(t_{pipe} = 1.88\)</span> mm - Borehole diameter: <span class="math inline">\(D_{bh} = 115\)</span> mm - Shank spacing: <span class="math inline">\(s = 75\)</span> mm</p>
-<p><strong>Thermal Properties:</strong> - Pipe thermal conductivity: <span class="math inline">\(\lambda_{pipe} = 0.4\)</span> W/(m·K) - Grout thermal conductivity: <span class="math inline">\(\lambda_{grout} = 1.5\)</span> W/(m·K) - Ground thermal conductivity: <span class="math inline">\(\lambda_{soil} = 2.0\)</span> W/(m·K) - Boundary condition: <span class="math inline">\(T_{wall} = 283.15\)</span> K (constant)</p>
-</section>
-<section id="a.2-heat-pump-system-parameters" class="level3" data-number="6.2.2">
-<h3 data-number="6.2.2" class="anchored" data-anchor-id="a.2-heat-pump-system-parameters"><span class="header-section-number">6.2.2</span> A.2 Heat Pump System Parameters</h3>
-<p><strong>Working Fluids:</strong> - Primary refrigerant: R134A - Secondary fluid: MEA aqueous solution with mass fraction <span class="math inline">\(\chi = 0.28\)</span></p>
-<p><strong>Compressor Specifications:</strong> - Isentropic efficiency: <span class="math inline">\(\eta_{is} = 0.7\)</span> - Operating frequency: <span class="math inline">\(f = 50\)</span> Hz - Electrical motor efficiency: <span class="math inline">\(\eta_{motor} = 0.9\)</span></p>
-</section>
-<section id="a.3-plate-heat-exchanger-evaporator-specifications" class="level3" data-number="6.2.3">
-<h3 data-number="6.2.3" class="anchored" data-anchor-id="a.3-plate-heat-exchanger-evaporator-specifications"><span class="header-section-number">6.2.3</span> A.3 Plate Heat Exchanger (Evaporator) Specifications</h3>
-<p><strong>Geometric Parameters:</strong> - Number of plates: <span class="math inline">\(N_{plates} = 20\)</span> - Plate width: <span class="math inline">\(W = 0.1\)</span> m - Plate length: <span class="math inline">\(L = 0.3\)</span> m - Channel spacing: <span class="math inline">\(b = 1.5\)</span> mm - Chevron angle: <span class="math inline">\(\beta = \pi/6\)</span> rad <span class="math inline">\((30°)\)</span> - Plate thickness: <span class="math inline">\(t_{plate} = 0.5\)</span> mm - Plate thermal conductivity: <span class="math inline">\(\lambda_{plate} = 16\)</span> W/(m·K)</p>
-</section>
-<section id="a.4-operating-conditions-test_gshp-reference-case" class="level3" data-number="6.2.4">
-<h3 data-number="6.2.4" class="anchored" data-anchor-id="a.4-operating-conditions-test_gshp-reference-case"><span class="header-section-number">6.2.4</span> A.4 Operating Conditions (test_GSHP Reference Case)</h3>
-<p><strong>Temperature Differences:</strong> - Secondary fluid temperature difference: <span class="math inline">\(\Delta T_{SF} = 3.5\)</span> K - Superheating temperature difference: <span class="math inline">\(\Delta T_{SH} = 7\)</span> K - Subcooling temperature difference: <span class="math inline">\(\Delta T_{SC} = 5\)</span> K</p>
-<p><strong>Pressure Conditions:</strong> - High-side pressure: <span class="math inline">\(P_{high} = 14\)</span> bar - Secondary fluid mass fraction: <span class="math inline">\(\chi = 0.28\)</span></p>
-</section>
-<section id="a.5-mathematical-correlations" class="level3" data-number="6.2.5">
-<h3 data-number="6.2.5" class="anchored" data-anchor-id="a.5-mathematical-correlations"><span class="header-section-number">6.2.5</span> A.5 Mathematical Correlations</h3>
-<p><strong>A.5.1 Pump Performance:</strong> - Dimensionless head coefficient: <span class="math display">\[\psi = \psi_0 - K \cdot \phi^2\]</span></p>
-<ul>
+<li><p>Dimensionless head coefficient: <span class="math display">\[\psi = \psi_0 - K \cdot \phi^2\]</span></p></li>
 <li><p>Dimensionless flow coefficient: <span class="math display">\[\phi = \frac{\dot{V}}{N \cdot D^3}\]</span></p></li>
 <li><p>Dimensionless head coefficient: <span class="math display">\[\psi = \frac{g \cdot H}{N^2 \cdot D^2}\]</span></p></li>
-<li><p>Pump efficiency: <span class="math display">\[\eta_{pump} = \eta_{max} \left(1 - \left(\frac{\phi - \phi_{BEP}}{\phi_{BEP}}\right)^2\right)\]</span></p></li>
+<li><p>Pump efficiency: <span class="math display">\[\eta_{pump} = \eta_{\text{max}} \left(1 - \left(\frac{\phi - \phi_{\text{BEP}}}{\phi_{\text{BEP}}}\right)^2\right)\]</span></p></li>
 </ul>
-<p>where <span class="math inline">\(N\)</span> is rotational speed [rpm], <span class="math inline">\(D\)</span> is impeller diameter [m], <span class="math inline">\(\dot{V}\)</span> is volumetric flow rate [m³/s], <span class="math inline">\(H\)</span> is pump head [m], <span class="math inline">\(\eta_{max}\)</span> is maximum efficiency, and <span class="math inline">\(\phi_{BEP}\)</span> is flow coefficient at best efficiency point.</p>
-<p><strong>A.5.2 Power Consumption:</strong> - Shaft power: <span class="math display">\[P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}\]</span></p>
+<p>where <span class="math inline">\(N\)</span> is rotational speed [rpm], <span class="math inline">\(D\)</span> is impeller diameter [m], <span class="math inline">\(\dot{V}\)</span> is volumetric flow rate [m³/s], <span class="math inline">\(H\)</span> is pump head [m], <span class="math inline">\(\eta_{\text{max}}\)</span> is maximum efficiency, and <span class="math inline">\(\phi_{\text{BEP}}\)</span> is flow coefficient at best efficiency point.</p>
+<p><strong>Power Consumption:</strong></p>
 <ul>
-<li>Electrical power: <span class="math display">\[P_{elec} = \frac{P_{shaft}}{\eta_{motor}}\]</span></li>
+<li><p>Shaft power: <span class="math display">\[P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}\]</span></p></li>
+<li><p>Electrical power: <span class="math display">\[P_{elec} = \frac{P_{shaft}}{\eta_{motor}}\]</span></p></li>
 </ul>
-<p><strong>A.5.3 Compressor Work:</strong> - Isentropic compression work: <span class="math display">\[W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}\]</span></p>
+<p><strong>Compressor Work:</strong></p>
+<ul>
+<li>Isentropic compression work: <span class="math display">\[W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}\]</span></li>
+</ul>
+<p>where <span class="math inline">\(\dot{m}_{ref}\)</span> is refrigerant mass flow rate [kg/s], <span class="math inline">\(h_{in}\)</span> and <span class="math inline">\(h_{out,s}\)</span> are inlet and isentropic outlet specific enthalpies [kJ/kg], respectively. - Dimensionless flow coefficient: <span class="math display">\[\phi = \frac{\dot{V}}{N \cdot D^3}\]</span></p>
+<ul>
+<li><p>Dimensionless head coefficient: <span class="math display">\[\psi = \frac{g \cdot H}{N^2 \cdot D^2}\]</span></p></li>
+<li><p>Pump efficiency: <span class="math display">\[\eta_{pump} = \eta_{\text{max}} \left(1 - \left(\frac{\phi - \phi_{\text{BEP}}}{\phi_{\text{BEP}}}\right)^2\right)\]</span></p></li>
+</ul>
+<p>where <span class="math inline">\(N\)</span> is rotational speed [rpm], <span class="math inline">\(D\)</span> is impeller diameter [m], <span class="math inline">\(\dot{V}\)</span> is volumetric flow rate [m³/s], <span class="math inline">\(H\)</span> is pump head [m], <span class="math inline">\(\eta_{\text{max}}\)</span> is maximum efficiency, and <span class="math inline">\(\phi_{\text{BEP}}\)</span> is flow coefficient at best efficiency point.</p>
+<p><strong>Power Consumption:</strong></p>
+<ul>
+<li><p>Shaft power: <span class="math display">\[P_{shaft} = \frac{\rho \cdot g \cdot \dot{V} \cdot H}{\eta_{pump}}\]</span></p></li>
+<li><p>Electrical power: <span class="math display">\[P_{elec} = \frac{P_{shaft}}{\eta_{motor}}\]</span></p></li>
+</ul>
+<p><strong>Compressor Work:</strong></p>
+<ul>
+<li>Isentropic compression work: <span class="math display">\[W_{comp} = \dot{m}_{ref} \cdot \frac{h_{out,s} - h_{in}}{\eta_{is}}\]</span></li>
+</ul>
 <p>where <span class="math inline">\(\dot{m}_{ref}\)</span> is refrigerant mass flow rate [kg/s], <span class="math inline">\(h_{in}\)</span> and <span class="math inline">\(h_{out,s}\)</span> are inlet and isentropic outlet specific enthalpies [kJ/kg], respectively.</p>
-<p><strong>A.5.4 Coefficient of Performance:</strong> - Thermal COP: <span class="math display">\[COP_1 = \frac{\dot{Q}_{evap}}{W_{comp}}\]</span></p>
-<ul>
-<li>System COP: <span class="math display">\[COP_2 = \frac{\dot{Q}_{evap}}{W_{comp} + P_{pump}}\]</span></li>
-</ul>
-<p>where <span class="math inline">\(\dot{Q}_{evap}\)</span> is evaporator heat transfer rate [W].</p>
-</section>
+
 </section>
 </section>
 
-</main>
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body" data-entry-spacing="0" role="list">
+<div id="ref-granryd2010analytical" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(1) </div><div class="csl-right-inline">Granryd, E. Analytical Expressions for Optimum Flow Rates in Evaporators and Condensers of Heat Pumping Systems. <em>International Journal of Refrigeration</em> <strong>2010</strong>, <em>33</em>. <a href="https://doi.org/10.1016/j.ijrefrig.2010.05.009">https://doi.org/10.1016/j.ijrefrig.2010.05.009</a>.</div>
+</div>
+<div id="ref-edwards2015generalised" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(2) </div><div class="csl-right-inline">Edwards, K. C.; Finn, D. Generalised Water Flow Rate Control Strategy for Optimal Part Load Operation of Ground Source Heat Pump Systems. <em>Applied Energy</em> <strong>2015</strong>, <em>150</em>. <a href="https://doi.org/10.1016/j.apenergy.2015.03.134">https://doi.org/10.1016/j.apenergy.2015.03.134</a>.</div>
+</div>
+<div id="ref-montagud2013situ" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(3) </div><div class="csl-right-inline">Montagud, C.; Corberán, J. M.; Montero, Á. In Situ Optimization Methodology for the Water Circulation Pumps Frequency of Ground Source Heat Pump Systems. <em>Energy and Buildings</em> <strong>2013</strong>, <em>68</em>. <a href="https://doi.org/10.1016/j.enbuild.2013.09.030">https://doi.org/10.1016/j.enbuild.2013.09.030</a>.</div>
+</div>
+<div id="ref-cervera2014situ" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(4) </div><div class="csl-right-inline">Cervera-Vázquez, J.; Montagud, C.; Corberán, J. M. In Situ Optimization Methodology for the Water Circulation Pumps Frequency of Ground Source Heat Pump Systems: Analysis for Multistage Heat Pump Units. <em>Energy and Buildings</em> <strong>2014</strong>, <em>88</em>. <a href="https://doi.org/10.1016/j.enbuild.2014.12.008">https://doi.org/10.1016/j.enbuild.2014.12.008</a>.</div>
+</div>
+<div id="ref-zarrella2016simulation" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(5) </div><div class="csl-right-inline">Zarrella, A.; Emmi, G.; De Carli, M. A Simulation-Based Analysis of Variable Flow Pumping in Ground Source Heat Pump Systems with Different Types of Borehole Heat Exchangers: A Case Study. <em>Energy Conversion and Management</em> <strong>2016</strong>, <em>131</em>. <a href="https://doi.org/10.1016/j.enconman.2016.10.061">https://doi.org/10.1016/j.enconman.2016.10.061</a>.</div>
+</div>
+<div id="ref-de2011optimal" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(6) </div><div class="csl-right-inline">De Ridder, F.; Diehl, M.; Mulder, G.; Desmedt, J.; Van Bael, J. An Optimal Control Algorithm for Borehole Thermal Energy Storage Systems. <em>Energy and Buildings</em> <strong>2011</strong>, <em>43</em>. <a href="https://doi.org/10.1016/j.enbuild.2011.07.015">https://doi.org/10.1016/j.enbuild.2011.07.015</a>.</div>
+</div>
+<div id="ref-benassi2015energy" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(7) </div><div class="csl-right-inline">Del Col, D.; Azzolin, M.; Benassi, G.; Mantovan, M. Energy Efficiency in a Ground Source Heat Pump with Variable Speed Drives. <em>Energy and Buildings</em> <strong>2015</strong>, <em>91</em>. <a href="https://doi.org/10.1016/j.enbuild.2014.12.048">https://doi.org/10.1016/j.enbuild.2014.12.048</a>.</div>
+</div>
+<div id="ref-mader2014capacity" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(8) </div><div class="csl-right-inline">Mader, G.; Madani, H. Capacity Control in Air–Water Heat Pumps: Total Cost of Ownership Analysis. <em>Energy and Buildings</em> <strong>2014</strong>, <em>81</em>. <a href="https://doi.org/10.1016/j.enbuild.2014.06.029">https://doi.org/10.1016/j.enbuild.2014.06.029</a>.</div>
+</div>
+<div id="ref-corberan2010quasi" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(9) </div><div class="csl-right-inline">Corberán, J. M.; Finn, D.; Montagud, C.; Murphy, F.; Edwards, K. C. A Quasi-Steady State Mathematical Model of an Integrated Ground Source Heat Pump for Building Space Control. <em>Energy and Buildings</em> <strong>2010</strong>, <em>43</em>. <a href="https://doi.org/10.1016/j.enbuild.2010.08.017">https://doi.org/10.1016/j.enbuild.2010.08.017</a>.</div>
+</div>
+<div id="ref-beaudry2022flow" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(10) </div><div class="csl-right-inline">Beaudry, G.; Pasquier, P.; Marcotte, D.; Zarrella, A. Flow Rate Control in Standing Column Wells: A Flexible Solution for Reducing the Energy Use and Peak Power Demand of the Built Environment. <em>Applied Energy</em> <strong>2022</strong>, <em>313</em>. <a href="https://doi.org/10.1016/j.apenergy.2022.118774">https://doi.org/10.1016/j.apenergy.2022.118774</a>.</div>
+</div>
+<div id="ref-atam2015ground" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(11) </div><div class="csl-right-inline">Atam, E.; Helsen, L. Ground-Coupled Heat Pumps: Part 1 – Literature Review and Research Challenges in Modeling and Optimal Control. <em>Renewable and Sustainable Energy Reviews</em> <strong>2015</strong>, <em>54</em>. <a href="https://doi.org/10.1016/j.rser.2015.10.007">https://doi.org/10.1016/j.rser.2015.10.007</a>.</div>
+</div>
+<div id="ref-capozza2015long" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(12) </div><div class="csl-right-inline">Capozza, A.; Zarrella, A.; De Carli, M. Long-Term Analysis of Two GSHP Systems Using Validated Numerical Models and Proposals to Optimize the Operating Parameters. <em>Energy and Buildings</em> <strong>2015</strong>, <em>93</em>. <a href="https://doi.org/10.1016/j.enbuild.2015.02.005">https://doi.org/10.1016/j.enbuild.2015.02.005</a>.</div>
+</div>
+<div id="ref-andres_riedemann_clapeyronthermoclapeyronjl_2025" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(13) </div><div class="csl-right-inline">Riedemann, A.; Walker, P.; Yew, P.; Zoubritzky, L.; Chaparro, G.; Schmitt, S.; Mo-Gul; LéoSchmider; Smith, S.; Luc; Putalapattu, R.; Ames, A.; ahaslam62; karei; Keskitalo, T.; Deshpande, S.; Kang, B. S.; Garren-H; Bell, I.; Kelethabetse; Dalum, S. S.; gregor-mendel; TJP-Karpowski; spinnau. <span>ClapeyronThermo</span>/<span>Clapeyron</span>.jl: V0.6.16, 2025. <a href="https://doi.org/10.5281/ZENODO.17066488">https://doi.org/10.5281/ZENODO.17066488</a>.</div>
+</div>
+<div id="ref-sebastian_schmitt_se-schmittentropyscalingjl_2025" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(14) </div><div class="csl-right-inline">Schmitt, S.; Riedemann, A.; Alves, E. B. D. M.; LéoSchmider. Se-Schmitt/<span>EntropyScaling</span>.jl: V0.3.5, 2025. <a href="https://doi.org/10.5281/ZENODO.17097480">https://doi.org/10.5281/ZENODO.17097480</a>.</div>
+</div>
+<div id="ref-vdi_e_v_n6_2010" class="csl-entry" role="listitem">
+<div class="csl-left-margin">(15) </div><div class="csl-right-inline">Martin, H. N6 <span>Pressure</span> <span>Drop</span> and <span>Heat</span> <span>Transfer</span> in <span>Plate</span> <span>Heat</span> <span>Exchangers</span>. In <em><span>VDI</span> <span>Heat</span> <span>Atlas</span></em>; VDI e. V., Ed.; Springer Berlin Heidelberg: Berlin, Heidelberg, 2010; pp 1515–1522. <a href="https://doi.org/10.1007/978-3-540-77877-6_109">https://doi.org/10.1007/978-3-540-77877-6_109</a>.</div>
+</div>
+</div></section></div></main>
 <!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {

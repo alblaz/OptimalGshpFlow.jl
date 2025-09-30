@@ -3563,6 +3563,81 @@ solver_fallback = NewtonRaphson(autodiff=AutoForwardDiff());
 # ╔═╡ 0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
 solvers = [solver_fast, solver_robust, solver_fallback];
 
+# ╔═╡ ce0ce754-c26a-4b8d-81d9-8234a165a0c6
+new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.))
+
+# ╔═╡ bbf5b367-b6c9-4185-9641-d711914892b6
+image_dir = normpath(joinpath(pwd(), "..", "..", "notebooks", "images"))
+
+# ╔═╡ b92cc8df-5884-4129-99fe-d22038b4eb0c
+"""
+    param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
+Return a Vector of N linearly-spaced `sym => value` pairs from `a` to `b`.
+"""
+function param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
+    values = range(a, stop=b, length=N)
+    return [ sym => v for v in values ]
+end
+
+
+# ╔═╡ fb29ede8-6f49-4e14-a6d9-d8caee90e5ba
+Npoints = 45
+
+# ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
+f_values = collect(range(50, 10, length = Npoints))
+
+# ╔═╡ 977b3df3-0fa4-452f-884b-94b24ec54cf3
+# high-contrast, CVD-safe accents (Okabe–Ito-ish)
+const OI_VERMILLION = RGBf(0.835, 0.365, 0.000)  # #D55E00
+
+# ╔═╡ 1320fac5-2cf2-484d-a01e-98ecd559588d
+const OI_MAGENTA    = RGBf(0.800, 0.475, 0.655)  # #CC79A7
+
+# ╔═╡ a3fe0b30-007d-415d-af04-f5712e3d0489
+const CHARCOAL      = RGBf(0.100, 0.100, 0.100)
+
+# ╔═╡ a03372ef-5a4f-49f4-bc97-28c34996cce4
+md" # 2D plots"
+
+# ╔═╡ ea33f723-8f17-4000-b483-eb8f1f9354f3
+md" ## BH efficiency"
+
+# ╔═╡ 75878c2e-4909-4c6e-8d44-164502edede0
+md" ## T inlet BH"
+
+# ╔═╡ dc7866d3-68e8-40de-b82d-26717fff53d9
+md" ## T outlet BH"
+
+# ╔═╡ 21a3e541-8ad9-41de-995a-e2b43221d15a
+md" ## T evap"
+
+# ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+md" ## COP2"
+
+# ╔═╡ 3c2996e1-d1e9-4e44-894f-64c7ccc98e0d
+md" ## COP3"
+
+# ╔═╡ 5ce8337c-aae0-476f-914b-854a054b26db
+md" ## Ridge position"
+
+# ╔═╡ a966eea4-f3e4-46f9-8230-7ab19eb7f905
+
+
+# ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
+md" # COP3 interpolation"
+
+# ╔═╡ 75653ae3-55e8-4703-8c09-9dcf7ecc1505
+md" # Optimal control"
+
+# ╔═╡ fdfb7456-6d8e-44c8-a883-1d1faeb96ede
+md" # Comparison pump efficiency"
+
+# ╔═╡ 8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
+md" # Other explorations"
+
+# ╔═╡ 6e2dd049-c583-4e2d-95ec-90796f38732d
+md" # 1D parametric simulations"
+
 # ╔═╡ 58a5d982-5d07-4a63-950a-ca5639cff43f
 base_params = [
     :b => 1.5e-3,
@@ -3580,6 +3655,10 @@ base_params = [
     :f_ => 50.0,
 	:log_ΔTSF_ => log(3),
 ]
+
+# ╔═╡ 1e116b39-5019-4e87-80eb-13b1a9d9ae58
+# ╠═╡ show_logs = false
+thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
 
 # ╔═╡ a4b78e57-3f4a-4bd1-a4fd-344aed782596
 thermal_prob, hydraulic_prob, sys_thermal, sys_hydraulic = prepare_problems(base_params);
@@ -3771,6 +3850,773 @@ res_thermal_overall = [results_thermal; results_thermal_down];
 # ╔═╡ fecd7f3d-bf0b-464e-a1ad-238e508b0f38
 res_hydraulic_overall = [results_hydraulic; results_hydraulic_down];
 
+# ╔═╡ 4e1204d9-eab8-4890-a957-92341c8edfc4
+md" # 2D Parametric Simulations"
+
+# ╔═╡ 987290e0-8b32-481a-85a0-442b075463cb
+md" ## Base"
+
+# ╔═╡ 8ddb2096-a2b0-4369-a188-5d972af91428
+md" ## Variant with colder wall"
+
+# ╔═╡ 44e95eb8-ef96-4832-9168-df5c504b0569
+md" ## Variant with water"
+
+# ╔═╡ 8a1007ab-a556-4670-a2a6-18292d721c89
+base_params_water = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.0,
+    :L => 0.60,
+    :L_BHE => 150.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+]
+
+# ╔═╡ 0d69490f-83ee-46fc-b034-8370e8a66361
+md" ## Variant with bigger pipes (40mm OD)"
+
+# ╔═╡ 6d9c073c-e05b-45ec-a4b4-1b47c43cc5ba
+base_params_pipe = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.28,
+    :L => 0.60,
+    :L_BHE => 150.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+	:D_p1_o => 40e-3,
+	:D_p1_i => 28.24e-3/32e-3*40e-3,
+	:D_p2_o => 40e-3,
+	:D_p2_i => 28.24e-3/32e-3*40e-3,
+	:D_b => 0.115,
+
+		
+]
+
+# ╔═╡ 6b0ca393-a200-4ee0-b71e-ea3f3b68c3f4
+md" ## Variant with longer BH (40mm OD)"
+
+# ╔═╡ 880e6614-2556-4d3a-9408-f59b45ba94fe
+base_params_long = [
+    :b => 1.5e-3,
+    :np => 20.0,
+    :W => 0.07,
+    :ϕ => 1.18,
+    :β => π/3,
+    :th => 0.5e-3,
+    :λ_pl => 16.0,
+    :λ_pitch => 4e-3,
+	:λ_grout => 1.5,
+	:λ_soil => 3.5,
+    :χ => 0.28,
+    :L => 0.60,
+    :L_BHE => 200.0,
+    :f_ => 50.0,
+	:log_ΔTSF_ => log(3),
+	:D_b => 0.115,
+
+		
+]
+
+# ╔═╡ c5875432-f3f0-4495-a0f0-853d87d73353
+md" ## Looking at the wall temperature"
+
+# ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
+log_ΔTSF_values = log.(collect(range(0.5, 8.0, length = Npoints)))
+
+# ╔═╡ b0b5c52c-a795-40a0-9c8d-f678010c454a
+log_msf_values = log.(collect(range(0.1, 2.0, length = Npoints)))
+
+# ╔═╡ 08d88b40-980e-4d17-91d1-2b1a06180bdd
+T_wall_values = 273.15 .+ collect(range(5, 10, length = Npoints))
+
+# ╔═╡ 54809c43-f7c3-493b-b06a-a13bf0a44bc6
+
+ovs_plots_2 = [
+        (z=:N_pump,color=:black, linewidth=1,   labels=true),
+        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
+        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
+    ]
+
+
+# ╔═╡ 033594e2-7f94-4b32-b7fa-23490e087918
+md" ## Base scenario"
+
+# ╔═╡ 8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
+Qs = 100:50:8500
+
+# ╔═╡ 48478706-2c6a-4bba-a63d-e8ebf8baafee
+md" ## Pure water"
+
+# ╔═╡ ff4149ab-7af1-4b9b-8f26-70c52930150d
+md" ## Colder wall"
+
+# ╔═╡ 9f3f5b7d-8a4d-4bd5-a7b9-1926d3087c72
+md" ## Longer borehole"
+
+# ╔═╡ b9613755-4061-4aec-a50f-b5d739b9df25
+md"---"
+
+# ╔═╡ 769f3480-9062-402b-a43e-9c98e9b63cde
+function save_figure(fig; save_path::AbstractString, force_create_path::Bool=true)
+    force_create_path && mkpath(dirname(save_path))
+    CairoMakie.save(save_path, fig)
+    return save_path
+end
+
+# ╔═╡ 5b3a3a8d-ed44-4565-8dae-2f215d5f4939
+#=╠═╡
+function plot_multi_axes_simple(
+    df;
+    x::Symbol,
+    y_series::Vector{Symbol},          # one series per axis
+    sides::Vector{Bool},               # false = left, true = right
+    ylabels::Vector{<:AbstractString}, # one per axis
+    xlabel::AbstractString = string(x),
+    title::AbstractString  = "",
+    size = (900, 550),
+    lw::Real = 2,
+    fontsize = 12, ticksize = 10, titlesize = 14,
+    palette = :tab10,
+
+    # spacing knobs (Float64!)
+    ylabel_padding_left::Real  = 8.0,
+    ylabel_padding_right::Real = 8.0,
+    yticklabelspace_left_base::Real  = 30.0,
+    yticklabelspace_left_step::Real  = 44.0,
+    yticklabelspace_right_base::Real = 36.0,
+    yticklabelspace_right_step::Real = 50.0,
+
+    y_limits::AbstractVector{<:Union{Nothing, Missing, Tuple{<:Real,<:Real}}} =
+        fill(nothing, length(y_series)),
+
+    # saving
+    save_path::Union{Nothing,AbstractString} = nothing,
+    force_create_path::Bool = true,
+)
+    @assert length(y_series) == length(sides)  "y_series and sides must match"
+    @assert length(ylabels)  == length(sides)  "ylabels must match sides"
+    @assert all(s ∈ Symbol.(names(df)) for s in y_series)
+
+    xs = df[!, x]
+
+    # stable categorical colors
+    cm = cgrad(palette, max(length(y_series),1); categorical=true)
+    color_map = Dict(s => cm[i] for (i, s) in enumerate(y_series))
+
+    # figure + inner grid; a little figure padding so outer labels aren’t cut
+    fig = Figure(size = size, fontsize = fontsize, figure_padding = (10, 10, 8, 8))  # L,R,B,T
+    rowsize!(fig.layout, 1, Relative(1.0))
+    gl = GridLayout(fig[1,1])
+    rowsize!(gl, 1, Relative(1.0))
+
+    # base axis (center column)
+    ax_base = Axis(gl[1,2];
+        xlabel=xlabel, ylabel="", title=title,
+        xticklabelsize=ticksize, yticklabelsize=ticksize,
+        xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
+    ax_base.aspect = nothing
+    ax_base.autolimitaspect = nothing
+    ax_base.height = Relative(1.0)
+
+    axes_left  = Axis[ax_base]
+    axes_right = Axis[]
+    axis_for_i = Axis[]
+
+    # overlays in same cell; hide x-decorations on overlays; link x
+    function _new_axis(; right::Bool, ylabel::AbstractString)
+        ax = Axis(gl[1,2];
+            yaxisposition = right ? :right : :left, ylabel = ylabel,
+            xticklabelsize=ticksize, yticklabelsize=ticksize,
+            xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
+        ax.aspect = nothing
+        ax.autolimitaspect = nothing
+        ax.height = Relative(1.0)
+        if right; hidespines!(ax, :l, :t, :b) else; hidespines!(ax, :r, :t, :b) end
+        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=false)
+        linkxaxes!(ax_base, ax)
+        ax
+    end
+
+    # build axes & plot
+    left_count = 0; right_count = 0
+    for (i, (s, on_right)) in enumerate(zip(y_series, sides))
+        ax = if on_right
+            a = _new_axis(right=true,  ylabel=ylabels[i]); push!(axes_right, a); a
+        else
+            if left_count == 0
+                ax_base.ylabel = ylabels[i]
+                ax_base
+            else
+                a = _new_axis(right=false, ylabel=ylabels[i]); push!(axes_left, a); a
+            end
+        end
+        push!(axis_for_i, ax)
+
+        col = color_map[s]
+        lines!(ax, xs, df[!, s]; linewidth=lw, color=col)
+		if y_limits[i] !== nothing
+		    ylims!(ax, y_limits[i]...)
+		end
+
+        ax.yticklabelcolor[] = col
+        ax.ytickcolor[]      = col
+        ax.ylabelcolor[]     = col
+        if on_right; ax.rightspinecolor[] = col else; ax.leftspinecolor[] = col end
+
+        if on_right; right_count += 1 else; left_count += 1 end
+    end
+
+    # real side margins: create columns whenever that side has ≥1 axis
+    if left_count > 0
+        Label(gl[1,1], " "; tellwidth=false)
+        colsize!(gl, 1, Fixed(max(28.0, 32.0 + 44.0*(left_count-1))))
+    else
+        colsize!(gl, 1, Fixed(0))
+    end
+    if right_count > 0
+        Label(gl[1,3], " "; tellwidth=false)
+        colsize!(gl, 3, Fixed(40.0 + 50.0*(right_count-1)))
+    else
+        colsize!(gl, 3, Fixed(0))
+    end
+    colsize!(gl, 2, Relative(1.0))
+
+    # y-tick label offsets + ylabel padding
+    if left_count == 1
+        ax = axes_left[1]
+        ax.yticklabelspace[] = 14.0
+        ax.ylabelpadding[]   = float(ylabel_padding_left)
+    else
+        for (k, ax) in enumerate(axes_left)
+            ax.yticklabelspace[] = float(yticklabelspace_left_base + (k-1)*yticklabelspace_left_step)
+            ax.ylabelpadding[]   = float(ylabel_padding_left)
+        end
+    end
+    if right_count == 1
+        ax = axes_right[1]
+        ax.yticklabelspace[] = 18.0
+        ax.ylabelpadding[]   = float(ylabel_padding_right)
+    else
+        for (k, ax) in enumerate(axes_right)
+            ax.yticklabelspace[] = float(yticklabelspace_right_base + (k-1)*yticklabelspace_right_step)
+            ax.ylabelpadding[]   = float(ylabel_padding_right)
+        end
+    end
+
+    # overlays: still hide x-decorations (base already shows them)
+    for (k, ax) in enumerate(axes_left)
+        if k > 1
+            hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
+        end
+    end
+    for ax in axes_right
+        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
+    end
+
+    # save
+    if save_path !== nothing
+        if @isdefined(save_figure)
+            save_figure(fig; save_path=String(save_path), force_create_path=force_create_path)
+        else
+            save(String(save_path), fig)
+        end
+    end
+
+    fig
+end
+
+  ╠═╡ =#
+
+# ╔═╡ e2db4d18-bc58-43ef-b003-e9bc10f7c89c
+function _fill_line!(v::AbstractVector{T}) where {T<:Real}
+    n = length(v); n == 0 && return v
+    m = .!isnan.(v); count(m) == 0 && return v
+    i1 = findfirst(m); i2 = findlast(m)
+    i1 > 1 && (v[1:i1-1] .= v[i1])
+    i2 < n && (v[i2+1:end] .= v[i2])
+    i = i1
+    while i <= i2
+        if !isnan(v[i]); i += 1; continue; end
+        s = i
+        while i <= i2 && isnan(v[i]); i += 1; end
+        e = i - 1
+        yL, yR = v[s-1], v[e+1]
+        L = e - s + 1
+        @inbounds for k in 0:L-1
+            v[s+k] = yL + (yR - yL) * ((k+1)/(L+1))
+        end
+    end
+    v
+end
+
+# 2D rectangular fill (columns, then rows, final fallback)
+
+# ╔═╡ f605308a-47a5-49e5-bda4-763350e21748
+function _fill_nans_rect!(Z::AbstractMatrix{T}) where {T<:Real}
+    Zf = copy(Z)
+    for j in axes(Zf,2); _fill_line!(view(Zf, :, j)); end
+    for i in axes(Zf,1); _fill_line!(view(Zf, i, :)); end
+    v = vec(Zf); m = .!isnan.(v)
+    if any(.!m)
+        μ = count(m) > 0 ? mean(v[m]) : 0.0
+        Zf[.!isfinite.(Zf)] .= μ
+        Zf[isnan.(Zf)] .= μ
+    end
+    Zf
+end
+
+# ╔═╡ dace0a13-ba22-49b3-b349-45090e15486b
+# ╠═╡ disabled = true
+#=╠═╡
+_safecolorrange(Z) = begin
+    v = vec(Z); m = .!isnan.(v)
+    !any(m) ? nothing : (extrema(v[m]) |> x -> x[1]==x[2] ? (x[1]-1e-6, x[2]+1e-6) : x)
+end
+
+# ---------- splines ----------
+  ╠═╡ =#
+
+# ╔═╡ d87aec62-0109-4ab8-a313-a339b1b6efb6
+function cop3_at_hard(spl::NamedTuple, x::Real, y::Real; Qsp::Real)
+    Ŵ = max(0.0, spl.W(x, y))
+    P̂ = max(0.0, spl.P(x, y))
+    Q̂ = max(0.0, spl.Q(x, y))
+    Paux = max(0.0, Qsp - Q̂)
+    return (Q̂ + Paux) / (Ŵ + P̂ + Paux)
+end
+
+# ╔═╡ 66c14835-9ebe-479b-82ef-637b7ca8651b
+"""
+    sample_splines_grid(setup; nx=401, ny=401,
+                        xbounds=nothing, ybounds=nothing,
+                        fields=(:W, :P, :Q, :N, :rP))
+
+Evaluate the fitted splines on a rectilinear grid.
+Returns `(xs, ys, Z::NamedTuple)` where each `Z[field]` is `nx×ny`.
+"""
+function sample_splines_grid(setup; nx::Int=401, ny::Int=401,
+                             xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+                             ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+                             fields::Tuple=(:W, :P, :Q, :N, :rP))
+
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
+
+    Zpairs = Vector{Pair{Symbol,Matrix{Float64}}}()
+    for f in fields
+        hasproperty(spl, f) || error("setup.spl has no field $(f)")
+        s = getproperty(spl, f)
+        Z = [s(x,y) for x in xs, y in ys]
+        push!(Zpairs, f => Z)
+    end
+    return xs, ys, NamedTuple(Zpairs)
+end
+
+
+# ╔═╡ 94fa6d40-53ae-43f5-a388-e713c00c4b18
+# Evaluate raw spline fields at (ΔT,f)
+function fields_at(spl, ΔT::Real, f::Real)
+    W = max(0.0, spl.W(ΔT,f))
+    P = max(0.0, spl.P(ΔT,f))
+    Q = max(0.0, spl.Q(ΔT,f))
+    N = spl.N(ΔT,f)
+    rP = max(0.0, spl.rP(ΔT,f))
+    return (; W, P, Q, N, rP)
+end
+
+# Add duty/Paux and a few convenience metrics (does not affect optimization)
+
+# ╔═╡ 8a415054-b012-4705-bf24-6268c05cbec4
+function _segments_avoiding_jumps(v::AbstractVector; thresh=:auto)
+    n = length(v); n ≤ 1 && return UnitRange{Int}[]
+    d = abs.(diff(v))
+    if thresh === :auto
+        # robust threshold using median absolute deviation of diffs
+        md = median(d[isfinite.(d)])
+        thresh = 5md   # tweak if needed
+        if !isfinite(thresh) || thresh == 0
+            thresh = maximum(d) * 0.0  # no splits
+        end
+    end
+    brks = findall(d .> thresh)
+    segs = UnitRange{Int}[]
+    s = 1
+    for b in brks
+        push!(segs, s:b)      # inclusive
+        s = b + 1
+    end
+    push!(segs, s:n)
+    segs
+end
+
+# simple centered rolling window (odd width), mean/median
+
+# ╔═╡ 96c15321-842a-4f66-926d-de1638cec610
+function _roll1(v::AbstractVector{<:Real}, method::Symbol, width::Int)
+    @assert isodd(width) "width should be odd"
+    n = length(v); k = (width-1) ÷ 2
+    out = similar(float.(v))
+    @inbounds for i in 1:n
+        lo = max(1, i-k); hi = min(n, i+k)
+        wv = @view v[lo:hi]
+        out[i] = method === :median ? median(wv) :
+                 method === :mean   ? mean(wv)   :
+                 error("method must be :median or :mean")
+    end
+    out
+end
+
+# jump-aware smoothing of selected columns
+
+# ╔═╡ 73744de2-af34-46be-8be6-b12ebbf00b73
+#=╠═╡
+function _smooth_columns(df::DataFrame; cols=Symbol[:ΔT, :f],
+                         method::Symbol=:median, width::Int=7,
+                         jump_thresh=:auto)
+    @assert width ≥ 1 && isodd(width)
+    for c in cols
+        v = collect(df[!, c])
+        segs = _segments_avoiding_jumps(v; thresh=jump_thresh)
+        sm = similar(float.(v))
+        for r in segs
+            sm[r] = _roll1(view(v, r), method, width)
+        end
+        df[!, c] = sm
+    end
+    return df
+end
+  ╠═╡ =#
+
+# ╔═╡ cbef6827-61cc-4c0b-b779-57ac14e28982
+function metrics_at(spl, ΔT::Real, f::Real; Qsp::Real)
+    F = fields_at(spl, ΔT, f)
+    Qhat, W, P = F.Q, F.W, F.P
+    if Qhat >= Qsp
+        duty = Qsp / Qhat
+        Paux = 0.0
+    else
+        duty = 1.0
+        Paux = Qsp - Qhat      # aux heat (and power, since COP_aux = 1)
+    end
+    COP_noaux = Qhat / max(1e-12, (W + P))                # machine-only COP
+    COP3      = (Qhat + Paux) / max(1e-12, (W + P + Paux))# your objective
+    Pin_total = W + P + Paux
+    cap_margin = Qhat - Qsp
+    return merge(F, (; duty, Paux, COP_noaux, COP3, Pin_total, cap_margin,
+                      Qhat=Qhat, meets = Qhat >= Qsp))
+end
+
+# ╔═╡ e63c52e0-678a-4673-a65a-62c422680e2d
+# hard masks; infeasible returns either NaN (for "holes") or 0.0
+function cop3_masked_hard_at(spl::NamedTuple, x::Real, y::Real;
+    Qsp::Real,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
+    Pmax::Real=1.0
+)
+    # feasibility checks
+    if N_bounds !== nothing
+        N̂ = spl.N(x, y)
+        lo, hi = N_bounds
+        if (N̂ < lo) || (N̂ > hi)
+            return 0.0
+        end
+    end
+
+    P̂ = max(0.0, spl.rP(x, y))
+    if isfinite(Pmax) && (P̂ > Pmax)
+        return 0.0
+    end
+
+    # feasible -> base COP3 with hard Paux
+    return cop3_at_hard(spl, x, y; Qsp=Qsp)
+end
+
+
+# ╔═╡ de4fb33c-7af3-4593-bc68-79558eb34f26
+function sample_masked_cop3_hard(setup; Qsp::Real,
+    nx::Int=401, ny::Int=401,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
+    Pmax::Real=1.0, margin::Real=0.0
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
+    Z  = [cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
+                               N_bounds=N_bounds, Pmax=Pmax)
+          for x in xs, y in ys]
+    xs, ys, Z
+end
+
+
+# ╔═╡ c472a38d-369c-4f33-b6ec-708e792ba1e6
+# ╠═╡ disabled = true
+#=╠═╡
+# compute a safe colorrange for a set of matrices (ignore NaNs)
+_safecolorrange_set(Zs::Vector{<:AbstractMatrix}) = begin
+    vals = reduce(vcat, map(vec, Zs))
+    m = .!isnan.(vals)
+    if !any(m)
+        nothing
+    else
+        lo, hi = extrema(vals[m])
+        lo == hi ? (lo-1e-6, hi+1e-6) : (lo, hi)
+    end
+end
+  ╠═╡ =#
+
+# ╔═╡ 899d157e-a242-41bf-92da-466f50e72588
+# pick the right evaluator based on `cop`
+# cop = :plain         -> cop3_at (soft Paux)
+# cop = :masked        -> cop3_masked_at (soft masks + soft Paux)
+# cop = :masked_hard   -> cop3_masked_hard_at (hard masks + hard Paux)
+function _make_cop_eval(spl; cop::Symbol= :masked_hard, Qsp::Real, N_bounds, Pmax::Real)
+    if cop === :masked_hard
+        return (x,y) -> cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
+                                            N_bounds=N_bounds, Pmax=Pmax)
+    else
+        error("cop must be one of :masked_hard; got $cop")
+    end
+end
+
+
+# ╔═╡ cb7178e5-9bc6-45c3-aa11-52972df91fac
+function brute_opt_cop3(setup; Qsp::Real,
+    nx::Int=201, ny::Int=201,
+    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    cop::Symbol=:masked_hard,
+    tau::Real=12.0,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=nothing,
+    Pmax::Real=Inf, kN::Real=30, kP::Real=30,
+    return_field::Bool=false
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    xs = range(xmin, xmax; length=nx)
+    ys = range(ymin, ymax; length=ny)
+
+    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp,
+                              N_bounds=N_bounds, Pmax=Pmax)
+
+    Z = [eval_cop(x,y) for x in xs, y in ys]
+
+    Zsafe = copy(Z)
+    @inbounds for j in axes(Zsafe,2), i in axes(Zsafe,1)
+        if !isfinite(Zsafe[i,j]); Zsafe[i,j] = -Inf; end
+    end
+    all(isinf, Zsafe) && error("No finite COP₃ on the grid; adjust bounds or inputs.")
+
+    k = argmax(Zsafe)
+    Ii, Jj = Tuple(CartesianIndices(Zsafe)[k])
+    x̂ = xs[Ii]; ŷ = ys[Jj]; ĉ = Z[Ii,Jj]
+
+    out = (; ΔT=x̂, f=ŷ, COP3=ĉ, Qsp=Qsp, idx=(Ii,Jj), xs, ys)
+    return return_field ? (; out..., Z) : out
+end
+
+
+# ╔═╡ 639e359f-5760-4adb-9258-967d5db2eea4
+function refine_opt_cop3(setup; Qsp::Real,
+    start::Tuple{<:Real,<:Real}, 
+    xbounds=nothing, ybounds=nothing,
+    cop::Symbol=:masked_hard, tau::Real=12.0,
+    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.15, 1.0),
+    Pmax::Real=1.0, kN::Real=30, kP::Real=30,
+    iterations::Int=10_000,
+    kstarts::Int=30,    # try >1 for multi-start
+    jitter::Real=10e-2  # fraction of range for random nudges
+)
+    X, Y, spl = setup.X, setup.Y, setup.spl
+    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
+    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
+    clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
+
+    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp, N_bounds=N_bounds, Pmax=Pmax)
+
+    fneg(v) = begin
+        x, y = clampxy(v[1], v[2])
+        -eval_cop(x, y)
+    end
+
+    # generate kstarts seeds (small interior jitters help escape local traps)
+    rx, ry = (xmax - xmin), (ymax - ymin)
+    seeds = Vector{Vector{Float64}}()
+    x0, y0 = clampxy(start[1], start[2])
+    push!(seeds, [x0, y0])
+    for _ in 2:kstarts
+        δx = (2rand()-1) * jitter * rx
+        δy = (2rand()-1) * jitter * ry
+        push!(seeds, [clamp(x0+δx, xmin, xmax), clamp(y0+δy, ymin, ymax)])
+    end
+
+    best_res, best_val, best_xy = nothing, Inf, (x0,y0)
+    for s in seeds
+        res = Optim.optimize(fneg, s, NelderMead(),
+                             Optim.Options(iterations=iterations, show_trace=false))
+        v̂ = Optim.minimizer(res)
+        x̂, ŷ = clampxy(v̂[1], v̂[2])
+        val = fneg(v̂)
+        if val < best_val
+            best_val, best_res, best_xy = val, res, (x̂,ŷ)
+        end
+    end
+    x̂, ŷ = best_xy
+    COP̂ = eval_cop(x̂, ŷ)
+    return (; ΔT=x̂, f=ŷ, COP3=COP̂, Qsp=Qsp, result=best_res, start=(x0,y0))
+end
+
+
+# ╔═╡ 40d4651c-93c5-41b5-aa2c-685f471d7a02
+"""
+    best_cop_point(setup; Qsp, nx=401, ny=401, do_refine=true, kwargs...)
+
+Return the maximum COP₃ and its location (ΔT*, f*) for a single setpoint `Qsp`.
+
+Arguments
+---------
+* `setup` : output of `make_splines`
+* `Qsp`   : heat set-point (W)
+* `nx,ny` : grid resolution for the brute-force pre-scan
+* `do_refine` : if true, refine with Optim starting from the coarse maximum
+* `kwargs...` : forwarded to `brute_opt_cop3` and `refine_opt_cop3`
+                (e.g. `cop=:masked_hard, N_bounds=(0.3,1.0), Pmax=180.0`)
+
+Returns
+-------
+NamedTuple `(COP3 = …, ΔT = …, f = …)`.
+"""
+function best_cop_point(setup; Qsp::Real,
+                        nx::Int=401, ny::Int=401,
+                        do_refine::Bool=true,
+                        kwargs...)
+    # coarse brute-force scan
+    brute = brute_opt_cop3(setup; Qsp=Qsp, nx=nx, ny=ny, kwargs...)
+    if do_refine
+        ref   = refine_opt_cop3(setup; Qsp=Qsp,
+                                start=(brute.ΔT, brute.f), kwargs...)
+        return (COP3 = ref.COP3, ΔT = ref.ΔT, f = ref.f)
+    else
+        return (COP3 = brute.COP3, ΔT = brute.ΔT, f = brute.f)
+    end
+end
+
+
+# ╔═╡ db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
+#=╠═╡
+function sweep_best_cop_points(setup; Qs::AbstractVector{<:Real},
+                               nx::Int=401, ny::Int=401,
+                               do_refine::Bool=true,
+                               kwargs...)
+    rows = NamedTuple[]
+    for q in Qs
+        best = best_cop_point(setup; Qsp=q, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
+        push!(rows, (; Qsp=float(q), ΔT=float(best.ΔT), f=float(best.f), COP3=float(best.COP3)))
+    end
+    DataFrame(rows)
+end
+
+  ╠═╡ =#
+
+# ╔═╡ d3d4578d-03c9-4ff8-af77-f84a2b52babe
+function best_cop_point_details(setup; Qsp::Real,
+                                nx::Int=401, ny::Int=401,
+                                do_refine::Bool=true, kwargs...)
+    b = best_cop_point(setup; Qsp=Qsp, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
+    M = metrics_at(setup.spl, b.ΔT, b.f; Qsp=Qsp)
+    return merge((; Qsp=float(Qsp), ΔT=float(b.ΔT), f=float(b.f), COP3=float(b.COP3)), M)
+end
+
+# ╔═╡ ef4aa4e8-aca5-4798-ae3b-bc179fa3480b
+#=╠═╡
+"""
+    sweep_best_with_details(setup; Qs, nx=401, ny=401, do_refine=true;
+                            smooth=nothing, smooth_cols=Symbol[:ΔT, :f],
+                            smooth_method=:median, smooth_width=7, jump_thresh=:auto,
+                            kwargs...)
+
+If `smooth` is not `nothing`, apply a centered rolling filter to `smooth_cols`
+without smoothing across large jumps (detected automatically).
+"""
+function sweep_best_with_details(setup; Qs::AbstractVector{<:Real},
+                                 nx::Int=401, ny::Int=401,
+                                 do_refine::Bool=true,
+                                 smooth::Union{Nothing,Bool}=true,
+                                 smooth_cols::Vector{Symbol}=Symbol[:ΔT, :f],
+                                 smooth_method::Symbol=:median,
+                                 smooth_width::Int=7,
+                                 jump_thresh=:auto,
+                                 kwargs...)
+    rows = NamedTuple[]
+    for q in Qs
+        push!(rows, best_cop_point_details(setup; Qsp=q, nx=nx, ny=ny,
+                                           do_refine=do_refine, kwargs...))
+    end
+    df = DataFrame(rows)
+    if !(smooth === nothing || smooth == false)
+        _smooth_columns(df; cols=smooth_cols,
+                           method=smooth_method,
+                           width=smooth_width,
+                           jump_thresh=jump_thresh)
+    end
+    return df
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 15f52274-d66b-46f2-8b4f-dac7ca039ccb
+#=╠═╡
+"""
+    optimal_controls(setup; Qs, grid_nx=201, grid_ny=201, do_refine=true, kwargs...)
+
+For each setpoint in `Qs`, do a brute grid search (and optional refine).
+Returns a DataFrame with columns: :Qsp, :ΔT, :f, :COP3.
+"""
+function optimal_controls(setup; Qs::AbstractVector{<:Real},
+    grid_nx::Int=201, grid_ny::Int=201, do_refine::Bool=true, kwargs...
+)
+    rows = NamedTuple[]
+    for q in Qs
+        brute = brute_opt_cop3(setup, Qsp=q, nx=grid_nx, ny=grid_ny, kwargs...)
+        if do_refine
+            ref = refine_opt_cop3(setup; Qsp=q, start=(brute.ΔT, brute.f), kwargs...)
+            push!(rows, (; Qsp=float(q), ΔT=float(ref.ΔT), f=float(ref.f), COP3=float(ref.COP3)))
+        else
+            push!(rows, (; Qsp=float(q), ΔT=float(brute.ΔT), f=float(brute.f), COP3=float(brute.COP3)))
+        end
+    end
+    DataFrame(rows)
+end
+  ╠═╡ =#
+
+# ╔═╡ 94138b2d-0fd6-494e-9fd1-ef5aecadaabf
+md" # Plotting functions"
+
 # ╔═╡ 0fe18091-e8f6-42d4-9961-5783452ddefd
 #=╠═╡
 function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hydraulic)
@@ -3875,6 +4721,11 @@ function process_results(results_thermal, results_hydraulic, sys_thermal, sys_hy
     
     return df  # Convert to DataFrame
 end
+  ╠═╡ =#
+
+# ╔═╡ c18c39fe-6896-433e-90d4-4a8149ae9b5b
+#=╠═╡
+df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sys_hydraulic);
   ╠═╡ =#
 
 # ╔═╡ 7d25aec4-c657-410a-8ae4-03195cefbee7
@@ -4424,17 +5275,6 @@ end
 
   ╠═╡ =#
 
-# ╔═╡ c18c39fe-6896-433e-90d4-4a8149ae9b5b
-#=╠═╡
-df = process_results(res_thermal_overall, res_hydraulic_overall, sys_thermal, sys_hydraulic);
-  ╠═╡ =#
-
-# ╔═╡ ce0ce754-c26a-4b8d-81d9-8234a165a0c6
-new_thresh = Dict("Re_bhe_leg1"=>(2300.,4000.), "Re_bhe_leg2"=>(2300.,4000.))
-
-# ╔═╡ bbf5b367-b6c9-4185-9641-d711914892b6
-image_dir = normpath(joinpath(pwd(), "..", "..", "notebooks", "images"))
-
 # ╔═╡ bed552fa-1a51-492b-8552-81186c96c6a1
 # ╠═╡ show_logs = false
 #=╠═╡
@@ -4481,850 +5321,8 @@ plot_G_ΔT
 plot_H_ΔT
   ╠═╡ =#
 
-# ╔═╡ b92cc8df-5884-4129-99fe-d22038b4eb0c
-"""
-    param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
-Return a Vector of N linearly-spaced `sym => value` pairs from `a` to `b`.
-"""
-function param_pair_range(sym::Symbol, a::Real, b::Real, N::Integer)
-    values = range(a, stop=b, length=N)
-    return [ sym => v for v in values ]
-end
-
-
-# ╔═╡ 1e116b39-5019-4e87-80eb-13b1a9d9ae58
-# ╠═╡ show_logs = false
-thermal_prob2, hydraulic_prob2, sys_thermal2, sys_hydraulic2 = prepare_problems(base_params);
-
-# ╔═╡ fb29ede8-6f49-4e14-a6d9-d8caee90e5ba
-Npoints = 45
-
-# ╔═╡ 870d81bf-2254-427b-8471-3c9d23b13a72
-f_values = collect(range(50, 10, length = Npoints))
-
-# ╔═╡ 24b94de6-1d03-4225-8fdd-95cac5beb33c
-250+708+7634-1400
-
-# ╔═╡ 977b3df3-0fa4-452f-884b-94b24ec54cf3
-# high-contrast, CVD-safe accents (Okabe–Ito-ish)
-const OI_VERMILLION = RGBf(0.835, 0.365, 0.000)  # #D55E00
-
-# ╔═╡ 1320fac5-2cf2-484d-a01e-98ecd559588d
-const OI_MAGENTA    = RGBf(0.800, 0.475, 0.655)  # #CC79A7
-
-# ╔═╡ a3fe0b30-007d-415d-af04-f5712e3d0489
-const CHARCOAL      = RGBf(0.100, 0.100, 0.100)
-
-# ╔═╡ ea33f723-8f17-4000-b483-eb8f1f9354f3
-md" # Comparison BH efficiency"
-
-# ╔═╡ 75878c2e-4909-4c6e-8d44-164502edede0
-md" # Comparison T inlet BH"
-
-# ╔═╡ dc7866d3-68e8-40de-b82d-26717fff53d9
-md" # Comparison T outlet BH"
-
-# ╔═╡ 21a3e541-8ad9-41de-995a-e2b43221d15a
-md" # Comparison T evap"
-
-# ╔═╡ 712bf240-09c1-4afb-be0d-5d76f9e5bbb1
-md" # Comparison COP2"
-
-# ╔═╡ 5ce8337c-aae0-476f-914b-854a054b26db
-md" # Comparison ridge position"
-
-# ╔═╡ a966eea4-f3e4-46f9-8230-7ab19eb7f905
-
-
-# ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
-
-
-# ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
-md" # COP3 interpolation"
-
-# ╔═╡ 75653ae3-55e8-4703-8c09-9dcf7ecc1505
-md" # Optimal control"
-
-# ╔═╡ fdfb7456-6d8e-44c8-a883-1d1faeb96ede
-md" # Comparison pump efficiency"
-
-# ╔═╡ 8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
-md" # Other explorations"
-
-# ╔═╡ 6e2dd049-c583-4e2d-95ec-90796f38732d
-
-
-# ╔═╡ 4e1204d9-eab8-4890-a957-92341c8edfc4
-md" # 2D Parametric Simulations"
-
-# ╔═╡ 987290e0-8b32-481a-85a0-442b075463cb
-md" ## Base"
-
-# ╔═╡ 8ddb2096-a2b0-4369-a188-5d972af91428
-md" ## Variant with colder wall"
-
-# ╔═╡ 44e95eb8-ef96-4832-9168-df5c504b0569
-md" ## Variant with water"
-
-# ╔═╡ 8a1007ab-a556-4670-a2a6-18292d721c89
-base_params_water = [
-    :b => 1.5e-3,
-    :np => 20.0,
-    :W => 0.07,
-    :ϕ => 1.18,
-    :β => π/3,
-    :th => 0.5e-3,
-    :λ_pl => 16.0,
-    :λ_pitch => 4e-3,
-	:λ_grout => 1.5,
-	:λ_soil => 3.5,
-    :χ => 0.0,
-    :L => 0.60,
-    :L_BHE => 150.0,
-    :f_ => 50.0,
-	:log_ΔTSF_ => log(3),
-]
-
-# ╔═╡ 0d69490f-83ee-46fc-b034-8370e8a66361
-md" ## Variant with bigger pipes (40mm OD)"
-
-# ╔═╡ 6d9c073c-e05b-45ec-a4b4-1b47c43cc5ba
-base_params_pipe = [
-    :b => 1.5e-3,
-    :np => 20.0,
-    :W => 0.07,
-    :ϕ => 1.18,
-    :β => π/3,
-    :th => 0.5e-3,
-    :λ_pl => 16.0,
-    :λ_pitch => 4e-3,
-	:λ_grout => 1.5,
-	:λ_soil => 3.5,
-    :χ => 0.28,
-    :L => 0.60,
-    :L_BHE => 150.0,
-    :f_ => 50.0,
-	:log_ΔTSF_ => log(3),
-	:D_p1_o => 40e-3,
-	:D_p1_i => 28.24e-3/32e-3*40e-3,
-	:D_p2_o => 40e-3,
-	:D_p2_i => 28.24e-3/32e-3*40e-3,
-	:D_b => 0.115,
-
-		
-]
-
-# ╔═╡ 6b0ca393-a200-4ee0-b71e-ea3f3b68c3f4
-md" ## Variant with longer BH (40mm OD)"
-
-# ╔═╡ 880e6614-2556-4d3a-9408-f59b45ba94fe
-base_params_long = [
-    :b => 1.5e-3,
-    :np => 20.0,
-    :W => 0.07,
-    :ϕ => 1.18,
-    :β => π/3,
-    :th => 0.5e-3,
-    :λ_pl => 16.0,
-    :λ_pitch => 4e-3,
-	:λ_grout => 1.5,
-	:λ_soil => 3.5,
-    :χ => 0.28,
-    :L => 0.60,
-    :L_BHE => 200.0,
-    :f_ => 50.0,
-	:log_ΔTSF_ => log(3),
-	:D_b => 0.115,
-
-		
-]
-
-# ╔═╡ c5875432-f3f0-4495-a0f0-853d87d73353
-md" ## Looking at the wall temperature"
-
-# ╔═╡ acbfba23-bbb5-4d9e-93b7-1120677332bd
-log_ΔTSF_values = log.(collect(range(0.5, 8.0, length = Npoints)))
-
-# ╔═╡ b0b5c52c-a795-40a0-9c8d-f678010c454a
-log_msf_values = log.(collect(range(0.1, 2.0, length = Npoints)))
-
-# ╔═╡ 08d88b40-980e-4d17-91d1-2b1a06180bdd
-T_wall_values = 273.15 .+ collect(range(5, 10, length = Npoints))
-
-# ╔═╡ 54809c43-f7c3-493b-b06a-a13bf0a44bc6
-
-ovs_plots_2 = [
-        (z=:N_pump,color=:black, linewidth=1,   labels=true),
-        (z=:Re_bhe_leg1, levels=[2300, 4000],         color=:red,   linewidth=1.2, linestyle=:dash, labels=true),
-        (z=:Re_bhe_leg2, levels=[2300, 4000],         color=:blue,  linewidth=1.2, linestyle=:dash, labels=true),
-    ]
-
-
-# ╔═╡ 33c1996a-aade-400a-9b2f-259db12c0835
-#=╠═╡
-df_grid_wall|> names
-  ╠═╡ =#
-
-# ╔═╡ 033594e2-7f94-4b32-b7fa-23490e087918
-md" ## Base scenario"
-
-# ╔═╡ 8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
-Qs = 100:50:8500
-
-# ╔═╡ 48478706-2c6a-4bba-a63d-e8ebf8baafee
-md" ## Pure water"
-
-# ╔═╡ ff4149ab-7af1-4b9b-8f26-70c52930150d
-md" ## Colder wall"
-
-# ╔═╡ 9f3f5b7d-8a4d-4bd5-a7b9-1926d3087c72
-md" ## Longer borehole"
-
-# ╔═╡ b9613755-4061-4aec-a50f-b5d739b9df25
+# ╔═╡ 55347278-7777-484b-ab9a-0bfb7f3d3769
 md"---"
-
-# ╔═╡ 769f3480-9062-402b-a43e-9c98e9b63cde
-function save_figure(fig; save_path::AbstractString, force_create_path::Bool=true)
-    force_create_path && mkpath(dirname(save_path))
-    CairoMakie.save(save_path, fig)
-    return save_path
-end
-
-# ╔═╡ 5b3a3a8d-ed44-4565-8dae-2f215d5f4939
-#=╠═╡
-function plot_multi_axes_simple(
-    df;
-    x::Symbol,
-    y_series::Vector{Symbol},          # one series per axis
-    sides::Vector{Bool},               # false = left, true = right
-    ylabels::Vector{<:AbstractString}, # one per axis
-    xlabel::AbstractString = string(x),
-    title::AbstractString  = "",
-    size = (900, 550),
-    lw::Real = 2,
-    fontsize = 12, ticksize = 10, titlesize = 14,
-    palette = :tab10,
-
-    # spacing knobs (Float64!)
-    ylabel_padding_left::Real  = 8.0,
-    ylabel_padding_right::Real = 8.0,
-    yticklabelspace_left_base::Real  = 30.0,
-    yticklabelspace_left_step::Real  = 44.0,
-    yticklabelspace_right_base::Real = 36.0,
-    yticklabelspace_right_step::Real = 50.0,
-
-    y_limits::AbstractVector{<:Union{Nothing, Missing, Tuple{<:Real,<:Real}}} =
-        fill(nothing, length(y_series)),
-
-    # saving
-    save_path::Union{Nothing,AbstractString} = nothing,
-    force_create_path::Bool = true,
-)
-    @assert length(y_series) == length(sides)  "y_series and sides must match"
-    @assert length(ylabels)  == length(sides)  "ylabels must match sides"
-    @assert all(s ∈ Symbol.(names(df)) for s in y_series)
-
-    xs = df[!, x]
-
-    # stable categorical colors
-    cm = cgrad(palette, max(length(y_series),1); categorical=true)
-    color_map = Dict(s => cm[i] for (i, s) in enumerate(y_series))
-
-    # figure + inner grid; a little figure padding so outer labels aren’t cut
-    fig = Figure(size = size, fontsize = fontsize, figure_padding = (10, 10, 8, 8))  # L,R,B,T
-    rowsize!(fig.layout, 1, Relative(1.0))
-    gl = GridLayout(fig[1,1])
-    rowsize!(gl, 1, Relative(1.0))
-
-    # base axis (center column)
-    ax_base = Axis(gl[1,2];
-        xlabel=xlabel, ylabel="", title=title,
-        xticklabelsize=ticksize, yticklabelsize=ticksize,
-        xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
-    ax_base.aspect = nothing
-    ax_base.autolimitaspect = nothing
-    ax_base.height = Relative(1.0)
-
-    axes_left  = Axis[ax_base]
-    axes_right = Axis[]
-    axis_for_i = Axis[]
-
-    # overlays in same cell; hide x-decorations on overlays; link x
-    function _new_axis(; right::Bool, ylabel::AbstractString)
-        ax = Axis(gl[1,2];
-            yaxisposition = right ? :right : :left, ylabel = ylabel,
-            xticklabelsize=ticksize, yticklabelsize=ticksize,
-            xlabelsize=fontsize, ylabelsize=fontsize, titlesize=titlesize)
-        ax.aspect = nothing
-        ax.autolimitaspect = nothing
-        ax.height = Relative(1.0)
-        if right; hidespines!(ax, :l, :t, :b) else; hidespines!(ax, :r, :t, :b) end
-        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=false)
-        linkxaxes!(ax_base, ax)
-        ax
-    end
-
-    # build axes & plot
-    left_count = 0; right_count = 0
-    for (i, (s, on_right)) in enumerate(zip(y_series, sides))
-        ax = if on_right
-            a = _new_axis(right=true,  ylabel=ylabels[i]); push!(axes_right, a); a
-        else
-            if left_count == 0
-                ax_base.ylabel = ylabels[i]
-                ax_base
-            else
-                a = _new_axis(right=false, ylabel=ylabels[i]); push!(axes_left, a); a
-            end
-        end
-        push!(axis_for_i, ax)
-
-        col = color_map[s]
-        lines!(ax, xs, df[!, s]; linewidth=lw, color=col)
-		if y_limits[i] !== nothing
-		    ylims!(ax, y_limits[i]...)
-		end
-
-        ax.yticklabelcolor[] = col
-        ax.ytickcolor[]      = col
-        ax.ylabelcolor[]     = col
-        if on_right; ax.rightspinecolor[] = col else; ax.leftspinecolor[] = col end
-
-        if on_right; right_count += 1 else; left_count += 1 end
-    end
-
-    # real side margins: create columns whenever that side has ≥1 axis
-    if left_count > 0
-        Label(gl[1,1], " "; tellwidth=false)
-        colsize!(gl, 1, Fixed(max(28.0, 32.0 + 44.0*(left_count-1))))
-    else
-        colsize!(gl, 1, Fixed(0))
-    end
-    if right_count > 0
-        Label(gl[1,3], " "; tellwidth=false)
-        colsize!(gl, 3, Fixed(40.0 + 50.0*(right_count-1)))
-    else
-        colsize!(gl, 3, Fixed(0))
-    end
-    colsize!(gl, 2, Relative(1.0))
-
-    # y-tick label offsets + ylabel padding
-    if left_count == 1
-        ax = axes_left[1]
-        ax.yticklabelspace[] = 14.0
-        ax.ylabelpadding[]   = float(ylabel_padding_left)
-    else
-        for (k, ax) in enumerate(axes_left)
-            ax.yticklabelspace[] = float(yticklabelspace_left_base + (k-1)*yticklabelspace_left_step)
-            ax.ylabelpadding[]   = float(ylabel_padding_left)
-        end
-    end
-    if right_count == 1
-        ax = axes_right[1]
-        ax.yticklabelspace[] = 18.0
-        ax.ylabelpadding[]   = float(ylabel_padding_right)
-    else
-        for (k, ax) in enumerate(axes_right)
-            ax.yticklabelspace[] = float(yticklabelspace_right_base + (k-1)*yticklabelspace_right_step)
-            ax.ylabelpadding[]   = float(ylabel_padding_right)
-        end
-    end
-
-    # overlays: still hide x-decorations (base already shows them)
-    for (k, ax) in enumerate(axes_left)
-        if k > 1
-            hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
-        end
-    end
-    for ax in axes_right
-        hidexdecorations!(ax; ticks=true, ticklabels=true, minorticks=true, grid=true)
-    end
-
-    # save
-    if save_path !== nothing
-        if @isdefined(save_figure)
-            save_figure(fig; save_path=String(save_path), force_create_path=force_create_path)
-        else
-            save(String(save_path), fig)
-        end
-    end
-
-    fig
-end
-
-  ╠═╡ =#
-
-# ╔═╡ e2db4d18-bc58-43ef-b003-e9bc10f7c89c
-function _fill_line!(v::AbstractVector{T}) where {T<:Real}
-    n = length(v); n == 0 && return v
-    m = .!isnan.(v); count(m) == 0 && return v
-    i1 = findfirst(m); i2 = findlast(m)
-    i1 > 1 && (v[1:i1-1] .= v[i1])
-    i2 < n && (v[i2+1:end] .= v[i2])
-    i = i1
-    while i <= i2
-        if !isnan(v[i]); i += 1; continue; end
-        s = i
-        while i <= i2 && isnan(v[i]); i += 1; end
-        e = i - 1
-        yL, yR = v[s-1], v[e+1]
-        L = e - s + 1
-        @inbounds for k in 0:L-1
-            v[s+k] = yL + (yR - yL) * ((k+1)/(L+1))
-        end
-    end
-    v
-end
-
-# 2D rectangular fill (columns, then rows, final fallback)
-
-# ╔═╡ f605308a-47a5-49e5-bda4-763350e21748
-function _fill_nans_rect!(Z::AbstractMatrix{T}) where {T<:Real}
-    Zf = copy(Z)
-    for j in axes(Zf,2); _fill_line!(view(Zf, :, j)); end
-    for i in axes(Zf,1); _fill_line!(view(Zf, i, :)); end
-    v = vec(Zf); m = .!isnan.(v)
-    if any(.!m)
-        μ = count(m) > 0 ? mean(v[m]) : 0.0
-        Zf[.!isfinite.(Zf)] .= μ
-        Zf[isnan.(Zf)] .= μ
-    end
-    Zf
-end
-
-# ╔═╡ dace0a13-ba22-49b3-b349-45090e15486b
-# ╠═╡ disabled = true
-#=╠═╡
-_safecolorrange(Z) = begin
-    v = vec(Z); m = .!isnan.(v)
-    !any(m) ? nothing : (extrema(v[m]) |> x -> x[1]==x[2] ? (x[1]-1e-6, x[2]+1e-6) : x)
-end
-
-# ---------- splines ----------
-  ╠═╡ =#
-
-# ╔═╡ d87aec62-0109-4ab8-a313-a339b1b6efb6
-function cop3_at_hard(spl::NamedTuple, x::Real, y::Real; Qsp::Real)
-    Ŵ = max(0.0, spl.W(x, y))
-    P̂ = max(0.0, spl.P(x, y))
-    Q̂ = max(0.0, spl.Q(x, y))
-    Paux = max(0.0, Qsp - Q̂)
-    return (Q̂ + Paux) / (Ŵ + P̂ + Paux)
-end
-
-# ╔═╡ 66c14835-9ebe-479b-82ef-637b7ca8651b
-"""
-    sample_splines_grid(setup; nx=401, ny=401,
-                        xbounds=nothing, ybounds=nothing,
-                        fields=(:W, :P, :Q, :N, :rP))
-
-Evaluate the fitted splines on a rectilinear grid.
-Returns `(xs, ys, Z::NamedTuple)` where each `Z[field]` is `nx×ny`.
-"""
-function sample_splines_grid(setup; nx::Int=401, ny::Int=401,
-                             xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-                             ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-                             fields::Tuple=(:W, :P, :Q, :N, :rP))
-
-    X, Y, spl = setup.X, setup.Y, setup.spl
-    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
-    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
-    xs = range(xmin, xmax; length=nx)
-    ys = range(ymin, ymax; length=ny)
-
-    Zpairs = Vector{Pair{Symbol,Matrix{Float64}}}()
-    for f in fields
-        hasproperty(spl, f) || error("setup.spl has no field $(f)")
-        s = getproperty(spl, f)
-        Z = [s(x,y) for x in xs, y in ys]
-        push!(Zpairs, f => Z)
-    end
-    return xs, ys, NamedTuple(Zpairs)
-end
-
-
-# ╔═╡ 94fa6d40-53ae-43f5-a388-e713c00c4b18
-# Evaluate raw spline fields at (ΔT,f)
-function fields_at(spl, ΔT::Real, f::Real)
-    W = max(0.0, spl.W(ΔT,f))
-    P = max(0.0, spl.P(ΔT,f))
-    Q = max(0.0, spl.Q(ΔT,f))
-    N = spl.N(ΔT,f)
-    rP = max(0.0, spl.rP(ΔT,f))
-    return (; W, P, Q, N, rP)
-end
-
-# Add duty/Paux and a few convenience metrics (does not affect optimization)
-
-# ╔═╡ 8a415054-b012-4705-bf24-6268c05cbec4
-function _segments_avoiding_jumps(v::AbstractVector; thresh=:auto)
-    n = length(v); n ≤ 1 && return UnitRange{Int}[]
-    d = abs.(diff(v))
-    if thresh === :auto
-        # robust threshold using median absolute deviation of diffs
-        md = median(d[isfinite.(d)])
-        thresh = 5md   # tweak if needed
-        if !isfinite(thresh) || thresh == 0
-            thresh = maximum(d) * 0.0  # no splits
-        end
-    end
-    brks = findall(d .> thresh)
-    segs = UnitRange{Int}[]
-    s = 1
-    for b in brks
-        push!(segs, s:b)      # inclusive
-        s = b + 1
-    end
-    push!(segs, s:n)
-    segs
-end
-
-# simple centered rolling window (odd width), mean/median
-
-# ╔═╡ 96c15321-842a-4f66-926d-de1638cec610
-function _roll1(v::AbstractVector{<:Real}, method::Symbol, width::Int)
-    @assert isodd(width) "width should be odd"
-    n = length(v); k = (width-1) ÷ 2
-    out = similar(float.(v))
-    @inbounds for i in 1:n
-        lo = max(1, i-k); hi = min(n, i+k)
-        wv = @view v[lo:hi]
-        out[i] = method === :median ? median(wv) :
-                 method === :mean   ? mean(wv)   :
-                 error("method must be :median or :mean")
-    end
-    out
-end
-
-# jump-aware smoothing of selected columns
-
-# ╔═╡ 73744de2-af34-46be-8be6-b12ebbf00b73
-#=╠═╡
-function _smooth_columns(df::DataFrame; cols=Symbol[:ΔT, :f],
-                         method::Symbol=:median, width::Int=7,
-                         jump_thresh=:auto)
-    @assert width ≥ 1 && isodd(width)
-    for c in cols
-        v = collect(df[!, c])
-        segs = _segments_avoiding_jumps(v; thresh=jump_thresh)
-        sm = similar(float.(v))
-        for r in segs
-            sm[r] = _roll1(view(v, r), method, width)
-        end
-        df[!, c] = sm
-    end
-    return df
-end
-  ╠═╡ =#
-
-# ╔═╡ cbef6827-61cc-4c0b-b779-57ac14e28982
-function metrics_at(spl, ΔT::Real, f::Real; Qsp::Real)
-    F = fields_at(spl, ΔT, f)
-    Qhat, W, P = F.Q, F.W, F.P
-    if Qhat >= Qsp
-        duty = Qsp / Qhat
-        Paux = 0.0
-    else
-        duty = 1.0
-        Paux = Qsp - Qhat      # aux heat (and power, since COP_aux = 1)
-    end
-    COP_noaux = Qhat / max(1e-12, (W + P))                # machine-only COP
-    COP3      = (Qhat + Paux) / max(1e-12, (W + P + Paux))# your objective
-    Pin_total = W + P + Paux
-    cap_margin = Qhat - Qsp
-    return merge(F, (; duty, Paux, COP_noaux, COP3, Pin_total, cap_margin,
-                      Qhat=Qhat, meets = Qhat >= Qsp))
-end
-
-# ╔═╡ e63c52e0-678a-4673-a65a-62c422680e2d
-# hard masks; infeasible returns either NaN (for "holes") or 0.0
-function cop3_masked_hard_at(spl::NamedTuple, x::Real, y::Real;
-    Qsp::Real,
-    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
-    Pmax::Real=1.0
-)
-    # feasibility checks
-    if N_bounds !== nothing
-        N̂ = spl.N(x, y)
-        lo, hi = N_bounds
-        if (N̂ < lo) || (N̂ > hi)
-            return 0.0
-        end
-    end
-
-    P̂ = max(0.0, spl.rP(x, y))
-    if isfinite(Pmax) && (P̂ > Pmax)
-        return 0.0
-    end
-
-    # feasible -> base COP3 with hard Paux
-    return cop3_at_hard(spl, x, y; Qsp=Qsp)
-end
-
-
-# ╔═╡ de4fb33c-7af3-4593-bc68-79558eb34f26
-function sample_masked_cop3_hard(setup; Qsp::Real,
-    nx::Int=401, ny::Int=401,
-    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
-    Pmax::Real=1.0, margin::Real=0.0
-)
-    X, Y, spl = setup.X, setup.Y, setup.spl
-    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
-    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
-    xs = range(xmin, xmax; length=nx)
-    ys = range(ymin, ymax; length=ny)
-    Z  = [cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
-                               N_bounds=N_bounds, Pmax=Pmax)
-          for x in xs, y in ys]
-    xs, ys, Z
-end
-
-
-# ╔═╡ c472a38d-369c-4f33-b6ec-708e792ba1e6
-# ╠═╡ disabled = true
-#=╠═╡
-# compute a safe colorrange for a set of matrices (ignore NaNs)
-_safecolorrange_set(Zs::Vector{<:AbstractMatrix}) = begin
-    vals = reduce(vcat, map(vec, Zs))
-    m = .!isnan.(vals)
-    if !any(m)
-        nothing
-    else
-        lo, hi = extrema(vals[m])
-        lo == hi ? (lo-1e-6, hi+1e-6) : (lo, hi)
-    end
-end
-  ╠═╡ =#
-
-# ╔═╡ 899d157e-a242-41bf-92da-466f50e72588
-# pick the right evaluator based on `cop`
-# cop = :plain         -> cop3_at (soft Paux)
-# cop = :masked        -> cop3_masked_at (soft masks + soft Paux)
-# cop = :masked_hard   -> cop3_masked_hard_at (hard masks + hard Paux)
-function _make_cop_eval(spl; cop::Symbol= :masked_hard, Qsp::Real, N_bounds, Pmax::Real)
-    if cop === :masked_hard
-        return (x,y) -> cop3_masked_hard_at(spl, x, y; Qsp=Qsp,
-                                            N_bounds=N_bounds, Pmax=Pmax)
-    else
-        error("cop must be one of :masked_hard; got $cop")
-    end
-end
-
-
-# ╔═╡ cb7178e5-9bc6-45c3-aa11-52972df91fac
-function brute_opt_cop3(setup; Qsp::Real,
-    nx::Int=201, ny::Int=201,
-    xbounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    ybounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    cop::Symbol=:masked_hard,
-    tau::Real=12.0,
-    N_bounds::Union{Nothing,Tuple{Real,Real}}=nothing,
-    Pmax::Real=Inf, kN::Real=30, kP::Real=30,
-    return_field::Bool=false
-)
-    X, Y, spl = setup.X, setup.Y, setup.spl
-    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
-    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
-    xs = range(xmin, xmax; length=nx)
-    ys = range(ymin, ymax; length=ny)
-
-    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp,
-                              N_bounds=N_bounds, Pmax=Pmax)
-
-    Z = [eval_cop(x,y) for x in xs, y in ys]
-
-    Zsafe = copy(Z)
-    @inbounds for j in axes(Zsafe,2), i in axes(Zsafe,1)
-        if !isfinite(Zsafe[i,j]); Zsafe[i,j] = -Inf; end
-    end
-    all(isinf, Zsafe) && error("No finite COP₃ on the grid; adjust bounds or inputs.")
-
-    k = argmax(Zsafe)
-    Ii, Jj = Tuple(CartesianIndices(Zsafe)[k])
-    x̂ = xs[Ii]; ŷ = ys[Jj]; ĉ = Z[Ii,Jj]
-
-    out = (; ΔT=x̂, f=ŷ, COP3=ĉ, Qsp=Qsp, idx=(Ii,Jj), xs, ys)
-    return return_field ? (; out..., Z) : out
-end
-
-
-# ╔═╡ 639e359f-5760-4adb-9258-967d5db2eea4
-function refine_opt_cop3(setup; Qsp::Real,
-    start::Tuple{<:Real,<:Real}, 
-    xbounds=nothing, ybounds=nothing,
-    cop::Symbol=:masked_hard, tau::Real=12.0,
-    N_bounds::Union{Nothing,Tuple{Real,Real}}=(0.3, 1.0),
-    Pmax::Real=1.0, kN::Real=30, kP::Real=30,
-    iterations::Int=10_000,
-    kstarts::Int=10,    # try >1 for multi-start
-    jitter::Real=5e-2  # fraction of range for random nudges
-)
-    X, Y, spl = setup.X, setup.Y, setup.spl
-    xmin, xmax = xbounds === nothing ? (first(X), last(X)) : xbounds
-    ymin, ymax = ybounds === nothing ? (first(Y), last(Y)) : ybounds
-    clampxy(x, y) = (clamp(x, xmin, xmax), clamp(y, ymin, ymax))
-
-    eval_cop = _make_cop_eval(spl; cop=cop, Qsp=Qsp, N_bounds=N_bounds, Pmax=Pmax)
-
-    fneg(v) = begin
-        x, y = clampxy(v[1], v[2])
-        -eval_cop(x, y)
-    end
-
-    # generate kstarts seeds (small interior jitters help escape local traps)
-    rx, ry = (xmax - xmin), (ymax - ymin)
-    seeds = Vector{Vector{Float64}}()
-    x0, y0 = clampxy(start[1], start[2])
-    push!(seeds, [x0, y0])
-    for _ in 2:kstarts
-        δx = (2rand()-1) * jitter * rx
-        δy = (2rand()-1) * jitter * ry
-        push!(seeds, [clamp(x0+δx, xmin, xmax), clamp(y0+δy, ymin, ymax)])
-    end
-
-    best_res, best_val, best_xy = nothing, Inf, (x0,y0)
-    for s in seeds
-        res = Optim.optimize(fneg, s, NelderMead(),
-                             Optim.Options(iterations=iterations, show_trace=false))
-        v̂ = Optim.minimizer(res)
-        x̂, ŷ = clampxy(v̂[1], v̂[2])
-        val = fneg(v̂)
-        if val < best_val
-            best_val, best_res, best_xy = val, res, (x̂,ŷ)
-        end
-    end
-    x̂, ŷ = best_xy
-    COP̂ = eval_cop(x̂, ŷ)
-    return (; ΔT=x̂, f=ŷ, COP3=COP̂, Qsp=Qsp, result=best_res, start=(x0,y0))
-end
-
-
-# ╔═╡ 40d4651c-93c5-41b5-aa2c-685f471d7a02
-"""
-    best_cop_point(setup; Qsp, nx=401, ny=401, do_refine=true, kwargs...)
-
-Return the maximum COP₃ and its location (ΔT*, f*) for a single setpoint `Qsp`.
-
-Arguments
----------
-* `setup` : output of `make_splines`
-* `Qsp`   : heat set-point (W)
-* `nx,ny` : grid resolution for the brute-force pre-scan
-* `do_refine` : if true, refine with Optim starting from the coarse maximum
-* `kwargs...` : forwarded to `brute_opt_cop3` and `refine_opt_cop3`
-                (e.g. `cop=:masked_hard, N_bounds=(0.3,1.0), Pmax=180.0`)
-
-Returns
--------
-NamedTuple `(COP3 = …, ΔT = …, f = …)`.
-"""
-function best_cop_point(setup; Qsp::Real,
-                        nx::Int=401, ny::Int=401,
-                        do_refine::Bool=true,
-                        kwargs...)
-    # coarse brute-force scan
-    brute = brute_opt_cop3(setup; Qsp=Qsp, nx=nx, ny=ny, kwargs...)
-    if do_refine
-        ref   = refine_opt_cop3(setup; Qsp=Qsp,
-                                start=(brute.ΔT, brute.f), kwargs...)
-        return (COP3 = ref.COP3, ΔT = ref.ΔT, f = ref.f)
-    else
-        return (COP3 = brute.COP3, ΔT = brute.ΔT, f = brute.f)
-    end
-end
-
-
-# ╔═╡ db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
-#=╠═╡
-function sweep_best_cop_points(setup; Qs::AbstractVector{<:Real},
-                               nx::Int=401, ny::Int=401,
-                               do_refine::Bool=true,
-                               kwargs...)
-    rows = NamedTuple[]
-    for q in Qs
-        best = best_cop_point(setup; Qsp=q, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
-        push!(rows, (; Qsp=float(q), ΔT=float(best.ΔT), f=float(best.f), COP3=float(best.COP3)))
-    end
-    DataFrame(rows)
-end
-
-  ╠═╡ =#
-
-# ╔═╡ d3d4578d-03c9-4ff8-af77-f84a2b52babe
-function best_cop_point_details(setup; Qsp::Real,
-                                nx::Int=401, ny::Int=401,
-                                do_refine::Bool=true, kwargs...)
-    b = best_cop_point(setup; Qsp=Qsp, nx=nx, ny=ny, do_refine=do_refine, kwargs...)
-    M = metrics_at(setup.spl, b.ΔT, b.f; Qsp=Qsp)
-    return merge((; Qsp=float(Qsp), ΔT=float(b.ΔT), f=float(b.f), COP3=float(b.COP3)), M)
-end
-
-# ╔═╡ ef4aa4e8-aca5-4798-ae3b-bc179fa3480b
-#=╠═╡
-"""
-    sweep_best_with_details(setup; Qs, nx=401, ny=401, do_refine=true;
-                            smooth=nothing, smooth_cols=Symbol[:ΔT, :f],
-                            smooth_method=:median, smooth_width=7, jump_thresh=:auto,
-                            kwargs...)
-
-If `smooth` is not `nothing`, apply a centered rolling filter to `smooth_cols`
-without smoothing across large jumps (detected automatically).
-"""
-function sweep_best_with_details(setup; Qs::AbstractVector{<:Real},
-                                 nx::Int=401, ny::Int=401,
-                                 do_refine::Bool=true,
-                                 smooth::Union{Nothing,Bool}=true,
-                                 smooth_cols::Vector{Symbol}=Symbol[:ΔT, :f],
-                                 smooth_method::Symbol=:median,
-                                 smooth_width::Int=7,
-                                 jump_thresh=:auto,
-                                 kwargs...)
-    rows = NamedTuple[]
-    for q in Qs
-        push!(rows, best_cop_point_details(setup; Qsp=q, nx=nx, ny=ny,
-                                           do_refine=do_refine, kwargs...))
-    end
-    df = DataFrame(rows)
-    if !(smooth === nothing || smooth == false)
-        _smooth_columns(df; cols=smooth_cols,
-                           method=smooth_method,
-                           width=smooth_width,
-                           jump_thresh=jump_thresh)
-    end
-    return df
-end
-
-  ╠═╡ =#
-
-# ╔═╡ 15f52274-d66b-46f2-8b4f-dac7ca039ccb
-#=╠═╡
-"""
-    optimal_controls(setup; Qs, grid_nx=201, grid_ny=201, do_refine=true, kwargs...)
-
-For each setpoint in `Qs`, do a brute grid search (and optional refine).
-Returns a DataFrame with columns: :Qsp, :ΔT, :f, :COP3.
-"""
-function optimal_controls(setup; Qs::AbstractVector{<:Real},
-    grid_nx::Int=201, grid_ny::Int=201, do_refine::Bool=true, kwargs...
-)
-    rows = NamedTuple[]
-    for q in Qs
-        brute = brute_opt_cop3(setup, Qsp=q, nx=grid_nx, ny=grid_ny, kwargs...)
-        if do_refine
-            ref = refine_opt_cop3(setup; Qsp=q, start=(brute.ΔT, brute.f), kwargs...)
-            push!(rows, (; Qsp=float(q), ΔT=float(ref.ΔT), f=float(ref.f), COP3=float(ref.COP3)))
-        else
-            push!(rows, (; Qsp=float(q), ΔT=float(brute.ΔT), f=float(brute.f), COP3=float(brute.COP3)))
-        end
-    end
-    DataFrame(rows)
-end
-  ╠═╡ =#
-
-# ╔═╡ 94138b2d-0fd6-494e-9fd1-ef5aecadaabf
-md" # Plotting functions"
 
 # ╔═╡ bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 #=╠═╡
@@ -5458,14 +5456,14 @@ ovs_plots = [
 
 
     # f_pump guides — dense, unobtrusive (no halo)
-    (z=:r_N_pump, levels=(0.3:0.1:1)[2:end-1], color=CHARCOAL, linewidth=.5, labels=false),
+    (z=:r_N_pump, levels=(0.2:0.1:1)[2:end-1], color=CHARCOAL, linewidth=.5, labels=false),
 
     # f_pump endpoints — highlighted w/ labels + halo
     (z=:r_N_pump, levels=[1.0], color=CHARCOAL, linewidth=2.0, labels=true,
      labelformatter=_level_labelformatter(Dict(1.0 => "f = 1.0"))),
 
-    (z=:r_N_pump, levels=[0.3], color=CHARCOAL, linewidth=2.0, labels=true,
-     labelformatter=_level_labelformatter(Dict(0.3 => "f = 0.3"))),
+    (z=:r_N_pump, levels=[0.2], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(0.2 => "f = 0.2"))),
 
     (z=:P_pump_P_max, levels=[1.0], color=CHARCOAL, linewidth=2.5, labels=true, linestyle=:dashdot, labelformatter=_level_labelformatter(Dict(1.0 => "P pump max"))),
 ]
@@ -5473,6 +5471,39 @@ ovs_plots = [
 
 # ╔═╡ 72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
 ovs_plots
+
+# ╔═╡ 1172258e-a6a2-49f6-8b1a-dd8b562cb6e1
+
+ovs_all = [
+    # Reynolds thresholds — leg 1 (red) with halo
+    (z=:Re_bhe_leg1, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     #halo=true, halocolor=:white, halowidth=1.2,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - down"))),
+
+    (z=:Re_bhe_leg1, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - down"))),
+
+    # Reynolds thresholds — leg 2 (magenta instead of blue) with halo
+    (z=:Re_bhe_leg2, levels=[2300], color=:red, linewidth=1.3, linestyle=:dash, labels=true,
+     labelformatter=_level_labelformatter(Dict(2300 => "onset of turbulence - up"))),
+
+    (z=:Re_bhe_leg2, levels=[4000], color=:red, linewidth=1.3, linestyle=:dot, labels=true,
+     labelformatter=_level_labelformatter(Dict(4000 => "full turbulence - up"))),
+
+
+    # f_pump guides — dense, unobtrusive (no halo)
+    (z=:r_N_pump, levels=(0.1:0.1:1)[2:end-1], color=CHARCOAL, linewidth=.5, labels=false),
+
+    # f_pump endpoints — highlighted w/ labels + halo
+    (z=:r_N_pump, levels=[1.0], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(1.0 => "f = 1.0"))),
+
+    (z=:r_N_pump, levels=[0.2], color=CHARCOAL, linewidth=2.0, labels=true,
+     labelformatter=_level_labelformatter(Dict(0.2 => "f = 0.2"))),
+
+    (z=:P_pump_P_max, levels=[1.0], color=CHARCOAL, linewidth=2.5, labels=true, linestyle=:dashdot, labelformatter=_level_labelformatter(Dict(1.0 => "P pump max"))),
+]
+
 
 # ╔═╡ 7ceca66f-f75a-4ba5-aa44-1f2b6939da77
 
@@ -5775,6 +5806,175 @@ function plot_contourf(df::DataFrame;
     end
 
     return return_axis ? (fig, ax) : fig
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 7bdfe5cc-0f3c-4bed-887d-d5b2b8a4000b
+#=╠═╡
+"""
+    plot_field_with_trajectory(
+        df_grid::DataFrame;
+        # --- base field (same as plot_contourf) ---
+        xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+        xlogbase::Symbol=:log10,
+        levels=10,
+        palette=:viridis, lowclip=nothing, highclip=nothing,
+        labels_for_lines::Bool=false,
+        overlays::Vector=Vector{Any}(),              # extra isolines from same df
+        labelmap::Union{AbstractDict,NamedTuple}=Dict(),
+        overlay_df::Union{Nothing,DataFrame}=nothing,
+        overlay_zcol::Symbol=:COP_3,
+        overlay_levels=nothing,
+        overlay_color::Union{Symbol,RGBAf,RGBf}=:black,
+        overlay_linestyle::Symbol=:dash,
+        overlay_linewidth::Real=1.5,
+        overlay_labels::Bool=false,
+        base_style::Symbol=:filled,                  # :filled | :lines | :none
+        show_colorbar::Bool=true,
+        line_width::Real=1.2,
+        line_color::Union{Nothing,Symbol,RGBAf,RGBf}=nothing,
+        xlabel::Union{Nothing,AbstractString}=nothing,
+        ylabel::Union{Nothing,AbstractString}=nothing,
+        zlabel::Union{Nothing,AbstractString}=nothing,
+        title::Union{Nothing,AbstractString}=nothing,
+
+        # --- trajectory layer (like plot_cop3_with_trajectory) ---
+        df_details::Union{Nothing,DataFrame}=nothing,  # if nothing, no path drawn
+        x_trajectory_col::Symbol=:ΔT,                  # column in df_details (linear ΔT)
+        y_trajectory_col::Symbol=:f,                   # column in df_details
+        traj_color=:black,
+        traj_linewidth::Real=3,
+        halo::Bool=true,
+        halo_color=:white,
+        halo_width::Real=traj_linewidth+2,
+        color_by::Union{Nothing,Symbol}=:Qsp,          # color points by this column
+        scatter_markersize::Real=5,
+        arrows_every::Union{Nothing,Int}=50,           # put arrows every N pts
+        arrows_color=:white,
+        arrows_linewidth::Real=1.5,
+        arrows_size::Real=10,
+
+        # --- output ---
+        save_path::Union{Nothing,AbstractString}=nothing,
+        save_px::Union{Nothing,Tuple{Int,Int}}=nothing,
+        transparent::Bool=false
+    )
+
+Draw the `zcol` field from `df_grid` (filled or line contours), optionally overlay extra
+isolines (from the same grid or a second grid), **and** optionally overlay a trajectory
+from `df_details` using columns `x_trajectory_col` (linear ΔT) and `y_trajectory_col` (e.g. f).
+If `color_by` is a Symbol present in `df_details`, colors the points and adds a colorbar.
+
+Returns the `Figure`.
+"""
+function plot_field_with_trajectory(
+    df_grid::DataFrame;
+    # base options (forwarded to plot_contourf)
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+    xlogbase::Symbol=:log10,
+    levels=10,
+    palette=:viridis, lowclip=nothing, highclip=nothing,
+    labels_for_lines::Bool=false,
+    overlays::Vector=Vector{Any}(),
+    labelmap::Union{AbstractDict,NamedTuple}=Dict(),
+    overlay_df::Union{Nothing,DataFrame}=nothing,
+    overlay_zcol::Symbol=:COP_3,
+    overlay_levels=nothing,
+    overlay_color::Union{Symbol,RGBAf,RGBf}=:black,
+    overlay_linestyle::Symbol=:dash,
+    overlay_linewidth::Real=1.5,
+    overlay_labels::Bool=false,
+    base_style::Symbol=:filled,
+    show_colorbar::Bool=true,
+    line_width::Real=1.2,
+    line_color::Union{Nothing,Symbol,RGBAf,RGBf}=nothing,
+    xlabel::Union{Nothing,AbstractString}=nothing,
+    ylabel::Union{Nothing,AbstractString}=nothing,
+    zlabel::Union{Nothing,AbstractString}=nothing,
+    title::Union{Nothing,AbstractString}=nothing,
+
+    # trajectory options
+    df_details::Union{Nothing,DataFrame}=nothing,
+    x_trajectory_col::Symbol=:ΔT,
+    y_trajectory_col::Symbol=:f,
+    traj_color=:black,
+    traj_linewidth::Real=3,
+    halo::Bool=true,
+    halo_color=:white,
+    halo_width::Real=traj_linewidth+2,
+    color_by::Union{Nothing,Symbol}=:Qsp,
+    scatter_markersize::Real=5,
+    arrows_every::Union{Nothing,Int}=50,
+    arrows_color=:white,
+    arrows_linewidth::Real=1.5,
+    arrows_size::Real=10,
+
+    # output
+    save_path::Union{Nothing,AbstractString}=nothing,
+    save_px::Union{Nothing,Tuple{Int,Int}}=nothing,
+    transparent::Bool=false
+)
+    # 1) draw the base field using your existing helper
+    fig, ax = plot_contourf(
+        df_grid;
+        xcol=xcol, ycol=ycol, zcol=zcol, xlogbase=xlogbase,
+        levels=levels, palette=palette, lowclip=lowclip, highclip=highclip,
+        labels_for_lines=labels_for_lines,
+        overlays=overlays,
+        labelmap=labelmap,
+        overlay_df=overlay_df, overlay_zcol=overlay_zcol,
+        overlay_levels=overlay_levels,
+        overlay_color=overlay_color, overlay_linestyle=overlay_linestyle,
+        overlay_linewidth=overlay_linewidth, overlay_labels=overlay_labels,
+        base_style=base_style, show_colorbar=show_colorbar,
+        line_width=line_width, line_color=line_color,
+        xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, title=title,
+        save_path=nothing, save_px=nothing, transparent=false,  # save at the end
+        return_axis=true
+    )
+
+    # 2) optional trajectory overlay
+    if df_details !== nothing
+        @assert hasproperty(df_details, x_trajectory_col) "df_details missing column $(x_trajectory_col)"
+        @assert hasproperty(df_details, y_trajectory_col) "df_details missing column $(y_trajectory_col)"
+        xs = df_details[!, x_trajectory_col]  # assumed linear ΔT (K) to match invx in base plot
+        ys = df_details[!, y_trajectory_col]
+
+        # halo line (for readability on top of filled contours)
+        if halo
+            lines!(ax, xs, ys; color=halo_color, linewidth=halo_width)
+        end
+        # main path
+        lines!(ax, xs, ys; color=traj_color, linewidth=traj_linewidth)
+
+        # optional colored scatter and colorbar
+        if color_by !== nothing && hasproperty(df_details, color_by)
+            cs = df_details[!, color_by]
+            scatter!(ax, xs, ys; color=cs, colormap=:plasma, markersize=scatter_markersize)
+            Colorbar(fig[1, 3]; colormap=:plasma, limits=extrema(cs),
+                     label=String(color_by), vertical=true)
+        end
+
+        # optional arrows along path
+        if arrows_every !== nothing && length(xs) >= 2
+            idx = 1:arrows_every:(length(xs)-1)
+            pos = Point2f.(xs[idx], ys[idx])
+            dir = Vec2f.(xs[idx .+ 1] .- xs[idx], ys[idx .+ 1] .- ys[idx])
+            arrows!(ax, pos, dir; linewidth=arrows_linewidth, arrowsize=arrows_size, color=arrows_color)
+        end
+    end
+
+    resize_to_layout!(fig)
+
+    # 3) optional saving (defer to end so everything is on the canvas)
+    if save_path !== nothing
+        if save_px !== nothing; resize!(fig, save_px...); end
+        if transparent; fig.scene.backgroundcolor[] = RGBAf(1,1,1,0); end
+        Makie.save(String(save_path), fig)
+    end
+
+    return fig
 end
 
   ╠═╡ =#
@@ -6330,174 +6530,9 @@ df_grid = process_grid_results(
     sols_thermal2, sols_hydraulic2,
     sys_thermal2, sys_hydraulic2;
     name1 = :log_ΔTSF_,
-    name2 = :f_
+    name2 = :f_,
+	target_Q_cond = 4000.0,
 );
-  ╠═╡ =#
-
-# ╔═╡ 02497be0-7d2f-43d1-b365-d4a8d72f045e
-#=╠═╡
-plot_heatmap(df_grid; xlogbase = :log)
-  ╠═╡ =#
-
-# ╔═╡ fc5900c1-9704-4384-9a29-be545faf74d6
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_3, levels=20, 
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ 8262db7e-b994-4afa-b823-661a0bb4949b
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Re_phx, levels=20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Reynolds PHX [-]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ eb8cd9d6-9237-4723-84d3-3f293d74d1e9
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_1, levels=3.0:0.05:4.1,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 1 (Compressor only) [-]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ 0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :COP_2, levels=3.0:0.05:4.1,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 2 (Including pump) [-]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ 6eab6576-10af-432d-abf6-42f424541e5b
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :T_evap,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Evaporation temperature [°C]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ 8dea2e5f-82b5-408e-843d-c25b7d265d48
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,)
-  ╠═╡ =#
-
-# ╔═╡ b153b909-a8b2-4e5d-abe7-a3c1bad81358
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :fr_EV,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Evaporation fraction [-]", title = "Base scenario")
-  ╠═╡ =#
-
-# ╔═╡ 2be85177-c03c-48de-8d4f-c2053fcf2a13
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :η_bh, levels = 20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Borehole effectiveness [-]", title = "")
-  ╠═╡ =#
-
-# ╔═╡ a24d0373-b198-42f6-a6bb-c2ede7259244
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_ref,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 74455461-5277-4fee-a53b-edf34e9e26f4
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :ṁ_sf,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ dc49f979-5f43-4234-864d-acfef268f5f9
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :P_pump, levels = 20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Pump power [W]", title = "")
-  ╠═╡ =#
-
-# ╔═╡ 50af6ba3-363d-4ca6-977a-7eb35919b27b
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Q_evap,levels = 20)
-
-  ╠═╡ =#
-
-# ╔═╡ 88cbfed8-9de9-4421-8dd0-8f42b82234bd
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :Q_cond,levels = 20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Condenser heat duty [W]", title = "")
-
-  ╠═╡ =#
-
-# ╔═╡ 9035962a-af30-4870-8ccb-c340892e81c3
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :r_fc_fp, levels = 20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Pump frequency ratio [-]", title = "")
-  ╠═╡ =#
-
-# ╔═╡ b6a370b1-bfe7-4324-b5a6-6018ddf55e12
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :T_out,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Outlet temperature [°C]", title = "Base scenario",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ d7b463f3-4a9d-4572-9ae6-eb5d4ea47531
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :T_in,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Inlet temperature [°C]", title = "Base scenario",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 60d5e58e-237b-4f13-ba00-c50a5315ffd7
-#=╠═╡
-plot_contourf(df_grid; xlogbase = :log, zcol = :T_bot,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Bottom temperature [°C]", title = "Base scenario",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ b9879207-d8b7-4465-b899-e7656e48e5fc
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.2,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 2 (Including pump) [-]", title = "",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 09b7509b-a308-49a4-966d-33d5ef7f9cb1
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_3, levels=10,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 1945625f-482a-4eda-985d-7112b4cf432d
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:U_EV,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Evaporator UA [W/K]", title = "",
-    overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 7386981b-7839-4588-aa68-5c4b3d461b06
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:U_SH,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Superheater UA [W/K]", title = "",
-    overlays=ovs_plots
-)
   ╠═╡ =#
 
 # ╔═╡ daed3493-da2b-489c-b7ae-5bcd66bfc03b
@@ -6507,7 +6542,7 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Borehole effectiveness [-]", title = "Base scenario",
     overlays=ovs_plots,
-	save_path = joinpath(image_dir, "2d_base", "bh_efficiency.svg")
+	save_path = joinpath(image_dir, "base", "bh_efficiency.svg")
 )
   ╠═╡ =#
 
@@ -6518,7 +6553,7 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    		
 	overlays=ovs_plots,
-	save_path = joinpath(image_dir, "2d_base", "T_inlet.svg")
+	save_path = joinpath(image_dir, "base", "T_inlet.svg")
 )
   ╠═╡ =#
 
@@ -6528,7 +6563,7 @@ plot_contourf(
     df_grid; xlogbase=:log, zcol=:T_in, levels = -0:0.5:10, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Outlet BH temperature [°C]", title = "Base Scenario",    overlays=ovs_plots,
-	save_path = joinpath(image_dir, "2d_base", "T_outlet.svg")
+	save_path = joinpath(image_dir, "base", "T_outlet.svg")
 )
   ╠═╡ =#
 
@@ -6538,19 +6573,48 @@ plot_contourf(
     df_grid; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Base Scenario",    overlays=ovs_plots,
-	save_path = joinpath(image_dir, "2d_base", "T_evap.svg")
+	save_path = joinpath(image_dir, "base", "T_evap.svg")
 )
   ╠═╡ =#
 
 # ╔═╡ 05d571f0-c990-430e-971c-965ba527e814
 #=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 2 [-]", title = "",
-    overlays=ovs_plots,
-	save_path = joinpath(image_dir, "2d_base", "COP2.svg")
+plot_field_with_trajectory(
+    df_grid;
+    # base field (what plot_contourf handled)
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Base scenario",
+    overlays = ovs_all,
+
+
+    # output
+    save_path = joinpath(image_dir, "base", "COP2.svg")
 )
+
+  ╠═╡ =#
+
+# ╔═╡ 280bf3c3-fcad-494e-9433-e8426f5d61ec
+#=╠═╡
+plot_field_with_trajectory(
+    df_grid;
+    # base field (what plot_contourf handled)
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_3, xlogbase=:log,
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 3 [-]",
+    title  = "Base scenario",
+    overlays = ovs_all,
+
+
+    # output
+    save_path = joinpath(image_dir, "base", "COP3.svg")
+)
+
   ╠═╡ =#
 
 # ╔═╡ 9fa61b9f-1d33-444f-9c1e-d7ed70933000
@@ -6563,26 +6627,6 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 42f382a4-7820-4d98-b2ac-ca1ec8a2497b
-#=╠═╡
-plot_contourf(df_grid;
-    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
-			 )
-  ╠═╡ =#
-
-# ╔═╡ beb5c52e-e951-467e-822f-62a4dea6b69c
-#=╠═╡
-plot_contourf(df_grid;
-    xlogbase=:log, zcol=:r_N_pump, levels=0.3:0.05:1.0,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 3 [-]", title = "",
-    overlays=ovs_plots,
-			 )
-  ╠═╡ =#
-
 # ╔═╡ 2f8b1672-934b-4b93-9e05-6169ba730cc8
 #=╠═╡
 plot_contourf(
@@ -6590,24 +6634,6 @@ plot_contourf(
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Pump efficiency [-]", title = "Base scenario",
     overlays=ovs_plots
-)
-  ╠═╡ =#
-
-# ╔═╡ 6ebdb8db-d5cc-4d02-a471-1e29a29ab42b
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:r_COP_3, levels = [0.0, 0.5, 0.7, 0.9, 0.95, 0.99, 0.999,1.0],
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Relative COP 3 [-]", title = ""
-)
-  ╠═╡ =#
-
-# ╔═╡ 1a9a9e58-41ac-45fb-9891-2e2e531621e5
-#=╠═╡
-plot_contourf(
-    df_grid; xlogbase=:log, zcol=:Q_cond, levels = 20,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Relative COP 3 [-]", title = ""
 )
   ╠═╡ =#
 
@@ -6685,29 +6711,38 @@ setup_cop3 = make_splines(df_grid; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
 # Quick single setpoint view (NaNs show light gray):
   ╠═╡ =#
 
-# ╔═╡ c3ad5a50-5f48-49ee-b3fa-032ae47d4402
-#=╠═╡
-fig_rN = plot_rN_contour(setup_cop3;
-    xlogbase=:log,          # matches your other plots
-    levels=0.2:0.05:1.2,    # or just an integer like 12
-    N_bounds=(0.3, 1.0)     # dashed overlays at the feasibility limits
-)
-  ╠═╡ =#
-
 # ╔═╡ a8bc2934-c96e-4475-ae2c-74ec8b665020
 #=╠═╡
-df_details = sweep_best_with_details(setup_cop3; Qs, nx=401, ny=401,
+df_details = sweep_best_with_details(setup_cop3; Qs, nx=601, ny=601,
                                      do_refine=true, cop=:masked_hard,
-                                     N_bounds=(0.3,1.0), Pmax=1.0);
+                                     N_bounds=(0.2,1.0), Pmax=1.0);
 
   ╠═╡ =#
 
-# ╔═╡ 9f9b192e-f820-4e79-be65-e95a5ef193a4
+# ╔═╡ 98c136d4-91f6-409a-bd0c-22e13218b3d6
 #=╠═╡
-fig_traj = plot_cop3_with_trajectory(df_grid, df_details;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:r_COP_3, xlogbase=:log,
-    levels= 20, color_by=:Qsp, arrows_every=7500,
-	save_path = joinpath(image_dir, "base", "overlay_optimal.svg"))
+fig_1 = plot_field_with_trajectory(
+    df_grid;
+    # base field (what plot_contourf handled)
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Base scenario",
+    overlays = ovs_all,
+
+    # trajectory (what plot_cop3_with_trajectory added)
+    df_details = df_details,
+    x_trajectory_col = :ΔT,
+    y_trajectory_col = :f,
+    color_by = :Qsp,
+    arrows_every = 100000,
+
+    # output
+    save_path = joinpath(image_dir, "base", "COP2_overlay_optimal.svg")
+)
+
   ╠═╡ =#
 
 # ╔═╡ 47f7d78a-4076-4974-a6ad-3a1ea3164713
@@ -6717,9 +6752,9 @@ plot_multi_axes_simple(df_details;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.2)],
     xlabel   = "Qsp",
-    title    = "Base scenarioPure Water",
+    title    = "Base scenario",
     size     = (600, 400),
     lw       = 2,
 	save_path = joinpath(image_dir, "base", "optimal.svg")
@@ -6809,24 +6844,6 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 0bc8ed9a-6d4d-4983-a204-9b54ef7a1fa9
-#=╠═╡
-plot_contourf(df_grid_cold;
-    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
-    overlays=ovs_plots,
-			  )
-
-  ╠═╡ =#
-
-# ╔═╡ bba28e41-70b6-409a-a4ec-1a1246261e82
-#=╠═╡
-plot_contourf(df_grid_cold;
-    xlogbase=:log, zcol=:COP_3, levels=2.7:0.1:4.1,
-    overlays=ovs_plots,
-			  )
-
-  ╠═╡ =#
-
 # ╔═╡ 7f0d2585-4675-4a23-830b-1e677da6ff3a
 #=╠═╡
 setup_cold = make_splines(df_grid_cold; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log)
@@ -6834,16 +6851,9 @@ setup_cold = make_splines(df_grid_cold; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:lo
 
 # ╔═╡ 3e4b6ca8-55e6-48d5-a71f-25f62fcafd51
 #=╠═╡
-df_details_cold = sweep_best_with_details(setup_cold; Qs, nx=401, ny=401,
+df_details_cold = sweep_best_with_details(setup_cold; Qs, nx=601, ny=601,
                                      do_refine=true, cop=:masked_hard,
-                                     N_bounds=(0.3,1.0), Pmax=1.0);
-  ╠═╡ =#
-
-# ╔═╡ 55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
-#=╠═╡
-fig_traj_cold = plot_cop3_with_trajectory(df_grid_cold, df_details_cold;
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=12, color_by=:Qsp, arrows_every=75)
+                                     N_bounds=(0.2,1.0), Pmax=1.0);
   ╠═╡ =#
 
 # ╔═╡ 9cf486c2-64da-4560-82ae-d1167165a7c7
@@ -6854,7 +6864,7 @@ plot_multi_axes_simple(df_details_cold;
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
     xlabel   = "Qsp",
-	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.2)],
     title    = "Cold borehole",
     size     = (600, 400),
     lw       = 2,
@@ -6878,7 +6888,8 @@ df_grid_water = process_grid_results(
     sols_thermal_water, sols_hydraulic_water,
     sys_thermal2, sys_hydraulic2;
     name1 = :log_ΔTSF_,
-    name2 = :f_
+    name2 = :f_,
+	target_Q_cond = 4000.0,
 );
   ╠═╡ =#
 
@@ -6927,7 +6938,7 @@ plot_contourf(
 # ╔═╡ e174ba39-dd8c-4af9-88c1-caa504af2c7b
 #=╠═╡
 plot_contourf(
-    df_grid_water; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    df_grid_water; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.1,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Pure water scenario",
     overlays=ovs_plots,
@@ -6977,14 +6988,33 @@ setup_water = make_splines(df_grid_water; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:
 #=╠═╡
 df_details_water = sweep_best_with_details(setup_water; Qs, nx=401, ny=401,
                                      do_refine=true, cop=:masked_hard,
-                                     N_bounds=(0.3,1.0), Pmax=1.0);
+                                     N_bounds=(0.2,1.0), Pmax=1.0);
   ╠═╡ =#
 
-# ╔═╡ 2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
+# ╔═╡ 8cca2e65-6535-41aa-88ad-a9a08a738656
 #=╠═╡
-fig_traj_water = plot_cop3_with_trajectory(df_grid_water, df_details_water;
+fig_water_1 = plot_field_with_trajectory(
+    df_grid_water;
+    # base field (what plot_contourf handled)
     xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=12, color_by=:Qsp, arrows_every=75)
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Water scenario",
+    overlays = ovs_all,
+
+    # trajectory (what plot_cop3_with_trajectory added)
+    df_details = df_details_water,
+    x_trajectory_col = :ΔT,
+    y_trajectory_col = :f,
+    color_by = :Qsp,
+    arrows_every = 100000,
+
+    # output
+    save_path = joinpath(image_dir, "water", "COP2_overlay_optimal.svg")
+)
+
   ╠═╡ =#
 
 # ╔═╡ 2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
@@ -6994,7 +7024,7 @@ plot_multi_axes_simple(df_details_water;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.2)],
     xlabel   = "Qsp",
     title    = "Pure Water",
     size     = (600, 400),
@@ -7019,7 +7049,8 @@ df_grid_pipe = process_grid_results(
     sols_thermal_pipe, sols_hydraulic_pipe,
     sys_thermal2, sys_hydraulic2;
     name1 = :log_ΔTSF_,
-    name2 = :f_
+    name2 = :f_,
+	target_Q_cond = 4000.0,
 );
   ╠═╡ =#
 
@@ -7064,40 +7095,10 @@ plot_contourf(
 )
   ╠═╡ =#
 
-# ╔═╡ 387e3115-866a-4831-bb59-a18edf749375
-#=╠═╡
-plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0, palette=:viridis,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "COP 2 [-]", title = "Wider pipe scenario",
-	save_path = joinpath(image_dir, "wide", "COP2.svg")
-)
-  ╠═╡ =#
-
-# ╔═╡ a7e7ede3-1caa-4483-91f3-c26393f2b45a
-#=╠═╡
-plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:p_r_COP_3, palette=:viridis, levels=-.2:.02:.0,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Relative COP 3 deficit [-]", title = "Wider pipe scenario",
-    #overlays=ovs_plots,
-) 
-  ╠═╡ =#
-
-# ╔═╡ 3862aa96-e219-4d7d-9556-aacf28049d5e
-#=╠═╡
-plot_contourf(
-    df_grid_pipe; xlogbase=:log, zcol=:η_pump,
-    xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
-    zlabel = "Pump efficiency [-]", title = "Wider pipe scenario",
-    #overlays=ovs_plots
-)
-  ╠═╡ =#
-
 # ╔═╡ 8bc61318-43a1-447d-81a5-d2fed06799b2
 #=╠═╡
 plot_contourf(df_grid_pipe;
-    xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:6.8,
+    xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.1,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 3 [-]", title = "",
     #overlays=ovs_plots,
@@ -7120,7 +7121,8 @@ df_grid_long = process_grid_results(
     sols_thermal_long, sols_hydraulic_long,
     sys_thermal2, sys_hydraulic2;
     name1 = :log_ΔTSF_,
-    name2 = :f_
+    name2 = :f_,
+	target_Q_cond = 4000.0,
 );
   ╠═╡ =#
 
@@ -7161,7 +7163,7 @@ plot_contourf(
     df_grid_long; xlogbase=:log, zcol=:T_evap, levels = -5:0.5:5, 
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "Evaporation temperature [°C]", title = "Long BH scenario",
-    overlays=ovs_plots_2,
+    overlays=ovs_plots,
 	save_path = joinpath(image_dir, "long", "T_evap.svg")
 )
   ╠═╡ =#
@@ -7169,7 +7171,7 @@ plot_contourf(
 # ╔═╡ d9a2618d-e923-4370-a20d-b8faf44bf06c
 #=╠═╡
 plot_contourf(
-    df_grid_long; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.0,
+    df_grid_long; xlogbase=:log, zcol=:COP_2, levels=2.7:0.1:4.1,
     xlabel = "ΔT Secondary Fluid [K]", ylabel = "Compressor frequency [Hz]", 
     zlabel = "COP 2 [-]", title = "Longer BH scenario",
     overlays=ovs_plots,
@@ -7189,14 +7191,33 @@ setup_long = make_splines(df_grid_long; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:lo
 #=╠═╡
 df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
                                      do_refine=true, cop=:masked_hard,
-                                     N_bounds=(0.3,1.0), Pmax=1.0);
+                                     N_bounds=(0.2,1.0), Pmax=1.0);
   ╠═╡ =#
 
-# ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╔═╡ d3d0b608-0359-4bb4-9ea4-56e013be34b7
 #=╠═╡
-fig_traj_long = plot_cop3_with_trajectory(df_grid_long, df_details_long;
+fig_long_1 = plot_field_with_trajectory(
+    df_grid_long;
+    # base field (what plot_contourf handled)
     xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=3.2:0.1:4.4, color_by=:Qsp, arrows_every=75)
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Long BH scenario",
+    overlays = ovs_all,
+
+    # trajectory (what plot_cop3_with_trajectory added)
+    df_details = df_details_long,
+    x_trajectory_col = :ΔT,
+    y_trajectory_col = :f,
+    color_by = :Qsp,
+    arrows_every = 100000,
+
+    # output
+    save_path = joinpath(image_dir, "long", "COP2_overlay_optimal.svg")
+)
+
   ╠═╡ =#
 
 # ╔═╡ 70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
@@ -7206,7 +7227,7 @@ plot_multi_axes_simple(df_details_long;
     y_series = [:N, :ΔT, :f, :COP3],
 	sides    = [true, false, true, false],
     ylabels  = ["Relative pump speed (–)",  "ΔT (K)", "Compressor frequency [Hz]", "COP₃ (–)"],
-	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.0)],
+	y_limits = [(-.10, 1.1), (0.5, 6.5), (00.0, 55.0), (2.5, 4.2)],
     xlabel   = "Qsp",
     title    = "Long borehole",
     size     = (600, 400),
@@ -7532,7 +7553,7 @@ df_cloud
   ╠═╡ =#
 
 # ╔═╡ 794b5b4d-62d7-4dda-a379-a7f1d9af7573
-md"## 1) Operators (physics-y, NaN-safe)"
+md"#### Operators (physics-y, NaN-safe)"
 
 
 # ╔═╡ 36f7dc30-ec0b-493b-bdd0-092c393342fa
@@ -7548,7 +7569,7 @@ begin
 end
 
 # ╔═╡ e78e5fac-9201-4208-a643-3583eecae761
-md"## 3) Choose columns + (optional) filter rows"
+md"#### Choose columns + (optional) filter rows"
 
 # ╔═╡ a8a0c668-be27-4e64-8a03-039c3bf07df8
 #=╠═╡
@@ -7580,7 +7601,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ 3812a920-c1f8-4ecd-ae82-8d5ab03b3522
-md"## 4) Fit SR, show best formulas"
+md"#### Fit SR, show best formulas"
 
 # ╔═╡ 76482fe3-b1c0-4a40-a41a-a95362d181ee
 # ╠═╡ show_logs = false
@@ -7603,7 +7624,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ dd40bbe0-6b5c-4bcc-a371-f6a956b7759b
-md"## 5) Predictions on training set + long table"
+md"#### Predictions on training set + long table"
 
 # ╔═╡ 1a0f0c34-0fe2-44ef-b67b-8ecb51732f7f
 # ╠═╡ show_logs = false
@@ -7653,7 +7674,7 @@ plot_pred_vs_actual_long(df_long)
   ╠═╡ =#
 
 # ╔═╡ e2a509cf-f4eb-4db2-9cf9-b390e3c36cd8
-md"## 2-D parametric study (grid → predict → contour)"
+md"#### 2-D parametric study (grid → predict → contour)"
 
 
 # ╔═╡ ce47fdb8-b5ef-4a17-b1a7-a47240576545
@@ -8160,6 +8181,59 @@ end
 # ╔═╡ 37e3be87-dff9-456d-b921-e0e1ecbb4909
 
 TableOfContents()
+
+# ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╠═╡ disabled = true
+#=╠═╡
+fig_cold_1 = plot_field_with_trajectory(
+    df_grid_cold;
+    # base field (what plot_contourf handled)
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Long borehole scenario",
+    overlays = ovs_all,
+
+    # trajectory (what plot_cop3_with_trajectory added)
+    df_details = df_details_cold,
+    x_trajectory_col = :ΔT,
+    y_trajectory_col = :f,
+    color_by = :Qsp,
+    arrows_every = 100000,
+
+    # output
+    save_path = joinpath(image_dir, "cold", "COP2_overlay_optimal.svg")
+)
+
+  ╠═╡ =#
+
+# ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
+#=╠═╡
+fig_cold_1 = plot_field_with_trajectory(
+    df_grid_cold;
+    # base field (what plot_contourf handled)
+    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
+    levels=2.7:0.1:4.1,
+    xlabel = "ΔT Secondary Fluid [K]",
+    ylabel = "Compressor frequency [Hz]",
+    zlabel = "COP 2 [-]",
+    title  = "Long borehole scenario",
+    overlays = ovs_all,
+
+    # trajectory (what plot_cop3_with_trajectory added)
+    df_details = df_details_cold,
+    x_trajectory_col = :ΔT,
+    y_trajectory_col = :f,
+    color_by = :Qsp,
+    arrows_every = 100000,
+
+    # output
+    save_path = joinpath(image_dir, "cold", "COP2_overlay_optimal.svg")
+)
+
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -11782,6 +11856,89 @@ version = "4.1.0+0"
 # ╠═fdddfe24-f560-4a52-9756-ee1d1d6946d3
 # ╠═104492fc-1c63-4571-80e4-2df35b6abdcf
 # ╠═0ab5ba9b-ee1d-4e7b-b16d-29ab59563ff2
+# ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
+# ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
+# ╠═bbf5b367-b6c9-4185-9641-d711914892b6
+# ╠═bed552fa-1a51-492b-8552-81186c96c6a1
+# ╟─473f4d2b-92a3-495c-975d-38738f714fb9
+# ╠═c2755bcf-548b-47ff-be58-b6cbfda319f7
+# ╠═afba0093-bdb2-4ee9-95da-0f4d1933d22c
+# ╠═bdbf26be-8a8b-4c4d-be59-a67ea68226ef
+# ╠═85978ad5-c80a-4eed-b04f-72b57afcc13e
+# ╠═2ce9d158-4156-47db-97bc-efa0e18618b3
+# ╠═aa8498ba-14aa-421d-abb8-67ac1286bd41
+# ╠═0761ab79-e4d9-43c2-b772-fe6df8f333b7
+# ╠═b92cc8df-5884-4129-99fe-d22038b4eb0c
+# ╠═1e116b39-5019-4e87-80eb-13b1a9d9ae58
+# ╠═fb29ede8-6f49-4e14-a6d9-d8caee90e5ba
+# ╠═870d81bf-2254-427b-8471-3c9d23b13a72
+# ╠═977b3df3-0fa4-452f-884b-94b24ec54cf3
+# ╠═1320fac5-2cf2-484d-a01e-98ecd559588d
+# ╠═a3fe0b30-007d-415d-af04-f5712e3d0489
+# ╠═c21e1161-99f5-4d15-adb8-7f7c669eadb0
+# ╠═a03372ef-5a4f-49f4-bc97-28c34996cce4
+# ╠═ea33f723-8f17-4000-b483-eb8f1f9354f3
+# ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
+# ╠═75c8b9a8-942f-4dd3-b0a9-afd0cf462469
+# ╠═b72f0888-4716-48ec-8a99-fc068a988abf
+# ╠═e086552e-9ce0-4353-a16b-395d2986d1a9
+# ╠═dfc85639-a09b-44fa-99af-61706a192549
+# ╠═75878c2e-4909-4c6e-8d44-164502edede0
+# ╠═82682ded-a94f-485b-a927-c9d62ef9d424
+# ╠═5583b4c0-ef58-4c2e-a748-29d6715af892
+# ╠═0151c5f2-20e8-41ec-9b26-4d7187c64bc6
+# ╠═1a532924-5f18-49d2-8bed-1451216cdd02
+# ╠═0caf8f7c-5354-49b1-b202-03ce25b4e32d
+# ╠═dc7866d3-68e8-40de-b82d-26717fff53d9
+# ╠═5e034021-1116-4d1d-8034-d582c8a9643f
+# ╠═e6a2deea-3658-42b3-8ef9-83e31be5a300
+# ╠═f4cd0268-7dab-4bac-90b5-db61cedfebb3
+# ╠═99e84662-a903-424d-b270-d665a52f479f
+# ╠═4217415e-772c-44d2-8c3d-2e85cf01fb1e
+# ╠═21a3e541-8ad9-41de-995a-e2b43221d15a
+# ╠═1ce3b2c5-71ba-4a1f-ab48-961585e57943
+# ╠═5d5f3c09-164b-4a55-9bf1-b2bb90221465
+# ╠═4175c8ba-346c-4afa-9267-ed7e689cff35
+# ╠═a1d20318-072f-4b6c-9718-f33d733a1408
+# ╠═629aaec1-eca1-4b91-910d-5579b49c8df2
+# ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
+# ╠═05d571f0-c990-430e-971c-965ba527e814
+# ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
+# ╠═d9a2618d-e923-4370-a20d-b8faf44bf06c
+# ╠═6ae2052e-907c-49b9-bb51-e2e3b0c641bc
+# ╠═3c2996e1-d1e9-4e44-894f-64c7ccc98e0d
+# ╠═280bf3c3-fcad-494e-9433-e8426f5d61ec
+# ╠═5ce8337c-aae0-476f-914b-854a054b26db
+# ╠═9fa61b9f-1d33-444f-9c1e-d7ed70933000
+# ╠═a0332504-e854-4b16-bb9d-e5f4ca277f40
+# ╠═3b86a38d-9b62-4db0-b943-a1b973eb9b3c
+# ╠═a966eea4-f3e4-46f9-8230-7ab19eb7f905
+# ╠═e2504f4a-6606-4051-b91e-189bbd218edf
+# ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
+# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
+# ╠═8cca2e65-6535-41aa-88ad-a9a08a738656
+# ╠═98c136d4-91f6-409a-bd0c-22e13218b3d6
+# ╠═d3d0b608-0359-4bb4-9ea4-56e013be34b7
+# ╠═1172258e-a6a2-49f6-8b1a-dd8b562cb6e1
+# ╟─75653ae3-55e8-4703-8c09-9dcf7ecc1505
+# ╟─47f7d78a-4076-4974-a6ad-3a1ea3164713
+# ╟─9cf486c2-64da-4560-82ae-d1167165a7c7
+# ╟─70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
+# ╟─2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
+# ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
+# ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
+# ╠═9beedddb-8b5a-4811-98cb-9a26ecd77b52
+# ╠═97b66208-6b79-40dd-bfd9-b710807a4e3f
+# ╠═8bc61318-43a1-447d-81a5-d2fed06799b2
+# ╟─8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
+# ╠═960c408c-3040-4a00-b285-c01080cb1c02
+# ╠═644901ea-7778-4e7d-a5cf-44e34df77827
+# ╠═57e985e5-023c-4389-8e08-2185bed0751a
+# ╠═eac9124f-ffa0-4a9a-948d-3c6e5ec0c7a2
+# ╠═bb90f897-17d3-4a9d-a462-fd6d3f4d98e7
+# ╠═6acbadd7-94f6-4399-ac5f-3a2724ce641c
+# ╠═29e4a45f-7a0b-425b-90d5-b2fc84f43d10
+# ╠═6e2dd049-c583-4e2d-95ec-90796f38732d
 # ╠═a4b78e57-3f4a-4bd1-a4fd-344aed782596
 # ╠═58a5d982-5d07-4a63-950a-ca5639cff43f
 # ╠═89dc461f-71b0-4b91-ab47-a70d2929fec2
@@ -11807,139 +11964,10 @@ version = "4.1.0+0"
 # ╠═798e29fe-16e5-4f68-baad-9edc88509245
 # ╠═05bbe96e-023c-413b-a347-d37e74fad7fe
 # ╠═fecd7f3d-bf0b-464e-a1ad-238e508b0f38
-# ╟─0fe18091-e8f6-42d4-9961-5783452ddefd
-# ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
-# ╠═5575055e-9136-4b4e-925a-ddf82ca1156c
-# ╠═4412cbfc-d470-4003-a2bd-606df1be7022
-# ╠═5bc8d146-8efc-4a71-819e-27f97fb4c411
-# ╠═f8b2fee6-eb35-493c-ac30-331176d9a795
-# ╠═d7384891-c5c0-4614-99cf-0f1cf58f759c
-# ╠═2a40d270-cfbd-4b79-b54b-301db14a7163
-# ╠═8622c9e6-db4a-49de-8a8a-c08dda988556
-# ╠═b451ced6-8933-4c55-9618-089a389a12a4
-# ╠═10e4d4f7-3446-4ba3-8bb2-e311e7e6d51f
-# ╠═06f41f8a-0086-4bce-8823-386cc2ab5ba4
-# ╠═a772e64c-c684-47c8-9f5b-96a85a1917a4
-# ╠═dc5f2677-99b5-4411-8e09-31f56106adda
-# ╠═89c0a373-c9b9-420b-adb1-f21f4c5b2cc3
-# ╠═86429d81-3516-488f-be3d-df2d83bdbae8
-# ╠═4982df2c-016a-4136-a074-b39c1befffb7
-# ╠═c18c39fe-6896-433e-90d4-4a8149ae9b5b
-# ╠═ce0ce754-c26a-4b8d-81d9-8234a165a0c6
-# ╠═bbf5b367-b6c9-4185-9641-d711914892b6
-# ╠═bed552fa-1a51-492b-8552-81186c96c6a1
-# ╟─473f4d2b-92a3-495c-975d-38738f714fb9
-# ╠═c2755bcf-548b-47ff-be58-b6cbfda319f7
-# ╠═afba0093-bdb2-4ee9-95da-0f4d1933d22c
-# ╠═bdbf26be-8a8b-4c4d-be59-a67ea68226ef
-# ╠═85978ad5-c80a-4eed-b04f-72b57afcc13e
-# ╠═2ce9d158-4156-47db-97bc-efa0e18618b3
-# ╠═aa8498ba-14aa-421d-abb8-67ac1286bd41
-# ╠═0761ab79-e4d9-43c2-b772-fe6df8f333b7
-# ╠═b92cc8df-5884-4129-99fe-d22038b4eb0c
-# ╠═1e116b39-5019-4e87-80eb-13b1a9d9ae58
-# ╠═fb29ede8-6f49-4e14-a6d9-d8caee90e5ba
-# ╠═870d81bf-2254-427b-8471-3c9d23b13a72
-# ╠═02497be0-7d2f-43d1-b365-d4a8d72f045e
-# ╠═fc5900c1-9704-4384-9a29-be545faf74d6
-# ╠═8262db7e-b994-4afa-b823-661a0bb4949b
-# ╠═eb8cd9d6-9237-4723-84d3-3f293d74d1e9
-# ╠═0b7c9c92-e263-4a91-bbf9-d32cb0ac7024
-# ╠═6eab6576-10af-432d-abf6-42f424541e5b
-# ╠═8dea2e5f-82b5-408e-843d-c25b7d265d48
-# ╠═b153b909-a8b2-4e5d-abe7-a3c1bad81358
-# ╠═2be85177-c03c-48de-8d4f-c2053fcf2a13
-# ╠═24b94de6-1d03-4225-8fdd-95cac5beb33c
-# ╠═a24d0373-b198-42f6-a6bb-c2ede7259244
-# ╠═74455461-5277-4fee-a53b-edf34e9e26f4
-# ╠═dc49f979-5f43-4234-864d-acfef268f5f9
-# ╠═50af6ba3-363d-4ca6-977a-7eb35919b27b
-# ╠═88cbfed8-9de9-4421-8dd0-8f42b82234bd
-# ╠═9035962a-af30-4870-8ccb-c340892e81c3
-# ╠═b6a370b1-bfe7-4324-b5a6-6018ddf55e12
-# ╠═d7b463f3-4a9d-4572-9ae6-eb5d4ea47531
-# ╠═60d5e58e-237b-4f13-ba00-c50a5315ffd7
-# ╠═b9879207-d8b7-4465-b899-e7656e48e5fc
-# ╠═09b7509b-a308-49a4-966d-33d5ef7f9cb1
-# ╠═1945625f-482a-4eda-985d-7112b4cf432d
-# ╠═7386981b-7839-4588-aa68-5c4b3d461b06
-# ╠═977b3df3-0fa4-452f-884b-94b24ec54cf3
-# ╠═1320fac5-2cf2-484d-a01e-98ecd559588d
-# ╠═a3fe0b30-007d-415d-af04-f5712e3d0489
-# ╠═c21e1161-99f5-4d15-adb8-7f7c669eadb0
-# ╟─ea33f723-8f17-4000-b483-eb8f1f9354f3
-# ╠═daed3493-da2b-489c-b7ae-5bcd66bfc03b
-# ╠═75c8b9a8-942f-4dd3-b0a9-afd0cf462469
-# ╠═b72f0888-4716-48ec-8a99-fc068a988abf
-# ╠═e086552e-9ce0-4353-a16b-395d2986d1a9
-# ╠═dfc85639-a09b-44fa-99af-61706a192549
-# ╟─75878c2e-4909-4c6e-8d44-164502edede0
-# ╠═82682ded-a94f-485b-a927-c9d62ef9d424
-# ╠═5583b4c0-ef58-4c2e-a748-29d6715af892
-# ╠═0151c5f2-20e8-41ec-9b26-4d7187c64bc6
-# ╠═1a532924-5f18-49d2-8bed-1451216cdd02
-# ╠═0caf8f7c-5354-49b1-b202-03ce25b4e32d
-# ╟─dc7866d3-68e8-40de-b82d-26717fff53d9
-# ╠═5e034021-1116-4d1d-8034-d582c8a9643f
-# ╠═e6a2deea-3658-42b3-8ef9-83e31be5a300
-# ╠═f4cd0268-7dab-4bac-90b5-db61cedfebb3
-# ╠═99e84662-a903-424d-b270-d665a52f479f
-# ╠═4217415e-772c-44d2-8c3d-2e85cf01fb1e
-# ╠═21a3e541-8ad9-41de-995a-e2b43221d15a
-# ╠═1ce3b2c5-71ba-4a1f-ab48-961585e57943
-# ╠═5d5f3c09-164b-4a55-9bf1-b2bb90221465
-# ╠═4175c8ba-346c-4afa-9267-ed7e689cff35
-# ╠═a1d20318-072f-4b6c-9718-f33d733a1408
-# ╠═629aaec1-eca1-4b91-910d-5579b49c8df2
-# ╟─712bf240-09c1-4afb-be0d-5d76f9e5bbb1
-# ╠═05d571f0-c990-430e-971c-965ba527e814
-# ╠═e174ba39-dd8c-4af9-88c1-caa504af2c7b
-# ╠═d9a2618d-e923-4370-a20d-b8faf44bf06c
-# ╠═387e3115-866a-4831-bb59-a18edf749375
-# ╠═6ae2052e-907c-49b9-bb51-e2e3b0c641bc
-# ╟─5ce8337c-aae0-476f-914b-854a054b26db
-# ╠═9fa61b9f-1d33-444f-9c1e-d7ed70933000
-# ╠═a0332504-e854-4b16-bb9d-e5f4ca277f40
-# ╠═3b86a38d-9b62-4db0-b943-a1b973eb9b3c
-# ╠═a966eea4-f3e4-46f9-8230-7ab19eb7f905
-# ╠═a7e7ede3-1caa-4483-91f3-c26393f2b45a
-# ╠═e2504f4a-6606-4051-b91e-189bbd218edf
-# ╠═54f9cc26-52cb-458c-93a8-74efb22b6057
-# ╠═9f9b192e-f820-4e79-be65-e95a5ef193a4
-# ╠═42f382a4-7820-4d98-b2ac-ca1ec8a2497b
-# ╠═2fc0f1d3-ba12-4ee6-af86-164c50a1e05a
-# ╠═55a0f9b0-3f41-4327-a9e0-36ad5bfde6a8
-# ╠═639e4130-5c65-4f13-9260-e8e0d469fdd2
-# ╠═beb5c52e-e951-467e-822f-62a4dea6b69c
-# ╠═c3ad5a50-5f48-49ee-b3fa-032ae47d4402
-# ╠═75653ae3-55e8-4703-8c09-9dcf7ecc1505
-# ╠═47f7d78a-4076-4974-a6ad-3a1ea3164713
-# ╠═9cf486c2-64da-4560-82ae-d1167165a7c7
-# ╠═70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
-# ╠═2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
-# ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
-# ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
-# ╠═9beedddb-8b5a-4811-98cb-9a26ecd77b52
-# ╠═3862aa96-e219-4d7d-9556-aacf28049d5e
-# ╠═6ebdb8db-d5cc-4d02-a471-1e29a29ab42b
-# ╠═1a9a9e58-41ac-45fb-9891-2e2e531621e5
-# ╠═97b66208-6b79-40dd-bfd9-b710807a4e3f
-# ╠═8bc61318-43a1-447d-81a5-d2fed06799b2
-# ╠═0bc8ed9a-6d4d-4983-a204-9b54ef7a1fa9
-# ╠═bba28e41-70b6-409a-a4ec-1a1246261e82
-# ╟─8c67c3c7-1452-42cf-a7f6-0a40b5bdd071
-# ╠═960c408c-3040-4a00-b285-c01080cb1c02
-# ╠═644901ea-7778-4e7d-a5cf-44e34df77827
-# ╠═57e985e5-023c-4389-8e08-2185bed0751a
-# ╠═eac9124f-ffa0-4a9a-948d-3c6e5ec0c7a2
-# ╠═bb90f897-17d3-4a9d-a462-fd6d3f4d98e7
-# ╠═6acbadd7-94f6-4399-ac5f-3a2724ce641c
-# ╠═29e4a45f-7a0b-425b-90d5-b2fc84f43d10
-# ╠═6e2dd049-c583-4e2d-95ec-90796f38732d
 # ╠═4e1204d9-eab8-4890-a957-92341c8edfc4
 # ╟─987290e0-8b32-481a-85a0-442b075463cb
-# ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 # ╠═1f4b84eb-7ca1-478e-8e4f-376ac069ea1e
+# ╠═6a624b9b-1e84-4e98-b1a8-60fd8e95cb13
 # ╠═8ddb2096-a2b0-4369-a188-5d972af91428
 # ╠═195ab453-b1f2-4632-9420-091f7f702ed7
 # ╠═517540bb-548e-4b97-8e96-bd674f8a9d18
@@ -11962,7 +11990,6 @@ version = "4.1.0+0"
 # ╠═54809c43-f7c3-493b-b06a-a13bf0a44bc6
 # ╠═7ceca66f-f75a-4ba5-aa44-1f2b6939da77
 # ╠═72ec6c2e-498a-47c1-a15f-31d1e5cd14c7
-# ╠═33c1996a-aade-400a-9b2f-259db12c0835
 # ╠═033594e2-7f94-4b32-b7fa-23490e087918
 # ╠═ff524033-5adc-4235-8891-bdb16d2dda97
 # ╠═8a74d4bc-3dff-4bce-b6bc-f6ac4669ce0e
@@ -11979,6 +12006,7 @@ version = "4.1.0+0"
 # ╟─b9613755-4061-4aec-a50f-b5d739b9df25
 # ╠═769f3480-9062-402b-a43e-9c98e9b63cde
 # ╠═db8f835c-5ffc-41c5-bf82-a2faa6a1b2cd
+# ╠═7bdfe5cc-0f3c-4bed-887d-d5b2b8a4000b
 # ╠═5b3a3a8d-ed44-4565-8dae-2f215d5f4939
 # ╠═40d4651c-93c5-41b5-aa2c-685f471d7a02
 # ╠═cb7178e5-9bc6-45c3-aa11-52972df91fac
@@ -12002,6 +12030,24 @@ version = "4.1.0+0"
 # ╠═c472a38d-369c-4f33-b6ec-708e792ba1e6
 # ╠═899d157e-a242-41bf-92da-466f50e72588
 # ╟─94138b2d-0fd6-494e-9fd1-ef5aecadaabf
+# ╟─0fe18091-e8f6-42d4-9961-5783452ddefd
+# ╟─7d25aec4-c657-410a-8ae4-03195cefbee7
+# ╠═5575055e-9136-4b4e-925a-ddf82ca1156c
+# ╠═4412cbfc-d470-4003-a2bd-606df1be7022
+# ╠═5bc8d146-8efc-4a71-819e-27f97fb4c411
+# ╠═f8b2fee6-eb35-493c-ac30-331176d9a795
+# ╠═d7384891-c5c0-4614-99cf-0f1cf58f759c
+# ╠═2a40d270-cfbd-4b79-b54b-301db14a7163
+# ╠═8622c9e6-db4a-49de-8a8a-c08dda988556
+# ╠═b451ced6-8933-4c55-9618-089a389a12a4
+# ╠═10e4d4f7-3446-4ba3-8bb2-e311e7e6d51f
+# ╠═06f41f8a-0086-4bce-8823-386cc2ab5ba4
+# ╠═a772e64c-c684-47c8-9f5b-96a85a1917a4
+# ╠═dc5f2677-99b5-4411-8e09-31f56106adda
+# ╠═89c0a373-c9b9-420b-adb1-f21f4c5b2cc3
+# ╠═86429d81-3516-488f-be3d-df2d83bdbae8
+# ╠═4982df2c-016a-4136-a074-b39c1befffb7
+# ╠═55347278-7777-484b-ab9a-0bfb7f3d3769
 # ╠═bb0f32e5-f72f-41d1-af47-ed1cbb571bb1
 # ╠═3ec7080c-2972-484b-805e-3d9fe0a7d9d1
 # ╠═7148e421-b7e8-4f3c-a0a9-da3d14dd32e5
@@ -12035,21 +12081,21 @@ version = "4.1.0+0"
 # ╟─31aa8e9b-9122-497f-866f-ef359f7604ad
 # ╠═6ccf5d2b-1e32-4aa6-bea2-f1830e795280
 # ╠═0e0ec7a4-31a2-4583-a8e5-0a44f48d2c59
-# ╟─794b5b4d-62d7-4dda-a379-a7f1d9af7573
+# ╠═794b5b4d-62d7-4dda-a379-a7f1d9af7573
 # ╠═36f7dc30-ec0b-493b-bdd0-092c393342fa
-# ╟─e78e5fac-9201-4208-a643-3583eecae761
+# ╠═e78e5fac-9201-4208-a643-3583eecae761
 # ╠═a8a0c668-be27-4e64-8a03-039c3bf07df8
 # ╠═92b07487-ebec-4026-989a-bf1bcdc9d1c9
-# ╟─3812a920-c1f8-4ecd-ae82-8d5ab03b3522
+# ╠═3812a920-c1f8-4ecd-ae82-8d5ab03b3522
 # ╠═76482fe3-b1c0-4a40-a41a-a95362d181ee
-# ╟─dd40bbe0-6b5c-4bcc-a371-f6a956b7759b
+# ╠═dd40bbe0-6b5c-4bcc-a371-f6a956b7759b
 # ╠═1a0f0c34-0fe2-44ef-b67b-8ecb51732f7f
 # ╠═65f2bffb-80eb-42f6-9685-bd719b0f61ed
 # ╠═e7f2b4bd-7b17-41d8-9c60-a41d88181456
 # ╠═3a4edf4f-d73b-4dd0-a706-da7f14c4801b
 # ╠═01ee0a4e-6d90-44ea-8119-bfd48892bff1
 # ╠═19f8c59d-f243-45db-837c-f664193b24a4
-# ╟─e2a509cf-f4eb-4db2-9cf9-b390e3c36cd8
+# ╠═e2a509cf-f4eb-4db2-9cf9-b390e3c36cd8
 # ╠═ce47fdb8-b5ef-4a17-b1a7-a47240576545
 # ╟─c6469779-0f69-4845-9183-719ecd3b7c26
 # ╟─60a39d0c-f909-48b7-922f-eb88bc11b088
