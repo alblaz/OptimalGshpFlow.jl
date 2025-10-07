@@ -3626,6 +3626,22 @@ md" ## Ridge position"
 # ╔═╡ 54f9cc26-52cb-458c-93a8-74efb22b6057
 md" # COP3 interpolation"
 
+# ╔═╡ c484fc34-3f29-4545-942b-1fef99e6d107
+
+ovs_iso = [
+    (z=:r_N_pump, levels=(0.1:0.1:1), color=CHARCOAL, linewidth=.5, labels=false),
+    (z=:r_fc_fp, levels=(0.2:0.2:1.8), color=:blue, linewidth=.5, labels=false),
+    (z=:Δp_tot, levels=(0.2:0.2:1.8), color=:red, linewidth=.5, labels=false),
+    #(z=:ṁ_ref, levels=10, color=:grey, linewidth=.5, labels=false),
+    (z=:ṁ_sf, levels=10, color=:pink, linewidth=.5, labels=false),
+    #(z=:P_pump_P_max, levels=10, color=:grey, linewidth=.5, labels=false),
+    (z=:pump_compressor, levels=0.02:0.1: 1.0, color=:black, linewidth=.5, labels=false),
+    (z=:ṁ_sf_ref, levels=0.02:0.1: 1.0, color=:yellow, linewidth=.5, labels=false),
+	
+
+]
+
+
 # ╔═╡ 75653ae3-55e8-4703-8c09-9dcf7ecc1505
 md" # Optimal control"
 
@@ -5665,7 +5681,7 @@ end
 # ╔═╡ bf82a17d-f524-4aa7-ab17-eadcc045d6cb
 #=╠═╡
 function plot_contourf(df::DataFrame;
-    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Union{Nothing,Symbol}=:COP_3,
     xlogbase::Symbol=:log10,
     levels=10,
     palette=:viridis, lowclip=nothing, highclip=nothing,
@@ -5682,7 +5698,7 @@ function plot_contourf(df::DataFrame;
 
     # optional second DF overlay (e.g., COP₃ contours from another grid)
     overlay_df::Union{Nothing,DataFrame}=nothing,
-    overlay_zcol::Symbol=:COP_3,
+    overlay_zcol::Union{Nothing,Symbol}=nothing,
     overlay_levels=nothing,
     overlay_color::Union{Symbol,RGBAf,RGBf}=:black,
     overlay_linestyle::Symbol=:dash,
@@ -5787,15 +5803,15 @@ function plot_contourf(df::DataFrame;
     end
 
     # --- NEW: overlay contours from a SECOND grid df (e.g., another COP₃) ---
-    if overlay_df !== nothing
-        X2, Y2, Z2 = _grid_from_df(overlay_df, xcol, ycol, overlay_zcol; invx=invx)
-        lev2 = overlay_levels === nothing ? _default_iso_levels(Z2) :
-               (overlay_levels isa AbstractVector ? Float64.(collect(overlay_levels)) :
-                                                    overlay_levels)
-        contour!(ax, X2, Y2, Z2; levels=lev2, color=overlay_color,
-                 linestyle=overlay_linestyle, linewidth=overlay_linewidth,
-                 labels=overlay_labels)
-    end
+    if overlay_df !== nothing && overlay_zcol !== nothing
+	    X2, Y2, Z2 = _grid_from_df(overlay_df, xcol, ycol, overlay_zcol; invx=invx)
+	    lev2 = overlay_levels === nothing ? _default_iso_levels(Z2) :
+	           (overlay_levels isa AbstractVector ? Float64.(collect(overlay_levels)) :
+	                                                overlay_levels)
+	    contour!(ax, X2, Y2, Z2; levels=lev2, color=overlay_color,
+	             linestyle=overlay_linestyle, linewidth=overlay_linewidth,
+	             labels=overlay_labels)
+	end
 
     resize_to_layout!(fig)
 
@@ -5871,7 +5887,7 @@ Returns the `Figure`.
 function plot_field_with_trajectory(
     df_grid::DataFrame;
     # base options (forwarded to plot_contourf)
-    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Symbol=:COP_3,
+    xcol::Symbol=:log_ΔTSF_, ycol::Symbol=:f_, zcol::Union{Nothing,Symbol}=nothing,
     xlogbase::Symbol=:log10,
     levels=10,
     palette=:viridis, lowclip=nothing, highclip=nothing,
@@ -5879,7 +5895,7 @@ function plot_field_with_trajectory(
     overlays::Vector=Vector{Any}(),
     labelmap::Union{AbstractDict,NamedTuple}=Dict(),
     overlay_df::Union{Nothing,DataFrame}=nothing,
-    overlay_zcol::Symbol=:COP_3,
+    overlay_zcol::Union{Nothing,Symbol}=:COP_3,
     overlay_levels=nothing,
     overlay_color::Union{Symbol,RGBAf,RGBf}=:black,
     overlay_linestyle::Symbol=:dash,
@@ -6288,9 +6304,11 @@ function process_grid_results(
 
 		# scalar, not a 1-element vector
 		f_measured = sys_thermal.cycle.compressor.f
+
+		ṁ_sf_ref = ṁ_sf / ṁ_ref
 		
 		# build the payload without params
-		payload = (;  ṁ_sf, ṁ_ref, T_in, T_mid, T_out, ΔTSF, T_bot, T_evap, T_comp_in,
+		payload = (;  ṁ_sf, ṁ_ref, ṁ_sf_ref, T_in, T_mid, T_out, ΔTSF, T_bot, T_evap, T_comp_in,
 		             Q_evap, Q_cond, W_comp, COP_1, U_EV, U_SH, fr_EV, fr_SH,
 		             Δp_bhe, Δp_phx, Δp_tot, P_pump, N_pump, r_N_pump, η_pump, COP_2,
 		             Re_phx, Re_bhe_leg1, Re_bhe_leg2,
@@ -7179,6 +7197,27 @@ plot_contourf(
 )
   ╠═╡ =#
 
+# ╔═╡ d3d0b608-0359-4bb4-9ea4-56e013be34b7
+#=╠═╡
+plot_field_with_trajectory(
+    df_grid_long;
+    xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:log,
+    zcol=:COP_2,            # ← keep a real symbol (unused for base if :none)
+    base_style=:none,       # ← skip the base field
+    overlay_zcol=nothing,   # ← skip the dashed second-grid overlay
+    overlays=ovs_iso,
+    #levels=2.7:0.1:4.1,
+    xlabel="ΔT Secondary Fluid [K]",
+    ylabel="Compressor frequency [Hz]",
+    #zlabel="COP 2 [-]",
+    title="Long BH scenario",
+    save_path=joinpath(image_dir, "long", "iso.svg"),
+	
+
+)
+
+  ╠═╡ =#
+
 # ╔═╡ cfe9ff8b-6cf5-43a0-bc07-4c77e860c236
 #=╠═╡
 # Build once from your df_grid (already produced by process_grid_results)
@@ -7192,32 +7231,6 @@ setup_long = make_splines(df_grid_long; xcol=:log_ΔTSF_, ycol=:f_, xlogbase=:lo
 df_details_long = sweep_best_with_details(setup_long; Qs, nx=501, ny=501,
                                      do_refine=true, cop=:masked_hard,
                                      N_bounds=(0.2,1.0), Pmax=1.0);
-  ╠═╡ =#
-
-# ╔═╡ d3d0b608-0359-4bb4-9ea4-56e013be34b7
-#=╠═╡
-fig_long_1 = plot_field_with_trajectory(
-    df_grid_long;
-    # base field (what plot_contourf handled)
-    xcol=:log_ΔTSF_, ycol=:f_, zcol=:COP_2, xlogbase=:log,
-    levels=2.7:0.1:4.1,
-    xlabel = "ΔT Secondary Fluid [K]",
-    ylabel = "Compressor frequency [Hz]",
-    zlabel = "COP 2 [-]",
-    title  = "Long BH scenario",
-    overlays = ovs_all,
-
-    # trajectory (what plot_cop3_with_trajectory added)
-    df_details = df_details_long,
-    x_trajectory_col = :ΔT,
-    y_trajectory_col = :f,
-    color_by = :Qsp,
-    arrows_every = 100000,
-
-    # output
-    save_path = joinpath(image_dir, "long", "COP2_overlay_optimal.svg")
-)
-
   ╠═╡ =#
 
 # ╔═╡ 70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
@@ -8183,7 +8196,6 @@ end
 TableOfContents()
 
 # ╔═╡ 639e4130-5c65-4f13-9260-e8e0d469fdd2
-# ╠═╡ disabled = true
 #=╠═╡
 fig_cold_1 = plot_field_with_trajectory(
     df_grid_cold;
@@ -8210,6 +8222,7 @@ fig_cold_1 = plot_field_with_trajectory(
   ╠═╡ =#
 
 # ╔═╡ e2504f4a-6606-4051-b91e-189bbd218edf
+# ╠═╡ disabled = true
 #=╠═╡
 fig_cold_1 = plot_field_with_trajectory(
     df_grid_cold;
@@ -11919,12 +11932,13 @@ version = "4.1.0+0"
 # ╠═8cca2e65-6535-41aa-88ad-a9a08a738656
 # ╠═98c136d4-91f6-409a-bd0c-22e13218b3d6
 # ╠═d3d0b608-0359-4bb4-9ea4-56e013be34b7
+# ╠═c484fc34-3f29-4545-942b-1fef99e6d107
 # ╠═1172258e-a6a2-49f6-8b1a-dd8b562cb6e1
 # ╟─75653ae3-55e8-4703-8c09-9dcf7ecc1505
 # ╟─47f7d78a-4076-4974-a6ad-3a1ea3164713
 # ╟─9cf486c2-64da-4560-82ae-d1167165a7c7
-# ╟─70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
-# ╟─2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
+# ╠═70490cd7-ac6b-4a8e-8d62-550ef3cfc03f
+# ╠═2bd7b681-3e7f-450c-bc2c-b7a2378c08ce
 # ╠═fdfb7456-6d8e-44c8-a883-1d1faeb96ede
 # ╟─2f8b1672-934b-4b93-9e05-6169ba730cc8
 # ╠═9beedddb-8b5a-4811-98cb-9a26ecd77b52

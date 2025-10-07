@@ -47,7 +47,7 @@ However, current understanding of optimal flow control in GSHP systems remains f
 
 <!-- FEEDBACK: Excellent paragraph that clearly states your contribution and approach. The sentence structure is good, though the second sentence is quite long - consider breaking it up for readability. Good use of technical terms like "equation-based modeling approach" and "subsystem boundaries." -->
 
-To address these limitations, this study develops a comprehensive thermal-hydraulic model of GSHP systems that integrates detailed thermodynamic cycle analysis with BHE physics and pump hydraulics. Using the Julia ModelingToolkit ecosystem, we implement an equation-based modeling approach that enables simultaneous solution of all system equations. Our analysis focuses on systems with direct hydraulic coupling between the heat pump and ground heat exchanger, a configuration common in residential and small commercial applications. The main scenario is defined to reflect typical Swedish GSHP installations. Through parametric analysis of the coupled model, we identify fundamental relationships between flow rates, temperature differences, and system performance, providing insights that may inform both system design and control strategy development.
+To address these limitations, this study develops a comprehensive thermal-hydraulic model of GSHP systems that integrates detailed thermodynamic cycle analysis with BHE physics and pump hydraulics. Using the Julia ModelingToolkit ecosystem, we implement an equation-based modeling approach that enables simultaneous solution of all system equations. Our analysis focuses on systems with direct hydraulic coupling between the heat pump and ground heat exchanger, a configuration common in residential and small commercial applications. The main scenario is defined in relation with typical Swedish GSHP installations. Through parametric analysis of the coupled model, we identify fundamental relationships between flow rates, temperature differences, and system performance, providing insights that may inform both system design and control strategy development.
 
 # Literature Review
 
@@ -325,11 +325,11 @@ The model calculates multiple performance indicators:
 -   **$\text{COP}_3$**: $\text{COP}_3 = \frac{\dot{Q}_{cond} + P_{aux}}{P_{comp} + P_{pump} + \dot{Q}_{aux}}$ (including auxiliary heating)
 
 
-### Numerical Implementation:
+## Numerical Implementation:
 
 <!-- FEEDBACK: Good technical details but very brief. Consider expanding on why these specific solvers were chosen and what makes the symbolic computation advantageous for this problem. What does "continuation methods" mean in this context? -->
 
--   **Symbolic computation**: Full symbolic derivation of equations using ModelingToolkit.jl
+<!---   **Symbolic computation**: Full symbolic derivation of equations using ModelingToolkit.jl-->
 
 -   **Robust solvers**: Multiple nonlinear solver options including RobustMultiNewton and TrustRegion methods
 
@@ -347,43 +347,41 @@ The model calculates multiple performance indicators:
 
 ## Single Case Analysis: Physical Process Insights
 
-<!-- REORGANIZATION COMMENT: This section establishes the baseline understanding using a single simulation case -->
-
-<!-- FEEDBACK: Good opening sentence but could be more specific about what "single simulation" means - what are the boundary conditions? -->
-
-In this section, we outline a single simulation case representing a typical Swedish GSHP installation (with the exception of grouting), using the parameters and technical specifications detailed in @sec-appendix-parameters.
+In this section, we outline a single simulation case representing a typical Swedish GSHP installation (with the exception of grouting), using the parameters and technical specifications detailed in @sec-appendix-parameters. The simulations are run on a range of Delta T value accross the BHE, which is the control parameter we are investigating.
 
 ![Thermal resistances in the BHE vs. temperature difference accross the BHE. P stands for pipe, it takes only conduction (pipes + grout) into account. F stands for fluid and includes the previous resistances as well as the convective resistances.](images/thermal_resistances_vs_dt.svg){#fig-thermal-resistances}
 
-@fig-thermal-resistances shows that all the convective thermal resistances are lower at low $\Delta T$, which is expected.
+@fig-thermal-resistances shows that all the convective thermal resistances are lower at low $\Delta T$, which is expected. Indeed, the convective resistance is very much dependent on the flow regime.
 
-Focusing on the borehole heat exchanger (BHE) efficiency, defined as:
+
+![Borehole heat exchanger efficiency vs. temperature difference](images/bh_efficiency_vs_dt.svg){#fig-bh_efficiency}
+
+<!-- FEEDBACK: Good explanation of the BHE efficiency curve. The physical reasoning is clear and the connection to flow regime transitions is well made. Consider clarifying why efficiency dips at the transition—mention the impact of increased thermal resistance in the laminar regime. The explanation of the local minimum at ΔT ≈ 4 K is helpful. For improved clarity, explicitly state that the efficiency penalty is due to the onset of laminar flow and higher convective resistance. -->
+
+@fig-bh-efficiency shows how BHE efficiency varies with the temperature difference control parameter. It is defined as:
 
 $$
 \epsilon = 1 - \frac{T_{out} - T_{wall}}{T_{in} - T_{wall}}
 $$
 
-![Borehole heat exchanger efficiency vs. temperature difference](images/bh_efficiency_vs_dt.svg){#fig-bh-efficiency}
 
-<!-- FEEDBACK: Good explanation of the BHE efficiency curve. The physical reasoning is clear and the connection to flow regime transitions is well made. Consider clarifying why efficiency dips at the transition—mention the impact of increased thermal resistance in the laminar regime. The explanation of the local minimum at ΔT ≈ 4 K is helpful. For improved clarity, explicitly state that the efficiency penalty is due to the onset of laminar flow and higher convective resistance. -->
+The efficiency is low at low $\Delta T$ because of the high flow rates. The general trend is an increase in efficiency with increasing $\Delta T$, since the fluid residency time in the BHE increases. At the transition though, the efficiency experiences a dip. When reaching the laminar region, the efficiency gets penalized by the higher resistances in the BHE. The same overall pattern of increasing efficiency with $\Delta T$ is still present in this second part, but the curveis shifted downwards compared to the turbulent region. This downward shifting leads to a local minimum at around Delta T = 4 K (last laminar region).
 
-@fig-bh-efficiency shows how BHE efficiency varies with the temperature difference control parameter. The efficiency is low at low $\Delta T$ because of the high flow rates. The general trend is an increase in efficiency with increasing $\Delta T$, since the fluid residency time in the BHE increases. At the transition though, the efficiency experiences a dip. When reaching the laminar region, the efficiency gets penalized by the higher resistances in the BHE. The same overall pattern of increasing efficiency with $\Delta T$ is still present in this second part, but the curveis shifted downwards compared to the turbulent region. This downward shifting leads to a local minimum at around Delta T = 4 K (last laminar region).
+Schematically, this better efficiency leads to higher evaporation temperature (@fig-temperature_profiles).
 
-Schematically, this better efficiency leads to higher evaporation temperature:
-
-![Temperature profiles vs. temperature difference](images/temperature_vs_dt.svg){#fig-temperature-profiles}
+![Temperature profiles vs. temperature difference](images/temperature_vs_dt.svg){#fig-temperature_profiles}
 
 Then, this higher temperature leads to a better capacity (due to a higher density at the outlet of the evaporator):
 
-![Energy components breakdown vs. temperature difference](images/energy_components_vs_dt.svg){#fig-energy-components}
+![Energy components breakdown vs. temperature difference](images/energy_components_vs_dt.svg){#fig-energy_components}
 
 <!-- FEEDBACK: Good explanation of the COP3 calculation logic. The physical reasoning about left vs right degradation is sound but could be clearer. "comsumption" should be "consumption". Consider adding specific numbers to quantify the degradation. -->
 
 We observe a clear peak around $\Delta T = 3$ K. On the left, the $\text{COP}_3$ is quickly degraded because of the pump consumption rising quickly. On the right of the optimum, the performances are degraded due to the transition towards a laminar regime in the BHE, which as explained previously degrades the performances of the system too.
 
-![System performance metrics showing COP variations with temperature difference control strategy.](images/cop_vs_dt.svg){#fig-cop-vs-dt}
+![System performance metrics showing COP variations with temperature difference control strategy.](images/cop_vs_dt.svg){#fig-cop_vs_dt}
 
-Zooming in on the COP scale, @fig-cop-vs-dt shows the main metrics we are considering: $\text{COP}$s against the control strategy under investigation: constant temperature difference across the evaporator/BHE.
+Zooming in on the COP scale, @fig-cop_vs_dt shows the main metrics we are considering: $\text{COP}$s against the control strategy under investigation: constant temperature difference across the evaporator/BHE.
 
 The $\text{COP}_3$ is calculated such that the delivered heat is the heat delivered at the maximum case for this frequency (see @sec-method_thermal).
 
@@ -441,6 +439,8 @@ This second region is often not reachable in the base scenario: the pump minimum
 
 Focusing on the position of the ridge, one can see that, in the colder wall collector, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.
 
+@fig-2d_base_cop3 shows the COP 3 for Q demand = 4000 W. 
+
 ### Scenario Variations
 
 <!-- REORGANIZATION COMMENT: This section shows how different system configurations affect the 2D performance maps -->
@@ -466,7 +466,30 @@ To understand the generalizability of our findings, 3 additional scenarios have 
 
 In this part, we used the 2D parametric simulation results of the forward problem (performance simulation for a certain operating point) to find the operating point with maximum $\text{COP}_3$ for a given heating demand. We used interpolations over the 2D grid instead of the model directly to run the optimization for performance reasons.
 
+::: {#fig-traj_rules layout-nrow=1}
+
 ![COP2 and optimal COP3 trajectory for the base case](images/base/COP2_overlay_optimal.svg){#fig-overlay_cop2}
+
+<!--![Range of iso-X curves](images/base/iso.svg){#fig-iso_rules}-->
+
+Optimal trajectory and illustration of iso strategies.
+
+:::
+
+
+**Different rules**
+
+Looking at the graph and coming back to the different ways to control a GSHP secondary fluid (SF) pump, we can make the following remarks about the following constant heuristic strategies:
+
+-   *$\Delta T$:* It necessarily fails at keeping the system on the ridge.
+
+-   *Pressure drop:* strategy could be [TODO: Complete this analysis]
+
+-   *Pump speed:* It cannot track the change either
+
+-   *Compressor speed to pump speed ratio:* performs decently well over the transition [TODO: Add quantitative comparison]
+
+-   *Mass flow:* [TODO: Add analysis]
 
 @fig-overlay_cop2 shows the position of this maximum $\text{COP}_3$ and overlays it on top of the $\text{COP}_2$ graph. The second color bar on the right denotes the heating demand associated with a certain optimal $\text{COP}_3$ point. What we see is that the pump envelope constrains the system at low heating demand. The "laminar optimum" is not reachable, but the lowest pump speed is nonetheless the optimal achievable point. Then there is a point where the system stops chasing the "laminar optimum" and switches instead to the "turbulent optimum". In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.
 
@@ -516,35 +539,18 @@ Then, focusing on the patterns visible at different heating demand, we can disti
 
 <!-- REORGANIZATION COMMENT: This section compares conventional control strategies to the optimal operation -->
 
-Focusing back on our base scenario, a range of control strategies families have been evaluated a similar way as for the optimal signals. In this case, we restrained the optimization space to a 1D subset of the parametric space. For example, looking at @fig-overlay_cop3, a strategy "constant delta T" is restrained to a vertical line. Within this 1D space, the point giving the maximum COP3 for a given demand has been selected, exactly like for the general case.
+<!--Focusing back on our base scenario, a range of control strategies families have been evaluated a similar way as for the optimal signals. In this case, we restrained the optimization space to a 1D subset of the parametric space. For example, looking at @fig-overlay_cop3, a strategy "constant delta T" is restrained to a vertical line. Within this 1D space, the point giving the maximum COP3 for a given demand has been selected, exactly like for the general case.-->
 
 <!-- FEEDBACK: Excellent analysis of control strategies. This is practically valuable. However, some strategies are incomplete (e.g., "strategy could be", "TODO"). Also, what does "SF" stand for? Secondary Fluid? Define acronyms on first use. -->
 
-Looking at the graph and coming back to the different ways to control a GSHP secondary fluid (SF) pump, we can make the following remarks about the following constant heuristic strategies:
 
--   *$\Delta T$:* It necessarily fails at keeping the system on the ridge.
 
--   *Pressure drop:* strategy could be [TODO: Complete this analysis]
-
--   *Pump speed:* It cannot track the change either
-
--   *Compressor speed to pump speed ratio:* performs decently well over the transition [TODO: Add quantitative comparison]
-
--   *Mass flow:* [TODO: Add analysis]
-
-The results have been gathered together in **fig-strategies**. We see that _________. [TODO: Add figure and complete analysis] table-comparison summarizes the key differences. We see that the delta T = 3K performs ____. An "optimal" delta T at __K has been found to be better by XX% compared to the traditional value. However, this number is not entirely meaningful, since the "optimal" value depends heavily on the heating demand profile.
+<!--The results have been gathered together in **fig-strategies**. We see that _________. [TODO: Add figure and complete analysis] table-comparison summarizes the key differences. We see that the delta T = 3K performs ____. An "optimal" delta T at __K has been found to be better by XX% compared to the traditional value. However, this number is not entirely meaningful, since the "optimal" value depends heavily on the heating demand profile.
 
 As for the "constant pressure drop", ______
 
-[TODO: Complete comparative analysis with specific quantitative results]
+[TODO: Complete comparative analysis with specific quantitative results]-->
 
-# Conclusions
-
-<!-- FEEDBACK: Very weak conclusions section. This is too brief and vague for a research paper. You need specific, quantitative conclusions. What exactly is the "considerable potential"? How much improvement is possible? What are the key findings? -->
-
-It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.
-
-<!-- comparison between our optimal signals and the rules: give percentages of increase and so on-->
 
 # Discussion
 
@@ -569,6 +575,16 @@ All in all, this paper contributes to advancing the understanding of optimal ope
 <!--Since the hydraulic model is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performance is expected thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.-->
 
 <!--considerable uncertainty in the localization of the transitionsd, then any rule must take this into account.-->
+
+
+
+# Conclusions
+
+<!-- FEEDBACK: Very weak conclusions section. This is too brief and vague for a research paper. You need specific, quantitative conclusions. What exactly is the "considerable potential"? How much improvement is possible? What are the key findings? -->
+
+<!--It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.-->
+
+<!-- comparison between our optimal signals and the rules: give percentages of increase and so on-->
 
 # Appendix: Model Parameters and Technical Specifications {#sec-appendix-parameters}
 

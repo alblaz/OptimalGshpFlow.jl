@@ -667,13 +667,9 @@ The model calculates multiple performance indicators:
   (including auxiliary heating)
 \end{itemize}
 
-\subsubsection{Numerical
-Implementation:}\label{numerical-implementation}
+\subsection{Numerical Implementation:}\label{numerical-implementation}
 
 \begin{itemize}
-\item
-  \textbf{Symbolic computation}: Full symbolic derivation of equations
-  using ModelingToolkit.jl
 \item
   \textbf{Robust solvers}: Multiple nonlinear solver options including
   RobustMultiNewton and TrustRegion methods
@@ -759,8 +755,8 @@ temperature:
 
 }
 
-\caption{\label{fig-temperature-profiles}Temperature profiles showing
-the effect of improved BHE efficiency}
+\caption{\label{fig-temperature-profiles}Temperature profiles
+vs.~temperature difference}
 
 \end{figure}%
 
@@ -824,8 +820,9 @@ contours represent the \(\text{COP}_3(f)\) (see
 Section~\ref{sec-appendix-parameters}), calculated as follows: This
 \(\text{COP}_3\) is calculated for a given frequency. The maximum
 condenser heat that the HP can deliver at this frequency and then the
-necessary auxiliary heating to match it is added. It's a way to quantify
-the efficiency of the system while not having to choose a target Q cond.
+necessary auxiliary heating to match the target heating demand is added.
+It's a way to quantify the efficiency of the system while not having to
+choose a specific heating demand.
 
 \begin{figure}
 
@@ -929,6 +926,8 @@ the minimum in order to take advantage of the increased BH efficiency
 instead of wasting the pumping power trying to achieve turbulence in the
 collector.
 
+Figure~\ref{fig-2d_base_cop3} shows the COP 3 for Q demand = 4000 W.
+
 \subsubsection{Scenario Variations}\label{scenario-variations}
 
 To understand the generalizability of our findings, 3 additional
@@ -954,25 +953,58 @@ model directly to run the optimization for performance reasons.
 
 \begin{figure}
 
+\begin{minipage}{0.50\linewidth}
+
 \centering{
 
-\pandocbounded{\includegraphics[keepaspectratio]{paper_files/mediabag/images/base/overlay_optimal.pdf}}
+\pandocbounded{\includegraphics[keepaspectratio]{paper_files/mediabag/images/base/COP2_overlay_optimal.pdf}}
 
 }
 
-\caption{\label{fig-overlay_cop3}COP2 and optimal COP3 trajectory for
+\subcaption{\label{fig-overlay_cop2}COP2 and optimal COP3 trajectory for
 the base case}
+
+\end{minipage}%
+%
+\begin{minipage}{0.50\linewidth}
+
+\end{minipage}%
+
+\caption{\label{fig-traj_rules}Optimal trajectory and illustration of
+iso strategies.}
 
 \end{figure}%
 
-Figure~\ref{fig-overlay_cop3} shows the position of this maximum
+\textbf{Different rules}
+
+Looking at the graph and coming back to the different ways to control a
+GSHP secondary fluid (SF) pump, we can make the following remarks about
+the following constant heuristic strategies:
+
+\begin{itemize}
+\item
+  \emph{\(\Delta T\):} It necessarily fails at keeping the system on the
+  ridge.
+\item
+  \emph{Pressure drop:} strategy could be {[}TODO: Complete this
+  analysis{]}
+\item
+  \emph{Pump speed:} It cannot track the change either
+\item
+  \emph{Compressor speed to pump speed ratio:} performs decently well
+  over the transition {[}TODO: Add quantitative comparison{]}
+\item
+  \emph{Mass flow:} {[}TODO: Add analysis{]}
+\end{itemize}
+
+Figure~\ref{fig-overlay_cop2} shows the position of this maximum
 \(\text{COP}_3\) and overlays it on top of the \(\text{COP}_2\) graph.
 The second color bar on the right denotes the heating demand associated
-with a particular \(\text{COP}_3\) point. What we see is that the pump
-envelope constrains the system at low Q heat. The ``laminar optimum'' is
-not reachable, but the lowest pump speed is nonetheless the optimal
-achievable point. Then there is a point where the system stops chasing
-the ``laminar optimum'' and switches instead to the ``turbulent
+with a certain optimal \(\text{COP}_3\) point. What we see is that the
+pump envelope constrains the system at low heating demand. The ``laminar
+optimum'' is not reachable, but the lowest pump speed is nonetheless the
+optimal achievable point. Then there is a point where the system stops
+chasing the ``laminar optimum'' and switches instead to the ``turbulent
 optimum''. In some sense, this is from this point on that it becomes
 worth investing the extra pump capacity in order to achieve better BHE
 efficiency.
@@ -1035,18 +1067,18 @@ heating demand as the x axis.
 \end{figure}%
 
 Figure~\ref{fig-optimals} shows both the maximum \(\text{COP}_3\)
-achievable for a given heat need as well as \(\Delta T\), pump and
+achievable for a given heating demand as well as \(\Delta T\), pump and
 compressor speeds. The figures represent both the base scenario as well
 as the 3 variants we run.
 
-First, we can observe a few general trends:
+First, we can observe some general trends:
 
 \begin{itemize}
 \item
-  The \(\text{COP}_3\) decreases monotonously with the demand: this is
-  expected, since the system can be run intermittently. The plateau at
-  the lowest heating demand is actually such a case: the systems runs at
-  the same point until the capacity is reached.
+  The \(\text{COP}_3\) decreases monotonously with the heating demand:
+  this is expected, since the system can be run intermittently. The
+  plateau at the lowest heating demand is actually such a case: the
+  systems runs at the same point until the capacity is reached.
 \item
   The \(\text{COP}_3\) for the water filled collector are higher than in
   the base case. This is once again expected: it has better
@@ -1061,80 +1093,40 @@ First, we can observe a few general trends:
 \end{itemize}
 
 Then, focusing on the patterns visible at different heating demand, we
-can distinguish:
+can distinguish different zones:
 
 \begin{itemize}
 \item
-  First for low demand, the system operates at a constant operating
-  point: it is forced at minimum compressor speed and minimum pump
-  speed.
+  First for low heating demand, the system operates at a constant
+  operating point: it is forced at minimum compressor speed and minimum
+  pump speed.
 \item
-  Then, once the capacity of this minimum speed is reached, the
-  compressor speed is increased linearly to its maximum value. In
-  parallel, we see that the pump stays at minimum speed, and then slowly
-  ramps up to follow the optimum.
+  Once the capacity of this minimum speed is reached, the compressor
+  speed is increased linearly to its maximum value. In parallel, we see
+  that the pump is still constrained by the minimum speed.
 \item
-  Then there can be a range of heating demand where we observe a
-  constant \(\Delta T\) or slightly sloped \(\Delta T\) vs Pump
-  speed/\(\Delta T\). This is when the system follows the turbulent
-  optimum.
+  We observe a zone where the systems follows a \emph{laminar optimum}
+  which is above the pump minimum speed. In this zone, the pump
+  accelerates slightly.
 \item
-  When the system reaches the maximum capacity, it settles in a regime
-  where the capacity is increased at the cost of a slightly higher pump
-  power, and this allows for less penalty due to the auxiliary heating.
-  However, this change is more subtle (between 0.1 K and 1 K of
-  difference compared to the previous optimal \(\Delta T\)).
+  Then, beyond a certain point, the pump penality becomes small enough
+  and suddenly the pump power to pay in order to achieve better heat
+  transfer is justified: the pump is accelerated.
+\item
+  After the transition to turbulent, the pump is continuously adapted to
+  follow the \emph{turbulent optimum} (the pump acceletates, see
+  Figure~\ref{fig-optimal_base} and Figure~\ref{fig-optimal_long}).
+\item
+  When the system reaches the maximum capacity, we cna observe a last
+  increase of pump speed. The system settles in a regime where the
+  capacity is increased at the cost of a slightly higher pump power, and
+  this allows for less penalty due to the auxiliary heating. However,
+  this change is more subtle (corresponding to a decrease of 0.1 K and 1
+  K in terms of \(\Delta T\)).
 \end{itemize}
 
 \subsection{Comparison to Popular Control
 Strategies}\label{comparison-to-popular-control-strategies}
-
-Focusing back on our base scenario, a range of control strategies
-families have been evaluated a similar way as for the optimal signals.
-In this case, we restrained the optimization space to a 1D subset of the
-parametric space. For example, looking at Figure~\ref{fig-overlay_cop3},
-a strategy ``constant delta T'' is restrained to a vertical line. Within
-this 1D space, the point giving the maximum COP3 for a given demand has
-been selected, exactly like for the general case.
-
-Looking at the graph and coming back to the different ways to control a
-GSHP secondary fluid (SF) pump, we can make the following remarks about
-the following constant heuristic strategies:
-
-\begin{itemize}
-\item
-  \emph{\(\Delta T\):} It necessarily fails at keeping the system on the
-  ridge.
-\item
-  \emph{Pressure drop:} strategy could be {[}TODO: Complete this
-  analysis{]}
-\item
-  \emph{Pump speed:} It cannot track the change either
-\item
-  \emph{Compressor speed to pump speed ratio:} performs decently well
-  over the transition {[}TODO: Add quantitative comparison{]}
-\item
-  \emph{Mass flow:} {[}TODO: Add analysis{]}
-\end{itemize}
-
-The results have been gathered together in \textbf{fig-strategies}. We
-see that \_\_\_\_\_\_\_\_\_. {[}TODO: Add figure and complete
-analysis{]} table-comparison summarizes the key differences. We see that
-the delta T = 3K performs \_\_\_\_. An ``optimal'' delta T at \_\_K has
-been found to be better by XX\% compared to the traditional value.
-However, this number is not entirely meaningful, since the ``optimal''
-value depends heavily on the demand profile.
-
-As for the ``constant pressure drop'', \_\_\_\_\_\_
-
-{[}TODO: Complete comparative analysis with specific quantitative
-results{]}
-
-\section{Conclusions}\label{conclusions}
-
-It seems that the widespread rule based control perform decently in some
-test cases, however, there is considerable potential to increase the
-performances.
 
 \section{Discussion}\label{discussion}
 
@@ -1185,6 +1177,8 @@ All in all, this paper contributes to advancing the understanding of
 optimal operation of GSHP, but more work is necessary in order to
 provide more actionable recommendations to manufacturers and
 practitioners.
+
+\section{Conclusions}\label{conclusions}
 
 \section{Appendix: Model Parameters and Technical
 Specifications}\label{sec-appendix-parameters}

@@ -129,10 +129,8 @@ window.Quarto = {
   <li><a href="#borehole-heat-exchanger" id="toc-borehole-heat-exchanger" class="nav-link" data-scroll-target="#borehole-heat-exchanger"><span class="header-section-number">3.1.3</span> Borehole Heat Exchanger:</a></li>
   </ul></li>
   <li><a href="#pump" id="toc-pump" class="nav-link" data-scroll-target="#pump"><span class="header-section-number">3.2</span> Pump</a></li>
-  <li><a href="#performance-metrics" id="toc-performance-metrics" class="nav-link" data-scroll-target="#performance-metrics"><span class="header-section-number">3.3</span> Performance Metrics:</a>
-  <ul class="collapse">
-  <li><a href="#numerical-implementation" id="toc-numerical-implementation" class="nav-link" data-scroll-target="#numerical-implementation"><span class="header-section-number">3.3.1</span> Numerical Implementation:</a></li>
-  </ul></li>
+  <li><a href="#performance-metrics" id="toc-performance-metrics" class="nav-link" data-scroll-target="#performance-metrics"><span class="header-section-number">3.3</span> Performance Metrics:</a></li>
+  <li><a href="#numerical-implementation" id="toc-numerical-implementation" class="nav-link" data-scroll-target="#numerical-implementation"><span class="header-section-number">3.4</span> Numerical Implementation:</a></li>
   </ul></li>
   <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results"><span class="header-section-number">4</span> Results:</a>
   <ul class="collapse">
@@ -145,8 +143,8 @@ window.Quarto = {
   <li><a href="#optimal-operation-analysis" id="toc-optimal-operation-analysis" class="nav-link" data-scroll-target="#optimal-operation-analysis"><span class="header-section-number">4.3</span> Optimal Operation Analysis</a></li>
   <li><a href="#comparison-to-popular-control-strategies" id="toc-comparison-to-popular-control-strategies" class="nav-link" data-scroll-target="#comparison-to-popular-control-strategies"><span class="header-section-number">4.4</span> Comparison to Popular Control Strategies</a></li>
   </ul></li>
-  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">5</span> Conclusions</a></li>
-  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion"><span class="header-section-number">6</span> Discussion</a></li>
+  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion"><span class="header-section-number">5</span> Discussion</a></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">6</span> Conclusions</a></li>
   <li><a href="#sec-appendix-parameters" id="toc-sec-appendix-parameters" class="nav-link" data-scroll-target="#sec-appendix-parameters"><span class="header-section-number">7</span> Appendix: Model Parameters and Technical Specifications</a>
   <ul class="collapse">
   <li><a href="#system-parameters-and-nomenclature" id="toc-system-parameters-and-nomenclature" class="nav-link" data-scroll-target="#system-parameters-and-nomenclature"><span class="header-section-number">7.1</span> System Parameters and Nomenclature</a></li>
@@ -459,18 +457,18 @@ solvers = [solver_fast, solver_robust, solver_fallback];-->
 <li><p><strong><span class="math inline">\(\text{COP}_2\)</span></strong>: <span class="math inline">\(\text{COP}_2 = \frac{\dot{Q}_{cond}}{P_{comp} + P_{pump}}\)</span> (including pump power)</p></li>
 <li><p><strong><span class="math inline">\(\text{COP}_3\)</span></strong>: <span class="math inline">\(\text{COP}_3 = \frac{\dot{Q}_{cond} + P_{aux}}{P_{comp} + P_{pump} + \dot{Q}_{aux}}\)</span> (including auxiliary heating)</p></li>
 </ul>
-<section id="numerical-implementation" class="level3" data-number="3.3.1">
-<h3 data-number="3.3.1" class="anchored" data-anchor-id="numerical-implementation"><span class="header-section-number">3.3.1</span> Numerical Implementation:</h3>
+</section>
+<section id="numerical-implementation" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="numerical-implementation"><span class="header-section-number">3.4</span> Numerical Implementation:</h2>
 <!-- FEEDBACK: Good technical details but very brief. Consider expanding on why these specific solvers were chosen and what makes the symbolic computation advantageous for this problem. What does "continuation methods" mean in this context? -->
+<!---   **Symbolic computation**: Full symbolic derivation of equations using ModelingToolkit.jl-->
 <ul>
-<li><p><strong>Symbolic computation</strong>: Full symbolic derivation of equations using ModelingToolkit.jl</p></li>
 <li><p><strong>Robust solvers</strong>: Multiple nonlinear solver options including RobustMultiNewton and TrustRegion methods</p></li>
 <li><p><strong>Automatic differentiation</strong>: Forward-mode AD for enhanced convergence properties</p></li>
 <li><p><strong>Continuation methods</strong>: Built-in parameter sweep capabilities with automatic stepping and convergence control</p></li>
 </ul>
 <!-- FEEDBACK: Good cross-reference to appendix. -->
 <p><em>Detailed system base parameters and correlations are provided in <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>.</em></p>
-</section>
 </section>
 </section>
 <section id="results" class="level1" data-number="4">
@@ -515,7 +513,7 @@ Figure&nbsp;2: Borehole heat exchanger efficiency vs.&nbsp;temperature differenc
 <img src="images/temperature_vs_dt.svg" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-temperature-profiles-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Temperature profiles showing the effect of improved BHE efficiency
+Figure&nbsp;3: Temperature profiles vs.&nbsp;temperature difference
 </figcaption>
 </figure>
 </div>
@@ -553,7 +551,7 @@ Figure&nbsp;5: System performance metrics showing COP variations with temperatur
 <!-- REORGANIZATION COMMENT: This section shows the 2D parametric exploration for the base case -->
 <!-- TODO: Move and expand the partial load analysis content here -->
 <!-- FEEDBACK: Incomplete paragraph with placeholder text. "fig XXX" and "Fig YYY" need to be replaced with actual figure references. The Q_demand value (4000W) needs context - is this a typical heating load? What does "lower part of the range has been trimmed" mean exactly? -->
-<p>The following analysis presents a comprehensive 2D parametric exploration where the x-axis represents the set <span class="math inline">\(\Delta T\)</span> for the secondary fluid and the y-axis represents the compressor frequency. The contours represent the <span class="math inline">\(\text{COP}_3(f)\)</span> (see <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>), calculated as follows: This <span class="math inline">\(\text{COP}_3\)</span> is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match it is added. It’s a way to quantify the efficiency of the system while not having to choose a target Q cond.</p>
+<p>The following analysis presents a comprehensive 2D parametric exploration where the x-axis represents the set <span class="math inline">\(\Delta T\)</span> for the secondary fluid and the y-axis represents the compressor frequency. The contours represent the <span class="math inline">\(\text{COP}_3(f)\)</span> (see <a href="#sec-appendix-parameters" class="quarto-xref">Section&nbsp;7</a>), calculated as follows: This <span class="math inline">\(\text{COP}_3\)</span> is calculated for a given frequency. The maximum condenser heat that the HP can deliver at this frequency and then the necessary auxiliary heating to match the target heating demand is added. It’s a way to quantify the efficiency of the system while not having to choose a specific heating demand.</p>
 <div id="fig-2d-base" class="quarto-layout-panel">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-2d-base-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -634,6 +632,7 @@ Figure&nbsp;6: COP 2 and COP 3 contour maps for the base case scenario.
 <p>This second region is often not reachable in the base scenario: the pump minimum speed being too high and therefore does not allow for a low enough SF flow.</p>
 <!-- FEEDBACK: Good transition to practical control strategies. -->
 <p>Focusing on the position of the ridge, one can see that, in the colder wall collector, there seems to be a moment where switching the pump to the minimum in order to take advantage of the increased BH efficiency instead of wasting the pumping power trying to achieve turbulence in the collector.</p>
+<p><a href="#fig-2d_base_cop3" class="quarto-xref">Figure&nbsp;6 (d)</a> shows the COP 3 for Q demand = 4000 W.</p>
 </section>
 <section id="scenario-variations" class="level3" data-number="4.2.2">
 <h3 data-number="4.2.2" class="anchored" data-anchor-id="scenario-variations"><span class="header-section-number">4.2.2</span> Scenario Variations</h3>
@@ -654,17 +653,42 @@ Figure&nbsp;6: COP 2 and COP 3 contour maps for the base case scenario.
 <h2 data-number="4.3" class="anchored" data-anchor-id="optimal-operation-analysis"><span class="header-section-number">4.3</span> Optimal Operation Analysis</h2>
 <!-- REORGANIZATION COMMENT: This section derives and compares optimal operation strategies across all scenarios -->
 <p>In this part, we used the 2D parametric simulation results of the forward problem (performance simulation for a certain operating point) to find the operating point with maximum <span class="math inline">\(\text{COP}_3\)</span> for a given heating demand. We used interpolations over the 2D grid instead of the model directly to run the optimization for performance reasons.</p>
-<div id="fig-overlay_cop3" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div id="fig-traj_rules" class="quarto-layout-panel">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-overlay_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/base/overlay_optimal.svg" class="img-fluid figure-img">
+<div aria-describedby="fig-traj_rules-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-traj_rules" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-overlay_cop2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-overlay_cop2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/base/COP2_overlay_optimal.svg" class="img-fluid figure-img" data-ref-parent="fig-traj_rules">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-overlay_cop3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;7: COP2 and optimal COP3 trajectory for the base case
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-overlay_cop2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(a) COP2 and optimal COP3 trajectory for the base case
 </figcaption>
 </figure>
 </div>
-<p><a href="#fig-overlay_cop3" class="quarto-xref">Figure&nbsp;7</a> shows the position of this maximum <span class="math inline">\(\text{COP}_3\)</span> and overlays it on top of the <span class="math inline">\(\text{COP}_2\)</span> graph. The second color bar on the right denotes the heating demand associated with a particular <span class="math inline">\(\text{COP}_3\)</span> point. What we see is that the pump envelope constrains the system at low Q heat. The “laminar optimum” is not reachable, but the lowest pump speed is nonetheless the optimal achievable point. Then there is a point where the system stops chasing the “laminar optimum” and switches instead to the “turbulent optimum”. In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.</p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<!--![Range of iso-X curves](images/base/iso.svg){#fig-iso_rules}-->
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-traj_rules-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Optimal trajectory and illustration of iso strategies.
+</figcaption>
+</figure>
+</div>
+<p><strong>Different rules</strong></p>
+<p>Looking at the graph and coming back to the different ways to control a GSHP secondary fluid (SF) pump, we can make the following remarks about the following constant heuristic strategies:</p>
+<ul>
+<li><p><em><span class="math inline">\(\Delta T\)</span>:</em> It necessarily fails at keeping the system on the ridge.</p></li>
+<li><p><em>Pressure drop:</em> strategy could be [TODO: Complete this analysis]</p></li>
+<li><p><em>Pump speed:</em> It cannot track the change either</p></li>
+<li><p><em>Compressor speed to pump speed ratio:</em> performs decently well over the transition [TODO: Add quantitative comparison]</p></li>
+<li><p><em>Mass flow:</em> [TODO: Add analysis]</p></li>
+</ul>
+<p><a href="#fig-overlay_cop2" class="quarto-xref">Figure&nbsp;7 (a)</a> shows the position of this maximum <span class="math inline">\(\text{COP}_3\)</span> and overlays it on top of the <span class="math inline">\(\text{COP}_2\)</span> graph. The second color bar on the right denotes the heating demand associated with a certain optimal <span class="math inline">\(\text{COP}_3\)</span> point. What we see is that the pump envelope constrains the system at low heating demand. The “laminar optimum” is not reachable, but the lowest pump speed is nonetheless the optimal achievable point. Then there is a point where the system stops chasing the “laminar optimum” and switches instead to the “turbulent optimum”. In some sense, this is from this point on that it becomes worth investing the extra pump capacity in order to achieve better BHE efficiency.</p>
 <p>We then unfolded the optimal operation onto a single graph, with the heating demand as the x axis.</p>
 <div id="fig-optimals" class="quarto-layout-panel">
 <figure class="quarto-float quarto-float-fig figure">
@@ -727,47 +751,37 @@ Figure&nbsp;8: Optimal operation for the 4 study cases.
 </figcaption>
 </figure>
 </div>
-<p><a href="#fig-optimals" class="quarto-xref">Figure&nbsp;8</a> shows both the maximum <span class="math inline">\(\text{COP}_3\)</span> achievable for a given heat need as well as <span class="math inline">\(\Delta T\)</span>, pump and compressor speeds. The figures represent both the base scenario as well as the 3 variants we run.</p>
-<p>First, we can observe a few general trends:</p>
+<p><a href="#fig-optimals" class="quarto-xref">Figure&nbsp;8</a> shows both the maximum <span class="math inline">\(\text{COP}_3\)</span> achievable for a given heating demand as well as <span class="math inline">\(\Delta T\)</span>, pump and compressor speeds. The figures represent both the base scenario as well as the 3 variants we run.</p>
+<p>First, we can observe some general trends:</p>
 <ul>
-<li><p>The <span class="math inline">\(\text{COP}_3\)</span> decreases monotonously with the demand: this is expected, since the system can be run intermittently. The plateau at the lowest heating demand is actually such a case: the systems runs at the same point until the capacity is reached.</p></li>
+<li><p>The <span class="math inline">\(\text{COP}_3\)</span> decreases monotonously with the heating demand: this is expected, since the system can be run intermittently. The plateau at the lowest heating demand is actually such a case: the systems runs at the same point until the capacity is reached.</p></li>
 <li><p>The <span class="math inline">\(\text{COP}_3\)</span> for the water filled collector are higher than in the base case. This is once again expected: it has better thermophysical properties compared to the MEA we use in the base simulation.</p></li>
 <li><p>The performance is also improved in the case of the longer collector. Two effects are occurring at the same time: there is more pressure drop for the same flow and thermal efficiency is enhanced for the same flow. Regardless, in this case it seems that the performance is slightly increased.</p></li>
 </ul>
-<p>Then, focusing on the patterns visible at different heating demand, we can distinguish:</p>
+<p>Then, focusing on the patterns visible at different heating demand, we can distinguish different zones:</p>
 <ul>
-<li><p>First for low demand, the system operates at a constant operating point: it is forced at minimum compressor speed and minimum pump speed.</p></li>
-<li><p>Then, once the capacity of this minimum speed is reached, the compressor speed is increased linearly to its maximum value. In parallel, we see that the pump stays at minimum speed, and then slowly ramps up to follow the optimum.</p></li>
-<li><p>Then there can be a range of heating demand where we observe a constant <span class="math inline">\(\Delta T\)</span> or slightly sloped <span class="math inline">\(\Delta T\)</span> vs Pump speed/<span class="math inline">\(\Delta T\)</span>. This is when the system follows the turbulent optimum.</p></li>
-<li><p>When the system reaches the maximum capacity, it settles in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for less penalty due to the auxiliary heating. However, this change is more subtle (between 0.1 K and 1 K of difference compared to the previous optimal <span class="math inline">\(\Delta T\)</span>).</p></li>
+<li><p>First for low heating demand, the system operates at a constant operating point: it is forced at minimum compressor speed and minimum pump speed.</p></li>
+<li><p>Once the capacity of this minimum speed is reached, the compressor speed is increased linearly to its maximum value. In parallel, we see that the pump is still constrained by the minimum speed.</p></li>
+<li><p>We observe a zone where the systems follows a <em>laminar optimum</em> which is above the pump minimum speed. In this zone, the pump accelerates slightly.</p></li>
+<li><p>Then, beyond a certain point, the pump penality becomes small enough and suddenly the pump power to pay in order to achieve better heat transfer is justified: the pump is accelerated.</p></li>
+<li><p>After the transition to turbulent, the pump is continuously adapted to follow the <em>turbulent optimum</em> (the pump acceletates, see <a href="#fig-optimal_base" class="quarto-xref">Figure&nbsp;8 (a)</a> and <a href="#fig-optimal_long" class="quarto-xref">Figure&nbsp;8 (b)</a>).</p></li>
+<li><p>When the system reaches the maximum capacity, we cna observe a last increase of pump speed. The system settles in a regime where the capacity is increased at the cost of a slightly higher pump power, and this allows for less penalty due to the auxiliary heating. However, this change is more subtle (corresponding to a decrease of 0.1 K and 1 K in terms of <span class="math inline">\(\Delta T\)</span>).</p></li>
 </ul>
 </section>
 <section id="comparison-to-popular-control-strategies" class="level2" data-number="4.4">
 <h2 data-number="4.4" class="anchored" data-anchor-id="comparison-to-popular-control-strategies"><span class="header-section-number">4.4</span> Comparison to Popular Control Strategies</h2>
 <!-- REORGANIZATION COMMENT: This section compares conventional control strategies to the optimal operation -->
-<p>Focusing back on our base scenario, a range of control strategies families have been evaluated a similar way as for the optimal signals. In this case, we restrained the optimization space to a 1D subset of the parametric space. For example, looking at <a href="#fig-overlay_cop3" class="quarto-xref">Figure&nbsp;7</a>, a strategy “constant delta T” is restrained to a vertical line. Within this 1D space, the point giving the maximum COP3 for a given demand has been selected, exactly like for the general case.</p>
+<!--Focusing back on our base scenario, a range of control strategies families have been evaluated a similar way as for the optimal signals. In this case, we restrained the optimization space to a 1D subset of the parametric space. For example, looking at @fig-overlay_cop3, a strategy "constant delta T" is restrained to a vertical line. Within this 1D space, the point giving the maximum COP3 for a given demand has been selected, exactly like for the general case.-->
 <!-- FEEDBACK: Excellent analysis of control strategies. This is practically valuable. However, some strategies are incomplete (e.g., "strategy could be", "TODO"). Also, what does "SF" stand for? Secondary Fluid? Define acronyms on first use. -->
-<p>Looking at the graph and coming back to the different ways to control a GSHP secondary fluid (SF) pump, we can make the following remarks about the following constant heuristic strategies:</p>
-<ul>
-<li><p><em><span class="math inline">\(\Delta T\)</span>:</em> It necessarily fails at keeping the system on the ridge.</p></li>
-<li><p><em>Pressure drop:</em> strategy could be [TODO: Complete this analysis]</p></li>
-<li><p><em>Pump speed:</em> It cannot track the change either</p></li>
-<li><p><em>Compressor speed to pump speed ratio:</em> performs decently well over the transition [TODO: Add quantitative comparison]</p></li>
-<li><p><em>Mass flow:</em> [TODO: Add analysis]</p></li>
-</ul>
-<p>The results have been gathered together in <strong>fig-strategies</strong>. We see that _________. [TODO: Add figure and complete analysis] table-comparison summarizes the key differences. We see that the delta T = 3K performs ____. An “optimal” delta T at __K has been found to be better by XX% compared to the traditional value. However, this number is not entirely meaningful, since the “optimal” value depends heavily on the demand profile.</p>
-<p>As for the “constant pressure drop”, ______</p>
-<p>[TODO: Complete comparative analysis with specific quantitative results]</p>
+<!--The results have been gathered together in **fig-strategies**. We see that _________. [TODO: Add figure and complete analysis] table-comparison summarizes the key differences. We see that the delta T = 3K performs ____. An "optimal" delta T at __K has been found to be better by XX% compared to the traditional value. However, this number is not entirely meaningful, since the "optimal" value depends heavily on the heating demand profile.
+
+As for the "constant pressure drop", ______
+
+[TODO: Complete comparative analysis with specific quantitative results]-->
 </section>
 </section>
-<section id="conclusions" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
-<!-- FEEDBACK: Very weak conclusions section. This is too brief and vague for a research paper. You need specific, quantitative conclusions. What exactly is the "considerable potential"? How much improvement is possible? What are the key findings? -->
-<p>It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.</p>
-<!-- comparison between our optimal signals and the rules: give percentages of increase and so on-->
-</section>
-<section id="discussion" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Discussion</h1>
+<section id="discussion" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Discussion</h1>
 <p>It remains to be seen if the same heuristic does as well when it comes to e.g.&nbsp;coaxial BHE. We suggest that the models be leveraged in order to produce better heuristics.</p>
 <p>Regarding the role of the flow transition and generalization of these results to devise control heuristics, it is important to remember the present model’s assumptions. In reality, in the transition region, the behaviour is somewhat complicated and not necessarilly smooth. An example of such complexity is the non uniformity of the temperature in the legs of the collector. due to these temeprature differences, some region of the fluid could very well be turbulent while another is laminar. Beyond these thermophisical effects, there is of course some turbulence introduced at the top and bottom, du to the singularities in the piping. These turbulences either die out at some length or remain stable depending on th conditions.</p>
 <p>However, as shown in sec-comparison-constant, the classic rule based control strategies cannot track this transition point in a satisfactory manner.</p>
@@ -779,6 +793,12 @@ Figure&nbsp;8: Optimal operation for the 4 study cases.
 <!-- also depends on the specific pump that is used, what range, how effective, etc -->
 <!--Since the hydraulic model is decoupled from the thermal model, there is no feedback from hydraulic losses to the thermal model, which is a limitation that affects the high flow simulations. In reality, better performance is expected thanks to the added heat in the heat source loop, both because of electrical losses as well as the conversion of work into heat due to frictional losses.-->
 <!--considerable uncertainty in the localization of the transitionsd, then any rule must take this into account.-->
+</section>
+<section id="conclusions" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Conclusions</h1>
+<!-- FEEDBACK: Very weak conclusions section. This is too brief and vague for a research paper. You need specific, quantitative conclusions. What exactly is the "considerable potential"? How much improvement is possible? What are the key findings? -->
+<!--It seems that the widespread rule based control perform decently in some test cases, however, there is considerable potential to increase the performances.-->
+<!-- comparison between our optimal signals and the rules: give percentages of increase and so on-->
 </section>
 <section id="sec-appendix-parameters" class="level1" data-number="7">
 <h1 data-number="7"><span class="header-section-number">7</span> Appendix: Model Parameters and Technical Specifications</h1>

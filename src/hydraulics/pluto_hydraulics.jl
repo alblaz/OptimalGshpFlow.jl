@@ -2427,6 +2427,7 @@ end
   ╠═╡ =#
 
 # ╔═╡ e9fecb1f-357f-47c0-a90d-f7b8a677b55e
+#=╠═╡
 """
 Analyze the impact of pump speed on power consumption for a geothermal loop.
 Returns a DataFrame with pump speeds, mass flow rates, and power consumption.
@@ -2493,6 +2494,7 @@ function analyze_pump_speed_vs_consumption(;
     
     return df
 end
+  ╠═╡ =#
 
 # ╔═╡ 5a3b2bdc-b1be-491b-8339-b597338a58b3
 # ╠═╡ disabled = true
@@ -5546,7 +5548,6 @@ version = "1.9.2+0"
 # ╠═4f21cf92-9f70-46e5-9f2e-1ccecbf2d0a6
 # ╠═e8bd8c77-2a84-4737-bdf3-ebf23a78f0aa
 # ╠═165e8538-776f-4c46-86c2-d43f3bb302e2
-# ╠═de4cfe89-bc6c-4cbf-96c8-345df5fa6041
 # ╠═12b98c45-6b61-4ea0-bfb5-4fa152be4ab1
 # ╟─cecce7db-5dc5-4c47-a666-af62bfe707a2
 # ╠═771bc84e-cb07-4be7-a129-5772749dc845
