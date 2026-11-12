@@ -43,7 +43,7 @@ y = sigmoid_01_to_R(x)
 
 mapping x ∈ (0,1) => y ∈ (-∞,+∞)
 """
-sigmoid_01_to_R(x) = -log((1 + x)/x)
+sigmoid_01_to_R(x) = log(x/(1 - x))
 
 """
 x = sigmoid_R_to_ab(y,a,b)
