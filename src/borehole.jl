@@ -61,7 +61,9 @@ Model a borehole with a single U-pipe with burial depth `D` and length `H`.
     R_cache::SMatrix{2, 2, T, 4} = @SMatrix zeros(2, 2)
     A::MMatrix{2, 2, T, 4} = @MMatrix zeros(2, 2)
     method::ExpMethodHigham2005 = ExpMethodHigham2005(false)
-    exp_cache::Tuple{Vector{MMatrix{2, 2, T, 4}}, Vector{T}} = ExponentialUtilities.alloc_mem(A, method)
+    # NB: A, method and exp_cache are currently unused. exp_cache is typed `Any` (not left bare: @deftype would make it T) because the
+    # return type of `alloc_mem` changed across ExponentialUtilities versions (1.37: Higham2005Cache).
+    exp_cache::Any = ExponentialUtilities.alloc_mem(A, method)
 end
 
 get_H(bh::SingleUPipeBorehole{T}) where {T <: Real} = bh.H
