@@ -16,9 +16,8 @@ Read it at the start of a session and update it when a branch is finished.
   second commit.
 - Open PRs with `/opt/homebrew/bin/gh` (it is not on the PATH of the Bash tool). PR bodies
   end with the Claude Code attribution line.
-- The user's uncommitted `.gitignore` change (`/assets/docs`) must stay uncommitted and must
-  not be lost: never `git reset --hard` or `git checkout -- .` with a dirty tree; use
-  `git stash` or a separate worktree.
+- Never discard uncommitted work: no `git reset --hard` or `git checkout -- .` with a dirty
+  tree; use `git stash` or a separate worktree.
 - `assets/docs/` holds reference papers (gitignored): Qiao 2025 on ε-NTU with glide, and an
   article on the laminar-turbulent transition in horizontal pipes (not used yet).
 - `legacy` branch: the original code (main at 5c0a87d) plus the sigmoid fix, kept for reference.
@@ -39,7 +38,7 @@ Read it at the start of a session and update it when a branch is finished.
 - `src/models.jl`: residual functions `evaporator_model!`, `evaporatorborehole_model!`,
   `borehole_model!`, plus constructors of the solution types.
 - `src/fluidproperties.jl`: spline-based `Refrigerant` and `SecondaryFluid` (CoolProp sampling).
-- `src/properties/clapeyron_refrigerant.jl` (PR #23): `ClapeyronRefrigerant` (Clapeyron + CoolProp or
+- `src/properties/clapeyron_refrigerant.jl`: `ClapeyronRefrigerant` (Clapeyron + CoolProp or
   EntropyScaling transport); pass `phase = :vapor/:liquid` whenever the phase is known.
 - `src/utilities.jl`: maps between bounded intervals and ℝ (linear, tanh, sigmoid).
 - `src/borehole.jl`, `src/pipeflow.jl`, `src/plateheatexchanger.jl`, `src/compressor.jl`,

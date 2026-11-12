@@ -15,12 +15,12 @@ unconstrained solvers can be used.
 ## Roadmap
 | # | Branch | Content | Status |
 |---|--------|---------|--------|
-| B1 | `fix/sigmoid-inverse` | `sigmoid_01_to_R` was not the inverse of the sigmoid | PR #18 |
-| B3 | `fix/refrigerant-pcrit-sampling` | spline sampling up to `pcrit` (CoolProp error, cp ringing), below triple point; kwargs ignored | PR #19 |
-| B5 | `fix/borehole-exp-cache` | `SingleUPipeBorehole` not constructible with ExponentialUtilities 1.37 | PR #20, **merge before #21/#22** |
-| B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | PR #21 (stacked on #20) |
-| B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | PR #22 (stacked on #20) |
-| 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | PR #23 |
+| B1 | `fix/sigmoid-inverse` | `sigmoid_01_to_R` was not the inverse of the sigmoid | merged (#18) |
+| B3 | `fix/refrigerant-pcrit-sampling` | spline sampling up to `pcrit` (CoolProp error, cp ringing), below triple point; kwargs ignored | merged (#19) |
+| B5 | `fix/borehole-exp-cache` | `SingleUPipeBorehole` not constructible with ExponentialUtilities 1.37 | merged (#20) |
+| B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
+| B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
+| 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **next** |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
@@ -28,6 +28,7 @@ unconstrained solvers can be used.
 | 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
+| – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
 Known bug, not fixed yet (B4): `models.jl` maps the pressure with
 `sigmoid_R_to_ab(u, refrigerant.pr_min, refrigerant.pcrit)`, so the lower bound is
@@ -78,8 +79,7 @@ property is then an explicit Helmholtz evaluation (`VT_*`, ≈ 0.5 µs, exact AD
 iterations. The outer Newton iteration acts as the warm start, and nothing is interpolated, so
 there is no spline mesh error.
 
-Base the branch on `main` after PRs #18–#23 are merged; otherwise R290 splines and boreholes
-are broken.
+Base the branch on up-to-date `main` (all prerequisite fixes are merged).
 
 1. **Interface (`AbstractRefrigerant`).** One set of functions used by the models:
    - saturation at p: `T_dew`, `T_bubble`, `h_dew`, `ρ_dew`, ...;
