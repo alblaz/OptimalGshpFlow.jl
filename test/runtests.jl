@@ -7,6 +7,7 @@ include("./fluidproperties.jl")
 include("./pipeflow.jl")
 include("./borehole.jl")
 include("./borehole_coupling.jl")
+include("./properties_clapeyron.jl")
 # include("./models.jl")
 
 @testset "OptimalGshpFlow.jl" begin

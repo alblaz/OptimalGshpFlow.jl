@@ -5,6 +5,7 @@ using CoolProp, Interpolations
 using StaticArrays, Parameters, ExponentialUtilities
 using RequiredInterfaces
 using LambertW
+import Clapeyron, EntropyScaling, ForwardDiff
 
 include("utilities.jl")
 export linearmap_01_to_ab, linearmap_ab_to_01
@@ -17,6 +18,11 @@ export SecondaryFluid
 # export secondary_fluid
 export Refrigerant
 #export  RefrigerantSaturatedVapor, RefrigerantSuperHeatedVapor, refrigerant_twophaseregion, refrigerant_superheated
+
+include("properties/clapeyron_refrigerant.jl")
+export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
+export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew, cp_twophase
+export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT, T_ps, h_ps
 
 include("evaporatordesign.jl")
 include("pipeflow.jl")        # before borehole.jl: defines NusseltTransition
