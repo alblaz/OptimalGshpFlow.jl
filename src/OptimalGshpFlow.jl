@@ -19,11 +19,11 @@ export Refrigerant
 #export  RefrigerantSaturatedVapor, RefrigerantSuperHeatedVapor, refrigerant_twophaseregion, refrigerant_superheated
 
 include("evaporatordesign.jl")
+include("pipeflow.jl")        # before borehole.jl: defines NusseltTransition
 include("borehole.jl")
 include("plateheatexchanger.jl")
 include("solutiontypes.jl")
 include("heatexchanger.jl")
-include("pipeflow.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
@@ -35,7 +35,8 @@ export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBo
 export Borehole, SingleUPipeBorehole
 
 # from "pipeflow.jl"
-export nusselt_circularpipe, h_circularpipe 
+export nusselt_circularpipe, h_circularpipe
+export NusseltTransition, SmoothTransition, SharpTransition
 
 # from "plateheatexchanger.jl"
 export PlateHeatExchanger, h_platehex_wanniarachchi
