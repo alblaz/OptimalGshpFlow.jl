@@ -34,9 +34,12 @@ using ForwardDiff
 end
 
 @testset "ClapeyronRefrigerant transport" begin
+    # defaults: CoolProp for pure fluids, EntropyScaling for mixtures
+    @test ClapeyronRefrigerant("R290").transport isa CoolPropTransport
+    @test ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.5, 0.5]).transport isa EntropyScalingTransport
     # CoolProp backend: identical to CoolProp
     for f in ("R290", "R134a", "R32")
-        r = ClapeyronRefrigerant(f; transport = CoolPropTransport())
+        r = ClapeyronRefrigerant(f)
         p = 0.1 * r.pcrit; T = T_dew(r, p) + 5
         @test μ_pT(r, p, T) ≈ PropsSI("V", "P", p, "T", T, f) rtol = 1e-12
         @test λ_pT(r, p, T) ≈ PropsSI("CONDUCTIVITY", "P", p, "T", T, f) rtol = 1e-12
@@ -46,7 +49,7 @@ end
     # EntropyScaling backend (RefpropRES): sanity bounds only. Measured deviations vs CoolProp in
     # the vapour: μ within ≈ 9 %, λ up to ≈ 16 % (R290); see examples/properties_validation.jl
     for f in ("R290", "R134a", "R32")
-        r = ClapeyronRefrigerant(f)
+        r = ClapeyronRefrigerant(f; transport = EntropyScalingTransport())
         for pr in (0.05, 0.15, 0.4)
             p = pr * r.pcrit; T = T_dew(r, p) + 5
             @test μ_pT(r, p, T; phase = :vapor) ≈ PropsSI("V", "P", p, "T", T, f) rtol = 0.10
@@ -57,8 +60,8 @@ end
 end
 
 @testset "ClapeyronRefrigerant automatic differentiation" begin
-    r  = ClapeyronRefrigerant("R290")
-    rc = ClapeyronRefrigerant("R290"; transport = CoolPropTransport())
+    r  = ClapeyronRefrigerant("R290"; transport = EntropyScalingTransport())
+    rc = ClapeyronRefrigerant("R290")       # CoolProp transport
     p  = 4.7e5
     T  = T_dew(r, p) + 5
     s  = s_pT(r, p, T)
@@ -77,6 +80,9 @@ end
     end
     # dh/ds at constant p is the temperature
     @test ForwardDiff.derivative(x -> h_ps(r, 15e5, x), s) ≈ T_ps(r, 15e5, s) rtol = 1e-8
+    # phase hint and initial guess give the same result
+    @test h_ps(r, 15e5, s; phase = :vapor, T0 = 330.) ≈ h_ps(r, 15e5, s) rtol = 1e-10
+    @test h_pT(r, p, T; phase = :vapor) ≈ h_pT(r, p, T) rtol = 1e-12
 end
 
 @testset "ClapeyronRefrigerant mixture (R454C)" begin

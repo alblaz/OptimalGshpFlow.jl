@@ -20,11 +20,12 @@ CoolProp to round-off.
 
 How viscosity and thermal conductivity are computed for a [`ClapeyronRefrigerant`](@ref).
 
-- `EntropyScalingTransport()`: EntropyScaling.jl `RefpropRES` model. Works for pure fluids and
-  mixtures and with automatic differentiation. Accuracy vs CoolProp (pure fluids, vapour):
-  viscosity within ≈ 2–9 %, thermal conductivity within ≈ 2 % (R134a) to ≈ 16 % (R290).
-- `CoolPropTransport()`: CoolProp reference correlations (pure fluids only). Derivatives for AD
-  are computed by central finite differences.
+- `CoolPropTransport()` (default for pure fluids): CoolProp reference correlations. Pure fluids
+  only. Derivatives for AD are computed by central finite differences.
+- `EntropyScalingTransport()` (default for mixtures): EntropyScaling.jl `RefpropRES` model. Works
+  for mixtures and with automatic differentiation. Accuracy vs CoolProp (pure fluids, vapour,
+  reduced pressure 0.02–0.7): viscosity within ≈ 5–14 %, thermal conductivity within ≈ 6–17 %
+  (R290: +17 %); liquid within ≈ 4 %.
 """
 abstract type TransportBackend end
 struct EntropyScalingTransport <: TransportBackend end
@@ -42,7 +43,7 @@ const ENTROPYSCALING_NAMES = Dict(
 
 """
     ClapeyronRefrigerant(components; mass_fractions = nothing, mole_fractions = nothing,
-                         transport = EntropyScalingTransport(), name = ...)
+                         transport = nothing, name = ...)
 
 Refrigerant whose properties are computed on the fly with Clapeyron.jl (multi-parameter
 Helmholtz equations of state, `MultiFluid`).
@@ -51,8 +52,12 @@ Helmholtz equations of state, `MultiFluid`).
 - `mass_fractions` / `mole_fractions`: composition of a mixture (one of them is required for
   mixtures). Refrigerant blends are usually specified by mass, e.g. R454C:
   `ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])`.
-- `transport`: [`TransportBackend`](@ref), `EntropyScalingTransport()` (default) or
-  `CoolPropTransport()` (pure fluids only).
+- `transport`: [`TransportBackend`](@ref). Default (`nothing`): `CoolPropTransport()` for a pure
+  fluid, `EntropyScalingTransport()` for a mixture.
+
+Performance: pass `phase = :vapor` (or `:liquid`) to the `(p, T)` functions whenever the phase is
+known. With the default `phase = :unknown` both volume roots are computed and compared, which is
+≈ 5–20× slower.
 
 Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (molar mass, kg/mol),
 `Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`).
@@ -71,10 +76,11 @@ end
 
 function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
                               mass_fractions = nothing, mole_fractions = nothing,
-                              transport::TransportBackend = EntropyScalingTransport(),
+                              transport::Union{Nothing, TransportBackend} = nothing,
                               name = join(components, "&"))
     comps = String.(components)
     n = length(comps)
+    transport === nothing && (transport = n == 1 ? CoolPropTransport() : EntropyScalingTransport())
     eos = Clapeyron.MultiFluid(comps)
     Mi = Clapeyron.mw(eos) ./ 1000                     # kg/mol
 
@@ -198,10 +204,12 @@ cp_pT(r::ClapeyronRefrigerant, p, T; phase = :unknown) = Clapeyron.isobaric_heat
 # isentropic           #
 ########################
 
-"Temperature [K] at pressure `p` and specific entropy `s` [J/kg/K] (p-s flash)."
-T_ps(r::ClapeyronRefrigerant, p, s) = Clapeyron.PS.temperature(r.eos, p, s * r.M, r.z)
-"Specific enthalpy [J/kg] at pressure `p` and specific entropy `s` (e.g. isentropic compressor outlet)."
-h_ps(r::ClapeyronRefrigerant, p, s) = h_pT(r, p, T_ps(r, p, s))
+"Temperature [K] at pressure `p` and specific entropy `s` [J/kg/K] (p-s flash). `T0`: optional initial guess."
+T_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing) =
+    T0 === nothing ? Clapeyron.PS.temperature(r.eos, p, s * r.M, r.z; phase = phase) :
+                     Clapeyron.PS.temperature(r.eos, p, s * r.M, r.z; phase = phase, T0 = T0)
+"Specific enthalpy [J/kg] at pressure `p` and specific entropy `s` (e.g. isentropic compressor outlet: `phase = :vapor`)."
+h_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing) = h_pT(r, p, T_ps(r, p, s; phase = phase, T0 = T0); phase = phase)
 
 ########################
 # transport internals  #

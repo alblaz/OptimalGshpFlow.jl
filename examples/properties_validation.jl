@@ -18,7 +18,7 @@ pct(x) = @sprintf("%+7.2f%%", 100x)
 println("Maximum deviation vs CoolProp, superheated vapour (ΔT = 2…20 K) and saturated states, pr = 0.02…0.7")
 println(rpad("fluid", 8), rpad("h", 10), rpad("ρ", 10), rpad("cp", 10), rpad("μ (ES)", 10), rpad("λ (ES)", 10))
 for f in ("R290", "R134a", "R32", "R1234yf")
-    r = ClapeyronRefrigerant(f)
+    r = ClapeyronRefrigerant(f; transport = EntropyScalingTransport())
     e = Dict(k => 0.0 for k in (:h, :ρ, :cp, :μ, :λ))
     upd!(k, x) = !isnan(x) && abs(x) > abs(e[k]) && (e[k] = x)
     for pr in (0.02, 0.05, 0.1, 0.2, 0.4, 0.7)
@@ -63,7 +63,7 @@ function timeit(f, n = 500)
     end
     return t / n * 1e6   # µs
 end
-r   = ClapeyronRefrigerant("R290")
+r   = ClapeyronRefrigerant("R290"; transport = EntropyScalingTransport())
 spl = try
     Refrigerant("R290")
 catch       # spline construction for R290 needs the sampling fix (fix/refrigerant-pcrit-sampling)
@@ -80,9 +80,12 @@ spline_cases = spl === nothing ? () : (
 for (label, f) in (spline_cases...,
         ("Clapeyron T_dew",                    () -> T_dew(r, p)),
         ("Clapeyron h_dew",                    () -> h_dew(r, p)),
-        ("Clapeyron h_pT",                     () -> h_pT(r, p, T)),
+        ("Clapeyron h_pT (phase unknown)",     () -> h_pT(r, p, T)),
+        ("Clapeyron h_pT (phase = :vapor)",    () -> h_pT(r, p, T; phase = :vapor)),
         ("Clapeyron h_ps (compressor outlet)", () -> h_ps(r, 15e5, s)),
-        ("EntropyScaling λ_pT",                () -> λ_pT(r, p, T)),
+        ("Clapeyron h_ps (:vapor, T0 guess)",  () -> h_ps(r, 15e5, s; phase = :vapor, T0 = 330.)),
+        ("EntropyScaling λ_pT (phase unknown)",() -> λ_pT(r, p, T)),
+        ("EntropyScaling λ_pT (:vapor)",       () -> λ_pT(r, p, T; phase = :vapor)),
         ("Clapeyron T_dew (R454C mixture)",    () -> T_dew(mx, p)),
         ("CoolProp PropsSI h(p,T)",            () -> PropsSI("H", "P", p, "T", T, "R290")),
         ("ForwardDiff dh_dew/dp",              () -> ForwardDiff.derivative(q -> h_dew(r, q), p)))
