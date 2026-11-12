@@ -12,6 +12,12 @@ export linearmap_01_to_ab, linearmap_ab_to_01
 export tanhmap_01_to_R, tanhmap_R_to_01, tanhmap_ab_to_R, tanhmap_R_to_ab
 export sigmoid_01_to_R, sigmoid_R_to_01, sigmoid_ab_to_R, sigmoid_R_to_ab
 
+include("properties/interface.jl")
+export AbstractRefrigerant, critical_pressure, molar_mass, pressure_bounds
+export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew
+export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT
+export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superheated, λ_superheated
+
 include("fluidproperties.jl")
 # export interpolate_sf_properties, interpolate_ref_properties_twophaseregion, interpolate_ref_properties_superheatedregion
 export SecondaryFluid 
@@ -21,8 +27,7 @@ export Refrigerant
 
 include("properties/clapeyron_refrigerant.jl")
 export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
-export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew, cp_twophase
-export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT, T_ps, h_ps
+export cp_twophase, T_ps, h_ps
 
 include("evaporatordesign.jl")
 include("pipeflow.jl")        # before borehole.jl: defines NusseltTransition

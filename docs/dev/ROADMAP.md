@@ -21,7 +21,7 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **next** |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-step 1 done) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit | |
@@ -92,6 +92,24 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
 
    Check: with the spline backend the residuals are bit-identical to `main`; with Clapeyron
    the solutions differ from the splines only by the spline error.
+
+   **Done** (`src/properties/interface.jl`, `test/property_interface.jl`):
+   - `AbstractRefrigerant` with `critical_pressure`, `molar_mass`, `pressure_bounds`, dew-point
+     functions, `(p, T)` functions and `*_superheated(r, p, ΔT)` (vapour `ΔT` above the dew
+     point; the spline backend interpolates in `(log10 p, ΔT)` directly, so it stays bit-exact).
+   - `evaporator_model!`/`evaporatorborehole_model!` share `evaporator_residuals!`; the
+     parameter structs are parametric in the refrigerant type (so `EvaporatorParameters(p;
+     refrigerant = other)` cannot switch backend: build a new struct).
+   - `pressure_bounds(::Refrigerant) = (pr_min, pcrit)` keeps B4 for bit-identity;
+     `ClapeyronRefrigerant` uses `(0, pcrit)`.
+   - Results (R290, 6 kW design, Ts_h = 278 K): spline residuals `==` the copy of main's; the
+     Clapeyron solution matches the spline one to 1.6e-9 in pe, ≤ 1e-8 in the heat flows and ≤ 1e-7 K
+     (also coupled to the borehole). Newton (ForwardDiff Jacobian) from the fixed design guess:
+     6 iterations with either backend.
+   - Cost per call: residual 8 µs (spline) vs 280 µs (Clapeyron + CoolProp transport); Jacobian
+     9 µs vs 1.1 ms. Each Clapeyron residual repeats the dew-point solve 8 times and calls
+     CoolProp for μ, λ with finite-difference derivatives: this is what sub-steps 2–3 target.
+   - Not ported: `compressor_power`/`condenser_power` (still CoolProp by name, `::Refrigerant`).
 2. **(T, v) state layer** for `ClapeyronRefrigerant`:
    - `state = (T, v)` with `p_Tv`, `h_Tv`, `s_Tv`, `cp_Tv`, `ρ_Tv`;
    - transport from (ρ, T). To verify: EntropyScaling density-based methods without Unitful;

@@ -94,7 +94,7 @@ struct RefrigerantSaturatedVapor
   - `pcrit`: critical pressure
 
 """
-struct Refrigerant
+struct Refrigerant <: AbstractRefrigerant
     name::String
     saturated_vapor::RefrigerantSaturatedVapor
     superheated_vapor::RefrigerantSuperHeatedVapor
@@ -267,3 +267,41 @@ function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns 
     spl = ( h =splpsΔT_H, ρ = splpsΔT_ρ,  cp = splpsΔT_cp,  μ=splpsΔT_μ, λ =  splpsΔT_λ, s =  splpsΔT_s  )
     return spl
 end
+
+##################################################
+# property interface (see properties/interface.jl) #
+##################################################
+
+# The spline backend covers saturated and superheated vapour of a pure fluid only.
+# Properties are interpolated in log10(p) (and in the superheat ΔT); outside the sampled range
+# the splines extrapolate flat.
+
+pressure_bounds(r::Refrigerant) = (r.pr_min, r.pcrit)   # B4: pr_min read as Pa, see pressure_bounds
+
+T_dew(r::Refrigerant, p)  = r.saturated_vapor.T(log10(p))
+T_bubble(r::Refrigerant, p) = T_dew(r, p)               # pure fluid
+h_dew(r::Refrigerant, p)  = r.saturated_vapor.h(log10(p))
+ρ_dew(r::Refrigerant, p)  = r.saturated_vapor.ρ(log10(p))
+s_dew(r::Refrigerant, p)  = r.saturated_vapor.s(log10(p))
+cp_dew(r::Refrigerant, p) = r.saturated_vapor.cp(log10(p))
+μ_dew(r::Refrigerant, p)  = r.saturated_vapor.μ(log10(p))
+λ_dew(r::Refrigerant, p)  = r.saturated_vapor.λ(log10(p))
+
+h_superheated(r::Refrigerant, p, ΔT)  = r.superheated_vapor.h(log10(p), ΔT)
+s_superheated(r::Refrigerant, p, ΔT)  = r.superheated_vapor.s(log10(p), ΔT)
+ρ_superheated(r::Refrigerant, p, ΔT)  = r.superheated_vapor.ρ(log10(p), ΔT)
+cp_superheated(r::Refrigerant, p, ΔT) = r.superheated_vapor.cp(log10(p), ΔT)
+μ_superheated(r::Refrigerant, p, ΔT)  = r.superheated_vapor.μ(log10(p), ΔT)
+λ_superheated(r::Refrigerant, p, ΔT)  = r.superheated_vapor.λ(log10(p), ΔT)
+
+# (p, T) access: vapour only, T at or above the dew point (within the sampled superheat range)
+function _spline_superheat(r::Refrigerant, p, T, phase)
+    phase === :liquid && throw(ArgumentError("the spline Refrigerant has no liquid-phase properties"))
+    return T - T_dew(r, p)
+end
+h_pT(r::Refrigerant, p, T; phase = :vapor)  = h_superheated(r, p, _spline_superheat(r, p, T, phase))
+s_pT(r::Refrigerant, p, T; phase = :vapor)  = s_superheated(r, p, _spline_superheat(r, p, T, phase))
+ρ_pT(r::Refrigerant, p, T; phase = :vapor)  = ρ_superheated(r, p, _spline_superheat(r, p, T, phase))
+cp_pT(r::Refrigerant, p, T; phase = :vapor) = cp_superheated(r, p, _spline_superheat(r, p, T, phase))
+μ_pT(r::Refrigerant, p, T; phase = :vapor)  = μ_superheated(r, p, _spline_superheat(r, p, T, phase))
+λ_pT(r::Refrigerant, p, T; phase = :vapor)  = λ_superheated(r, p, _spline_superheat(r, p, T, phase))

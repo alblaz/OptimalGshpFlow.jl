@@ -62,7 +62,7 @@ known. With the default `phase = :unknown` both volume roots are computed and co
 Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (molar mass, kg/mol),
 `Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`).
 """
-struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM}
+struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigerant
     name::String
     components::Vector{String}
     eos::E
@@ -112,6 +112,9 @@ ClapeyronRefrigerant(component::AbstractString; kwargs...) =
     ClapeyronRefrigerant([component]; name = component, kwargs...)
 
 ispure(r::ClapeyronRefrigerant) = length(r.components) == 1
+
+# no lower bound: the saturation solver works down to the triple point
+pressure_bounds(r::ClapeyronRefrigerant) = (zero(r.pcrit), r.pcrit)
 
 Base.show(io::IO, r::ClapeyronRefrigerant) =
     print(io, "ClapeyronRefrigerant(", r.name, ", z = ", r.z, ", transport = ", nameof(typeof(r.transport)), ")")
