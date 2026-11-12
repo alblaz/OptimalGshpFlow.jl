@@ -1,23 +1,34 @@
-# evaluate nusselt number for flow in pipe for given value of Reynolds and Prandtl number
-# currently for Reynolds greater than 10000 we use Dittus-Boelter correlation which require
-# knowledge on whether the fluid is heated or cooled. The choosen default is that the fluid is heated.
+# Nusselt number for fully developed flow in a circular pipe.
+# Laminar (Re ≤ 2300): constant wall temperature value 3.657.
+# Turbulent (Re ≥ 1e4): Dittus-Boelter, which requires knowing whether the fluid is heated or cooled
+# (default: heated).
+# Transition (2300 < Re < 1e4): linear interpolation in Re between the two values at the boundaries
+# (Gnielinski 2013 / VDI Heat Atlas), so that Nu is continuous in Re. A discontinuous Nu makes the
+# borehole equations lose their root when Re crosses a regime boundary.
+const RE_LAMINAR   = 2300.
+const RE_TURBULENT = 1e4
+const NU_LAMINAR   = 3.657
+
+nusselt_dittusboelter(Re, Pr; mode = "heating") = 0.023 * Re^0.8 * Pr^(mode == "heating" ? 0.3 : 0.4)
+
 """
-`Nu = circularpipe_nusselt(Re, Pr; mode = "heating")``
+`Nu = nusselt_circularpipe(Re, Pr; mode = "heating")`
 
-`Nu`,`Re` and `Pr` are respectively the Nusselt, Reynold and the Prandtl numbers. The keyword argument takes either "heating" or "cooling"
+`Nu`,`Re` and `Pr` are respectively the Nusselt, Reynold and the Prandtl numbers. The keyword argument takes either "heating" or "cooling".
 
+- `Re ≤ 2300`: laminar, `Nu = 3.657`
+- `Re ≥ 1e4`: turbulent, Dittus-Boelter
+- in between: linear interpolation in `Re` between the laminar value and Dittus-Boelter at `Re = 1e4`
 """
 function nusselt_circularpipe(Re, Pr; mode = "heating")
-    if Re < 2300
-        Nu = 3.657
-    elseif (Re >= 2300) && (Re < 10000)        
-        f =  (1.58*log(Re) - 3.28)^(-2)
-        Nu = (0.5*f*(Re - 1000.) * Pr)/(1 + 12.7*sqrt(0.5*f) * (Pr^(2/3) - 1))
-    else 
-        n = mode == "heating" ? 0.3 : 0.4  
-        Nu = 0.023 * Re^0.8 * Pr^n
+    if Re <= RE_LAMINAR
+        return NU_LAMINAR + zero(Re * Pr)
+    elseif Re >= RE_TURBULENT
+        return nusselt_dittusboelter(Re, Pr; mode = mode)
+    else
+        γ = (Re - RE_LAMINAR) / (RE_TURBULENT - RE_LAMINAR)
+        return (1 - γ) * NU_LAMINAR + γ * nusselt_dittusboelter(RE_TURBULENT, Pr; mode = mode)
     end
-    return Nu
 end
 
 
