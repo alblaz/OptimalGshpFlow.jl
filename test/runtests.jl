@@ -5,6 +5,7 @@ using CoolProp
 include("./utilities.jl") 
 include("./fluidproperties.jl")
 include("./pipeflow.jl")
+include("./borehole.jl")
 # include("./models.jl")
 
 @testset "OptimalGshpFlow.jl" begin
