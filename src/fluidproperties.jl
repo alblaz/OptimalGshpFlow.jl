@@ -107,7 +107,7 @@ end
 Constructor\\
 ≡≡≡≡≡≡≡≡≡≡≡
 
-    `Refrigerant(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-4)`
+    `Refrigerant(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-2, pr_max = 0.95)`
 
 Arguments
 =========
@@ -119,11 +119,15 @@ Keyword arguments
 
 - `superheating_range = 0:1.:40``: range of temperatures used to generate the interpolants
 - `ns=100`: number of points used on the log10 pressure axis used 
-- `pr_min = 1e-4`: minimum pressure value used for generating the interpolants
+- `pr_min = 1e-2`: minimum reduced pressure p/pcrit used for generating the interpolants
+  (clamped to just above the triple point pressure). Some fluids need a larger value because
+  CoolProp transport properties fail at low pressure, e.g. `Refrigerant("R32"; pr_min = 0.05)`.
+- `pr_max = 0.95`: maximum reduced pressure p/pcrit used for generating the interpolants.
+  It must stay below 1: at the critical point cp, μ and λ diverge and the cubic spline rings.
 """
-function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-4)
-    saturated = refrigerant_twophaseregion(refrigerant_name, 1.; ns = 100, pr_min = 1e-4)
-    superheated = refrigerant_superheated(refrigerant_name; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-4)
+function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-2, pr_max = 0.95)
+    saturated = refrigerant_twophaseregion(refrigerant_name, 1.; ns = ns, pr_min = pr_min, pr_max = pr_max)
+    superheated = refrigerant_superheated(refrigerant_name; superheating_range = superheating_range, ns = ns, pr_min = pr_min, pr_max = pr_max)
     pcrit = PropsSI.("Pcrit",  refrigerant_name) # critical pressure 
     M = PropsSI.("M",  refrigerant_name)
 
@@ -135,7 +139,26 @@ function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, 
 end
 
 """
-`refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-4)`
+`log10p_grid(refrigerant; ns = 100, pr_min = 1e-2, pr_max = 0.95)`
+
+Uniform grid in `log10(p)` used to sample `refrigerant` properties, from
+`max(pr_min*pcrit, 1.01*ptriple)` to `pr_max*pcrit`. Returns the range of `log10(p)`
+and the corresponding pressures. `pr_max < 1` keeps the grid away from the critical
+point, where CoolProp fails or properties diverge.
+"""
+function log10p_grid(refrigerant; ns = 100, pr_min = 1e-2, pr_max = 0.95)
+    0 < pr_min < pr_max < 1 || throw(ArgumentError("need 0 < pr_min < pr_max < 1, got pr_min=$pr_min, pr_max=$pr_max"))
+    pcrit = PropsSI("Pcrit", refrigerant)
+    ptriple = try PropsSI("ptriple", refrigerant) catch; 0. end
+    pmin = max(pr_min * pcrit, 1.01 * ptriple)
+    pmax = pr_max * pcrit
+    log10ps = range(log10(pmin), log10(pmax), ns)
+    ps = exp10.(log10ps)
+    return log10ps, ps
+end
+
+"""
+`refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-2, pr_max = 0.95)`
 
 `refrigerant` is a string containing a refrigerant supported by CoolProp, x is the vapor quality, `ns=100` is the number of sample point utilized to create the interpolant and `pr_min` is the reduced pressure used as lower bound for the interpolation.
 
@@ -153,12 +176,9 @@ spl_sat.μ(log10(p))  #  viscosity
 spl_sat.λ(log10(p))  #  conductivity
 ```
 """
-function refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-4)
+function refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-2, pr_max = 0.95)
     # sample points from the p-h Diagram
-    pcrit = PropsSI.("Pcrit",  refrigerant)
-
-    pmin,pmax = pr_min*pcrit, pcrit
-    ps = map(exp10, range(log10(pmin),log10(pcrit), ns) )
+    log10ps, ps = log10p_grid(refrigerant; ns = ns, pr_min = pr_min, pr_max = pr_max)
     h1 = map(p-> PropsSI.("H", "P",  p, "Q", x, refrigerant), ps)
     ρ1 = map(p-> PropsSI.("D", "P",  p, "Q", x, refrigerant), ps)
     T1 = map(p-> PropsSI.("T", "P",  p, "Q", x, refrigerant), ps)
@@ -166,13 +186,13 @@ function refrigerant_twophaseregion(refrigerant, x; ns = 100, pr_min = 1e-4)
     μ1 = map(p-> PropsSI.("V", "P",  p, "Q", x, refrigerant), ps)
     λ1 = map(p-> PropsSI.("CONDUCTIVITY", "P",  p, "Q", x, refrigerant), ps)
     s1 = map(p-> PropsSI.("S", "P",  p, "Q", x, refrigerant), ps)
-    spl_hsat = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), h1, extrapolation_bc = Flat())
-    spl_Tref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), T1, extrapolation_bc = Flat())
-    spl_ρref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), ρ1, extrapolation_bc = Flat())
-    spl_cpref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), cp1, extrapolation_bc = Flat())
-    spl_μref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), μ1, extrapolation_bc = Flat())
-    spl_λref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), λ1, extrapolation_bc = Flat())
-    spl_sref = cubic_spline_interpolation(range(log10(pmin),log10(pmax), ns), s1, extrapolation_bc = Flat())
+    spl_hsat = cubic_spline_interpolation(log10ps, h1, extrapolation_bc = Flat())
+    spl_Tref = cubic_spline_interpolation(log10ps, T1, extrapolation_bc = Flat())
+    spl_ρref = cubic_spline_interpolation(log10ps, ρ1, extrapolation_bc = Flat())
+    spl_cpref = cubic_spline_interpolation(log10ps, cp1, extrapolation_bc = Flat())
+    spl_μref = cubic_spline_interpolation(log10ps, μ1, extrapolation_bc = Flat())
+    spl_λref = cubic_spline_interpolation(log10ps, λ1, extrapolation_bc = Flat())
+    spl_sref = cubic_spline_interpolation(log10ps, s1, extrapolation_bc = Flat())
 
     spl_sat = (h = spl_hsat, T = spl_Tref, ρ = spl_ρref, cp = spl_cpref, μ = spl_μref, λ=spl_λref, s = spl_sref)
     return spl_sat
@@ -182,7 +202,7 @@ end
 # build spline for superheated region
 """
 
-`refrigerant_superheatedregion(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-4)`
+`refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-2, pr_max = 0.95)`
 
 `refrigerant` is a string containing a refrigerant supported by CoolProp, `superheating_range = 0:1.:40.` is the superheating range for the interpolation, `ns=100` is the number of point utilized to sample the pressure to create the interpolant and `pr_min` is the reduced pressure used as lower bound for the interpolation.
 
@@ -199,11 +219,8 @@ spl.μ(log10(p), ΔTsup)  #  visccosity
 spl.λ(log10(p), ΔTsup)  #  conductivity
 ```
 """
-function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-4)
-    
-    pcrit = PropsSI.("Pcrit",  refrigerant)
-    pmin,pmax = pr_min*pcrit, pcrit
-    ps = map(exp10, range(log10(pmin),log10(pcrit), ns) )
+function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns = 100, pr_min = 1e-2, pr_max = 0.95)
+    log10ps, ps = log10p_grid(refrigerant; ns = ns, pr_min = pr_min, pr_max = pr_max)
 
     h1 = map(p-> PropsSI.("H", "P",  p, "Q", 1., refrigerant), ps)
     T1 = map(p-> PropsSI.("T", "P",  p, "Q", 1., refrigerant), ps)
@@ -239,12 +256,12 @@ function refrigerant_superheated(refrigerant; superheating_range = 0:1.:40., ns 
     B_s[:,1] .= s1
     B_s[:, 2:end] .= map(x-> PropsSI.("S", "P",  x[1], "T", x[2] + x[3], refrigerant), C[:,2:end] )
 
-    splpsΔT_H = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_H, extrapolation_bc = Flat())
-    splpsΔT_ρ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_ρ, extrapolation_bc = Flat())
-    splpsΔT_μ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_μ, extrapolation_bc = Flat())
-    splpsΔT_cp = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_cp, extrapolation_bc = Flat())
-    splpsΔT_λ = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_λ, extrapolation_bc = Flat())
-    splpsΔT_s = cubic_spline_interpolation( (range(log10(pmin),log10(pmax), ns), superheating_range ) ,B_s, extrapolation_bc = Flat())
+    splpsΔT_H = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_H, extrapolation_bc = Flat())
+    splpsΔT_ρ = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_ρ, extrapolation_bc = Flat())
+    splpsΔT_μ = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_μ, extrapolation_bc = Flat())
+    splpsΔT_cp = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_cp, extrapolation_bc = Flat())
+    splpsΔT_λ = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_λ, extrapolation_bc = Flat())
+    splpsΔT_s = cubic_spline_interpolation( (log10ps, superheating_range ) ,B_s, extrapolation_bc = Flat())
 
 
     spl = ( h =splpsΔT_H, ρ = splpsΔT_ρ,  cp = splpsΔT_cp,  μ=splpsΔT_μ, λ =  splpsΔT_λ, s =  splpsΔT_s  )
