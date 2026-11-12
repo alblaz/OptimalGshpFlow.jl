@@ -25,11 +25,11 @@ export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_de
 export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT, T_ps, h_ps
 
 include("evaporatordesign.jl")
+include("pipeflow.jl")        # before borehole.jl: defines NusseltTransition
 include("borehole.jl")
 include("plateheatexchanger.jl")
 include("solutiontypes.jl")
 include("heatexchanger.jl")
-include("pipeflow.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
@@ -41,7 +41,8 @@ export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBo
 export Borehole, SingleUPipeBorehole
 
 # from "pipeflow.jl"
-export nusselt_circularpipe, h_circularpipe 
+export nusselt_circularpipe, h_circularpipe
+export NusseltTransition, SmoothTransition, SharpTransition
 
 # from "plateheatexchanger.jl"
 export PlateHeatExchanger, h_platehex_wanniarachchi
