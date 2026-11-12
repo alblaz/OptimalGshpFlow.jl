@@ -23,9 +23,10 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.11'
-          - '1.10'
-          - 'pre'
+          - '1'      # latest stable release
+          - 'lts'    # current long-term-support release
+          - 'min'    # minimum version allowed by the julia compat entry in Project.toml
+          - 'pre'    # upcoming release
         os:
           - ubuntu-latest
         arch:
