@@ -92,6 +92,8 @@ struct RefrigerantSaturatedVapor
   - saturated_vapor::RefrigerantSaturatedVapor
   - superheated_vapor::RefrigerantSuperHeatedVapor
   - `pcrit`: critical pressure
+  - `pr_min`: minimum reduced pressure of the sampling; `M`: molar mass [kg/mol]
+  - `pmin`, `pmax`: sampled pressure range [Pa] (the [`pressure_bounds`](@ref))
 
 """
 struct Refrigerant <: AbstractRefrigerant
@@ -101,6 +103,8 @@ struct Refrigerant <: AbstractRefrigerant
     pcrit
     pr_min
     M
+    pmin    # sampled pressure range [Pa], see log10p_grid
+    pmax
 end
 
 """
@@ -130,12 +134,15 @@ function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, 
     superheated = refrigerant_superheated(refrigerant_name; superheating_range = superheating_range, ns = ns, pr_min = pr_min, pr_max = pr_max)
     pcrit = PropsSI.("Pcrit",  refrigerant_name) # critical pressure 
     M = PropsSI.("M",  refrigerant_name)
+    _, ps = log10p_grid(refrigerant_name; ns = ns, pr_min = pr_min, pr_max = pr_max)
 
     return Refrigerant(refrigerant_name, RefrigerantSaturatedVapor(saturated.h, saturated.T, saturated.ρ, saturated.cp, saturated.μ,  saturated.λ, saturated.s),
     RefrigerantSuperHeatedVapor(superheated.h, superheated.ρ, superheated.cp, superheated.μ, superheated.λ, superheated.s),
     pcrit,
     pr_min,
-    M)
+    M,
+    first(ps),
+    last(ps))
 end
 
 """
@@ -276,7 +283,8 @@ end
 # Properties are interpolated in log10(p) (and in the superheat ΔT); outside the sampled range
 # the splines extrapolate flat.
 
-pressure_bounds(r::Refrigerant) = (r.pr_min, r.pcrit)   # B4: pr_min read as Pa, see pressure_bounds
+# the sampled range: outside it the splines extrapolate flat (zero derivative in p)
+pressure_bounds(r::Refrigerant) = (r.pmin, r.pmax)
 
 T_dew(r::Refrigerant, p)  = r.saturated_vapor.T(log10(p))
 T_bubble(r::Refrigerant, p) = T_dew(r, p)               # pure fluid

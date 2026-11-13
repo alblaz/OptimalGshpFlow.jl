@@ -88,3 +88,18 @@ end
         end
     end
 end
+
+# B4: the evaporation-pressure unknown is mapped onto `pressure_bounds(r)`. For the spline
+# backend this must be the sampled pressure range: the original code used the field `pr_min`
+# (a reduced pressure, 1e-2) as a bound in Pa, so the unknown could reach pressures far below
+# the splines, where they extrapolate flat and the Jacobian is singular.
+@testset "pressure bounds of the spline Refrigerant (B4)" begin
+    for (name, pr_min) in (("R134a", 1e-2), ("R290", 2e-2))
+        r = Refrigerant(name; pr_min = pr_min)
+        _, ps = OptimalGshpFlow.log10p_grid(name; pr_min = pr_min)
+        pmin, pmax = pressure_bounds(r)
+        @test pmin ≈ first(ps) rtol = 1e-12
+        @test pmax ≈ last(ps) rtol = 1e-12
+        @test pmin ≥ pr_min * r.pcrit
+    end
+end

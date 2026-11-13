@@ -62,7 +62,8 @@ known. With the default `phase = :unknown` both volume roots are computed and co
 Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (molar mass, kg/mol),
 `Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`), `vmin`
 (co-volume, the lower bound of the molar volume [m³/mol], see [`volume_from_R`](@ref)),
-`Ttriple`, `superancillary` (pure fluid whose saturation curve is an explicit function of T, see
+`Ttriple`, `ptriple` (triple point; for a mixture `Ttriple = NaN` and `ptriple` is the lowest
+triple-point pressure of the components), `superancillary` (pure fluid whose saturation curve is an explicit function of T, see
 [`saturation_T`](@ref)).
 """
 struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigerant
@@ -77,6 +78,7 @@ struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigeran
     pcrit::Float64
     vmin::Float64
     Ttriple::Float64
+    ptriple::Float64
     superancillary::Bool
 end
 
@@ -113,18 +115,18 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
     end
     vmin = Clapeyron.lb_volume(eos, Tc, z)   # independent of T for MultiFluid
     Ttriple = n == 1 ? Float64(eos.pures[1].properties.Ttp) : NaN
+    ptriple = minimum(Float64(pure.properties.ptp) for pure in eos.pures)
     superanc = n == 1 && _has_superancillary(eos.pures[1], Ttriple, Tc)
 
     return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
-                                Ttriple, superanc)
+                                Ttriple, ptriple, superanc)
 end
 ClapeyronRefrigerant(component::AbstractString; kwargs...) =
     ClapeyronRefrigerant([component]; name = component, kwargs...)
 
 ispure(r::ClapeyronRefrigerant) = length(r.components) == 1
 
-# no lower bound: the saturation solver works down to the triple point
-pressure_bounds(r::ClapeyronRefrigerant) = (zero(r.pcrit), r.pcrit)
+pressure_bounds(r::ClapeyronRefrigerant) = (r.ptriple, r.pcrit)
 
 Base.show(io::IO, r::ClapeyronRefrigerant) =
     print(io, "ClapeyronRefrigerant(", r.name, ", z = ", r.z, ", transport = ", nameof(typeof(r.transport)), ")")

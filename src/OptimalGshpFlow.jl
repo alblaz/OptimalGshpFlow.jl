@@ -12,8 +12,11 @@ export linearmap_01_to_ab, linearmap_ab_to_01
 export tanhmap_01_to_R, tanhmap_R_to_01, tanhmap_ab_to_R, tanhmap_R_to_ab
 export sigmoid_01_to_R, sigmoid_R_to_01, sigmoid_ab_to_R, sigmoid_R_to_ab
 
+include("transforms.jl")
+export VariableTransform, Free, Unit, Box, LogBox, Above, from_R, to_R, bounds
+
 include("properties/interface.jl")
-export AbstractRefrigerant, critical_pressure, molar_mass, pressure_bounds
+export AbstractRefrigerant, critical_pressure, molar_mass, pressure_bounds, pressure_transform
 export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew
 export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT
 export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superheated, λ_superheated
@@ -28,7 +31,7 @@ export Refrigerant
 include("properties/clapeyron_refrigerant.jl")
 include("properties/tv_state.jl")
 export volume_pT, p_Tv, h_Tv, s_Tv, cp_Tv, ρ_Tv, μ_Tv, λ_Tv, pressure_residual
-export volume_to_R, volume_from_R, saturation_T, p_sat
+export volume_transform, volume_to_R, volume_from_R, saturation_T, p_sat
 export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
 export cp_twophase, T_ps, h_ps
 
@@ -70,7 +73,8 @@ export  pressure_drop_evap,  pressure_drop, pumping_power
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!
 export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
 export PropertyFormulation, NestedPressure, SaturationTemperature, ExplicitTv
-export n_extra_unknowns, temperature_bounds, evaporator_unknowns, nested_unknowns
+export n_extra_unknowns, temperature_bounds, temperature_transform, evaporator_transforms
+export evaporator_unknowns, nested_unknowns
 
 export compressor_power, condenser_power
 export pressure_drop, pumping_power

@@ -55,15 +55,17 @@ Scaled residual `p_Tv(r, T, v)/p - 1` that closes a (T, v) state at pressure `p`
 pressure_residual(r::ClapeyronRefrigerant, T, v, p) = p_Tv(r, T, v) / p - 1
 
 """
-    volume_from_R(r, u) = r.vmin * (1 + exp(u))
-    volume_to_R(r, v)   = log(v / r.vmin - 1)
+    volume_transform(r) = Above(r.vmin)
+    volume_from_R(r, u) = from_R(volume_transform(r), u)   # r.vmin * (1 + exp(u))
+    volume_to_R(r, v)   = to_R(volume_transform(r), v)     # log(v / r.vmin - 1)
 
 Map between the molar volume, bounded below by the co-volume `r.vmin`, and an unbounded unknown
 on a log scale (like the pressure). Liquid states map to `u ≈ 0`, vapour at low reduced
 pressure to `u ≈ 4–6`.
 """
-volume_from_R(r::ClapeyronRefrigerant, u) = r.vmin * (1 + exp(u))
-volume_to_R(r::ClapeyronRefrigerant, v) = log(v / r.vmin - 1)
+volume_transform(r::ClapeyronRefrigerant) = Above(r.vmin)
+volume_from_R(r::ClapeyronRefrigerant, u) = from_R(volume_transform(r), u)
+volume_to_R(r::ClapeyronRefrigerant, v) = to_R(volume_transform(r), v)
 
 ########################
 # saturation at T      #

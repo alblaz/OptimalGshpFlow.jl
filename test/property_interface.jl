@@ -2,8 +2,9 @@
 #
 # The legacy residual functions below are verbatim copies of `evaporator_model!` and
 # `evaporatorborehole_model!` on main at bfb6816 (before the port to the interface), renamed and
-# with module-qualified internals. The ported models must reproduce them bit for bit with the
-# spline backend.
+# with module-qualified internals, and with the pressure mapped by `pressure_transform`
+# (feature/bounded-variables: originally a linear sigmoid on `(pr_min, pcrit)`, see B4). The ported
+# models must reproduce them bit for bit with the spline backend.
 using ForwardDiff
 import OptimalGshpFlow: evaporator_uvalue_twophase, evaporator_uvalue_superheat, uniform_Tb_coeffs
 import OptimalGshpFlow.Parameters: @unpack
@@ -19,7 +20,7 @@ function legacy_evaporator_model!(du, u, p)
     # These are Cs_e, Ue, Cs_sup, Cref_sup, Cr,  U_sup,
 
     # two-phase
-    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)
+    pe = from_R(pressure_transform(refrigerant), u[1])
     xs = sigmoid_R_to_01(u[6])
     Qe = u[2]
     Tsm_e = (u[7] + u[8])/2
@@ -43,14 +44,14 @@ function legacy_evaporator_model!(du, u, p)
 
     # Heat balance equations (two-phase)
     du[1] = Cs_e * (u[8] - u[7]) - u[2]  # heat balance secondary fluid
-    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
-    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
+    du[2] = refrigerant.superheated_vapor.ρ(log10(from_R(pressure_transform(refrigerant), u[1])), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(from_R(pressure_transform(refrigerant), u[1])))  - hei) - u[2]   # heat balance refrigerant
+    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(from_R(pressure_transform(refrigerant), u[1]))) ) - u[2]        # ϵ-NTU method 
     du[4] =  1 - exp(-Ue * A * sigmoid_R_to_01(u[6]) / Cmin_e)  -  sigmoid_R_to_01(u[4])
 
     # heat balance equations (superheater)
     du[5] = Cs_sup* (Ts_h - u[8]) - u[3]  # heat balance secondary fluid
     du[6] = Cref_sup * ΔTsup - u[3]
-    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (Ts_h - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
+    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (Ts_h - refrigerant.saturated_vapor.T(log10(from_R(pressure_transform(refrigerant), u[1])))  ) - u[3]     # ϵ-NTU 
     du[8] = (1 - exp((-Usup*A*(1- sigmoid_R_to_01(u[6]))/Cmin_sup*(1-Cr))))/(1 - Cr *(exp(-Usup*A*(1- sigmoid_R_to_01(u[6]) )/Cmin_sup*(1-Cr)))) - sigmoid_R_to_01(u[5])  
 
     return nothing
@@ -67,7 +68,7 @@ function legacy_evaporatorborehole_model!(du, u, p)
     # These are Cs_e, Ue, Cs_sup, Cref_sup, Cr,  U_sup,
 
     # two-phase
-    pe = sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)
+    pe = from_R(pressure_transform(refrigerant), u[1])
     xs = sigmoid_R_to_01(u[6])
     Qe = u[2]
     Tsm_e = (u[7] + u[8])/2
@@ -91,14 +92,14 @@ function legacy_evaporatorborehole_model!(du, u, p)
 
     # Heat balance equations (two-phase)
     du[1] = Cs_e * (u[8] - u[7]) - u[2]  # heat balance secondary fluid
-    du[2] = refrigerant.superheated_vapor.ρ(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  - hei) - u[2]   # heat balance refrigerant
-    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit))) ) - u[2]        # ϵ-NTU method 
+    du[2] = refrigerant.superheated_vapor.ρ(log10(from_R(pressure_transform(refrigerant), u[1])), ΔTsup) * Vref *  (refrigerant.saturated_vapor.h(log10(from_R(pressure_transform(refrigerant), u[1])))  - hei) - u[2]   # heat balance refrigerant
+    du[3] = sigmoid_R_to_01(u[4]) *Cmin_e*(u[8] - refrigerant.saturated_vapor.T(log10(from_R(pressure_transform(refrigerant), u[1]))) ) - u[2]        # ϵ-NTU method 
     du[4] =  1 - exp(-Ue * A * sigmoid_R_to_01(u[6]) / Cmin_e)  -  sigmoid_R_to_01(u[4])
 
     # heat balance equations (superheater)
     du[5] = Cs_sup* (u[9] - u[8]) - u[3]  # heat balance secondary fluid
     du[6] = Cref_sup * ΔTsup - u[3]
-    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (u[9] - refrigerant.saturated_vapor.T(log10(sigmoid_R_to_ab(u[1], refrigerant.pr_min, refrigerant.pcrit)))  ) - u[3]     # ϵ-NTU 
+    du[7] = sigmoid_R_to_01(u[5]) * Cmin_sup * (u[9] - refrigerant.saturated_vapor.T(log10(from_R(pressure_transform(refrigerant), u[1])))  ) - u[3]     # ϵ-NTU 
     du[8] = (1 - exp((-Usup*A*(1- sigmoid_R_to_01(u[6]))/Cmin_sup*(1-Cr))))/(1 - Cr *(exp(-Usup*A*(1- sigmoid_R_to_01(u[6]) )/Cmin_sup*(1-Cr)))) - sigmoid_R_to_01(u[5])  #1/(1 + exp(-u[5])) # sigmoid_R_to_01(u[5])
 
     # borehole model 
@@ -138,7 +139,7 @@ end
     ebp(r) = EvaporatorBoreholeParameters(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
                  hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., borehole = bh, λground = 3.5, Tb = 283.15)
     pe0 = PropsSI("P", "T", ev.Te, "Q", 1., "R290")
-    guess(r) = [sigmoid_ab_to_R(pe0, pressure_bounds(r)...), 0.9ev.Qnom, 0.1ev.Qnom, 0., 0., 0., 274., 276.]
+    guess(r) = [to_R(pressure_transform(r), pe0), 0.9ev.Qnom, 0.1ev.Qnom, 0., 0., 0., 274., 276.]
 
     @testset "spline backend" begin
         p = 4.7e5; lp = log10(p)
@@ -171,8 +172,8 @@ end
         @test its > 0
         uc, itc = newton_solve((d, u) -> evaporator_model!(d, u, evp(cla)), guess(cla))
         @test itc > 0
-        pes = sigmoid_R_to_ab(us[1], pressure_bounds(spl)...)
-        pec = sigmoid_R_to_ab(uc[1], pressure_bounds(cla)...)
+        pes = from_R(pressure_transform(spl), us[1])
+        pec = from_R(pressure_transform(cla), uc[1])
         @test pec ≈ pes rtol = 1e-5
         @test uc[2:end] ≈ us[2:end] rtol = 1e-5
         ss, sc = evaporator_model(us, evp(spl)), evaporator_model(uc, evp(cla))
@@ -220,8 +221,23 @@ end
 
     # evaporator_unknowns ↔ nested_unknowns round trip
     u = evaporator_unknowns(ExplicitTv(), r, 5.; Te = 270., Qe = 5e3, Qsup = 300., Ts_l = 274., Ts_m = 276.)
-    @test sigmoid_R_to_ab(nested_unknowns(ExplicitTv(), r, u, 8)[1], pressure_bounds(r)...) ≈ p_sat(r, 270.) rtol = 1e-12
+    @test from_R(pressure_transform(r), nested_unknowns(ExplicitTv(), r, u, 8)[1]) ≈ p_sat(r, 270.) rtol = 1e-12
     @test temperature_bounds(r) == (r.Ttriple, r.Tcrit)
+
+    # transforms of the unknowns: evaporator_unknowns maps physical values with them
+    @test pressure_bounds(r) == (r.ptriple, r.pcrit)
+    @test r.ptriple ≈ PropsSI("ptriple", "R290") rtol = 1e-6
+    @test pressure_transform(r) isa LogBox && temperature_transform(r) isa Box
+    for F in (NestedPressure(), SaturationTemperature(), ExplicitTv()), Ts_h in (nothing, 279.)
+        ts = evaporator_transforms(F, r; borehole = Ts_h !== nothing)
+        u = evaporator_unknowns(F, r, 5.; Te = 270., Qe = 5e3, Qsup = 300., ϵe = 0.6, ϵsup = 0.7, xs = 0.8,
+                                Ts_l = 274., Ts_m = 276., Ts_h = Ts_h)
+        @test length(ts) == length(u) == 8 + (Ts_h !== nothing) + n_extra_unknowns(F)
+        x = map(from_R, ts, u)
+        @test x[1] ≈ (F isa NestedPressure ? p_sat(r, 270.) : 270.) rtol = 1e-12
+        @test collect(x[2:8]) ≈ [5e3, 300., 0.6, 0.7, 0.8, 274., 276.] rtol = 1e-12
+        F isa ExplicitTv && @test x[end] ≈ volume_pT(r, p_sat(r, 270.), 272.5; phase = :vapor) rtol = 1e-12
+    end
     # the Te-based formulations need a ClapeyronRefrigerant
     spl = Refrigerant("R290")
     ps = EvaporatorParameters(refrigerant = spl, secondaryfluid = sf, plateheatexchanger = phx,

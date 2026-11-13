@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-13.
+Last updated: 2026-11-13 (feature/bounded-variables).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -21,18 +21,17 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | PR #27 |
-| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | **next** |
-| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
+| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | PR, see below |
+| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | **next** |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
-Known bug, not fixed yet (B4): `models.jl` maps the pressure with
-`sigmoid_R_to_ab(u, refrigerant.pr_min, refrigerant.pcrit)`, so the lower bound is
-`pr_min` read as Pa (1e-4 or 1e-2 Pa) instead of `pr_min·pcrit`. This belongs in step 3.
+B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
+`pr_min` read as Pa (1e-2 Pa) instead of a pressure.
 
 ## Refrigerants of interest
 - **Priority: natural, low-GWP pure fluids** (European move away from HFCs): R290 (main case),
@@ -232,3 +231,34 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
 
 Out of scope for this branch: residual scaling of the existing equations (step 4 of the
 roadmap), glide (step 5) and new components.
+
+## `feature/bounded-variables` (done)
+1. **B4** (failing test, then fix): the spline `Refrigerant` stores its sampled pressure range
+   (`pmin`, `pmax` fields) and `pressure_bounds` returns it (was `(pr_min, pcrit)` with `pr_min`
+   read as Pa). Outside that range the splines extrapolate flat, so the Jacobian is singular there.
+2. **Transforms as types** (`src/transforms.jl`): `VariableTransform` with `from_R(t, u)`,
+   `to_R(t, x)`, `bounds(t)`; `Free()`, `Unit()` (0, 1), `Box(lo, hi)`, `LogBox(lo, hi)` (sigmoid
+   in log x), `Above(lo, scale)` ((lo, ∞), `lo + scale·eᵘ`). The old `sigmoid_*`/`tanhmap_*`
+   helpers stay exported.
+3. **Models ported**: `pressure_transform(r) = LogBox(pressure_bounds(r)...)` (the pressure is now
+   on a log scale), `temperature_transform(r) = Box(Ttriple, Tcrit)`, `volume_transform(r) =
+   Above(vmin)`; `ϵe`, `ϵsup`, `xs` use `Unit()`. `evaporator_transforms(F, r; borehole)` lists the
+   transforms of all unknowns (a first step towards the component unknowns of step 4), and
+   `evaporator_unknowns` maps physical values with it. `ClapeyronRefrigerant` gets a `ptriple`
+   field and `pressure_bounds = (ptriple, pcrit)` (LogBox needs `pmin > 0`; lowest component
+   value for a mixture).
+   **Breaking for scripts:** a pressure unknown built with `sigmoid_ab_to_R(pe, pressure_bounds(r)...)`
+   is now wrong; use `to_R(pressure_transform(r), pe)` (examples and tests updated).
+
+Effect of the log-scale pressure on the sweep (`examples/formulations_benchmark.jl`, `sweep` +
+`sweep2`, 4 fluids × evaporator / evaporator + borehole × Newton / TrustRegion, Clapeyron
+backend; "cont" = 87 continuation solves):
+- Same roots: |ΔTe| ≤ 4e-11 K wherever both converge.
+- `NestedPressure` success rate unchanged within ±1 case almost everywhere; better with
+  TrustRegion + continuation on the coupled system (R290 84 → 87/87, R717 82 → 87/87) and
+  fixed guess (R290 22 → 24/42, median iterations 106 → 66); one regression (R290 evaporator,
+  Newton, continuation, 73 → 71/87). Median iterations unchanged.
+- `SaturationTemperature` identical case by case; `ExplicitTv` identical up to one iteration count
+  (rounding of `vmin + vmin·eᵘ` vs `vmin(1 + eᵘ)`).
+- Conclusion: the log map is neutral to slightly positive. Robustness is set by the initial guess and
+  the residual scales, as found in step 2, and belongs in steps 4 and 6.
