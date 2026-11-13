@@ -20,14 +20,16 @@ function _solve(sys, u0, alg; kwargs...)
         err isa InterruptException && rethrow()
         nothing
     end
+    U = typeof(u0)
     sol === nothing && return (ok = false, u = u0, iterations = -1)
     ok = SciMLBase.successful_retcode(sol) && all(isfinite, sol.u)
-    return (ok = ok, u = sol.u, iterations = sol.stats.nsteps)
+    return (ok = ok, u = convert(U, sol.u)::U, iterations = Int(sol.stats.nsteps))
 end
 
 function continuation(build, λs, u0, alg; secant::Bool = true, max_halvings::Integer = 6, kwargs...)
-    λs = collect(λs)
-    results = NamedTuple[]
+    λs = float.(collect(λs))
+    # concrete element type, so that code post-processing the results is inferred
+    results = @NamedTuple{λ::eltype(λs), ok::Bool, u::typeof(u0), iterations::Int}[]
     first_step = _solve(build(λs[1]), u0, alg; kwargs...)
     push!(results, (λ = λs[1], first_step...))
     first_step.ok || return results
