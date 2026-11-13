@@ -8,6 +8,7 @@ physical variable x is recovered with `from_R(t, u)` and an initial guess is map
 | transform          | x ∈        | x = from_R(t, u)                         | used for                      |
 |--------------------|------------|------------------------------------------|-------------------------------|
 | `Free()`           | ℝ          | u                                        | temperatures, heat flows      |
+| `Linear(x0, s)`    | ℝ          | x0 + s u                                 | scaled heat flows             |
 | `Unit()`           | (0, 1)     | σ(u)                                     | effectiveness, boundary x     |
 | `Box(lo, hi)`      | (lo, hi)   | lo + (hi - lo) σ(u)                      | evaporation temperature       |
 | `LogBox(lo, hi)`   | (lo, hi)   | exp(log lo + (log hi - log lo) σ(u))     | pressure                      |
@@ -22,7 +23,7 @@ All maps are generic in the number type (ForwardDiff Duals pass through).
     VariableTransform
 
 Map between a bounded physical variable `x` and an unbounded unknown `u ∈ ℝ`: [`Free`](@ref),
-[`Unit`](@ref), [`Box`](@ref), [`LogBox`](@ref), [`Above`](@ref). Interface: `from_R(t, u)`,
+[`Linear`](@ref), [`Unit`](@ref), [`Box`](@ref), [`LogBox`](@ref), [`Above`](@ref). Interface: `from_R(t, u)`,
 `to_R(t, x)`, `bounds(t)`.
 """
 abstract type VariableTransform end
@@ -54,6 +55,25 @@ struct Free <: VariableTransform end
 from_R(::Free, u) = u
 to_R(::Free, x) = x
 bounds(::Free) = (-Inf, Inf)
+
+"""
+    Linear(x0, scale)
+
+No bound, scaled: `x = x0 + scale·u`, so that `u` is of order one when `x - x0` is of order
+`scale` (e.g. a heat flow in units of a nominal duty).
+"""
+struct Linear{T <: Real} <: VariableTransform
+    x0::T
+    scale::T
+    function Linear(x0::Real, scale::Real)
+        x0, scale = promote(float(x0), float(scale))
+        isfinite(x0) && 0 < scale < Inf || throw(ArgumentError("Linear needs finite x0 and 0 < scale < ∞, got ($x0, $scale)"))
+        return new{typeof(x0)}(x0, scale)
+    end
+end
+from_R(t::Linear, u) = t.x0 + t.scale * u
+to_R(t::Linear, x) = (x - t.x0) / t.scale
+bounds(t::Linear) = (oftype(t.x0, -Inf), oftype(t.x0, Inf))
 
 "`x ∈ (0, 1)`: `x = σ(u)` (sigmoid)."
 struct Unit <: VariableTransform end

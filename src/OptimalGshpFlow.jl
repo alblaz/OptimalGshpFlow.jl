@@ -6,6 +6,7 @@ using StaticArrays, Parameters, ExponentialUtilities
 using RequiredInterfaces
 using LambertW
 import Clapeyron, EntropyScaling, ForwardDiff
+using ComponentArrays: ComponentVector, getaxes
 
 include("utilities.jl")
 export linearmap_01_to_ab, linearmap_ab_to_01
@@ -13,7 +14,7 @@ export tanhmap_01_to_R, tanhmap_R_to_01, tanhmap_ab_to_R, tanhmap_R_to_ab
 export sigmoid_01_to_R, sigmoid_R_to_01, sigmoid_ab_to_R, sigmoid_R_to_ab
 
 include("transforms.jl")
-export VariableTransform, Free, Unit, Box, LogBox, Above, from_R, to_R, bounds
+export VariableTransform, Free, Linear, Unit, Box, LogBox, Above, from_R, to_R, bounds
 
 include("properties/interface.jl")
 export AbstractRefrigerant, critical_pressure, molar_mass, pressure_transform
@@ -45,6 +46,8 @@ include("evaporator_formulations.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
+include("components/core.jl")
+include("components/evaporator.jl")
 
 # from "solutiontypes.jl"
 export HeatExchangerSolution, BoreholeSolution, EvaporatorSolution, EvaporatorBoreholeSolution
@@ -77,6 +80,11 @@ export n_extra_unknowns, temperature_bounds, temperature_transform, evaporator_t
 export evaporator_unknowns, nested_unknowns
 
 export compressor_power, condenser_power
+
+# from "components/"
+export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
+export ComponentSystem, residual!, initial_guess, physical, port_values
+export Evaporator, BoreholeHX, default_formulation, nominal_duty, evaporator_solution, borehole_solution
 export pressure_drop, pumping_power
 
 __init__() = _init_coolprop_indices()
