@@ -87,8 +87,17 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
                               transport::Union{Nothing, TransportBackend} = nothing,
                               name = join(components, "&"))
     comps = String.(components)
+    tb = transport === nothing ? (length(comps) == 1 ? CoolPropTransport() : EntropyScalingTransport()) : transport
+    return _clapeyron_refrigerant(comps, tb, mass_fractions, mole_fractions, String(name))
+end
+# a single fluid: the default transport is known statically, so the result type is inferred
+ClapeyronRefrigerant(component::AbstractString; transport::TransportBackend = CoolPropTransport(), kwargs...) =
+    ClapeyronRefrigerant([component]; name = component, transport = transport, kwargs...)
+
+# function barrier: specialized on the transport backend, so the transport model type is inferred
+function _clapeyron_refrigerant(comps::Vector{String}, transport::TransportBackend, mass_fractions, mole_fractions,
+                                name::String)
     n = length(comps)
-    transport === nothing && (transport = n == 1 ? CoolPropTransport() : EntropyScalingTransport())
     eos = Clapeyron.MultiFluid(comps)
     Mi = Clapeyron.mw(eos) ./ 1000                     # kg/mol
 
@@ -121,8 +130,6 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
     return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
                                 Ttriple, ptriple, superanc)
 end
-ClapeyronRefrigerant(component::AbstractString; kwargs...) =
-    ClapeyronRefrigerant([component]; name = component, kwargs...)
 
 ispure(r::ClapeyronRefrigerant) = length(r.components) == 1
 
