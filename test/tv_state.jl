@@ -76,3 +76,17 @@ end
     @test h_Tv(r, 268.15, vv) ≈ h_dew(r, p) rtol = 1e-9
     @test_throws ArgumentError saturation_T(ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785]), 270.)
 end
+
+# R744: triple point (216.6 K) above 0.6 Tc (182 K). Superancillary detection must only sample
+# inside (Ttriple, Tcrit), and the dew point at a given pressure must not be NaN
+# (Clapeyron 0.6.30 saturation_temperature returns NaN for R744 at every pressure).
+@testset "R744 saturation" begin
+    r = ClapeyronRefrigerant("R744")
+    @test r.superancillary
+    for p in (6e5, 2e6, 3.5e6, 6e6)
+        @test T_dew(r, p) ≈ PropsSI("T", "P", p, "Q", 1, "R744") rtol = 1e-9
+        @test T_bubble(r, p) ≈ PropsSI("T", "P", p, "Q", 0, "R744") rtol = 1e-9
+        @test h_dew(r, p) - h_bubble(r, p) ≈ PropsSI("H", "P", p, "Q", 1, "R744") - PropsSI("H", "P", p, "Q", 0, "R744") rtol = 1e-7
+        @test ForwardDiff.derivative(q -> T_dew(r, q), p) ≈ (T_dew(r, p + 1) - T_dew(r, p - 1)) / 2 rtol = 1e-6
+    end
+end
