@@ -23,14 +23,27 @@ function nominal_duty(r, Vref, hei; Te = 273.15)
 end
 
 """
+    default_Te_min(refrigerant)
+
+Default lower bound of the evaporation temperature of an [`Evaporator`](@ref): the dew
+temperature at a reduced pressure of 0.01, or just above the lowest pressure of the backend if
+that is higher (R290: −60 °C; R744: −56.5 °C, its triple point). It keeps the solver away from
+the zero-flow root at the triple point, where the vapour density, hence the refrigerant mass
+flow and all heat flows, vanish.
+"""
+default_Te_min(r::AbstractRefrigerant) = T_dew(r, max(0.01 * critical_pressure(r), 1.001 * first(pressure_bounds(r))))
+
+"""
     Evaporator(; refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup,
-               formulation = default_formulation(refrigerant), Qscale = nominal_duty(...))
+               formulation = default_formulation(refrigerant), Qscale = nominal_duty(...),
+               Te_min = default_Te_min(refrigerant))
 
 Two-zone (two-phase + superheat) moving-boundary plate evaporator, ε-NTU in each zone; the same
 equations as [`evaporator_model!`](@ref).
 
 - Ports: `Ts_in` (secondary-fluid inlet, the warm side), `Ts_out` (outlet).
-- Unknowns: `pe` (`NestedPressure`) or `Te` (otherwise), `Qe`, `Qsup` (`Linear(0, Qscale)`),
+- Unknowns: `pe` (`NestedPressure`, `LogBox` from the dew pressure at `Te_min` to the upper
+  pressure bound) or `Te` (otherwise, `Box(Te_min, Tcrit)`), `Qe`, `Qsup` (`Linear(0, Qscale)`),
   `ϵe`, `ϵsup`, `xs` (`Unit()`), `Ts_m` (secondary fluid at the moving boundary), and for
   `ExplicitTv` the molar volumes `vsup`, `vm`.
 - Residuals: heat balances scaled by `Qscale`, the ε-NTU relations and the volume residuals as
@@ -38,7 +51,8 @@ equations as [`evaporator_model!`](@ref).
 
 Guess: `guess(evap; Te, Qe, Qsup, Ts_m, ϵe = 0.5, ϵsup = 0.5, xs = 0.5)`.
 """
-struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: PlateHeatExchanger, T <: Real} <: AbstractComponent
+struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: PlateHeatExchanger, T <: Real,
+                  X <: VariableTransform} <: AbstractComponent
     refrigerant::R
     secondaryfluid::SecondaryFluid
     plateheatexchanger::P
@@ -48,13 +62,26 @@ struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: Plate
     ΔTsup::T
     formulation::F
     Qscale::T
+    Te_min::T
+    x1transform::X          # map of the first unknown (pe or Te), from Te_min
 end
 
 function Evaporator(; refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup,
                     formulation::PropertyFormulation = default_formulation(refrigerant),
-                    Qscale = nominal_duty(refrigerant, Vref, hei))
-    hei, Vs, Vref, ΔTsup, Qscale = promote(float.((hei, Vs, Vref, ΔTsup, Qscale))...)
-    return Evaporator(refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, formulation, Qscale)
+                    Qscale = nominal_duty(refrigerant, Vref, hei), Te_min = default_Te_min(refrigerant))
+    hei, Vs, Vref, ΔTsup, Qscale, Te_min = promote(float.((hei, Vs, Vref, ΔTsup, Qscale, Te_min))...)
+    x1 = _first_transform(formulation, refrigerant, Te_min)
+    return Evaporator(refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, formulation, Qscale,
+                      Te_min, x1)
+end
+
+function _first_transform(::NestedPressure, r, Te_min)
+    pmin, pmax = pressure_bounds(r)
+    return LogBox(max(pmin, _p_dew(r, Te_min)), pmax)
+end
+function _first_transform(F::PropertyFormulation, r, Te_min)
+    lo, hi = bounds(first_transform(F, r))
+    return Box(max(lo, Te_min), hi)
 end
 
 _first_name(::NestedPressure) = :pe
@@ -65,7 +92,7 @@ _extra_names(::ExplicitTv) = (:vsup, :vm)
 function unknowns(c::Evaporator)
     F, r, Q = c.formulation, c.refrigerant, Linear(0, c.Qscale)
     names = (_first_name(F), :Qe, :Qsup, :ϵe, :ϵsup, :xs, :Ts_m, _extra_names(F)...)
-    return NamedTuple{names}((first_transform(F, r), Q, Q, Unit(), Unit(), Unit(), Free(), extra_transforms(F, r)...))
+    return NamedTuple{names}((c.x1transform, Q, Q, Unit(), Unit(), Unit(), Free(), extra_transforms(F, r)...))
 end
 
 ports(::Evaporator) = (Ts_in = Free(), Ts_out = Free())
@@ -157,3 +184,31 @@ end
 
 "Post-processing: `BoreholeSolution` at the port values `p`."
 borehole_solution(c::BoreholeHX, p) = BoreholeSolution(c.borehole, c.λground, p.Tin, p.Tout, c.Tb, c.Vs, c.secondaryfluid)
+
+"""
+    validity(c::Evaporator, x, p; ΔTpinch = 0.1, xs_tol = 1e-3)
+
+Issues reported for an evaporator solution:
+- secondary fluid (`Ts_in`, `Ts_m`, `Ts_out`) below its freezing point or outside its property
+  table;
+- evaporation temperature at its lower bound `Te_min` (within 0.01 K): not a physical solution;
+- pinch (within `ΔTpinch`): `Ts_out - Te` (two-phase zone) or `Ts_in - (Te + ΔTsup)` (superheat);
+- a zone almost vanished: `xs < xs_tol` or `xs > 1 - xs_tol`.
+"""
+function validity(c::Evaporator, x, p; ΔTpinch = 0.1, xs_tol = 1e-3)
+    issues = NamedTuple[]
+    _secondary_issues!(issues, c.secondaryfluid, (Ts_in = p.Ts_in, Ts_m = x.Ts_m, Ts_out = p.Ts_out))
+    Te = c.formulation isa NestedPressure ? T_dew(c.refrigerant, x.pe) : x.Te
+    Te < c.Te_min + 0.01 &&
+        push!(issues, _issue(:Te, Te, c.Te_min, "evaporation temperature at its lower bound Te_min"))
+    p.Ts_out - Te < ΔTpinch &&
+        push!(issues, _issue(:Te, Te, p.Ts_out - ΔTpinch, "two-phase pinch: Ts_out - Te below ΔTpinch"))
+    p.Ts_in - (Te + c.ΔTsup) < ΔTpinch &&
+        push!(issues, _issue(:Te, Te, p.Ts_in - c.ΔTsup - ΔTpinch, "superheat pinch: Ts_in - (Te + ΔTsup) below ΔTpinch"))
+    x.xs < xs_tol && push!(issues, _issue(:xs, x.xs, xs_tol, "two-phase zone almost vanished"))
+    x.xs > 1 - xs_tol && push!(issues, _issue(:xs, x.xs, 1 - xs_tol, "superheat zone almost vanished"))
+    return issues
+end
+
+"Issues reported for a borehole: secondary fluid (`Tin`, `Tout`) below freezing or outside its table."
+validity(c::BoreholeHX, x, p) = _secondary_issues!(NamedTuple[], c.secondaryfluid, (Tin = p.Tin, Tout = p.Tout))

@@ -241,3 +241,69 @@ function port_values(sys::ComponentSystem, u, name::Symbol)
     b = sys.blocks[findfirst(==(name), keys(sys.components))]
     return _port_values(b, _node_values(sys, u))
 end
+
+########################
+# validity             #
+########################
+
+"""
+    validity(c::AbstractComponent, x, p) -> Vector
+
+Physical-validity issues of component `c` at the physical values `x` (internal unknowns) and `p`
+(ports), as NamedTuples `(quantity, value, limit, message)`. Empty if none. Reported only: the
+solver is not constrained by them.
+"""
+validity(::AbstractComponent, x, p) = NamedTuple[]
+
+"""
+    validity_issues(sys::ComponentSystem, u) -> Vector
+
+Validity issues of all components at the unknowns `u` (e.g. a solution), as NamedTuples
+`(component, quantity, value, limit, message)`; empty if none. See [`validity`](@ref).
+"""
+function validity_issues(sys::ComponentSystem, u)
+    nodevals = _node_values(sys, u)
+    issues = NamedTuple[]
+    for (name, b) in zip(keys(sys.components), sys.blocks)
+        for i in validity(b.component, _internal_values(b, u), _port_values(b, nodevals))
+            push!(issues, (component = name, i...))
+        end
+    end
+    return issues
+end
+
+_issue(quantity, value, limit, message) = (quantity = quantity, value = value, limit = limit, message = message)
+
+# secondary-fluid temperatures: freezing point and tabulated range
+function _secondary_issues!(issues, sf::SecondaryFluid, temps::NamedTuple)
+    for (k, T) in pairs(temps)
+        if isfinite(sf.Tfreeze) && T < sf.Tfreeze
+            push!(issues, _issue(k, T, sf.Tfreeze, "secondary fluid below its freezing point"))
+        end
+        if T < sf.Tmin || T > sf.Tmax
+            push!(issues, _issue(k, T, T < sf.Tmin ? sf.Tmin : sf.Tmax,
+                                 "secondary fluid outside its property table (properties extrapolated flat)"))
+        end
+    end
+    return issues
+end
+
+########################
+# continuation         #
+########################
+
+"""
+    continuation(build, λs, u0, alg; secant = true, max_halvings = 6, kwargs...) -> Vector
+
+Solve the systems `build(λ)` (a [`ComponentSystem`](@ref) for each parameter value `λ`, e.g. a
+flow factor or a source temperature) for `λ` in `λs`, in order, starting from the guess `u0` for
+`build(first(λs))`. Each solve starts from the previous solution, extrapolated linearly in `λ`
+from the last two solutions (`secant = true`). When a step fails, it is halved (at most
+`max_halvings` times) and the intermediate values are solved first.
+
+Returns one NamedTuple `(λ, u, ok, iterations)` per value of `λs` solved (the continuation
+stops after the first value that fails; its `u` is then the last converged solution, at an
+intermediate `λ`). `kwargs` go to
+`solve`. Needs NonlinearSolve (package extension).
+"""
+function continuation end
