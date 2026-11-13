@@ -264,3 +264,38 @@ backend; "cont" = 87 continuation solves):
   (rounding of `vmin + vmin·eᵘ` vs `vmin(1 + eᵘ)`).
 - Conclusion: the log map is neutral to slightly positive. Robustness is set by the initial guess and
   the residual scales, as found in step 2, and belongs in steps 4 and 6.
+
+## `feature/component-core` (plan)
+Scope (decided 2026-11-13): **the evaporator first**, standalone (given secondary-fluid inlet
+temperature) and coupled to the borehole. Compressor and condenser stay post-processing; the
+design must allow closing the cycle later (e.g. `hei` becoming a port instead of a parameter).
+The old API (`evaporator_model!`, `evaporatorborehole_model!`, `*Parameters`) stays unchanged;
+tests check that the components give the same roots.
+
+Design:
+- **Component** (`AbstractComponent`): declares its internal unknowns (name → transform,
+  physical values), its ports (name → transform), its residuals with a nominal scale each, and
+  `residuals!(r, c, x, ports)` on **physical** values. The system does all the `from_R` mapping.
+- **Ports as shared node variables:** a node joins ports of different components (e.g. the
+  evaporator secondary outlet and the borehole inlet) into one unknown, or fixes them to a value
+  (e.g. a given source temperature). No connection equations: the evaporator alone stays 8 × 8 and
+  evaporator + borehole 9 × 9, as today.
+- **System:** unknowns in a `ComponentVector` (`u.evaporator.Qe`, `u.nodes.T_cold`, ...), square
+  check, `residual!(du, u, sys)`, `initial_guess(sys; ...)` from physical values and
+  `physical(sys, u)` back. Generic in the number type (ForwardDiff).
+- **Scaling:** unknowns through the transforms (new `Linear(x0, scale)`, e.g. heat flows in units
+  of a nominal duty); residuals divided by their nominal scale (W → duty, K → 1, ε → 1). Newton is
+  invariant to this, TrustRegion/LevenbergMarquardt are not: that is the measurement.
+- **Formulation:** `SaturationTemperature()` by default for a pure `ClapeyronRefrigerant` with
+  superancillaries (step 2 recommendation), `NestedPressure()` otherwise.
+- **NonlinearSolve** as a package extension: `NonlinearProblem(sys, u0)` when it is loaded.
+
+Steps: (1) residual functions on physical values (old models unchanged, bit for bit);
+(2) `Linear` transform; (3) component core, `Evaporator`, `BoreholeHX`, `System`;
+(4) NonlinearSolve extension; (5) same roots as the old models; sweep with and without scaling
+(Newton, TrustRegion, LevenbergMarquardt).
+
+Known difference: the borehole component evaluates the fluid density at its own mean temperature
+`(Tin + Tout)/2`, as `borehole_model!` does; `evaporatorborehole_model!` uses the evaporator
+two-phase mean `(Ts_l + Ts_m)/2`, which a separate component cannot see. Roots differ by the
+density change over ≈ 1 K (≈ 1e-4 relative).

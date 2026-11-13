@@ -5,22 +5,30 @@ authors = ["Alberto Lazzarotto <alberto.lazzarotto84@gmail.com> and contributors
 
 [deps]
 Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 CoolProp = "e084ae63-2819-5025-826e-f8e611a84251"
 EntropyScaling = "36a13073-9e6e-4b19-b12b-cb530e79ee8e"
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 ExponentialUtilities = "d4d017d3-3776-5f7e-afef-a10c40355c18"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LambertW = "984bce1d-4616-540c-a9ee-88d1112d94c9"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 RequiredInterfaces = "97f35ef4-7bc5-4ec1-a41a-dcc69c7308c6"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[weakdeps]
+NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
+
+[extensions]
+OptimalGshpFlowNonlinearSolveExt = "NonlinearSolve"
+
 [compat]
 Clapeyron = "0.6.30"
+ComponentArrays = "0.15"
 CoolProp = "0.2.0"
 EntropyScaling = "0.4.3"
-ForwardDiff = "0.10, 1"
 ExponentialUtilities = "1.27.0"
+ForwardDiff = "0.10, 1"
 Interpolations = "0.15.1"
 LambertW = "1.0.0"
 NonlinearSolve = "4.4.0"
@@ -34,4 +42,4 @@ NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "NonlinearSolve"]
