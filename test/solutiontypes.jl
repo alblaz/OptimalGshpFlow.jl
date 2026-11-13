@@ -93,3 +93,23 @@ end
     T = only(Base.return_types(c -> ClapeyronRefrigerant(c; mass_fractions = [0.5, 0.5]), (Vector{String},)))
     @test T isa Union || isconcretetype(T)
 end
+
+# Purity is part of the refrigerant type, so that the default formulation (SaturationTemperature
+# for a pure fluid, NestedPressure for a mixture) and hence the Evaporator, the system and its
+# unknowns are inferred; with a run-time choice they were a Union of two systems with different
+# unknowns (Te vs pe), which made a parameter study / test block practically impossible to compile.
+@testset "purity in the refrigerant type" begin
+    r = ClapeyronRefrigerant("R290")
+    mx = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])
+    @test OptimalGshpFlow.ispure(r) && !OptimalGshpFlow.ispure(mx)
+    @test ClapeyronRefrigerant(["R290"]) isa typeof(r)                 # a 1-element vector is pure too
+    @test only(Base.return_types(default_formulation, (typeof(r),))) === SaturationTemperature
+    @test only(Base.return_types(default_formulation, (typeof(mx),))) === NestedPressure
+    sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), "INCOMP::MEA-28%")
+    ev  = EvaporatorDesign(6000., 273., 273 + 40, "R290", "INCOMP::MEA-28%"; U = 2000., ΔTs = 3., ΔT_l = 1.5)
+    phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
+    mk(r) = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei, Vs = ev.Vs,
+                       Vref = ev.Vref, ΔTsup = 5.)
+    @test isconcretetype(only(Base.return_types(mk, (typeof(r),))))
+    @test isconcretetype(only(Base.return_types(n -> mk(ClapeyronRefrigerant(n)), (String,))))
+end
