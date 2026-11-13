@@ -38,8 +38,11 @@ Read it at the start of a session and update it when a branch is finished.
 - `src/models.jl`: residual functions `evaporator_model!`, `evaporatorborehole_model!`,
   `borehole_model!`, plus constructors of the solution types.
 - `src/fluidproperties.jl`: spline-based `Refrigerant` and `SecondaryFluid` (CoolProp sampling).
+- `src/properties/interface.jl`: `AbstractRefrigerant` and the property functions the models use.
 - `src/properties/clapeyron_refrigerant.jl`: `ClapeyronRefrigerant` (Clapeyron + CoolProp or
   EntropyScaling transport); pass `phase = :vapor/:liquid` whenever the phase is known.
+  CoolProp goes through a cached `AbstractState`, never `PropsSI` in hot paths (≈ 100 µs/call).
+- `src/properties/tv_state.jl`: explicit (T, v) property evaluations for `ClapeyronRefrigerant`.
 - `src/utilities.jl`: maps between bounded intervals and ℝ (linear, tanh, sigmoid).
 - `src/borehole.jl`, `src/pipeflow.jl`, `src/plateheatexchanger.jl`, `src/compressor.jl`,
   `src/pressuredrop.jl`: component correlations.

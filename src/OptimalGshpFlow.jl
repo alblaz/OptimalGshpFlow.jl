@@ -26,6 +26,9 @@ export Refrigerant
 #export  RefrigerantSaturatedVapor, RefrigerantSuperHeatedVapor, refrigerant_twophaseregion, refrigerant_superheated
 
 include("properties/clapeyron_refrigerant.jl")
+include("properties/tv_state.jl")
+export volume_pT, p_Tv, h_Tv, s_Tv, cp_Tv, ρ_Tv, μ_Tv, λ_Tv, pressure_residual
+export volume_to_R, volume_from_R
 export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
 export cp_twophase, T_ps, h_ps
 
@@ -68,5 +71,7 @@ export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
 
 export compressor_power, condenser_power
 export pressure_drop, pumping_power
+
+__init__() = _init_coolprop_indices()
 
 end

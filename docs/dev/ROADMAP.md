@@ -21,7 +21,7 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-step 1 done) |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-steps 1–2 done) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit | |
@@ -117,6 +117,26 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
    - the residual `p_Tv(T, v)/p - 1`, scaled from the start;
    - the molar volume as a bounded unknown on a log scale (from the co-volume to ∞), in line
      with the pressure mapping.
+   **Done** (`src/properties/tv_state.jl`, `test/tv_state.jl`):
+   - `p_Tv`, `h_Tv`, `s_Tv`, `cp_Tv`, `ρ_Tv`, `μ_Tv`, `λ_Tv` (v molar [m³/mol], outputs per kg),
+     `pressure_residual`, `volume_pT` (for initial guesses), `volume_to_R`/`volume_from_R`
+     (`v = vmin (1 + eᵘ)`, `vmin` = co-volume, a new field, independent of T for MultiFluid).
+   - They reproduce the (p, T) functions to ≤ 1e-12 (vapour and liquid, R290 and R454C) and AD
+     matches central differences.
+   - Transport from (ρ, T): EntropyScaling has an unexported, unitless
+     `VT_viscosity(model, V, T, z)` / `VT_thermal_conductivity` (the density method is
+     Unitful-only). CoolProp: `PropsSI` costs ≈ 100 µs per call for any input pair, so
+     `CoolPropTransport` now uses a cached low-level `AbstractState` (`CoolPropState`, with a
+     lock), ≈ 2–3 µs, values `==` PropsSI. CoolProp has no analytic transport derivatives
+     (`get_dT_drho[viscosity] is invalid`), so Duals still use central differences.
+   - Cost per call: `p_Tv` 0.3 µs, `h_Tv` 0.45, `cp_Tv` 0.57, `μ_Tv` 0.6 (EntropyScaling) /
+     1.8 (CoolProp); with Duals in (T, v): 0.5, 0.8, –, 1.0 / 11 µs. Compare `h_pT(:vapor)` 2.3,
+     `T_dew` 2.7, `h_superheated` 6.4 µs.
+   - Side effect on the existing models (CoolProp transport): evaporator residual 280 → 41 µs,
+     Jacobian 1.1 ms → 115 µs (EntropyScaling transport: 69 / 163 µs).
+   - Benchmark note: hand-made Dual tags (`Dual{Nothing}`) break Clapeyron's nested AD
+     ("Cannot determine ordering of Dual tags"); use `ForwardDiff.Tag(f, Float64)`.
+
 3. **Saturation without inner iterations** (pure fluids). Options:
    - Clapeyron superancillaries, if available for `MultiFluid`. To verify: `SuperAncSaturation`
      may only cover cubic/SAFT models;
