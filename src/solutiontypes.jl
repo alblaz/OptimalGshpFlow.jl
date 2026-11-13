@@ -24,22 +24,24 @@ Contains all the parameters of the heat exchanger model. The model is based on t
 - `ϵ`: efficiency
 - `NTU`: number of transfer units
 """
-struct HeatExchangerSolution
-    Q
-    Thh
-    Thl
-    Tch
-    Tcl
-    Ch
-    Cc
-    Vh
-    Vc
-    hh
-    hc
-    UA
-    ϵ
-    NTU
+struct HeatExchangerSolution{T <: Real}
+    Q::T
+    Thh::T
+    Thl::T
+    Tch::T
+    Tcl::T
+    Ch::T
+    Cc::T
+    Vh::T
+    Vc::T
+    hh::T
+    hc::T
+    UA::T
+    ϵ::T
+    NTU::T
 end
+# fields of mixed types (e.g. ForwardDiff Duals and Float64) are promoted to a common type
+HeatExchangerSolution(x::Vararg{Real, 14}) = HeatExchangerSolution(promote(x...)...)
 
 """
     BoreholeSolution
@@ -56,17 +58,18 @@ Borehole solution based on Hellström model
 - `Qb`: Heat exchnaged in the borehole
 - `Rbstar`: Effective borehole resistance
 """
-struct BoreholeSolution
-    borehole::Borehole
-    λground
-    Tin
-    Tout
-    Tb
-    Vs
-    Cs
-    Qb
-    Rbstar
+struct BoreholeSolution{B <: Borehole, T <: Real}
+    borehole::B
+    λground::T
+    Tin::T
+    Tout::T
+    Tb::T
+    Vs::T
+    Cs::T
+    Qb::T
+    Rbstar::T
 end
+BoreholeSolution(borehole::Borehole, x::Vararg{Real, 8}) = BoreholeSolution(borehole, promote(x...)...)
 
 """
 Constructor
@@ -107,21 +110,22 @@ end
 - `Qb`: Heat exchnaged in the borehole
 - `Rbstar`: Effective borehole resistance
 """
-struct EvaporatorSolution
-    plateheatexchanger::PlateHeatExchanger
-    xs::Real
-    twophase_region::HeatExchangerSolution
-    superheat_region::HeatExchangerSolution
-    ΔT_l  
-    ΔT_m
-    ΔT_h
+struct EvaporatorSolution{P <: PlateHeatExchanger, X <: Real, H1 <: HeatExchangerSolution,
+                          H2 <: HeatExchangerSolution, T <: Real}
+    plateheatexchanger::P
+    xs::X
+    twophase_region::H1
+    superheat_region::H2
+    ΔT_l::T
+    ΔT_m::T
+    ΔT_h::T
 end
 
 function EvaporatorSolution(plateheatexchanger::PlateHeatExchanger, xs, twophase_region::HeatExchangerSolution, superheat_region::HeatExchangerSolution)
     ΔT_l = twophase_region.Thl - twophase_region.Tcl
     ΔT_m = twophase_region.Thh - twophase_region.Tch   
     ΔT_h = superheat_region.Thh - superheat_region.Tch  
-    return EvaporatorSolution(plateheatexchanger,xs, twophase_region,superheat_region, ΔT_l, ΔT_m, ΔT_h)
+    return EvaporatorSolution(plateheatexchanger, xs, twophase_region, superheat_region, promote(ΔT_l, ΔT_m, ΔT_h)...)
 end
 
 
@@ -137,9 +141,9 @@ function temperatureprofiles(evaporator_solution::EvaporatorSolution; n = 11)
     return x, Tc, Th
 end
 
-struct EvaporatorBoreholeSolution
-    evaporator::EvaporatorSolution
-    borehole::BoreholeSolution
+struct EvaporatorBoreholeSolution{E <: EvaporatorSolution, B <: BoreholeSolution}
+    evaporator::E
+    borehole::B
 end
 
 
