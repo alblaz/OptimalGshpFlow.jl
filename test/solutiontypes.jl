@@ -67,4 +67,12 @@ end
     pv = (Ts_in = 278., Ts_out = 274.)
     @test isconcretetype(only(Base.return_types(evaporator_solution, (typeof(e), typeof(x), typeof(pv)))))
     @test isconcretetype(only(Base.return_types(borehole_solution, (typeof(b), typeof((Tin = 270., Tout = 272.))))))
+
+    # physical values of a system solution (input of the post-processing above)
+    sys = ComponentSystem((evaporator = e, borehole = b);
+        nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout)))
+    u = initial_guess(sys; evaporator = (Te = 268., Qe = 5e3, Qsup = 300., Ts_m = 276.), nodes = (T_cold = 274., T_warm = 279.))
+    ph = @inferred physical(sys, u)
+    @test keys(ph) == (:evaporator, :nodes)                  # no entry for the borehole (no unknowns)
+    @test ph.evaporator.Te ≈ 268. && ph.nodes.T_warm ≈ 279.
 end
