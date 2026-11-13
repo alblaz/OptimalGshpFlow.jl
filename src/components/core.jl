@@ -90,10 +90,10 @@ Example, evaporator coupled to a borehole:
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout)))
 """
-struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Tuple, NT <: Tuple, F <: Tuple, I <: Tuple, AX}
+struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <: Tuple, I <: Tuple, AX}
     components::C
     blocks::B
-    nodenames::NN
+    nodenames::NN           # Val((names...)): node names in the type, so that results keyed by them are inferred
     nodetransforms::NT
     nodefixed::F            # `nothing` (free) or the fixed value, per node
     nodeindex::I            # index in u of each free node (0 if fixed)
@@ -145,14 +145,14 @@ function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::Named
                 for cname in keys(components) if !isempty(unknowns(components[cname])))...)
     isempty(freenodes) || (proto = (; proto..., nodes = NamedTuple{freenodes}(zeros(length(freenodes)))))
     ax = getaxes(ComponentVector(proto))
-    return ComponentSystem(components, blocks, nodenames, nodetransforms, nodefixed, nodeindex, uoff, ax)
+    return ComponentSystem(components, blocks, Val(nodenames), nodetransforms, nodefixed, nodeindex, uoff, ax)
 end
 
 Base.length(sys::ComponentSystem) = sys.n
 
 function Base.show(io::IO, sys::ComponentSystem)
     print(io, "ComponentSystem(", join(keys(sys.components), ", "), "; ", sys.n, " unknowns, nodes: ",
-          join((v === nothing ? string(k) : "$k = $v" for (k, v) in zip(sys.nodenames, sys.nodefixed)), ", "), ")")
+          join((v === nothing ? string(k) : "$k = $v" for (k, v) in zip(_nodenames(sys), sys.nodefixed)), ", "), ")")
 end
 
 # physical value of every node, in the element type of u
@@ -208,7 +208,7 @@ function initial_guess(sys::ComponentSystem; nodes::NamedTuple = (;), kwargs...)
             u[b.uoffset + i] = to_R(t, xi)
         end
     end
-    for (k, t, v, i) in zip(sys.nodenames, sys.nodetransforms, sys.nodefixed, sys.nodeindex)
+    for (k, t, v, i) in zip(_nodenames(sys), sys.nodetransforms, sys.nodefixed, sys.nodeindex)
         v === nothing || continue
         haskey(nodes, k) || throw(ArgumentError("no initial value for node $k"))
         u[i] = to_R(t, nodes[k])
@@ -227,9 +227,18 @@ Physical values of the unknowns `u`: one NamedTuple per component with internal 
 """
 function physical(sys::ComponentSystem, u)
     nodevals = _node_values(sys, u)
-    comps = (; (k => _internal_values(b, u) for (k, b) in zip(keys(sys.components), sys.blocks)
-                if !isempty(unknowns(b.component)))...)
-    return (; comps..., nodes = NamedTuple{sys.nodenames}(nodevals))
+    comps = _drop_empty(NamedTuple{keys(sys.components)}(map(b -> _internal_values(b, u), sys.blocks)))
+    return merge(comps, (nodes = NamedTuple{_nodenames(sys)}(nodevals),))
+end
+
+_nodenames(::ComponentSystem{C, B, Val{NN}}) where {C, B, NN} = NN
+
+# drop the entries without internal unknowns (empty NamedTuples), at the type level so that the
+# result is inferred
+_drop_empty(nt::NamedTuple{()}) = nt
+function _drop_empty(nt::NamedTuple{K}) where {K}
+    rest = _drop_empty(Base.tail(nt))
+    return first(nt) isa NamedTuple{()} ? rest : merge(NamedTuple{(first(K),)}((first(nt),)), rest)
 end
 
 """
