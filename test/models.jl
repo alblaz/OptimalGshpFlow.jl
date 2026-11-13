@@ -63,7 +63,7 @@ param_evaporator_prototype  = EvaporatorParameters(refrigerant=refrigerant, seco
                                         
 # @unpack plateheatexchanger = param_evaporator_prototype                           
 
-pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), refrigerant.pr_min, refrigerant.pcrit)
+pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), pressure_bounds(refrigerant)...)
 ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
 xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1

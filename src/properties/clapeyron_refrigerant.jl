@@ -60,9 +60,12 @@ known. With the default `phase = :unknown` both volume roots are computed and co
 ≈ 5–20× slower.
 
 Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (molar mass, kg/mol),
-`Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`).
+`Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`), `vmin`
+(co-volume, the lower bound of the molar volume [m³/mol], see [`volume_from_R`](@ref)),
+`Ttriple`, `superancillary` (pure fluid whose saturation curve is an explicit function of T, see
+[`saturation_T`](@ref)).
 """
-struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM}
+struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigerant
     name::String
     components::Vector{String}
     eos::E
@@ -72,6 +75,9 @@ struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM}
     M::Float64
     Tcrit::Float64
     pcrit::Float64
+    vmin::Float64
+    Ttriple::Float64
+    superancillary::Bool
 end
 
 function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
@@ -103,15 +109,22 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
         EntropyScaling.RefpropRES([get(ENTROPYSCALING_NAMES, c, c) for c in comps])
     else
         n == 1 || throw(ArgumentError("CoolPropTransport supports pure fluids only"))
-        comps[1]
+        CoolPropState(comps[1])
     end
+    vmin = Clapeyron.lb_volume(eos, Tc, z)   # independent of T for MultiFluid
+    Ttriple = n == 1 ? Float64(eos.pures[1].properties.Ttp) : NaN
+    superanc = n == 1 && _has_superancillary(eos.pures[1], Ttriple, Tc)
 
-    return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc)
+    return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
+                                Ttriple, superanc)
 end
 ClapeyronRefrigerant(component::AbstractString; kwargs...) =
     ClapeyronRefrigerant([component]; name = component, kwargs...)
 
 ispure(r::ClapeyronRefrigerant) = length(r.components) == 1
+
+# no lower bound: the saturation solver works down to the triple point
+pressure_bounds(r::ClapeyronRefrigerant) = (zero(r.pcrit), r.pcrit)
 
 Base.show(io::IO, r::ClapeyronRefrigerant) =
     print(io, "ClapeyronRefrigerant(", r.name, ", z = ", r.z, ", transport = ", nameof(typeof(r.transport)), ")")
@@ -130,7 +143,7 @@ bubble temperatures coincide; for a zeotropic mixture `T_dew - T_bubble` is the 
 """
 function saturation_dew(r::ClapeyronRefrigerant, p)
     if ispure(r)
-        T, vl, vv = Clapeyron.saturation_temperature(r.eos, p)
+        T, vl, vv = _saturation_temperature_pure(r, p)
     else
         T, vl, vv, _ = Clapeyron.dew_temperature(r.eos, p, r.z)
     end
@@ -139,11 +152,43 @@ end
 
 function saturation_bubble(r::ClapeyronRefrigerant, p)
     if ispure(r)
-        T, vl, vv = Clapeyron.saturation_temperature(r.eos, p)
+        T, vl, vv = _saturation_temperature_pure(r, p)
     else
         T, vl, vv, _ = Clapeyron.bubble_temperature(r.eos, p, r.z)
     end
     return T, vl
+end
+
+# Pure fluid at pressure p: invert the superancillary p_sat(T) when available (explicit and
+# exact, see saturation_T), otherwise Clapeyron's solver. Clapeyron 0.6.30
+# saturation_temperature returns NaN for R744 at every pressure.
+function _saturation_temperature_pure(r::ClapeyronRefrigerant, p)
+    r.superancillary || return Clapeyron.saturation_temperature(r.eos, p)
+    T = _T_sat_superanc(r, p)
+    _, vl, vv = saturation_T(r, T)
+    return T, vl, vv
+end
+
+_primal(x::ForwardDiff.Dual) = _primal(ForwardDiff.value(x))
+_primal(x) = x
+
+# Newton on ln p_sat(T) = ln p with Float64 values, then one Newton step with the (possibly Dual)
+# pressure: the step propagates the exact derivative dT/dp = 1/(p d ln p_sat/dT).
+# NaN outside (p_triple, p_crit).
+function _T_sat_superanc(r::ClapeyronRefrigerant, p)
+    lnp = log(_primal(p))
+    lnpsat(T) = log(p_sat(r, T))
+    Ttp, Tc = r.Ttriple, r.Tcrit
+    lnptp, lnpc = lnpsat(Ttp + 1e-6 * (Tc - Ttp)), log(r.pcrit)
+    lnptp < lnp < lnpc || return oftype(float(_primal(p)), NaN) * one(p)
+    # initial guess: ln p linear in 1/T between the triple and critical points
+    T = 1 / (1/Ttp + (lnp - lnptp) / (lnpc - lnptp) * (1/Tc - 1/Ttp))
+    for _ in 1:30
+        ΔT = (lnpsat(T) - lnp) / ForwardDiff.derivative(lnpsat, T)
+        T = clamp(T - ΔT, Ttp + 1e-9, Tc - 1e-9)
+        abs(ΔT) < 1e-11 * T && break
+    end
+    return T - (lnpsat(T) - log(p)) / ForwardDiff.derivative(lnpsat, T)
 end
 
 "Dew point temperature [K] at pressure `p` [Pa]."
@@ -224,34 +269,78 @@ function _transport(r::ClapeyronRefrigerant{<:Any, EntropyScalingTransport}, pro
 end
 
 function _transport(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p, T, phase)
-    out = prop === :viscosity ? "V" : "CONDUCTIVITY"
-    return _coolprop_pT(out, p, T, r.transport_model)
+    return _coolprop(r.transport_model, COOLPROP_PT, _coolprop_key(prop), p, T, 1e-6, 1e-4)
 end
 
 _transport_dew(r::ClapeyronRefrigerant{<:Any, EntropyScalingTransport}, prop, p) =
     _transport(r, prop, p, T_dew(r, p), :vapor)
 
 # saturated vapour with CoolProp: (p, Q = 1) avoids evaluating exactly on the phase boundary
-function _transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p)
-    out = prop === :viscosity ? "V" : "CONDUCTIVITY"
-    fluid = r.transport_model
-    p isa ForwardDiff.Dual || return CoolProp.PropsSI(out, "P", p, "Q", 1, fluid)
-    pv = ForwardDiff.value(p); dp = 1e-6 * pv
-    f  = CoolProp.PropsSI(out, "P", pv, "Q", 1, fluid)
-    fp = (CoolProp.PropsSI(out, "P", pv + dp, "Q", 1, fluid) - CoolProp.PropsSI(out, "P", pv - dp, "Q", 1, fluid)) / (2dp)
-    return typeof(p)(f, fp * ForwardDiff.partials(p))
+_transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
+    _coolprop(r.transport_model, COOLPROP_PQ, _coolprop_key(prop), p, 1.0, 1e-6, 0.0)
+
+########################
+# CoolProp low level   #
+########################
+
+"""
+    CoolPropState(fluid)
+
+Cached CoolProp `AbstractState` (HEOS backend) of a pure fluid, used for transport properties.
+Updating it and reading outputs costs ≈ 3 µs, against ≈ 100 µs for one `PropsSI` call, with
+identical results. A lock serialises access, so a refrigerant can be shared between threads.
+"""
+mutable struct CoolPropState
+    fluid::String
+    handle::Clong
+    lock::ReentrantLock
+    function CoolPropState(fluid::AbstractString)
+        cs = new(String(fluid), CoolProp.AbstractState_factory("HEOS", fluid), ReentrantLock())
+        finalizer(x -> CoolProp.AbstractState_free(x.handle), cs)
+        return cs
+    end
+end
+Base.show(io::IO, cs::CoolPropState) = print(io, "CoolPropState(", cs.fluid, ")")
+
+const COOLPROP_PT = Ref{Clong}(-1)
+const COOLPROP_PQ = Ref{Clong}(-1)
+const COOLPROP_DT = Ref{Clong}(-1)
+const COOLPROP_V  = Ref{Clong}(-1)
+const COOLPROP_L  = Ref{Clong}(-1)
+
+function _init_coolprop_indices()
+    COOLPROP_PT[] = CoolProp.get_input_pair_index("PT_INPUTS")
+    COOLPROP_PQ[] = CoolProp.get_input_pair_index("PQ_INPUTS")
+    COOLPROP_DT[] = CoolProp.get_input_pair_index("DmassT_INPUTS")
+    COOLPROP_V[]  = CoolProp.get_param_index("V")
+    COOLPROP_L[]  = CoolProp.get_param_index("CONDUCTIVITY")
+    return nothing
 end
 
-# CoolProp property at (p, T) with derivatives for ForwardDiff.Dual inputs by central differences
-function _coolprop_pT(out, p, T, fluid)
-    (p isa ForwardDiff.Dual || T isa ForwardDiff.Dual) || return CoolProp.PropsSI(out, "P", p, "T", T, fluid)
-    pv, Tv = ForwardDiff.value(p), ForwardDiff.value(T)
-    f = CoolProp.PropsSI(out, "P", pv, "T", Tv, fluid)
-    dp, dT = 1e-6 * pv, 1e-4 * Tv
-    fp = (CoolProp.PropsSI(out, "P", pv + dp, "T", Tv, fluid) - CoolProp.PropsSI(out, "P", pv - dp, "T", Tv, fluid)) / (2dp)
-    fT = (CoolProp.PropsSI(out, "P", pv, "T", Tv + dT, fluid) - CoolProp.PropsSI(out, "P", pv, "T", Tv - dT, fluid)) / (2dT)
-    D = p isa ForwardDiff.Dual ? typeof(p) : typeof(T)
-    return D(f, fp * _partials(p, D) + fT * _partials(T, D))
+_coolprop_key(prop) = prop === :viscosity ? COOLPROP_V : COOLPROP_L
+
+function _coolprop_value(cs::CoolPropState, pair, key, x1, x2)
+    lock(cs.lock) do
+        CoolProp.AbstractState_update(cs.handle, pair[], x1, x2)
+        CoolProp.AbstractState_keyed_output(cs.handle, key[])
+    end
 end
-_partials(x::ForwardDiff.Dual, ::Type{D}) where {D} = ForwardDiff.partials(x)
-_partials(x::Real, ::Type{D}) where {D} = zero(ForwardDiff.partials(one(D)))
+
+# CoolProp output for the input pair (x1, x2); for ForwardDiff.Dual inputs the derivatives are
+# central differences with relative steps rel1, rel2
+function _coolprop(cs::CoolPropState, pair, key, x1, x2, rel1, rel2)
+    (x1 isa ForwardDiff.Dual || x2 isa ForwardDiff.Dual) || return _coolprop_value(cs, pair, key, x1, x2)
+    a, b = ForwardDiff.value(x1), ForwardDiff.value(x2)
+    f = _coolprop_value(cs, pair, key, a, b)
+    D = x1 isa ForwardDiff.Dual ? typeof(x1) : typeof(x2)
+    ∂ = zero(ForwardDiff.partials(one(D)))
+    if x1 isa ForwardDiff.Dual
+        h = rel1 * a
+        ∂ += (_coolprop_value(cs, pair, key, a + h, b) - _coolprop_value(cs, pair, key, a - h, b)) / (2h) * ForwardDiff.partials(x1)
+    end
+    if x2 isa ForwardDiff.Dual
+        h = rel2 * b
+        ∂ += (_coolprop_value(cs, pair, key, a, b + h) - _coolprop_value(cs, pair, key, a, b - h)) / (2h) * ForwardDiff.partials(x2)
+    end
+    return D(f, ∂)
+end
