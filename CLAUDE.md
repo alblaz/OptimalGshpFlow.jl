@@ -33,6 +33,18 @@ Read it at the start of a session and update it when a branch is finished.
   - Run tests with `Pkg.test(; io = devnull)` inside the package session.
 - Units are SI throughout; refrigerant properties are per kg.
 - Keep model and property code generic in the number type, so ForwardDiff Duals pass through.
+- Type stability and compile time: keep structs concretely typed (parametric fields, no
+  untyped or abstract fields) and refrigerants/components concrete. Inference on an abstract
+  type blows up inside Clapeyron (PR #32: untyped fields turned the study's first call into a
+  20-minute compile hang). For type instability, compile hangs or long first calls, **start
+  with the dedicated tools, before any hand bisecting or sampling**:
+  - JET.jl `@report_opt target_modules = (OptimalGshpFlow,)` on the concrete entry points:
+    lists runtime dispatch with file:line; `@test_opt` to lock a fix in a test.
+  - SnoopCompile.jl (`@snoop_inference`, inference triggers): where compile time goes.
+  - Cthulhu.jl `@descend`: interactive, cannot be driven through julia-mcp; suggest the user
+    runs it in their REPL.
+  - Install them in a scratch env, not the package. Also check lowered code for `Core.Box`
+    (captured variables reassigned in closures, e.g. inside `@testset` or keyword functions).
 
 ## Code map
 - `src/models.jl`: residual functions `evaporator_model!`, `evaporatorborehole_model!`,
