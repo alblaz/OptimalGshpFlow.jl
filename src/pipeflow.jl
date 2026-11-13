@@ -17,6 +17,9 @@ Model for the Nusselt number in the laminar-turbulent transition range `2300 ≤
   so model solutions vary continuously with flow rate and temperature.
 - `SharpTransition()`: Gnielinski correlation from `Re = 2300`, i.e. `Nu` jumps at `Re = 2300`
   (×2–7 depending on `Pr`) and at `Re = 1e4`. This is the original model of the package.
+
+The same two types select the friction-factor model of the pipe pressure drop, see `fDarcy`
+(smooth: linear blend between `Re = 2300` and `4000`; sharp: original switch at `Re = 2300`).
 """
 abstract type NusseltTransition end
 struct SmoothTransition <: NusseltTransition end

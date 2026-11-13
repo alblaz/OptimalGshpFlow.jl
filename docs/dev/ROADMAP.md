@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-13 (feature/optimal-flow-components, in progress).
+Last updated: 2026-11-14 (fix/pressure-drop-transition).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -26,7 +26,8 @@ unconstrained solvers can be used.
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | merged (#30) |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | merged (#31) |
-| 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | PR open, see below |
+| 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | merged (#34) |
+| B7 | `fix/pressure-drop-transition` | pipe friction factor jumped ×1.65 at Re = 2300 (pump power 344 → 216 W in the study); smooth blend 2300–4000, `SharpTransition()` keeps the original | PR open |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -442,15 +443,25 @@ Results (R290, MEA-28 %, Tb = −5 °C, Tc = 40 °C, ηis 0.7, ηpump 0.3; 39 fl
 - **COP optimum**: COP1 = 3.209 at 0.55 × design flow (0.27 l/s); COP2 = 2.302 at 0.65 ×. Both lie
   in the valid region: the brine leaves its table at 0.15 × and drops below its freezing point
   only at 0.10 × design flow.
-- Jump between 1.65 and 1.60 × design flow (Te −0.8 K, Q2 −115 W, pump power 352 → 211 W):
-  laminar–turbulent transition; the Nusselt blend is smooth, the pressure-drop correlation
-  probably not. To check (follow-up).
+- Jump between 1.65 and 1.60 × design flow (Te −0.8 K, Q2 −115 W, pump power 352 → 211 W),
+  checked on a 0.01 grid (2026-11-14, `fix/pressure-drop-transition`):
+  - pump power: real discontinuity, `fDarcy` switched from 64/Re to the turbulent fit at
+    Re = 2300 (×1.65). Fixed: linear blend in Re from 2300 to 4000 (`SmoothTransition()`, the
+    `NusseltTransition` types now also select the friction model; `SharpTransition()` keeps
+    the original). Pump power now 225.5 → 219.6 → 215.9 W across the crossing; optimum unchanged.
+  - Te: continuous but steep (−0.26 K and −0.42 K per 0.01 × design flow at 1.64 → 1.62): the
+    linear Nusselt blend goes from 3.66 at Re 2300 to Dittus-Boelter at 1e4 (≈ 100 for this
+    brine's Pr), so h rises very fast just above 2300 and has a kink there. It makes a small
+    spurious local COP1 maximum at 1.64 × (2.968, vs 2.941 at 1.62 ×). Not a bug; a smoother
+    Nu model (e.g. Gnielinski 2013 with a C¹ blend) would remove it if it matters.
+  - `f_Martin` (plate HX friction) also switches at Re = 2000, but the plate Re is only 3–56
+    in this study.
 
 Open:
 1. First-call compile of the Clapeyron study (366 s) vs spline (14 s): profile with JET /
    SnoopCompile (`T_ps` alone ≈ 20 s); candidates: own Newton for `T_ps` of a pure fluid,
    PrecompileTools workload.
-2. Pressure-drop continuity at the laminar–turbulent transition (jump above).
+2. ~~Pressure-drop continuity at the laminar–turbulent transition~~ (fixed, B7, see above).
 3. `test/tv_state.jl` (boxes `p`, `r`) and `test/property_interface.jl` (boxes `u`, 137 s
    runtime): same closure pattern as `operating_envelope.jl`.
 4. Possible follow-ups: pump-power helper in the library; `Tb` as a port (step 8 note).
