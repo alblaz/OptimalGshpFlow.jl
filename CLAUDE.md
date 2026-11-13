@@ -37,6 +37,8 @@ Read it at the start of a session and update it when a branch is finished.
 ## Code map
 - `src/models.jl`: residual functions `evaporator_model!`, `evaporatorborehole_model!`,
   `borehole_model!`, plus constructors of the solution types.
+- `src/evaporator_formulations.jl`: `PropertyFormulation` (`NestedPressure` default,
+  `SaturationTemperature`, `ExplicitTv`), passed as last argument of the evaporator residuals.
 - `src/fluidproperties.jl`: spline-based `Refrigerant` and `SecondaryFluid` (CoolProp sampling).
 - `src/properties/interface.jl`: `AbstractRefrigerant` and the property functions the models use.
 - `src/properties/clapeyron_refrigerant.jl`: `ClapeyronRefrigerant` (Clapeyron + CoolProp or

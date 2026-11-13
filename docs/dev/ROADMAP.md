@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-12.
+Last updated: 2026-11-13.
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -21,8 +21,8 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-steps 1–3 done) |
-| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | done, PR pending |
+| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | **next** |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
@@ -87,7 +87,7 @@ Known bug, not fixed yet (B4): `models.jl` maps the pressure with
   | R454C dew point (cold / warm `ChemPotDewTemperature`) | 118 / 72 |
   | `vol0` warm start for the volume solve | no gain |
 
-## Plan: `feature/property-interface` (next)
+## `feature/property-interface` (done; plan and results)
 Idea: carry the thermodynamic state as **(T, v)** inside the model's nonlinear system. Each
 property is then an explicit Helmholtz evaluation (`VT_*`, ≈ 0.5 µs, exact AD) with no inner
 iterations. The outer Newton iteration acts as the warm start, and nothing is interpolated, so
@@ -190,6 +190,45 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
    `pressure_residual(r, Te + ΔTsup, v_sup, p_sat(Te))`; transport at the mean superheat state from
    (T, v) as well (one more volume unknown at `Te + ΔTsup/2`, or interpolate the volume). Compare
    with the nested formulation (sub-step 1 port on `ClapeyronRefrigerant`).
+
+   **Done** (`src/evaporator_formulations.jl`; tests in `test/property_interface.jl`; benchmark
+   `examples/formulations_benchmark.jl`). `evaporator_model!(du, u, p, F)` / `evaporatorborehole_model!`
+   take a `PropertyFormulation`: `NestedPressure()` (default, unknown pe, all backends),
+   `SaturationTemperature()` (unknown Te, explicit saturation, 2 inner volume solves) and
+   `ExplicitTv()` (Te + 2 volume unknowns, no inner iteration). Helpers: `evaporator_unknowns`
+   (guess from physical values), `nested_unknowns` (for post-processing). The heat balances are
+   shared, so all three give the same root (Te within 5e-11 K, Q within 1.4e-12).
+
+   Sweep (6 kW design, 14 flows 0.2–1.5 × Vs, sources 0/5/10 °C; evaporator and evaporator +
+   borehole; NonlinearSolve `NewtonRaphson`/`TrustRegion`, AutoForwardDiff; CoolProp transport):
+
+   | | R290 | R744 | R717 | R134a |
+   |---|---|---|---|---|
+   | design guess, unshifted (R290 only) | 17/42 | | | |
+   | guess = design state shifted to the source T, Newton | 32/42 | 34/42 | 30/42 | 30/42 |
+   | continuation from it (up and down from the design flow) | 42/42 | 42/42 | 42/42 | 42/42 |
+   | median Newton iterations (continuation) | 4 | 4 | 4 | 4 |
+   | median time per solve, Nested / SatT / ExplicitTv [ms] | 3.5 / 1.3 / 1.3 | 7.1 / 2.9 / 3.4 | 4.2 / 1.2 / 1.2 | 3.6 / 1.3 / 1.3 |
+   | residual [µs], Nested / SatT / ExplicitTv | 36 / 18 / 11 | 61 / 27 / 19 | 42 / 11 / 9 | 37 / 12 / 9 |
+   | Jacobian [µs], Nested / SatT / ExplicitTv | 112 / 119 / 63 | 203 / 100 / 69 | 108 / 35 / 36 | 106 / 43 / 34 |
+   | cond(row-scaled J), Nested / SatT / ExplicitTv | 1.3e4 / 3.2e4 / 3.5e4 | 7.3e3 / 7.3e3 / 2.1e4 | 1.3e4 / 2.6e4 / 3.0e4 | 1.2e4 / 2.8e4 / 3.1e4 |
+
+   - **Convergence is the same for all three formulations, case by case** (also with the spline
+     backend): failures are set by the model and the initial guess, not by the properties. The
+     unshifted design guess puts Te above the secondary fluid for a 0 °C source. From the shifted
+     guess only the low flows (≤ 0.4–0.5 × Vs) fail; continuation solves everything.
+   - R744 runs with a subcritical stand-in for the high side (condensing at 25 °C for `hei`).
+   - **Speed: ≈ 2.5–3× per solve** with Te as the unknown; `ExplicitTv` adds little over
+     `SaturationTemperature` (Clapeyron's warm volume solve is cheap), at the price of two
+     unknowns and a 2× worse conditioning than nested.
+   - **R744** exposed two bugs (fixed in this branch): superancillary detection sampled below the
+     triple point (0.6 Tc < Ttriple), and Clapeyron 0.6.30 `saturation_temperature` returns NaN for
+     R744 at every pressure (upstream bug, to report). `T_dew(p)` for pure fluids now inverts the
+     superancillary instead.
+   - Recommendation for `component-core`: **use Te (dew temperature) as the unknown with explicit
+     saturation (`SaturationTemperature`)**; keep `ExplicitTv` available but not as default. The
+     robustness work belongs to step 6 (initial guesses from the source temperature,
+     continuation in flow), plus residual scaling (step 4 of the roadmap).
 
 Out of scope for this branch: residual scaling of the existing equations (step 4 of the
 roadmap), glide (step 5) and new components.
