@@ -50,7 +50,8 @@ Read it at the start of a session and update it when a branch is finished.
   `from_R`, `to_R`); `pressure_transform`, `temperature_transform`, `volume_transform`,
   `evaporator_transforms` give the maps the models use.
 - `src/components/`: component layer (`ComponentSystem`, `Evaporator`, `BoreholeHX`); ports joined
-  by shared node unknowns, scaled residuals. `ext/`: `NonlinearProblem(sys, u0)` (NonlinearSolve).
+  by shared node unknowns, scaled residuals; `validity_issues` (brine freezing, pinch, bounds).
+  `ext/`: `NonlinearProblem(sys, u0)` and `continuation` (NonlinearSolve).
 - `src/utilities.jl`: low-level maps between bounded intervals and ℝ (linear, tanh, sigmoid).
 - `src/borehole.jl`, `src/pipeflow.jl`, `src/plateheatexchanger.jl`, `src/compressor.jl`,
   `src/pressuredrop.jl`: component correlations.

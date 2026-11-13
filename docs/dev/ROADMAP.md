@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-13 (feature/component-core).
+Last updated: 2026-11-13 (feature/evaporator-operating-envelope).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -23,9 +23,10 @@ unconstrained solvers can be used.
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
-| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | PR, see below |
+| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | merged (#30) |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
-| 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | **next** (evaporator priority) |
+| 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | PR, see below |
+| 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
@@ -331,3 +332,48 @@ Known difference: the borehole component evaluates the fluid density at its own 
 `(Tin + Tout)/2`, as `borehole_model!` does; `evaporatorborehole_model!` uses the evaporator
 two-phase mean `(Ts_l + Ts_m)/2`, which a separate component cannot see. Roots differ by the
 density change over ≈ 1 K (≈ 1e-4 relative).
+
+## `feature/evaporator-operating-envelope` (done)
+Planned as `robust-moving-boundary`; renamed after mapping the failures (2026-11-13, agreed with
+the user). Map: R290 (then R744, R717, R134a), flows 0.05–5 × design, sources −5…15 °C, evaporator
+alone and with the borehole, scaled `TrustRegion` from the shifted guess.
+
+Findings:
+- **No zone collapses in this evaporator model.** With fixed superheat ΔTsup and compressor volume
+  flow, Te adjusts: at high flow `Te → Ts_in − ΔTsup` (superheat pinch), at low flow `xs → 0.98`.
+  Zone switching (Bell et al. 2015: bounded solve for Q in (0, Q_max) from a pinch analysis;
+  Bonilla et al.: switching moving-boundary models) matters only for other components or controls
+  (condenser, R744 gas cooler, fixed orifice / flooded outlet): deferred to the cycle closure (6b).
+- **Spurious zero-flow root.** As `Te → Ttriple` the vapour density at the compressor inlet, hence
+  the refrigerant mass flow and every heat flow, vanish: a true root of the equations (Te = 86 K,
+  Q ≈ 0, all brine temperatures = ground). TrustRegion reached it once (R290, borehole, −5 °C,
+  0.3 × flow) because Te was only bounded by (Ttriple, Tcrit).
+- **Brine freezing (issue #14).** At 0.05–0.2 × flow the brine leaves at −27 °C (MEA-28 % freezes at
+  −18.2 °C) and Te reaches −28 °C; the brine splines covered −15…30 °C and extrapolated flat.
+
+Implemented:
+- `Evaporator(...; Te_min = default_Te_min(r))`: the first unknown is mapped on `(Te_min, Tcrit)`
+  (or the pressure from the dew pressure at `Te_min`); default: dew temperature at pr = 0.01, or
+  just above the triple point (R290 −60 °C, R744 −56.5 °C, R717 −31 °C, R134a −44 °C). The
+  spurious root is out of reach: the case above now fails honestly from the fixed guess and
+  converges with continuation (Te = −15.3 °C).
+- `SecondaryFluid`: fields `Tmin`, `Tmax` (table range), `Tfreeze` (`freezing_point`, CoolProp
+  `T_freeze`); `SecondaryFluid(name)` tabulates from just above the freezing point to 30 °C.
+- **Validity reports (reported only, the solver is not constrained):** `validity(c, x, p)` per
+  component, `validity_issues(sys, u)` for a system: brine below freezing or outside its table,
+  Te at `Te_min`, two-phase and superheat pinch (0.1 K), a zone almost vanished (`xs` within 1e-3
+  of 0 or 1).
+- `continuation(build, λs, u0, alg; secant, max_halvings)` (NonlinearSolve extension): solves
+  `build(λ)` along `λs` from the previous solution with a secant predictor, halving failed steps.
+
+Results (480 cases = 4 fluids × 2 systems × 12 flows × 5 sources, scaled systems):
+- Continuation in flow (TrustRegion, from the design flow up and down): **480/480**, median 4
+  iterations per step. Reported issues: superheat pinch at high flow (4–22 cases per fluid and
+  system), brine below freezing (3–12) or outside its table at low flow.
+- Fixed (shifted) guess, no continuation: LevenbergMarquardt 477/480 (median 13–29 iterations),
+  TrustRegion 462/480 (median 8–20; R717 is the hardest, 52–53/60), no wrong roots.
+  `PseudoTransient()` does not help: 0/60 with the default initial step (and with α = 1), 56/60
+  (R290) and 46/60 (R717) with α = 10, below TrustRegion and LevenbergMarquardt: not adopted.
+- Recommendation: continuation for sweeps (what the optimal-flow study does anyway); for single
+  points from a guess, LevenbergMarquardt (most robust) or TrustRegion (faster). Then check
+  `validity_issues`.
