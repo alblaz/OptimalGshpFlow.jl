@@ -1,16 +1,10 @@
-
 """
-  struct SecondaryFluid
+    struct SecondaryFluid
 
-  Fields\\
-  ≡≡≡≡≡≡
-
-  ```
-  ρ  :: Real,
-  μ  :: Real,
-  cp :: Real,
-  λ  :: Real,
-  ```
+Secondary-fluid (brine) properties as cubic splines of the temperature [K]: `ρ`, `μ`, `cp`, `λ`
+(callables). Outside the tabulated range `(Tmin, Tmax)` the splines extrapolate flat.
+`Tfreeze` is the freezing point [K] (`NaN` if CoolProp does not provide one); see
+[`validity_issues`](@ref).
 """
 struct SecondaryFluid
     name::String
@@ -18,20 +12,41 @@ struct SecondaryFluid
     μ
     cp
     λ
- end
+    Tmin::Float64
+    Tmax::Float64
+    Tfreeze::Float64
+end
 
 """
-Constructor\\
-≡≡≡≡≡≡≡≡≡≡≡
+    SecondaryFluid(Trange, fluid_name)
+    SecondaryFluid(fluid_name; Tmin = freezing_point(fluid_name) + 0.1, Tmax = 303.15, ns = 40)
 
-    `SecondaryFluid(Trange, fluid_name)`
- 
-- `Trange` temperature range used to build the interpolatants of the secondary properties
-- `fluid_name` is a string with a valid secondary fluid CoolProp name.
+Splines of the properties of the CoolProp fluid `fluid_name` (e.g. `"INCOMP::MEA-28%"`) over
+`Trange`, or over `ns` points from `Tmin` (by default just above the freezing point) to `Tmax`.
 """
 function SecondaryFluid(Trange, fluid_name)
     spl = secondary_fluid(Trange, fluid_name)
-    return SecondaryFluid(fluid_name, spl.ρ, spl.μ, spl.cp, spl.λ)
+    return SecondaryFluid(fluid_name, spl.ρ, spl.μ, spl.cp, spl.λ, Float64(first(Trange)), Float64(last(Trange)),
+                          freezing_point(fluid_name))
+end
+
+function SecondaryFluid(fluid_name::AbstractString; Tmin = nothing, Tmax = 273.15 + 30, ns = 40)
+    if Tmin === nothing
+        Tf = freezing_point(fluid_name)
+        isnan(Tf) && throw(ArgumentError("no freezing point for $fluid_name in CoolProp: pass Tmin"))
+        Tmin = Tf + 0.1
+    end
+    return SecondaryFluid(range(Tmin, Tmax, length = ns), String(fluid_name))
+end
+
+"""
+    freezing_point(fluid_name) -> T [K]
+
+Freezing point of a CoolProp incompressible fluid (`NaN` if not available, e.g. pure fluids).
+"""
+function freezing_point(fluid_name)
+    Tf = try PropsSI("T_freeze", "T", 280., "P", 101325., fluid_name) catch; NaN end
+    return isfinite(Tf) && Tf > 0 ? Float64(Tf) : NaN
 end
 
 """
