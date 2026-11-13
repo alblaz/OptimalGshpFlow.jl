@@ -56,18 +56,21 @@ Tsat = PropsSI("T", "P",  p, "Q", 1, "R134a")
     end
 end
 
-# Refrigerant construction must work for common heat-pump refrigerants and the
-# spline must reproduce CoolProp over the operating range (evaporator and condenser).
+# Refrigerant construction must work for common heat-pump refrigerants over the whole sampled
+# range (evaporator and condenser). A coarse grid with the same end points keeps this fast (a
+# full grid is ≈ 25 000 CoolProp calls per refrigerant); spline accuracy is tested below.
+const COARSE = (ns = 10, superheating_range = 0:10.:40.)
+
 @testset "Refrigerant construction" begin
     for f in ("R290", "R134a", "R1234yf", "R600a", "R744", "R410A")
-        @test (Refrigerant(f); true)
+        @test (Refrigerant(f; COARSE...); true)
     end
     # CoolProp cannot evaluate the saturated-vapour conductivity of R32 below ≈ -30 °C
     # (conformal state solver fails), so the sampling range has to start higher.
-    @test (Refrigerant("R32"; pr_min = 0.05); true)
+    @test (Refrigerant("R32"; pr_min = 0.05, COARSE...); true)
 
     # keyword arguments are forwarded to the interpolants
-    r = Refrigerant("R134a"; pr_min = 0.02)
+    r = Refrigerant("R134a"; pr_min = 0.02, COARSE...)
     @test r.pr_min == 0.02
 end
 
@@ -95,8 +98,8 @@ end
 # the splines, where they extrapolate flat and the Jacobian is singular.
 @testset "pressure bounds of the spline Refrigerant (B4)" begin
     for (name, pr_min) in (("R134a", 1e-2), ("R290", 2e-2))
-        r = Refrigerant(name; pr_min = pr_min)
-        _, ps = OptimalGshpFlow.log10p_grid(name; pr_min = pr_min)
+        r = Refrigerant(name; pr_min = pr_min, COARSE...)
+        _, ps = OptimalGshpFlow.log10p_grid(name; pr_min = pr_min, ns = COARSE.ns)
         pmin, pmax = OptimalGshpFlow.pressure_bounds(r)
         @test pmin ≈ first(ps) rtol = 1e-12
         @test pmax ≈ last(ps) rtol = 1e-12
