@@ -28,7 +28,7 @@ unconstrained solvers can be used.
 | 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | PR, see below |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
-| 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
+| 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
@@ -377,3 +377,30 @@ Results (480 cases = 4 fluids × 2 systems × 12 flows × 5 sources, scaled syst
 - Recommendation: continuation for sweeps (what the optimal-flow study does anyway); for single
   points from a guess, LevenbergMarquardt (most robust) or TrustRegion (faster). Then check
   `validity_issues`.
+
+## Warm starts for a dynamic coupling (measured 2026-11-13, for step 8)
+Use case: the steady-state evaporator solved at every time step of a dynamic model (e.g. a dynamic
+borehole whose wall temperature `Tb` changes slowly). Measured on R290, evaporator + borehole,
+design flow, scaled system, after a change ΔTb of the ground temperature:
+
+| ΔTb per step | cold start (TrustRegion, shifted guess) | warm start (Newton, previous `u`) | warm start + tangent predictor |
+|---|---|---|---|
+| 0.01 K | 6 it, 2.2 ms | 2 it, 0.95 ms | 1 it, 0.64 ms + 0.1 ms |
+| 0.1 K | 6 it, 2.2 ms | 2 it, 0.95 ms | 1 it, 0.64 ms + 0.1 ms |
+| 1 K | 5 it, 1.9 ms | 3 it, 1.3 ms | 2 it, 0.95 ms + 0.1 ms |
+
+- Tangent predictor: `du/dTb = −J⁻¹ ∂F/∂Tb` at the previous solution (implicit function theorem;
+  one ForwardDiff Jacobian and one derivative, 0.1 ms).
+- One Newton iteration costs ≈ 60 µs (residual 12 µs + Jacobian 42 µs); the rest of the 0.64 ms
+  is NonlinearSolve's per-call setup. Building the `ComponentSystem` costs 24 µs.
+- Order of magnitude: hourly steps over 20 years ≈ 175 000 solves: ≈ 6 min cold, ≈ 3 min warm,
+  < 30 s with a lean warm-started Newton. The evaporator is unlikely to be the bottleneck of a
+  dynamic simulation (g-function convolutions of a dynamic borehole model probably are).
+
+Decisions for step 8:
+- No caching layer now: the warm start is "keep the last `u`" (what `continuation` does).
+- Make the ground temperature `Tb` a **port** of `BoreholeHX` (connected to a node) instead of a
+  field, so that a dynamic borehole component can provide it and a time step changes a node value
+  instead of rebuilding the system.
+- Only if profiling shows the solver overhead matters: reuse the solver cache (`init`/`reinit!`)
+  or a small dedicated Newton loop (≈ 0.1–0.2 ms per step), and/or the tangent predictor.
