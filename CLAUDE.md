@@ -46,7 +46,10 @@ Read it at the start of a session and update it when a branch is finished.
   CoolProp goes through a cached `AbstractState`, never `PropsSI` in hot paths (≈ 100 µs/call).
 - `src/properties/tv_state.jl`: explicit (T, v) property evaluations for `ClapeyronRefrigerant`;
   `saturation_T` (explicit p, v_l, v_v from the superancillaries of the CoolProp fluid files).
-- `src/utilities.jl`: maps between bounded intervals and ℝ (linear, tanh, sigmoid).
+- `src/transforms.jl`: bounded unknowns as types (`Free`, `Unit`, `Box`, `LogBox`, `Above`;
+  `from_R`, `to_R`); `pressure_transform`, `temperature_transform`, `volume_transform`,
+  `evaporator_transforms` give the maps the models use.
+- `src/utilities.jl`: low-level maps between bounded intervals and ℝ (linear, tanh, sigmoid).
 - `src/borehole.jl`, `src/pipeflow.jl`, `src/plateheatexchanger.jl`, `src/compressor.jl`,
   `src/pressuredrop.jl`: component correlations.
 - `examples/`: scripts used for the original study (need NonlinearSolve and Makie in the env).
