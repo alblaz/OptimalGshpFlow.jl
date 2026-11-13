@@ -6,12 +6,12 @@ Secondary-fluid (brine) properties as cubic splines of the temperature [K]: `ρ`
 `Tfreeze` is the freezing point [K] (`NaN` if CoolProp does not provide one); see
 [`validity_issues`](@ref).
 """
-struct SecondaryFluid
+struct SecondaryFluid{Fρ, Fμ, Fcp, Fλ}
     name::String
-    ρ
-    μ
-    cp
-    λ
+    ρ::Fρ
+    μ::Fμ
+    cp::Fcp
+    λ::Fλ
     Tmin::Float64
     Tmax::Float64
     Tfreeze::Float64

@@ -46,7 +46,7 @@ compute the convective heat transfer coefficient for a liquid flowing in a plate
 """
 function h_platehex_wanniarachchi(V, platehex::PlateHeatExchanger, fluidproperties)    
     
-    A, L, W, H, np, ϕ, b, β = getfield.(Ref(platehex), fieldnames(PlateHeatExchanger))    
+    (; W, H, b, β) = platehex     # not getfield.(Ref(platehex), fieldnames(...)): not inferred on Julia 1.10
     ρ, μ, λ, cp = fluidproperties
 
     us = V/(H*W)                  # speed of the secondary fluid 

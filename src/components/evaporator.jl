@@ -5,11 +5,13 @@ Evaporator and borehole as components (feature/component-core).
 """
     default_formulation(refrigerant)
 
-`SaturationTemperature()` for a pure `ClapeyronRefrigerant` with explicit saturation
-(superancillaries), `NestedPressure()` otherwise.
+`SaturationTemperature()` for a pure `ClapeyronRefrigerant` (explicit saturation from the
+superancillaries when available, Clapeyron's saturation solver otherwise), `NestedPressure()`
+for a mixture and for the spline `Refrigerant`. Determined by the refrigerant type only, so that
+an `Evaporator` built with the default is inferred.
 """
 default_formulation(::AbstractRefrigerant) = NestedPressure()
-default_formulation(r::ClapeyronRefrigerant) = ispure(r) && r.superancillary ? SaturationTemperature() : NestedPressure()
+default_formulation(r::ClapeyronRefrigerant) = ispure(r) ? SaturationTemperature() : NestedPressure()
 
 """
     nominal_duty(refrigerant, Vref, hei; Te = 273.15)
@@ -52,9 +54,9 @@ equations as [`evaporator_model!`](@ref).
 Guess: `guess(evap; Te, Qe, Qsup, Ts_m, ϵe = 0.5, ϵsup = 0.5, xs = 0.5)`.
 """
 struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: PlateHeatExchanger, T <: Real,
-                  X <: VariableTransform} <: AbstractComponent
+                  X <: VariableTransform, S <: SecondaryFluid} <: AbstractComponent
     refrigerant::R
-    secondaryfluid::SecondaryFluid
+    secondaryfluid::S
     plateheatexchanger::P
     hei::T
     Vs::T
@@ -159,9 +161,9 @@ Borehole heat exchanger (Hellström, uniform borehole wall temperature `Tb`), as
 - No internal unknowns; one residual `kin Tin - Tout + (1 - kin) Tb` [K], with the coefficient
   and the fluid density at the mean temperature `(Tin + Tout)/2`.
 """
-struct BoreholeHX{B <: Borehole, T <: Real} <: AbstractComponent
+struct BoreholeHX{B <: Borehole, T <: Real, S <: SecondaryFluid} <: AbstractComponent
     borehole::B
-    secondaryfluid::SecondaryFluid
+    secondaryfluid::S
     Vs::T
     λground::T
     Tb::T

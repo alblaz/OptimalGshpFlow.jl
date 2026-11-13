@@ -41,6 +41,11 @@ const ENTROPYSCALING_NAMES = Dict(
 # refrigerant type     #
 ########################
 
+"Composition of a [`ClapeyronRefrigerant`](@ref), a type parameter: `Pure` or `Mixture`."
+abstract type Composition end
+struct Pure <: Composition end
+struct Mixture <: Composition end
+
 """
     ClapeyronRefrigerant(components; mass_fractions = nothing, mole_fractions = nothing,
                          transport = nothing, name = ...)
@@ -66,7 +71,7 @@ Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (m
 triple-point pressure of the components), `superancillary` (pure fluid whose saturation curve is an explicit function of T, see
 [`saturation_T`](@ref)).
 """
-struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigerant
+struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM, C <: Composition} <: AbstractRefrigerant
     name::String
     components::Vector{String}
     eos::E
@@ -87,8 +92,24 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
                               transport::Union{Nothing, TransportBackend} = nothing,
                               name = join(components, "&"))
     comps = String.(components)
+    if length(comps) == 1
+        return _clapeyron_refrigerant(comps, something(transport, CoolPropTransport()), Pure(), mass_fractions,
+                                      mole_fractions, String(name))
+    else
+        return _clapeyron_refrigerant(comps, something(transport, EntropyScalingTransport()), Mixture(),
+                                      mass_fractions, mole_fractions, String(name))
+    end
+end
+# a single fluid: purity and the default transport are known statically, so the type is inferred
+ClapeyronRefrigerant(component::AbstractString; transport::TransportBackend = CoolPropTransport(),
+                     name = component, mass_fractions = nothing, mole_fractions = nothing) =
+    _clapeyron_refrigerant([String(component)], transport, Pure(), mass_fractions, mole_fractions, String(name))
+
+# function barrier: specialized on the transport backend and the composition, so that the type of
+# the result (transport model, composition) is inferred
+function _clapeyron_refrigerant(comps::Vector{String}, transport::TransportBackend, composition::C, mass_fractions,
+                                mole_fractions, name::String) where {C <: Composition}
     n = length(comps)
-    transport === nothing && (transport = n == 1 ? CoolPropTransport() : EntropyScalingTransport())
     eos = Clapeyron.MultiFluid(comps)
     Mi = Clapeyron.mw(eos) ./ 1000                     # kg/mol
 
@@ -118,13 +139,13 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
     ptriple = minimum(Float64(pure.properties.ptp) for pure in eos.pures)
     superanc = n == 1 && _has_superancillary(eos.pures[1], Ttriple, Tc)
 
-    return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
-                                Ttriple, ptriple, superanc)
+    return ClapeyronRefrigerant{typeof(eos), typeof(transport), typeof(transport_model), C}(name, comps, eos,
+               transport, transport_model, collect(float.(z)), M, Tc, pc, vmin, Ttriple, ptriple, superanc)
 end
-ClapeyronRefrigerant(component::AbstractString; kwargs...) =
-    ClapeyronRefrigerant([component]; name = component, kwargs...)
 
-ispure(r::ClapeyronRefrigerant) = length(r.components) == 1
+"`true` for a pure fluid: from the type, so that branches on it are resolved at compile time."
+ispure(::ClapeyronRefrigerant{<:Any, <:Any, <:Any, Pure}) = true
+ispure(::ClapeyronRefrigerant{<:Any, <:Any, <:Any, Mixture}) = false
 
 pressure_bounds(r::ClapeyronRefrigerant) = (r.ptriple, r.pcrit)
 
