@@ -72,6 +72,9 @@ using NonlinearSolve
         res = continuation(build, λs, u0, TrustRegion(); abstol = 1e-10)
         @test length(res) == 4 && all(x -> x.ok, res)
         @test [x.λ for x in res] == λs
+        # concrete element type: code that post-processes the results is inferred (an abstract
+        # `NamedTuple[]` made a study with ClapeyronRefrigerant compile practically forever)
+        @test isconcretetype(eltype(res)) && eltype(res).parameters[2] == Tuple{Float64, Bool, typeof(u0), Int}
         # same roots as direct solves started from the continuation results
         for x in res
             s = solve(NonlinearProblem(build(x.λ), x.u), NewtonRaphson(); abstol = 1e-10)
