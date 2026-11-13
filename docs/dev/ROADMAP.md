@@ -21,7 +21,7 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | done, PR pending |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | PR #27 |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | **next** |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
