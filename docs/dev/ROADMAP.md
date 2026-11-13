@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-13 (feature/evaporator-operating-envelope).
+Last updated: 2026-11-13 (feature/optimal-flow-components, in progress).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -25,7 +25,8 @@ unconstrained solvers can be used.
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | merged (#30) |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
-| 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | PR, see below |
+| 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | merged (#31) |
+| 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | PR open, see below |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -404,3 +405,52 @@ Decisions for step 8:
   instead of rebuilding the system.
 - Only if profiling shows the solver overhead matters: reuse the solver cache (`init`/`reinit!`)
   or a small dedicated Newton loop (≈ 0.1–0.2 ms per step), and/or the tangent predictor.
+
+## `feature/optimal-flow-components` (results 2026-11-13)
+Goal (agreed 2026-11-13): port `examples/heatpumpborehole_optimalflowrate.jl` (the study the package
+is named after: COP vs brine flow, evaporator + borehole, R290, ground −5 °C, ΔTsup 3.5 K) to the
+component API, validate it against the original pipeline, and fix the gaps it exposes.
+
+Content:
+- `src/compressor.jl`: `compressor_power` / `condenser_power` accept any `AbstractRefrigerant`
+  (`compression(r, pe, Tsuc, pc, ηis)`; spline backend keeps the original CoolProp-by-name calls,
+  `ClapeyronRefrigerant` uses `h_pT`/`s_pT`/`h_ps`/`h_bubble`; condensing pressure = bubble pressure,
+  subcritical only). Tests: `test/compressor.jl`.
+- `examples/optimalflow_components.jl`: `study(r)` (continuation in flow 2 → 0.1 × design,
+  post-processing, `validity_issues` per point), `report(rows)`, `original()`, `compare(new, old)`.
+
+Gap found: **compile hangs** (the "~20 min at 100 % CPU" of the handoff was type inference, not the
+solver). Fixed in `fix/concrete-solution-types` (PR #32, merged into this branch), found with JET
+`@report_opt` and `Core.Box` checks of lowered code: untyped solution/parameter structs and
+`SecondaryFluid` splines, abstract `NamedTuple[]` continuation results, non-inferable
+`physical`, transport type and default formulation (now purity in the `ClapeyronRefrigerant`
+type). Inference with an abstract refrigerant still blows up inside Clapeyron: keep refrigerants
+and components concretely typed (beware Julia boxing a captured local keyword function, or a
+variable assigned in an inner `@testset`, which is a closure).
+
+Results (R290, MEA-28 %, Tb = −5 °C, Tc = 40 °C, ηis 0.7, ηpump 0.3; 39 flows 2 → 0.1 × design):
+
+| variant | first call (compile) | sweep | max ΔTe vs original | max rel ΔCOP1 vs original |
+|---|---|---|---|---|
+| components, ClapeyronRefrigerant | 366 s | 1.2 s | 6.1e-5 K | 1.3e-6 |
+| components, spline `Refrigerant` | 14 s | 0.3 s | 6.2e-5 K | 1.2e-6 |
+| `original()` (old API) | 7.7 s total | | — | — |
+
+- Clapeyron vs spline: |ΔTe| ≤ 7e-7 K, rel ΔCOP1 ≤ 1e-8. The residual difference to `original()`
+  is the borehole density at its own mean temperature (B2). `original()` fails at the first point
+  (2.0 × design, its hand-written guess) and recovers from 1.95; the component API converges at all.
+- **COP optimum**: COP1 = 3.209 at 0.55 × design flow (0.27 l/s); COP2 = 2.302 at 0.65 ×. Both lie
+  in the valid region: the brine leaves its table at 0.15 × and drops below its freezing point
+  only at 0.10 × design flow.
+- Jump between 1.65 and 1.60 × design flow (Te −0.8 K, Q2 −115 W, pump power 352 → 211 W):
+  laminar–turbulent transition; the Nusselt blend is smooth, the pressure-drop correlation
+  probably not. To check (follow-up).
+
+Open:
+1. First-call compile of the Clapeyron study (366 s) vs spline (14 s): profile with JET /
+   SnoopCompile (`T_ps` alone ≈ 20 s); candidates: own Newton for `T_ps` of a pure fluid,
+   PrecompileTools workload.
+2. Pressure-drop continuity at the laminar–turbulent transition (jump above).
+3. `test/tv_state.jl` (boxes `p`, `r`) and `test/property_interface.jl` (boxes `u`, 137 s
+   runtime): same closure pattern as `operating_envelope.jl`.
+4. Possible follow-ups: pump-power helper in the library; `Tb` as a port (step 8 note).
