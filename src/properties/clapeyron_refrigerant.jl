@@ -113,7 +113,7 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
     end
     vmin = Clapeyron.lb_volume(eos, Tc, z)   # independent of T for MultiFluid
     Ttriple = n == 1 ? Float64(eos.pures[1].properties.Ttp) : NaN
-    superanc = n == 1 && _has_superancillary(eos.pures[1], Tc)
+    superanc = n == 1 && _has_superancillary(eos.pures[1], Ttriple, Tc)
 
     return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
                                 Ttriple, superanc)
@@ -143,7 +143,7 @@ bubble temperatures coincide; for a zeotropic mixture `T_dew - T_bubble` is the 
 """
 function saturation_dew(r::ClapeyronRefrigerant, p)
     if ispure(r)
-        T, vl, vv = Clapeyron.saturation_temperature(r.eos, p)
+        T, vl, vv = _saturation_temperature_pure(r, p)
     else
         T, vl, vv, _ = Clapeyron.dew_temperature(r.eos, p, r.z)
     end
@@ -152,11 +152,43 @@ end
 
 function saturation_bubble(r::ClapeyronRefrigerant, p)
     if ispure(r)
-        T, vl, vv = Clapeyron.saturation_temperature(r.eos, p)
+        T, vl, vv = _saturation_temperature_pure(r, p)
     else
         T, vl, vv, _ = Clapeyron.bubble_temperature(r.eos, p, r.z)
     end
     return T, vl
+end
+
+# Pure fluid at pressure p: invert the superancillary p_sat(T) when available (explicit and
+# exact, see saturation_T), otherwise Clapeyron's solver. Clapeyron 0.6.30
+# saturation_temperature returns NaN for R744 at every pressure.
+function _saturation_temperature_pure(r::ClapeyronRefrigerant, p)
+    r.superancillary || return Clapeyron.saturation_temperature(r.eos, p)
+    T = _T_sat_superanc(r, p)
+    _, vl, vv = saturation_T(r, T)
+    return T, vl, vv
+end
+
+_primal(x::ForwardDiff.Dual) = _primal(ForwardDiff.value(x))
+_primal(x) = x
+
+# Newton on ln p_sat(T) = ln p with Float64 values, then one Newton step with the (possibly Dual)
+# pressure: the step propagates the exact derivative dT/dp = 1/(p d ln p_sat/dT).
+# NaN outside (p_triple, p_crit).
+function _T_sat_superanc(r::ClapeyronRefrigerant, p)
+    lnp = log(_primal(p))
+    lnpsat(T) = log(p_sat(r, T))
+    Ttp, Tc = r.Ttriple, r.Tcrit
+    lnptp, lnpc = lnpsat(Ttp + 1e-6 * (Tc - Ttp)), log(r.pcrit)
+    lnptp < lnp < lnpc || return oftype(float(_primal(p)), NaN) * one(p)
+    # initial guess: ln p linear in 1/T between the triple and critical points
+    T = 1 / (1/Ttp + (lnp - lnptp) / (lnpc - lnptp) * (1/Tc - 1/Ttp))
+    for _ in 1:30
+        ΔT = (lnpsat(T) - lnp) / ForwardDiff.derivative(lnpsat, T)
+        T = clamp(T - ΔT, Ttp + 1e-9, Tc - 1e-9)
+        abs(ΔT) < 1e-11 * T && break
+    end
+    return T - (lnpsat(T) - log(p)) / ForwardDiff.derivative(lnpsat, T)
 end
 
 "Dew point temperature [K] at pressure `p` [Pa]."

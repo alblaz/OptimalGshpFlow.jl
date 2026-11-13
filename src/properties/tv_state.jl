@@ -101,14 +101,18 @@ end
 _saturation_solve(pure, T) = Clapeyron.saturation_pressure(pure, T)
 
 # the ancillaries are superancillaries if they satisfy the phase equilibrium to near round-off
-function _has_superancillary(pure, Tc)
-    for T in (0.6Tc, 0.8Tc, 0.95Tc)
+# (sampled inside (Ttriple, Tcrit): for R744 the triple point is above 0.6 Tc)
+function _has_superancillary(pure, Ttriple, Tc)
+    Tlow = isfinite(Ttriple) ? Ttriple : 0.5Tc
+    for T in Tlow .+ (Tc - Tlow) .* (0.2, 0.5, 0.9)
         p, vl, vv = _saturation_superanc(pure, T)
         all(isfinite, (p, vl, vv)) || return false
         gl = Clapeyron.VT_gibbs_free_energy(pure, vl, T)
         gv = Clapeyron.VT_gibbs_free_energy(pure, vv, T)
-        pl, pv = Clapeyron.pressure(pure, vl, T), Clapeyron.pressure(pure, vv, T)
-        (abs(pl / p - 1) < 1e-9 && abs(pv / p - 1) < 1e-9 && abs(gl - gv) / (Clapeyron.R̄ * T) < 1e-9) || return false
+        # no relative pressure test on the liquid: dp/dv is huge there (1.6e-8 for R290 at 142 K);
+        # ordinary ancillaries are off by ~1e-3
+        pv = Clapeyron.pressure(pure, vv, T)
+        (abs(pv / p - 1) < 1e-8 && abs(gl - gv) / (Clapeyron.R̄ * T) < 1e-10) || return false
     end
     return true
 end
