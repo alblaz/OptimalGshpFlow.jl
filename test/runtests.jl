@@ -12,6 +12,7 @@ include("./properties_clapeyron.jl")
 include("./property_interface.jl")
 include("./tv_state.jl")
 include("./components.jl")
+include("./operating_envelope.jl")
 # include("./models.jl")
 
 @testset "OptimalGshpFlow.jl" begin

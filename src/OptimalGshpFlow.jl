@@ -24,7 +24,7 @@ export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superhea
 
 include("fluidproperties.jl")
 # export interpolate_sf_properties, interpolate_ref_properties_twophaseregion, interpolate_ref_properties_superheatedregion
-export SecondaryFluid 
+export SecondaryFluid, freezing_point
 # export secondary_fluid
 export Refrigerant
 #export  RefrigerantSaturatedVapor, RefrigerantSuperHeatedVapor, refrigerant_twophaseregion, refrigerant_superheated
@@ -83,8 +83,8 @@ export compressor_power, condenser_power
 
 # from "components/"
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
-export ComponentSystem, residual!, initial_guess, physical, port_values
-export Evaporator, BoreholeHX, default_formulation, nominal_duty, evaporator_solution, borehole_solution
+export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation
+export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
 export pressure_drop, pumping_power
 
 __init__() = _init_coolprop_indices()
