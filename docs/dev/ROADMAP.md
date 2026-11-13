@@ -24,7 +24,7 @@ unconstrained solvers can be used.
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-steps 1–3 done) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
-| 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit | |
+| 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
@@ -33,6 +33,20 @@ unconstrained solvers can be used.
 Known bug, not fixed yet (B4): `models.jl` maps the pressure with
 `sigmoid_R_to_ab(u, refrigerant.pr_min, refrigerant.pcrit)`, so the lower bound is
 `pr_min` read as Pa (1e-4 or 1e-2 Pa) instead of `pr_min·pcrit`. This belongs in step 3.
+
+## Refrigerants of interest
+- **Priority: natural, low-GWP pure fluids** (European move away from HFCs): R290 (main case),
+  R744, R717, R600a, R1270. All have superancillaries (explicit saturation, sub-step 3).
+- **Reference:** R134a.
+- **Glide examples (step 5):** R407C (R32/R125/R134a, glide ≈ 6.4 K at 4 bar in CoolProp) and
+  R410A (R32/R125, near-azeotropic); R454C as an extra low-GWP blend.
+- Blocker for step 5: Clapeyron 0.6.30 (latest in the local registry) cannot load **R125**
+  ("ResidualHelmholtzLemmon2005 not supported"), so neither R407C nor R410A can be built. Options:
+  implement the Lemmon–Jacobsen 2005 term type in Clapeyron (upstream PR); CoolProp HEOS mixture
+  through `AbstractState` as reference (no AD); `EmpiricPseudoPure("R410A")` has no glide.
+- R744: evaporator subcritical (≈ 30 bar at −5 °C, pr ≈ 0.4), but the high side is usually
+  transcritical: `compressor_power`/`condenser_power` assume condensation, a gas cooler needs its
+  own branch. Check the Cooper correlation in `href_e` at R744's higher reduced pressure.
 
 ## Decisions
 - Composition framework: lightweight custom layer, not ModelingToolkit (MTK is evaluated in step 7).
@@ -170,6 +184,7 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
 
    Report the results. Adopt the formulation in `component-core` only if it pays off.
 
+   Benchmark fluids: R290, R744, R717 (and R134a as reference).
    Plan after sub-step 3: unknowns `Te` (sigmoid on (Ttriple, Tcrit), replacing `pme`) and the
    superheat-outlet volume `u_v = volume_to_R(v_sup)` with residual
    `pressure_residual(r, Te + ΔTsup, v_sup, p_sat(Te))`; transport at the mean superheat state from
