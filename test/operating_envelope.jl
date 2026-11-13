@@ -7,9 +7,11 @@ using NonlinearSolve
         Tf = freezing_point(sfname)
         @test Tf ≈ 273.15 - 18.2355 atol = 0.01
         @test isnan(freezing_point("Water"))
-        sf = SecondaryFluid(sfname)
-        @test sf.Tfreeze == Tf && sf.Tmin ≈ Tf + 0.1 && sf.Tmax ≈ 303.15
-        @test sf.ρ(sf.Tmin) ≈ PropsSI("D", "T", sf.Tmin, "P", 101325, sfname) rtol = 1e-10
+        # NB: not `sf`: an inner @testset is a closure sharing the outer scope, so assigning the outer
+        # `sf` here would box it (Core.Box) and every component built from it would be inferred as Any
+        sf1 = SecondaryFluid(sfname)
+        @test sf1.Tfreeze == Tf && sf1.Tmin ≈ Tf + 0.1 && sf1.Tmax ≈ 303.15
+        @test sf1.ρ(sf1.Tmin) ≈ PropsSI("D", "T", sf1.Tmin, "P", 101325, sfname) rtol = 1e-10
         sf2 = SecondaryFluid(range(260., 300., length = 20), sfname)
         @test (sf2.Tmin, sf2.Tmax, sf2.Tfreeze) == (260., 300., Tf)
         @test_throws ArgumentError SecondaryFluid("Water")          # no freezing point: Tmin needed
@@ -63,7 +65,11 @@ using NonlinearSolve
     end
 
     @testset "continuation in flow" begin
-        build(λ) = ComponentSystem((evaporator = evap(Vs = λ * ev.Vs),
+        # NB: `build` must not call the keyword closure `evap`: capturing a local keyword function in
+        # another closure boxes it (Core.Box), every `evap(...)` in this block is then inferred as Any,
+        # and compiling the block with an abstract refrigerant takes practically forever.
+        build(λ) = ComponentSystem((evaporator = Evaporator(; refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
+                                                            hei = ev.hei, Vs = λ * ev.Vs, Vref = ev.Vref, ΔTsup = 5.),
                                     borehole = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = λ * ev.Vs, λground = 3.5, Tb = 283.15));
             nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout)))
         u0 = initial_guess(build(1.0); evaporator = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.),

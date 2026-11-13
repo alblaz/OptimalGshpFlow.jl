@@ -5,11 +5,13 @@ Evaporator and borehole as components (feature/component-core).
 """
     default_formulation(refrigerant)
 
-`SaturationTemperature()` for a pure `ClapeyronRefrigerant` with explicit saturation
-(superancillaries), `NestedPressure()` otherwise.
+`SaturationTemperature()` for a pure `ClapeyronRefrigerant` (explicit saturation from the
+superancillaries when available, Clapeyron's saturation solver otherwise), `NestedPressure()`
+for a mixture and for the spline `Refrigerant`. Determined by the refrigerant type only, so that
+an `Evaporator` built with the default is inferred.
 """
 default_formulation(::AbstractRefrigerant) = NestedPressure()
-default_formulation(r::ClapeyronRefrigerant) = ispure(r) && r.superancillary ? SaturationTemperature() : NestedPressure()
+default_formulation(r::ClapeyronRefrigerant) = ispure(r) ? SaturationTemperature() : NestedPressure()
 
 """
     nominal_duty(refrigerant, Vref, hei; Te = 273.15)
