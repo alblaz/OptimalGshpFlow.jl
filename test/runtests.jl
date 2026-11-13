@@ -13,6 +13,7 @@ include("./property_interface.jl")
 include("./tv_state.jl")
 include("./components.jl")
 include("./operating_envelope.jl")
+include("./solutiontypes.jl")
 # include("./models.jl")
 
 @testset "OptimalGshpFlow.jl" begin
