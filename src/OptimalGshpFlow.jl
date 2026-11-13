@@ -38,6 +38,7 @@ include("borehole.jl")
 include("plateheatexchanger.jl")
 include("solutiontypes.jl")
 include("heatexchanger.jl")
+include("evaporator_formulations.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
@@ -68,6 +69,8 @@ export  pressure_drop_evap,  pressure_drop, pumping_power
 # include("models.jl")
 export evaporator_model!, evaporator_model, evaporatorborehole_model!, evaporatorborehole_model, borehole_model!
 export EvaporatorParameters, BoreholeParameters, EvaporatorBoreholeParameters
+export PropertyFormulation, NestedPressure, SaturationTemperature, ExplicitTv
+export n_extra_unknowns, temperature_bounds, evaporator_unknowns, nested_unknowns
 
 export compressor_power, condenser_power
 export pressure_drop, pumping_power

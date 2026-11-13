@@ -185,3 +185,46 @@ end
         @test ubc[2:end] ≈ ubs[2:end] rtol = 1e-5
     end
 end
+
+@testset "evaporator property formulations" begin
+    sfname = "INCOMP::MEA-28%"
+    sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), sfname)
+    ev  = EvaporatorDesign(6000., 273., 273 + 40, "R290", sfname; U = 2000., ΔTs = 3., ΔT_l = 1.5)
+    phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
+    bh  = SingleUPipeBorehole(H = 200., D = 4., λg = 3., pipe_position = ((0.04, 0.), (-0.04, 0.)))
+    r   = ClapeyronRefrigerant("R290")
+    pe  = EvaporatorParameters(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
+              hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)
+    pb  = EvaporatorBoreholeParameters(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
+              hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., borehole = bh, λground = 3.5, Tb = 283.15)
+    guess(F, Ts_h) = evaporator_unknowns(F, r, 5.; Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom,
+                                         Ts_l = 274., Ts_m = 276., Ts_h = Ts_h)
+
+    for (sys, p, nb, Ts_h, f!, post) in (("evaporator", pe, 8, nothing, evaporator_model!, evaporator_model),
+                                         ("evaporator + borehole", pb, 9, 279., evaporatorborehole_model!, evaporatorborehole_model))
+        sols = map((NestedPressure(), SaturationTemperature(), ExplicitTv())) do F
+            u0 = guess(F, Ts_h)
+            @test length(u0) == nb + n_extra_unknowns(F)
+            u, it = newton_solve((d, x) -> f!(d, x, p, F), u0)
+            @test it > 0
+            un = nested_unknowns(F, r, u, nb)
+            # the nested residuals vanish at the converted solution
+            d = zeros(nb); f!(d, un, p)
+            @test maximum(abs, d) < 1e-6
+            un
+        end
+        @test sols[2] ≈ sols[1] rtol = 1e-9
+        @test sols[3] ≈ sols[1] rtol = 1e-9
+        @test (post(sols[3], p); true)
+    end
+
+    # evaporator_unknowns ↔ nested_unknowns round trip
+    u = evaporator_unknowns(ExplicitTv(), r, 5.; Te = 270., Qe = 5e3, Qsup = 300., Ts_l = 274., Ts_m = 276.)
+    @test sigmoid_R_to_ab(nested_unknowns(ExplicitTv(), r, u, 8)[1], pressure_bounds(r)...) ≈ p_sat(r, 270.) rtol = 1e-12
+    @test temperature_bounds(r) == (r.Ttriple, r.Tcrit)
+    # the Te-based formulations need a ClapeyronRefrigerant
+    spl = Refrigerant("R290")
+    ps = EvaporatorParameters(refrigerant = spl, secondaryfluid = sf, plateheatexchanger = phx,
+             hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)
+    @test_throws MethodError evaporator_model!(zeros(8), zeros(8), ps, SaturationTemperature())
+end

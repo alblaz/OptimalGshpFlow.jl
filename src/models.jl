@@ -91,25 +91,25 @@ variables:
 `Tsf_l`   secondary fluid temperature (in Kelvin) at the evaporator outlet, 
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
 """
-function evaporator_model!(du, u, p::EvaporatorParameters)
+function evaporator_model!(du, u, p::EvaporatorParameters, formulation::PropertyFormulation = NestedPressure())
     @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, Ts_h = p
-    evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+    rs = evaporator_refrigerant_state!(du, formulation, refrigerant, u, 8, ΔTsup)
+    evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
     return nothing
 end
 
 """
-    evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+    evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
 
 Residuals `du[1:8]` of the two-zone (two-phase + superheat) evaporator for the unknowns
-`u[1:8] = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m`, with secondary-fluid inlet temperature
-`Ts_h`. Shared by [`evaporator_model!`](@ref) and [`evaporatorborehole_model!`](@ref).
+`u[2:8] = Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m`, with secondary-fluid inlet temperature `Ts_h`
+and the refrigerant state `rs` (see [`evaporator_refrigerant_state!`](@ref), which also handles
+`u[1]`). Shared by [`evaporator_model!`](@ref) and [`evaporatorborehole_model!`](@ref).
 """
-function evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+function evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
     A = plateheatexchanger.A
-    pmin, pmax = pressure_bounds(refrigerant)
 
     # mapped unknowns
-    pe   = sigmoid_R_to_ab(u[1], pmin, pmax)
     Qe   = u[2]
     Qsup = u[3]
     ϵe   = sigmoid_R_to_01(u[4])
@@ -118,10 +118,8 @@ function evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, platehe
     Ts_l, Ts_m = u[7], u[8]
 
     # refrigerant states
-    Te  = T_dew(refrigerant, pe)
-    hes = h_dew(refrigerant, pe)
-    hsup     = h_superheated(refrigerant, pe, ΔTsup)
-    ρref_sup = ρ_superheated(refrigerant, pe, ΔTsup)
+    (; pe, Te, hes, hsup) = rs
+    ρref_sup = rs.ρsup
 
     # two-phase: locally constant capacities and U value
     Tsm_e = (Ts_l + Ts_m)/2
@@ -130,7 +128,7 @@ function evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, platehe
 
     # superheat
     Tsm_sup = (Ts_h + Ts_m)/2
-    Usup, hs_sup, href_sup = evaporator_uvalue_superheat(Tsm_sup, pe, Vs, Vref, ΔTsup, secondaryfluid, refrigerant, plateheatexchanger)
+    Usup, hs_sup, href_sup = evaporator_uvalue_superheat(Tsm_sup, Vs, Vref, rs, secondaryfluid, plateheatexchanger)
     Cs_sup = secondaryfluid.ρ(Tsm_sup) * secondaryfluid.cp(Tsm_sup) * Vs
     Cref_sup = ρref_sup*Vref*(hsup - hes)/ΔTsup   # mean capacity of the refrigerant in the superheating region
     Cmin_sup = min(Cref_sup, Cs_sup)
@@ -209,25 +207,28 @@ return values
 """
 
 function evaporator_uvalue_superheat(Tsm_sup, pe, Vs, Vref, ΔTsup, secondaryfluid, refrigerant, plateheatexchanger)
-    
+    rs = (ρsup = ρ_superheated(refrigerant, pe, ΔTsup), cpm = cp_superheated(refrigerant, pe, ΔTsup/2),
+          μm = μ_superheated(refrigerant, pe, ΔTsup/2), λm = λ_superheated(refrigerant, pe, ΔTsup/2))
+    return evaporator_uvalue_superheat(Tsm_sup, Vs, Vref, rs, secondaryfluid, plateheatexchanger)
+end
+
+# refrigerant properties from the state `rs`: density at the outlet, cp, μ, λ at mid superheat
+function evaporator_uvalue_superheat(Tsm_sup, Vs, Vref, rs, secondaryfluid, plateheatexchanger)
+
     # heat_transfer_coefficient secondary fluid side
-    ρs_sup = secondaryfluid.ρ(Tsm_sup)      
-    cps_sup = secondaryfluid.cp(Tsm_sup)   
+    ρs_sup = secondaryfluid.ρ(Tsm_sup)
+    cps_sup = secondaryfluid.cp(Tsm_sup)
     μs_sup = secondaryfluid.μ(Tsm_sup)
     λs_sup = secondaryfluid.λ(Tsm_sup)
     properties_s_sup = ρs_sup, μs_sup, λs_sup, cps_sup
 
-    hs_sup = h_platehex_wanniarachchi(Vs , plateheatexchanger, properties_s_sup)    
+    hs_sup = h_platehex_wanniarachchi(Vs , plateheatexchanger, properties_s_sup)
 
     # heat_transfer_coefficient refrigerant side
-    ρref_sup  = ρ_superheated(refrigerant, pe, ΔTsup)
-    cpref_sup = cp_superheated(refrigerant, pe, ΔTsup/2)
-    μref_sup  = μ_superheated(refrigerant, pe, ΔTsup/2)
-    λref_sup  = λ_superheated(refrigerant, pe, ΔTsup/2)
-    propertiesR_sup = ρref_sup, μref_sup, λref_sup, cpref_sup
-    
+    propertiesR_sup = rs.ρsup, rs.μm, rs.λm, rs.cpm
+
     href_sup = h_platehex_wanniarachchi(Vref, plateheatexchanger, propertiesR_sup)
-    Usup =  1/(1/hs_sup + 1/href_sup) 
+    Usup =  1/(1/hs_sup + 1/href_sup)
 
     return Usup, hs_sup,href_sup
 end
@@ -307,12 +308,13 @@ variables:
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
 `Ts_h`    secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters)
+function evaporatorborehole_model!(du, u, p::EvaporatorBoreholeParameters, formulation::PropertyFormulation = NestedPressure())
     @unpack refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, borehole, λground, Tb = p
-    ## u = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h]
+    ## u = [pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h] (+ formulation unknowns)
     Ts_l, Ts_m, Ts_h = u[7], u[8], u[9]
 
-    evaporator_residuals!(du, u, Ts_h, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+    rs = evaporator_refrigerant_state!(du, formulation, refrigerant, u, 9, ΔTsup)
+    evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
 
     # borehole model (Hellström), coefficient at the mean secondary-fluid temperature
     Tsm_e = (Ts_l + Ts_m)/2
