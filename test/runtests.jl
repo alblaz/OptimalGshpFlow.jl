@@ -3,6 +3,7 @@ using Test
 using CoolProp
 
 include("./utilities.jl") 
+include("./transforms.jl")
 include("./fluidproperties.jl")
 include("./pipeflow.jl")
 include("./borehole.jl")

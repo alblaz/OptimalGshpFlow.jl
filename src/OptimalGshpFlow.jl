@@ -12,6 +12,9 @@ export linearmap_01_to_ab, linearmap_ab_to_01
 export tanhmap_01_to_R, tanhmap_R_to_01, tanhmap_ab_to_R, tanhmap_R_to_ab
 export sigmoid_01_to_R, sigmoid_R_to_01, sigmoid_ab_to_R, sigmoid_R_to_ab
 
+include("transforms.jl")
+export VariableTransform, Free, Unit, Box, LogBox, Above, from_R, to_R, bounds
+
 include("properties/interface.jl")
 export AbstractRefrigerant, critical_pressure, molar_mass, pressure_bounds
 export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew
