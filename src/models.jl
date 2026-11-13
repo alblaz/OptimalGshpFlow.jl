@@ -107,15 +107,21 @@ and the refrigerant state `rs` (see [`evaporator_refrigerant_state!`](@ref), whi
 `u[1]`). Shared by [`evaporator_model!`](@ref) and [`evaporatorborehole_model!`](@ref).
 """
 function evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
-    A = plateheatexchanger.A
-
     # mapped unknowns
-    Qe   = u[2]
-    Qsup = u[3]
-    ϵe   = from_R(Unit(), u[4])
-    ϵsup = from_R(Unit(), u[5])
-    xs   = from_R(Unit(), u[6])
-    Ts_l, Ts_m = u[7], u[8]
+    x = (Qe = u[2], Qsup = u[3], ϵe = from_R(Unit(), u[4]), ϵsup = from_R(Unit(), u[5]),
+         xs = from_R(Unit(), u[6]), Ts_l = u[7], Ts_m = u[8])
+    return evaporator_balances!(du, x, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+end
+
+"""
+    evaporator_balances!(du, x, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+
+The eight evaporator residuals (`du[1:8]`, unscaled: W for the heat balances, dimensionless for
+the effectiveness equations) on physical values `x = (; Qe, Qsup, ϵe, ϵsup, xs, Ts_l, Ts_m)`.
+"""
+function evaporator_balances!(du, x, Ts_h, rs, refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup)
+    A = plateheatexchanger.A
+    (; Qe, Qsup, ϵe, ϵsup, xs, Ts_l, Ts_m) = x
 
     # refrigerant states
     (; pe, Te, hes, hsup) = rs

@@ -98,15 +98,28 @@ enthalpy and density (at `ΔTsup` superheat), and cp, μ, λ at the mean superhe
 `nbase` is the number of base unknowns of the model; a formulation with extra unknowns writes
 their residuals into `du[nbase+1:end]`.
 """
-function evaporator_refrigerant_state!(du, ::NestedPressure, r::AbstractRefrigerant, u, nbase, ΔTsup)
-    pe = from_R(pressure_transform(r), u[1])
+function evaporator_refrigerant_state!(du, F::PropertyFormulation, r::AbstractRefrigerant, u, nbase, ΔTsup)
+    x1 = from_R(first_transform(F, r), u[1])
+    vt = extra_transforms(F, r)
+    vols = ntuple(i -> from_R(vt[i], u[nbase + i]), length(vt))
+    return refrigerant_state!(view(du, nbase+1:nbase+length(vt)), F, r, x1, vols, ΔTsup)
+end
+
+"""
+    refrigerant_state!(dr, formulation, refrigerant, x1, vols, ΔTsup)
+
+As [`evaporator_refrigerant_state!`](@ref), on physical values: `x1` is the evaporation pressure
+(`NestedPressure`) or the dew temperature (otherwise), `vols` the extra molar volumes
+(`ExplicitTv`: outlet and mean superheat; empty tuple otherwise). The residuals closing the
+volumes are written to `dr[1:length(vols)]`.
+"""
+function refrigerant_state!(dr, ::NestedPressure, r::AbstractRefrigerant, pe, vols, ΔTsup)
     return (pe = pe, Te = T_dew(r, pe), hes = h_dew(r, pe),
             hsup = h_superheated(r, pe, ΔTsup), ρsup = ρ_superheated(r, pe, ΔTsup),
             cpm = cp_superheated(r, pe, ΔTsup/2), μm = μ_superheated(r, pe, ΔTsup/2), λm = λ_superheated(r, pe, ΔTsup/2))
 end
 
-function evaporator_refrigerant_state!(du, ::SaturationTemperature, r::ClapeyronRefrigerant, u, nbase, ΔTsup)
-    Te = from_R(temperature_transform(r), u[1])
+function refrigerant_state!(dr, ::SaturationTemperature, r::ClapeyronRefrigerant, Te, vols, ΔTsup)
     pe, _, vv = saturation_T(r, Te)
     Tsup, Tm = Te + ΔTsup, Te + ΔTsup/2
     vsup = volume_pT(r, pe, Tsup; phase = :vapor)
@@ -114,14 +127,12 @@ function evaporator_refrigerant_state!(du, ::SaturationTemperature, r::Clapeyron
     return _superheat_state(r, pe, Te, vv, Tsup, vsup, Tm, vm)
 end
 
-function evaporator_refrigerant_state!(du, ::ExplicitTv, r::ClapeyronRefrigerant, u, nbase, ΔTsup)
-    Te = from_R(temperature_transform(r), u[1])
+function refrigerant_state!(dr, ::ExplicitTv, r::ClapeyronRefrigerant, Te, vols, ΔTsup)
     pe, _, vv = saturation_T(r, Te)
     Tsup, Tm = Te + ΔTsup, Te + ΔTsup/2
-    vsup = volume_from_R(r, u[nbase + 1])
-    vm   = volume_from_R(r, u[nbase + 2])
-    du[nbase + 1] = pressure_residual(r, Tsup, vsup, pe)
-    du[nbase + 2] = pressure_residual(r, Tm, vm, pe)
+    vsup, vm = vols
+    dr[1] = pressure_residual(r, Tsup, vsup, pe)
+    dr[2] = pressure_residual(r, Tm, vm, pe)
     return _superheat_state(r, pe, Te, vv, Tsup, vsup, Tm, vm)
 end
 
