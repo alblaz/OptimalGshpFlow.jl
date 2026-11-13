@@ -12,8 +12,8 @@ ForwardDiff.Dual numbers pass through.
 Required by the evaporator models
 ---------------------------------
 - `critical_pressure(r)`, `molar_mass(r)` [kg/mol]
-- `pressure_bounds(r)`: `(pmin, pmax)` [Pa], admissible evaporation pressures; the models map
-  the pressure unknown with `pressure_transform(r) = LogBox(pressure_bounds(r)...)`
+- `pressure_bounds(r)` (not exported): `(pmin, pmax)` [Pa], admissible evaporation pressures;
+  the models map the pressure unknown with `pressure_transform(r) = LogBox(pressure_bounds(r)...)`
 - saturated vapour (dew point) at p: `T_dew`, `h_dew`, `ρ_dew`
 - superheated vapour at p and superheat ΔT above the dew point: `h_superheated`,
   `ρ_superheated`, `cp_superheated`, `μ_superheated`, `λ_superheated`
@@ -46,6 +46,10 @@ molar_mass(r::AbstractRefrigerant) = r.M
 Interval [Pa] of admissible evaporation pressures, `0 < pmin < pmax`. For the spline
 `Refrigerant` it is the sampled pressure range; for `ClapeyronRefrigerant` it is (triple-point
 pressure, critical pressure).
+
+Not exported: map the pressure with [`pressure_transform`](@ref) (`to_R`/`from_R`) and read the
+interval with `bounds(pressure_transform(r))`. A backend extends
+`OptimalGshpFlow.pressure_bounds`.
 """
 function pressure_bounds end
 
