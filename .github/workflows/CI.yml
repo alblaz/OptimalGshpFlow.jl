@@ -24,8 +24,8 @@ jobs:
       matrix:
         version:
           - '1'      # latest stable release
-          - 'lts'    # current long-term-support release
-          - 'min'    # minimum version allowed by the julia compat entry in Project.toml
+          - 'min'    # minimum version allowed by the julia compat entry in Project.toml (1.10,
+                     # also the current LTS: no separate 'lts' job)
           - 'pre'    # upcoming release
         os:
           - ubuntu-latest
@@ -40,3 +40,7 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          # no coverage upload is configured; with coverage on, Julia >= 1.12 re-precompiles
+          # all ~250 dependencies on every run (≈ 13 min) and the tests run slower
+          coverage: false
