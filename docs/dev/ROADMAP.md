@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-13 (feature/bounded-variables).
+Last updated: 2026-11-13 (feature/component-core).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -23,9 +23,9 @@ unconstrained solvers can be used.
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
-| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | **next** |
+| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | PR, see below |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
-| 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
+| 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | **next** (evaporator priority) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? | |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
@@ -265,7 +265,7 @@ backend; "cont" = 87 continuation solves):
 - Conclusion: the log map is neutral to slightly positive. Robustness is set by the initial guess and
   the residual scales, as found in step 2, and belongs in steps 4 and 6.
 
-## `feature/component-core` (plan)
+## `feature/component-core` (done)
 Scope (decided 2026-11-13): **the evaporator first**, standalone (given secondary-fluid inlet
 temperature) and coupled to the borehole. Compressor and condenser stay post-processing; the
 design must allow closing the cycle later (e.g. `hei` becoming a port instead of a parameter).
@@ -290,10 +290,42 @@ Design:
   superancillaries (step 2 recommendation), `NestedPressure()` otherwise.
 - **NonlinearSolve** as a package extension: `NonlinearProblem(sys, u0)` when it is loaded.
 
-Steps: (1) residual functions on physical values (old models unchanged, bit for bit);
-(2) `Linear` transform; (3) component core, `Evaporator`, `BoreholeHX`, `System`;
-(4) NonlinearSolve extension; (5) same roots as the old models; sweep with and without scaling
-(Newton, TrustRegion, LevenbergMarquardt).
+Implemented: `src/components/core.jl` (`AbstractComponent`, `ComponentSystem`, `residual!`,
+`initial_guess`, `physical`, `port_values`), `src/components/evaporator.jl` (`Evaporator`,
+`BoreholeHX`, `default_formulation`, `nominal_duty`, post-processing to `EvaporatorSolution` /
+`BoreholeSolution`), `ext/OptimalGshpFlowNonlinearSolveExt.jl` (`NonlinearProblem(sys, u0)`),
+`Linear(x0, scale)` in `src/transforms.jl`. The residual functions of the original models now
+work on physical values (`refrigerant_state!`, `evaporator_balances!`), with the old functions
+as wrappers (bit for bit). Tests: `test/components.jl`.
+
+Checks (R290 design case):
+- Evaporator alone: exactly the root of `evaporator_model!` (all three formulations, both
+  backends); scaled residuals × scales == original residuals to 1e-12.
+- Evaporator + borehole: root of `evaporatorborehole_model!` within 4.4e-6 K / 1.4e-7 relative
+  in Qe (density, see below).
+- Cost per residual / ForwardDiff Jacobian: the same as the original models (SatT 12 / 42 µs,
+  ExplicitTv 10 / 38, Nested 38 / 86, spline 4 / 8).
+
+**Scaling** (`examples/components_benchmark.jl`; default formulation `SaturationTemperature`,
+CoolProp transport; 14 flows × 3 source temperatures; "unscaled" = `Qscale = 1`, i.e. the
+original unknowns and residuals). Converged / 42 from the guess shifted to the source temperature:
+
+| | R290 | R744 | R717 | R134a |
+|---|---|---|---|---|
+| Newton, unscaled → scaled (evap / evap+bh) | 32 → 32 / 32 → 32 | 34 → 34 / 34 → 34 | 30 → 30 / 30 → 30 | 30 → 30 / 30 → 30 |
+| TrustRegion, unscaled → scaled | 29 → **42** / 29 → **42** | 36 → **42** / 33 → **42** | 26 → **42** / 26 → **41** | 28 → **41** / 29 → **42** |
+| LevenbergMarquardt, unscaled → scaled | 10 → **42** / 6 → **42** | 6 → **42** / 3 → **42** | 8 → **42** / 8 → **42** | 8 → **42** / 10 → **41** |
+
+- With continuation in flow everything converges with Newton and TrustRegion (scaled or not);
+  LevenbergMarquardt needs the scaling (3–12/42 unscaled, 42/42 scaled).
+- Newton is unchanged, as expected (affine invariance); its failures from the shifted guess are
+  the low flows.
+- Scaled TrustRegion: median iterations as Newton (4–8), maximum ≤ 48 (unscaled up to 196);
+  scaled LevenbergMarquardt: median 12–28 iterations (unscaled 24–96).
+- All variants reach the same root (|ΔTe| ≤ 6.5e-7 K).
+- **Recommendation:** scaled system + `TrustRegion` as the default solve: it converges from a
+  guess derived from the source temperature without continuation. Continuation remains the tool
+  for zone appearance/collapse (step 6).
 
 Known difference: the borehole component evaluates the fluid density at its own mean temperature
 `(Tin + Tout)/2`, as `borehole_model!` does; `evaporatorborehole_model!` uses the evaporator
