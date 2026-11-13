@@ -22,7 +22,7 @@ unconstrained solvers can be used.
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
-| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | PR, see below |
+| 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | **next** |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/robust-moving-boundary` | zone appearance/collapse, continuation, pseudo-transient continuation | |
@@ -248,7 +248,9 @@ roadmap), glide (step 5) and new components.
    field and `pressure_bounds = (ptriple, pcrit)` (LogBox needs `pmin > 0`; lowest component
    value for a mixture).
    **Breaking for scripts:** a pressure unknown built with `sigmoid_ab_to_R(pe, pressure_bounds(r)...)`
-   is now wrong; use `to_R(pressure_transform(r), pe)` (examples and tests updated).
+   is now wrong; use `to_R(pressure_transform(r), pe)` (examples and tests updated). To make old
+   scripts fail instead of silently mis-mapping, `pressure_bounds` is no longer exported (read the
+   interval with `bounds(pressure_transform(r))`).
 
 Effect of the log-scale pressure on the sweep (`examples/formulations_benchmark.jl`, `sweep` +
 `sweep2`, 4 fluids × evaporator / evaporator + borehole × Newton / TrustRegion, Clapeyron

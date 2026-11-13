@@ -97,7 +97,7 @@ end
     for (name, pr_min) in (("R134a", 1e-2), ("R290", 2e-2))
         r = Refrigerant(name; pr_min = pr_min)
         _, ps = OptimalGshpFlow.log10p_grid(name; pr_min = pr_min)
-        pmin, pmax = pressure_bounds(r)
+        pmin, pmax = OptimalGshpFlow.pressure_bounds(r)
         @test pmin ≈ first(ps) rtol = 1e-12
         @test pmax ≈ last(ps) rtol = 1e-12
         @test pmin ≥ pr_min * r.pcrit

@@ -225,7 +225,11 @@ end
     @test temperature_bounds(r) == (r.Ttriple, r.Tcrit)
 
     # transforms of the unknowns: evaporator_unknowns maps physical values with them
-    @test pressure_bounds(r) == (r.ptriple, r.pcrit)
+    @test OptimalGshpFlow.pressure_bounds(r) == (r.ptriple, r.pcrit)
+    @test bounds(pressure_transform(r)) == (r.ptriple, r.pcrit)
+    # not exported: scripts that built the pressure unknown by hand with
+    # `sigmoid_ab_to_R(pe, pressure_bounds(r)...)` (linear map) must fail, not silently mis-map
+    @test :pressure_bounds ∉ names(OptimalGshpFlow)
     @test r.ptriple ≈ PropsSI("ptriple", "R290") rtol = 1e-6
     @test pressure_transform(r) isa LogBox && temperature_transform(r) isa Box
     for F in (NestedPressure(), SaturationTemperature(), ExplicitTv()), Ts_h in (nothing, 279.)
