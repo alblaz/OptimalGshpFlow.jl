@@ -76,3 +76,18 @@ end
     @test keys(ph) == (:evaporator, :nodes)                  # no entry for the borehole (no unknowns)
     @test ph.evaporator.Te ≈ 268. && ph.nodes.T_warm ≈ 279.
 end
+
+# The refrigerant itself must be inferred: code that builds it inside a compiled block (a
+# function, or a top-level block with loops such as a @testset) otherwise propagates a partially
+# abstract ClapeyronRefrigerant into Clapeyron/EntropyScaling, and inference did not finish
+# (test/operating_envelope.jl run on its own).
+@testset "inferred ClapeyronRefrigerant construction" begin
+    @test isconcretetype(only(Base.return_types(ClapeyronRefrigerant, (String,))))
+    r = @inferred ClapeyronRefrigerant("R290")
+    @test r.transport isa CoolPropTransport
+    res = @inferred ClapeyronRefrigerant("R290"; transport = EntropyScalingTransport())
+    @test res.transport isa EntropyScalingTransport
+    # vector of components, default transport chosen at run time: a small Union at worst
+    T = only(Base.return_types(c -> ClapeyronRefrigerant(c; mass_fractions = [0.5, 0.5]), (Vector{String},)))
+    @test T isa Union || isconcretetype(T)
+end
