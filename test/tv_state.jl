@@ -45,3 +45,34 @@ using ForwardDiff
     @test μ_pT(r, p, T) == PropsSI("V", "P", p, "T", T, "R290")
     @test λ_dew(r, p) == PropsSI("CONDUCTIVITY", "P", p, "Q", 1, "R290")
 end
+
+@testset "explicit saturation at T (superancillaries)" begin
+    for f in ("R290", "R32", "R1234yf", "R134a")
+        r = ClapeyronRefrigerant(f)
+        @test r.superancillary
+        pure = r.eos.pures[1]
+        for T in (0.6, 0.7, 0.8, 0.9, 0.97) .* r.Tcrit
+            p, vl, vv = saturation_T(r, T)
+            # phase equilibrium: equal pressure and Gibbs energy of both phases
+            @test p_Tv(r, T, vl) ≈ p rtol = 1e-9
+            @test p_Tv(r, T, vv) ≈ p rtol = 1e-9
+            @test h_Tv(r, T, vv) - T * s_Tv(r, T, vv) ≈ h_Tv(r, T, vl) - T * s_Tv(r, T, vl) atol = 1e-9 * r.Tcrit * 8.314 / r.M
+            # agrees with CoolProp and with the iterative solver (fallback path)
+            @test p ≈ PropsSI("P", "T", T, "Q", 1, f) rtol = 1e-9
+            ps, vls, vvs = OptimalGshpFlow._saturation_solve(pure, T)
+            @test p ≈ ps rtol = 1e-9
+            @test vl ≈ vls rtol = 1e-9
+            @test vv ≈ vvs rtol = 1e-9
+            # exact AD: Clausius-Clapeyron
+            @test ForwardDiff.derivative(t -> p_sat(r, t), T) ≈ r.M * (h_Tv(r, T, vv) - h_Tv(r, T, vl)) / (T * (vv - vl)) rtol = 1e-9   # h per kg, v molar
+        end
+        @test isnan(p_sat(r, r.Tcrit + 1))
+        @test r.Ttriple < 0.6 * r.Tcrit
+    end
+    # consistent with the pressure-based dew point
+    r = ClapeyronRefrigerant("R290")
+    p, _, vv = saturation_T(r, 268.15)
+    @test T_dew(r, p) ≈ 268.15 rtol = 1e-10
+    @test h_Tv(r, 268.15, vv) ≈ h_dew(r, p) rtol = 1e-9
+    @test_throws ArgumentError saturation_T(ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785]), 270.)
+end

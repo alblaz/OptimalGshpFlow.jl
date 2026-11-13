@@ -28,7 +28,7 @@ export Refrigerant
 include("properties/clapeyron_refrigerant.jl")
 include("properties/tv_state.jl")
 export volume_pT, p_Tv, h_Tv, s_Tv, cp_Tv, ρ_Tv, μ_Tv, λ_Tv, pressure_residual
-export volume_to_R, volume_from_R
+export volume_to_R, volume_from_R, saturation_T, p_sat
 export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
 export cp_twophase, T_ps, h_ps
 

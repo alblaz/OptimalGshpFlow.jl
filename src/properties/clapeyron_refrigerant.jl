@@ -61,7 +61,9 @@ known. With the default `phase = :unknown` both volume roots are computed and co
 
 Fields: `eos` (Clapeyron model), `transport_model`, `z` (mole fractions), `M` (molar mass, kg/mol),
 `Tcrit`, `pcrit` (critical point of the fluid or of the mixture at composition `z`), `vmin`
-(co-volume, the lower bound of the molar volume [m³/mol], see [`volume_from_R`](@ref)).
+(co-volume, the lower bound of the molar volume [m³/mol], see [`volume_from_R`](@ref)),
+`Ttriple`, `superancillary` (pure fluid whose saturation curve is an explicit function of T, see
+[`saturation_T`](@ref)).
 """
 struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigerant
     name::String
@@ -74,6 +76,8 @@ struct ClapeyronRefrigerant{E, TB <: TransportBackend, TM} <: AbstractRefrigeran
     Tcrit::Float64
     pcrit::Float64
     vmin::Float64
+    Ttriple::Float64
+    superancillary::Bool
 end
 
 function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
@@ -108,8 +112,11 @@ function ClapeyronRefrigerant(components::AbstractVector{<:AbstractString};
         CoolPropState(comps[1])
     end
     vmin = Clapeyron.lb_volume(eos, Tc, z)   # independent of T for MultiFluid
+    Ttriple = n == 1 ? Float64(eos.pures[1].properties.Ttp) : NaN
+    superanc = n == 1 && _has_superancillary(eos.pures[1], Tc)
 
-    return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin)
+    return ClapeyronRefrigerant(name, comps, eos, transport, transport_model, collect(float.(z)), M, Tc, pc, vmin,
+                                Ttriple, superanc)
 end
 ClapeyronRefrigerant(component::AbstractString; kwargs...) =
     ClapeyronRefrigerant([component]; name = component, kwargs...)

@@ -42,7 +42,8 @@ Read it at the start of a session and update it when a branch is finished.
 - `src/properties/clapeyron_refrigerant.jl`: `ClapeyronRefrigerant` (Clapeyron + CoolProp or
   EntropyScaling transport); pass `phase = :vapor/:liquid` whenever the phase is known.
   CoolProp goes through a cached `AbstractState`, never `PropsSI` in hot paths (≈ 100 µs/call).
-- `src/properties/tv_state.jl`: explicit (T, v) property evaluations for `ClapeyronRefrigerant`.
+- `src/properties/tv_state.jl`: explicit (T, v) property evaluations for `ClapeyronRefrigerant`;
+  `saturation_T` (explicit p, v_l, v_v from the superancillaries of the CoolProp fluid files).
 - `src/utilities.jl`: maps between bounded intervals and ℝ (linear, tanh, sigmoid).
 - `src/borehole.jl`, `src/pipeflow.jl`, `src/plateheatexchanger.jl`, `src/compressor.jl`,
   `src/pressuredrop.jl`: component correlations.

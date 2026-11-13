@@ -21,7 +21,7 @@ unconstrained solvers can be used.
 | B2 | `fix/borehole-mean-temperature` | borehole coefficient at `(u7 + u9/2)` instead of the mean | merged (#21) |
 | B6 | `fix/nusselt-continuity` | `SmoothTransition()` (default, VDI blend) / `SharpTransition()` (original) | merged (#22) |
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
-| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-steps 1–2 done) |
+| 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | **in progress** (sub-steps 1–3 done) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit | |
@@ -144,6 +144,23 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
      equations per saturation state.
 
    Mixture dew/bubble points (n + 2 unknowns each) go to the glide branch (step 5).
+   **Done** (`saturation_T`, `p_sat` in `src/properties/tv_state.jl`; tests in `test/tv_state.jl`):
+   - `SuperAncSaturation` covers only cubics (and PC-SAFT via EoSSuperancillaries), **but** when a
+     CoolProp fluid file has a `SUPERANCILLARY` block Clapeyron loads it as the fluid's ancillary
+     equations (`x0_psat`, `x0_sat_pure`). These are Bell's Chebyshev superancillaries: p, v_l,
+     v_v explicit in T, phase equilibrium satisfied to ≤ 2e-11 (0.6–0.98 Tc), p within 1e-11 of
+     CoolProp, exact AD (Clausius–Clapeyron to 7e-14). `NaN` outside (Ttriple, Tc).
+   - Every CoolProp refrigerant tried has them (R290, R32, R1234yf, R134a, R600a, R1270, R744,
+     R717, R1234ze(E)/(Z), R1233zd(E), R245fa, R152a, R143a, ...; R125 does not load in
+     Clapeyron at all). `ClapeyronRefrigerant` checks them at construction (`superancillary`
+     field); without them `saturation_T` falls back to `Clapeyron.saturation_pressure`.
+   - Cost: `saturation_T` 0.2 µs (Dual 1.4 µs) vs 3.5 µs for the solver and 4 µs for `T_dew(p)`;
+     dew-point state from T (`saturation_T` + `h_Tv`) 0.6 µs vs `h_dew(p)` 2.9 µs.
+   - Consequence: for pure fluids the extra unknowns (T, v_l, v_v) with equal-p/equal-g residuals
+     are not needed. Use the **saturation temperature** as the unknown instead of the pressure:
+     p, v_l, v_v follow explicitly. The superancillaries are in T only, so keeping p as the unknown
+     would still need an inner iteration (or a residual `p_sat(T)/p − 1`).
+
 4. **Augmented evaporator**, behind an option. Add the superheat-outlet state (and optionally
    the saturation state) as unknowns with the residuals above. Compare with the nested
    formulation (properties solved inside the residual) on:
@@ -152,6 +169,12 @@ Base the branch on up-to-date `main` (all prerequisite fixes are merged).
    - Jacobian conditioning.
 
    Report the results. Adopt the formulation in `component-core` only if it pays off.
+
+   Plan after sub-step 3: unknowns `Te` (sigmoid on (Ttriple, Tcrit), replacing `pme`) and the
+   superheat-outlet volume `u_v = volume_to_R(v_sup)` with residual
+   `pressure_residual(r, Te + ΔTsup, v_sup, p_sat(Te))`; transport at the mean superheat state from
+   (T, v) as well (one more volume unknown at `Te + ΔTsup/2`, or interpolate the volume). Compare
+   with the nested formulation (sub-step 1 port on `ClapeyronRefrigerant`).
 
 Out of scope for this branch: residual scaling of the existing equations (step 4 of the
 roadmap), glide (step 5) and new components.

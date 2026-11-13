@@ -64,3 +64,51 @@ pressure to `u ≈ 4–6`.
 """
 volume_from_R(r::ClapeyronRefrigerant, u) = r.vmin * (1 + exp(u))
 volume_to_R(r::ClapeyronRefrigerant, v) = log(v / r.vmin - 1)
+
+########################
+# saturation at T      #
+########################
+
+"""
+    saturation_T(r::ClapeyronRefrigerant, T) -> (p, v_l, v_v)
+
+Saturation pressure [Pa] and molar volumes [m³/mol] of saturated liquid and vapour of a pure
+fluid at temperature `T` [K].
+
+When the CoolProp fluid file provides superancillary equations (Bell et al., Chebyshev expansions
+in T accurate to ≈ 1e-12, `r.superancillary == true`; true for all common refrigerants) this is
+an explicit evaluation (≈ 0.2 µs, exact AD) with no inner iteration. Otherwise it falls back to
+Clapeyron's saturation solver.
+
+Valid for `r.Ttriple < T < r.Tcrit`; the superancillaries return `NaN` outside. Combine with the
+(T, v) functions, e.g. the dew-point enthalpy is `h_Tv(r, T, v_v)`. Mixtures (dew and bubble
+points with glide) are not covered (see the roadmap, glide branch).
+"""
+function saturation_T(r::ClapeyronRefrigerant, T)
+    ispure(r) || throw(ArgumentError("saturation_T is implemented for pure fluids only"))
+    return r.superancillary ? _saturation_superanc(r.eos.pures[1], T) : _saturation_solve(r.eos.pures[1], T)
+end
+
+"Saturation pressure [Pa] of a pure fluid at temperature `T` [K]; see [`saturation_T`](@ref)."
+p_sat(r::ClapeyronRefrigerant, T) = saturation_T(r, T)[1]
+
+# Clapeyron loads the superancillaries of a CoolProp fluid file as the ancillary (initial-guess)
+# equations, available through x0_psat and x0_sat_pure
+function _saturation_superanc(pure, T)
+    vl, vv = Clapeyron.x0_sat_pure(pure, T)
+    return Clapeyron.x0_psat(pure, T), vl, vv
+end
+_saturation_solve(pure, T) = Clapeyron.saturation_pressure(pure, T)
+
+# the ancillaries are superancillaries if they satisfy the phase equilibrium to near round-off
+function _has_superancillary(pure, Tc)
+    for T in (0.6Tc, 0.8Tc, 0.95Tc)
+        p, vl, vv = _saturation_superanc(pure, T)
+        all(isfinite, (p, vl, vv)) || return false
+        gl = Clapeyron.VT_gibbs_free_energy(pure, vl, T)
+        gv = Clapeyron.VT_gibbs_free_energy(pure, vv, T)
+        pl, pv = Clapeyron.pressure(pure, vl, T), Clapeyron.pressure(pure, vv, T)
+        (abs(pl / p - 1) < 1e-9 && abs(pv / p - 1) < 1e-9 && abs(gl - gv) / (Clapeyron.R̄ * T) < 1e-9) || return false
+    end
+    return true
+end
