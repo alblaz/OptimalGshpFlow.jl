@@ -10,16 +10,19 @@ EvaporatorParameters
 `ΔTsup`                                    refrigerant super heating degree, 
 `Ts_h`                                     secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-@with_kw struct EvaporatorParameters{R <: AbstractRefrigerant}
+@with_kw struct EvaporatorParameters{R <: AbstractRefrigerant, S <: SecondaryFluid, P <: PlateHeatExchanger, T <: Real}
     refrigerant::R
-    secondaryfluid::SecondaryFluid
-    plateheatexchanger::PlateHeatExchanger
-    hei
-    Vs
-    Vref
-    ΔTsup 
-    Ts_h
+    secondaryfluid::S
+    plateheatexchanger::P
+    hei::T
+    Vs::T
+    Vref::T
+    ΔTsup::T
+    Ts_h::T
 end
+# scalars of mixed types (e.g. Int, Float64, ForwardDiff Duals) are promoted to a common type
+EvaporatorParameters(r::AbstractRefrigerant, sf::SecondaryFluid, phx::PlateHeatExchanger, x::Vararg{Real, 5}) =
+    EvaporatorParameters(r, sf, phx, promote(x...)...)
 
 
 """
@@ -32,13 +35,17 @@ BoreholeParameters
 `λground`                                  ground conductivity,
 `Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-@with_kw struct BoreholeParameters 
-    secondaryfluid::SecondaryFluid
-    Vs
-    Tin 
-    borehole::Borehole
-    λground
-    Tb
+@with_kw struct BoreholeParameters{S <: SecondaryFluid, B <: Borehole, T <: Real}
+    secondaryfluid::S
+    Vs::T
+    Tin::T
+    borehole::B
+    λground::T
+    Tb::T
+end
+function BoreholeParameters(sf::SecondaryFluid, Vs::Real, Tin::Real, borehole::Borehole, λground::Real, Tb::Real)
+    Vs, Tin, λground, Tb = promote(Vs, Tin, λground, Tb)
+    return BoreholeParameters(sf, Vs, Tin, borehole, λground, Tb)
 end
 
 
@@ -56,17 +63,23 @@ EvaporatorBoreholeParameters
 `λground`                                  ground conductivity,
 `Tb`                                       secondary fluid temperature (in Kelvin) at the inlet of the evaporator
 """
-@with_kw struct EvaporatorBoreholeParameters{R <: AbstractRefrigerant}
+@with_kw struct EvaporatorBoreholeParameters{R <: AbstractRefrigerant, S <: SecondaryFluid, P <: PlateHeatExchanger,
+                                              B <: Borehole, T <: Real}
     refrigerant::R
-    secondaryfluid::SecondaryFluid
-    plateheatexchanger::PlateHeatExchanger
-    hei
-    Vs
-    Vref
-    ΔTsup 
-    borehole::Borehole
-    λground
-    Tb
+    secondaryfluid::S
+    plateheatexchanger::P
+    hei::T
+    Vs::T
+    Vref::T
+    ΔTsup::T
+    borehole::B
+    λground::T
+    Tb::T
+end
+function EvaporatorBoreholeParameters(r::AbstractRefrigerant, sf::SecondaryFluid, phx::PlateHeatExchanger, hei::Real,
+                                      Vs::Real, Vref::Real, ΔTsup::Real, borehole::Borehole, λground::Real, Tb::Real)
+    hei, Vs, Vref, ΔTsup, λground, Tb = promote(hei, Vs, Vref, ΔTsup, λground, Tb)
+    return EvaporatorBoreholeParameters(r, sf, phx, hei, Vs, Vref, ΔTsup, borehole, λground, Tb)
 end
 
 
