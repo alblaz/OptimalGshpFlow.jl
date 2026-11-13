@@ -42,7 +42,7 @@ param_evaporatorborehole_prototype  = EvaporatorBoreholeParameters(refrigerant=r
                                         borehole=borehole, λground=λground, Tb=Tb)
 
         
-pme = sigmoid_ab_to_R(PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name), pressure_bounds(refrigerant)...)
+pme = to_R(pressure_transform(refrigerant), PropsSI("P", "T",  evaporator.Te, "Q", 1., refrigerant.name))
 ϵme = ϵmsup =  sigmoid_01_to_R(0.5) 
 xms = sigmoid_01_to_R(0.5)
 Qe, Qsup = evaporator.Qnom* 0.9, evaporator.Qnom*0.1

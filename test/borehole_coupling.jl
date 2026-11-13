@@ -12,7 +12,7 @@
             hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., borehole = bh, λground = λground, Tb = Tb)
 
     pe = PropsSI("P", "T", 273.15, "Q", 1., "R134a")
-    pm = sigmoid_ab_to_R(pe, pressure_bounds(ref)...)
+    pm = to_R(pressure_transform(ref), pe)
     Tin, Tm, Tout = 274.15, 276.15, 278.15                  # Ts_l, Ts_m, Ts_h
     u  = [pm, 5000., 500., 0., 0., 0., Tin, Tm, Tout]
     du = zeros(9)

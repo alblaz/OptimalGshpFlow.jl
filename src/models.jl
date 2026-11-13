@@ -82,12 +82,12 @@ Heat balances and equalities defining the evaporator's physical behavior conside
 variables:
     `u0 = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m`
 
-`pme`     refrigerant evaporation pressure mapped using tanh transformation, 
+`pme`     refrigerant evaporation pressure, mapped with `pressure_transform(refrigerant)` (with `NestedPressure()`; see `evaporator_transforms`), 
 `Qe`      evaporator power exchange in the two phase region, 
 `Qsup`    evaporator power exchange in the superheated region, 
-`ϵme`     heat exchanger efficiency in the two phase region mapped using tanh transformation, 
-`ϵmsup`   heat exchanger efficiency in the two phase region mapped using tanh transformation, 
-`xms`     coordinate of the moving boundary mapped using tanh transformation, 
+`ϵme`     heat exchanger effectiveness in the two-phase region, mapped with `Unit()`, 
+`ϵmsup`   heat exchanger effectiveness in the superheat region, mapped with `Unit()`, 
+`xms`     coordinate of the moving boundary, mapped with `Unit()`, 
 `Tsf_l`   secondary fluid temperature (in Kelvin) at the evaporator outlet, 
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
 """
@@ -112,9 +112,9 @@ function evaporator_residuals!(du, u, Ts_h, rs, refrigerant, secondaryfluid, pla
     # mapped unknowns
     Qe   = u[2]
     Qsup = u[3]
-    ϵe   = sigmoid_R_to_01(u[4])
-    ϵsup = sigmoid_R_to_01(u[5])
-    xs   = sigmoid_R_to_01(u[6])
+    ϵe   = from_R(Unit(), u[4])
+    ϵsup = from_R(Unit(), u[5])
+    xs   = from_R(Unit(), u[6])
     Ts_l, Ts_m = u[7], u[8]
 
     # refrigerant states
@@ -247,10 +247,10 @@ function evaporator_model(u,p::EvaporatorParameters)
     A = plateheatexchanger.A 
 
     # transform mapped variables
-    pe = sigmoid_R_to_ab(pme, pressure_bounds(refrigerant)...)
-    ϵe = sigmoid_R_to_01(ϵme)
-    ϵsup = sigmoid_R_to_01(ϵmsup)
-    xs  = sigmoid_R_to_01(xms)
+    pe = from_R(pressure_transform(refrigerant), pme)
+    ϵe = from_R(Unit(), ϵme)
+    ϵsup = from_R(Unit(), ϵmsup)
+    xs  = from_R(Unit(), xms)
     
     # two-phase
     Te = T_dew(refrigerant, pe)
@@ -298,12 +298,12 @@ Heat balances and equalities defining the evaporator's physical behavior conside
 variables:
     `u0 = pme, Qe, Qsup, ϵme, ϵmsup, xms, Tsf_l, Tsf_m, Tsf_h`
 
-`pme`     refrigerant evaporation pressure mapped using tanh transformation, 
+`pme`     refrigerant evaporation pressure, mapped with `pressure_transform(refrigerant)` (with `NestedPressure()`; see `evaporator_transforms`), 
 `Qe`      evaporator power exchange in the two phase region, 
 `Qsup`    evaporator power exchange in the superheated region, 
-`ϵme`     heat exchanger efficiency in the two phase region mapped using tanh transformation, 
-`ϵmsup`   heat exchanger efficiency in the two phase region mapped using tanh transformation, 
-`xms`     coordinate of the moving boundary mapped using tanh transformation, 
+`ϵme`     heat exchanger effectiveness in the two-phase region, mapped with `Unit()`, 
+`ϵmsup`   heat exchanger effectiveness in the superheat region, mapped with `Unit()`, 
+`xms`     coordinate of the moving boundary, mapped with `Unit()`, 
 `Tsf_l`   secondary fluid temperature (in Kelvin) at the evaporator outlet, 
 `Tsf_m`   secondary fluid temperature (in Kelvin) at the moving boundary, 
 `Ts_h`    secondary fluid temperature (in Kelvin) at the inlet of the evaporator

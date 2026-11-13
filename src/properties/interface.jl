@@ -12,7 +12,8 @@ ForwardDiff.Dual numbers pass through.
 Required by the evaporator models
 ---------------------------------
 - `critical_pressure(r)`, `molar_mass(r)` [kg/mol]
-- `pressure_bounds(r)`: `(pmin, pmax)` used to map the evaporation pressure to ℝ
+- `pressure_bounds(r)`: `(pmin, pmax)` [Pa], admissible evaporation pressures; the models map
+  the pressure unknown with `pressure_transform(r) = LogBox(pressure_bounds(r)...)`
 - saturated vapour (dew point) at p: `T_dew`, `h_dew`, `ρ_dew`
 - superheated vapour at p and superheat ΔT above the dew point: `h_superheated`,
   `ρ_superheated`, `cp_superheated`, `μ_superheated`, `λ_superheated`
@@ -42,10 +43,19 @@ molar_mass(r::AbstractRefrigerant) = r.M
 """
     pressure_bounds(r) -> (pmin, pmax)
 
-Interval [Pa] onto which the models map the evaporation-pressure unknown with
-`sigmoid_R_to_ab`. For the spline `Refrigerant` it is the sampled pressure range.
+Interval [Pa] of admissible evaporation pressures, `0 < pmin < pmax`. For the spline
+`Refrigerant` it is the sampled pressure range; for `ClapeyronRefrigerant` it is (triple-point
+pressure, critical pressure).
 """
 function pressure_bounds end
+
+"""
+    pressure_transform(r) = LogBox(pressure_bounds(r)...)
+
+Map of the evaporation-pressure unknown: `pe = from_R(pressure_transform(r), u)`,
+`u = to_R(pressure_transform(r), pe)` (sigmoid in `log p`, see [`LogBox`](@ref)).
+"""
+pressure_transform(r::AbstractRefrigerant) = LogBox(pressure_bounds(r)...)
 
 # saturation (dew = saturated vapour, bubble = saturated liquid)
 function T_dew end

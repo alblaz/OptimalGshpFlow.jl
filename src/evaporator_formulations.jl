@@ -26,7 +26,7 @@ abstract type PropertyFormulation end
 """
     NestedPressure()
 
-Unknown `u[1]`: evaporation pressure (sigmoid on [`pressure_bounds`](@ref)). Properties come from
+Unknown `u[1]`: evaporation pressure, mapped with [`pressure_transform`](@ref) (sigmoid in log p). Properties come from
 the refrigerant interface at (p, ΔT), with inner iterations for the Clapeyron backend. The
 original formulation, valid for every refrigerant backend.
 """
@@ -35,7 +35,7 @@ struct NestedPressure <: PropertyFormulation end
 """
     SaturationTemperature()
 
-Unknown `u[1]`: dew (evaporation) temperature `Te` (sigmoid on `(Ttriple, Tcrit)`). Saturation is
+Unknown `u[1]`: dew (evaporation) temperature `Te`, mapped with [`temperature_transform`](@ref). Saturation is
 explicit ([`saturation_T`](@ref)); the superheated states need one (p, T) volume solve each
 (outlet at `Te + ΔTsup`, mean at `Te + ΔTsup/2`). Pure `ClapeyronRefrigerant` only.
 """
@@ -56,8 +56,38 @@ struct ExplicitTv <: PropertyFormulation end
 n_extra_unknowns(::PropertyFormulation) = 0
 n_extra_unknowns(::ExplicitTv) = 2
 
-"Interval `(Tmin, Tmax)` [K] onto which the evaporation-temperature unknown is mapped."
+"Interval `(Tmin, Tmax)` [K] of the evaporation (dew) temperature."
 temperature_bounds(r::ClapeyronRefrigerant) = (r.Ttriple, r.Tcrit)
+
+"Map of the dew-temperature unknown: `Box(temperature_bounds(r)...)`."
+temperature_transform(r::ClapeyronRefrigerant) = Box(temperature_bounds(r)...)
+
+"Map of `u[1]` in a formulation: pressure or dew temperature."
+first_transform(::NestedPressure, r) = pressure_transform(r)
+first_transform(::Union{SaturationTemperature, ExplicitTv}, r) = temperature_transform(r)
+
+extra_transforms(::PropertyFormulation, r) = ()
+extra_transforms(::ExplicitTv, r) = (volume_transform(r), volume_transform(r))
+
+"""
+    evaporator_transforms(formulation, refrigerant; borehole = false)
+
+[`VariableTransform`](@ref)s of the unknowns of [`evaporator_model!`](@ref) (or, with
+`borehole = true`, of [`evaporatorborehole_model!`](@ref)), in order:
+
+1. `pe` ([`pressure_transform`](@ref)) or `Te` ([`temperature_transform`](@ref)), by formulation;
+2. `Qe`, `Qsup`: `Free()`;
+3. `ϵe`, `ϵsup`, `xs`: `Unit()`;
+4. `Ts_l`, `Ts_m` (and `Ts_h` with the borehole): `Free()`;
+5. the extra unknowns of the formulation (`ExplicitTv`: two [`volume_transform`](@ref)s).
+
+`map(from_R, evaporator_transforms(F, r), u)` gives the physical values of a solution `u`.
+"""
+function evaporator_transforms(formulation::PropertyFormulation, r; borehole::Bool = false)
+    base = (first_transform(formulation, r), Free(), Free(), Unit(), Unit(), Unit(), Free(), Free())
+    base = borehole ? (base..., Free()) : base
+    return (base..., extra_transforms(formulation, r)...)
+end
 
 """
     evaporator_refrigerant_state!(du, formulation, refrigerant, u, nbase, ΔTsup)
@@ -69,14 +99,14 @@ enthalpy and density (at `ΔTsup` superheat), and cp, μ, λ at the mean superhe
 their residuals into `du[nbase+1:end]`.
 """
 function evaporator_refrigerant_state!(du, ::NestedPressure, r::AbstractRefrigerant, u, nbase, ΔTsup)
-    pe = sigmoid_R_to_ab(u[1], pressure_bounds(r)...)
+    pe = from_R(pressure_transform(r), u[1])
     return (pe = pe, Te = T_dew(r, pe), hes = h_dew(r, pe),
             hsup = h_superheated(r, pe, ΔTsup), ρsup = ρ_superheated(r, pe, ΔTsup),
             cpm = cp_superheated(r, pe, ΔTsup/2), μm = μ_superheated(r, pe, ΔTsup/2), λm = λ_superheated(r, pe, ΔTsup/2))
 end
 
 function evaporator_refrigerant_state!(du, ::SaturationTemperature, r::ClapeyronRefrigerant, u, nbase, ΔTsup)
-    Te = sigmoid_R_to_ab(u[1], temperature_bounds(r)...)
+    Te = from_R(temperature_transform(r), u[1])
     pe, _, vv = saturation_T(r, Te)
     Tsup, Tm = Te + ΔTsup, Te + ΔTsup/2
     vsup = volume_pT(r, pe, Tsup; phase = :vapor)
@@ -85,7 +115,7 @@ function evaporator_refrigerant_state!(du, ::SaturationTemperature, r::Clapeyron
 end
 
 function evaporator_refrigerant_state!(du, ::ExplicitTv, r::ClapeyronRefrigerant, u, nbase, ΔTsup)
-    Te = sigmoid_R_to_ab(u[1], temperature_bounds(r)...)
+    Te = from_R(temperature_transform(r), u[1])
     pe, _, vv = saturation_T(r, Te)
     Tsup, Tm = Te + ΔTsup, Te + ΔTsup/2
     vsup = volume_from_R(r, u[nbase + 1])
@@ -114,20 +144,19 @@ _p_dew(r::ClapeyronRefrigerant, T) = ispure(r) ? p_sat(r, T) : Clapeyron.dew_pre
 Vector of unknowns for [`evaporator_model!`](@ref) (or, with `Ts_h`, for
 [`evaporatorborehole_model!`](@ref)) in the given formulation, from physical values: dew
 temperature `Te`, heat flows, effectivenesses, moving-boundary position and secondary-fluid
-temperatures.
+temperatures. The values are mapped with [`evaporator_transforms`](@ref).
 """
 function evaporator_unknowns(formulation::PropertyFormulation, r, ΔTsup; Te, Qe, Qsup, Ts_l, Ts_m,
                              ϵe = 0.5, ϵsup = 0.5, xs = 0.5, Ts_h = nothing)
-    u1 = formulation isa NestedPressure ? sigmoid_ab_to_R(_p_dew(r, Te), pressure_bounds(r)...) :
-                                          sigmoid_ab_to_R(Te, temperature_bounds(r)...)
-    u = [u1, Qe, Qsup, sigmoid_01_to_R(ϵe), sigmoid_01_to_R(ϵsup), sigmoid_01_to_R(xs), Ts_l, Ts_m]
-    Ts_h === nothing || push!(u, Ts_h)
+    x1 = formulation isa NestedPressure ? _p_dew(r, Te) : Te
+    x = [x1, Qe, Qsup, ϵe, ϵsup, xs, Ts_l, Ts_m]
+    Ts_h === nothing || push!(x, Ts_h)
     if formulation isa ExplicitTv
         pe = _p_dew(r, Te)
-        push!(u, volume_to_R(r, volume_pT(r, pe, Te + ΔTsup; phase = :vapor)),
-                 volume_to_R(r, volume_pT(r, pe, Te + ΔTsup/2; phase = :vapor)))
+        push!(x, volume_pT(r, pe, Te + ΔTsup; phase = :vapor), volume_pT(r, pe, Te + ΔTsup/2; phase = :vapor))
     end
-    return u
+    ts = evaporator_transforms(formulation, r; borehole = Ts_h !== nothing)
+    return [to_R(t, xi) for (t, xi) in zip(ts, x)]
 end
 
 """
@@ -139,8 +168,8 @@ unknowns, map `u[1]` to the pressure), e.g. to post-process with [`evaporator_mo
 """
 nested_unknowns(::NestedPressure, r, u, nbase) = u[1:nbase]
 function nested_unknowns(::Union{SaturationTemperature, ExplicitTv}, r::ClapeyronRefrigerant, u, nbase)
-    Te = sigmoid_R_to_ab(u[1], temperature_bounds(r)...)
+    Te = from_R(temperature_transform(r), u[1])
     v = u[1:nbase]
-    v[1] = sigmoid_ab_to_R(p_sat(r, Te), pressure_bounds(r)...)
+    v[1] = to_R(pressure_transform(r), p_sat(r, Te))
     return v
 end
