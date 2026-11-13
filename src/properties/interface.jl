@@ -43,11 +43,7 @@ molar_mass(r::AbstractRefrigerant) = r.M
     pressure_bounds(r) -> (pmin, pmax)
 
 Interval [Pa] onto which the models map the evaporation-pressure unknown with
-`sigmoid_R_to_ab`.
-
-Note (known bug B4, fixed in `feature/bounded-variables`): for the spline `Refrigerant`, `pmin`
-is the field `pr_min` read as a pressure in Pa, as in the original code, so that results are
-unchanged.
+`sigmoid_R_to_ab`. For the spline `Refrigerant` it is the sampled pressure range.
 """
 function pressure_bounds end
 
