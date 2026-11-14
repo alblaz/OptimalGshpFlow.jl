@@ -16,6 +16,11 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    env:
+      # Portable native code in the precompile cache (as the official binaries). Without it the
+      # cached packages are compiled for the CPU of the runner that built them and rejected
+      # ("runtime-disabled features") when the next run lands on a different CPU model.
+      JULIA_CPU_TARGET: "generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
       contents: read
