@@ -40,6 +40,8 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env:
+          JULIA_DEBUG: loading   # TEMPORARY: why are cached pkgimages rejected?
         with:
           # no coverage upload is configured; with coverage on, Julia >= 1.12 re-precompiles
           # all ~250 dependencies on every run (≈ 13 min) and the tests run slower
