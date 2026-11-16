@@ -33,10 +33,11 @@ function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB)
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = DESIGN.hei,
                       Vs = Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP)
-    bhx = BoreholeHX(borehole = BOREHOLE, secondaryfluid = sf, Vs = Vs, λground = λGROUND, Tb = Tb)
+    bhx = BoreholeHX(borehole = BOREHOLE, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
-                 T_warm = (:evaporator => :Ts_in,  :borehole => :Tout)))
+                 T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
+                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
 end
 
 # pumping power: borehole (U-pipe, 2H) and evaporator plates (as in the original script)

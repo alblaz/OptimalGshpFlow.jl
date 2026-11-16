@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-16 (perf/t-ps-newton).
+Last updated: 2026-11-16 (feature/tb-port).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -31,7 +31,8 @@ unconstrained solvers can be used.
 | B8 | `fix/inferable-component-system` | `ComponentSystem` type not inferred → callers inferred NonlinearSolve/Clapeyron on abstract types; unknowns now a plain `Vector{Float64}` (no ComponentArrays); first call of the Clapeyron study 366 → 52 s | merged (#40) |
 | T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
 | P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
-| P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | PR #43 |
+| P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | merged (#43) |
+| 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | PR open |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -408,7 +409,7 @@ Decisions for step 8:
 - No caching layer now: the warm start is "keep the last `u`" (what `continuation` does).
 - Make the ground temperature `Tb` a **port** of `BoreholeHX` (connected to a node) instead of a
   field, so that a dynamic borehole component can provide it and a time step changes a node value
-  instead of rebuilding the system.
+  instead of rebuilding the system. **Done** (8a: `set_fixed`).
 - Only if profiling shows the solver overhead matters: reuse the solver cache (`init`/`reinit!`)
   or a small dedicated Newton loop (≈ 0.1–0.2 ms per step), and/or the tangent predictor.
 
@@ -528,4 +529,9 @@ Open:
    Clapeyron's code paths (same type for all pure fluids, nothing duplicated): a package
    precompile workload would cut it (≈ 102 → 42 s) but was dropped (P1, item 1). Rule for new tests:
    differentiate through the helpers, not `ForwardDiff.*` on closures.
-4. Possible follow-ups: pump-power helper in the library; `Tb` as a port (step 8 note).
+4. Possible follow-ups: pump-power helper in the library. ~~`Tb` as a port~~ (8a, 2026-11-16):
+   `BoreholeHX` has ports `Tin`, `Tout`, `Tb`; `Tb` is usually a fixed node
+   (`T_ground = (:borehole => :Tb,)`, `fixed = (T_ground = …,)`), and `set_fixed(sys; T_ground = …)`
+   returns a copy of the same type (≈ 1.6 µs, no allocation, nothing recompiled). Time steps with
+   ΔTb = -0.1 K, warm start from the previous `u`: 1.3 ms and 3 Newton iterations per step (R290,
+   NewtonRaphson). `BoreholeHX(…; Tb)` now throws an `ArgumentError` pointing to the node.

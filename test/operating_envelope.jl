@@ -60,8 +60,8 @@ using NonlinearSolve
         u = initial_guess(sys; evaporator = (Te = e.Te_min + 1e-3, Qe = 5e3, Qsup = 300., Ts_m = 276.), nodes = (T_out = 274.,))
         @test "evaporation temperature at its lower bound Te_min" in [i.message for i in validity_issues(sys, u)]
         # borehole
-        b = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5, Tb = 283.15)
-        @test length(validity(b, (;), (Tin = 250., Tout = 280.))) == 2
+        b = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5)
+        @test length(validity(b, (;), (Tin = 250., Tout = 280., Tb = 283.15))) == 2
     end
 
     @testset "continuation in flow" begin
@@ -70,8 +70,9 @@ using NonlinearSolve
         # and compiling the block with an abstract refrigerant takes practically forever.
         build(λ) = ComponentSystem((evaporator = Evaporator(; refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
                                                             hei = ev.hei, Vs = λ * ev.Vs, Vref = ev.Vref, ΔTsup = 5.),
-                                    borehole = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = λ * ev.Vs, λground = 3.5, Tb = 283.15));
-            nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout)))
+                                    borehole = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = λ * ev.Vs, λground = 3.5));
+            nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
+                     T_ground = (:borehole => :Tb,)), fixed = (T_ground = 283.15,))
         u0 = initial_guess(build(1.0); evaporator = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.),
                            nodes = (T_cold = 274., T_warm = 279.))
         λs = [1.0, 0.7, 0.4, 0.2]

@@ -152,12 +152,15 @@ function evaporator_solution(c::Evaporator, x, p)
 end
 
 """
-    BoreholeHX(; borehole, secondaryfluid, Vs, λground, Tb)
+    BoreholeHX(; borehole, secondaryfluid, Vs, λground)
 
 Borehole heat exchanger (Hellström, uniform borehole wall temperature `Tb`), as in
 [`borehole_model!`](@ref).
 
-- Ports: `Tin`, `Tout` (secondary fluid).
+- Ports: `Tin`, `Tout` (secondary fluid) and `Tb`, the ground (borehole wall) temperature:
+  usually a fixed node, e.g. `nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = 268.15,)`.
+  Change it with [`set_fixed`](@ref) (same system type, nothing recompiled), or connect it to a
+  component that computes it (e.g. a dynamic ground model).
 - No internal unknowns; one residual `kin Tin - Tout + (1 - kin) Tb` [K], with the coefficient
   and the fluid density at the mean temperature `(Tin + Tout)/2`.
 """
@@ -166,26 +169,27 @@ struct BoreholeHX{B <: Borehole, T <: Real, S <: SecondaryFluid} <: AbstractComp
     secondaryfluid::S
     Vs::T
     λground::T
-    Tb::T
 end
-function BoreholeHX(; borehole, secondaryfluid, Vs, λground, Tb)
-    Vs, λground, Tb = promote(float.((Vs, λground, Tb))...)
-    return BoreholeHX(borehole, secondaryfluid, Vs, λground, Tb)
+function BoreholeHX(; borehole, secondaryfluid, Vs, λground, Tb = nothing)
+    Tb === nothing || throw(ArgumentError("BoreholeHX: `Tb` is a port; connect it to a node, e.g. " *
+        "`nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = $Tb,)`"))
+    Vs, λground = promote(float(Vs), float(λground))
+    return BoreholeHX(borehole, secondaryfluid, Vs, λground)
 end
 
-ports(::BoreholeHX) = (Tin = Free(), Tout = Free())
+ports(::BoreholeHX) = (Tin = Free(), Tout = Free(), Tb = Free())
 residual_scales(::BoreholeHX) = (1.0,)
 
 function residuals!(r, c::BoreholeHX, x, p)
     Tm = (p.Tin + p.Tout)/2
     sf = c.secondaryfluid
     kin = uniform_Tb_coeffs(c.borehole, c.λground, sf.ρ(Tm) * c.Vs, Tm, sf)
-    r[1] = kin * p.Tin - p.Tout + (1 - kin) * c.Tb
+    r[1] = kin * p.Tin - p.Tout + (1 - kin) * p.Tb
     return nothing
 end
 
 "Post-processing: `BoreholeSolution` at the port values `p`."
-borehole_solution(c::BoreholeHX, p) = BoreholeSolution(c.borehole, c.λground, p.Tin, p.Tout, c.Tb, c.Vs, c.secondaryfluid)
+borehole_solution(c::BoreholeHX, p) = BoreholeSolution(c.borehole, c.λground, p.Tin, p.Tout, p.Tb, c.Vs, c.secondaryfluid)
 
 """
     validity(c::Evaporator, x, p; ΔTpinch = 0.1, xs_tol = 1e-3)

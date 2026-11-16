@@ -11,11 +11,12 @@ using NonlinearSolve, ForwardDiff
     spl = SPL_R290
     evap(r, F = default_formulation(r); kw...) = Evaporator(; refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
         hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., formulation = F, kw...)
-    bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5, Tb = 283.15)
+    bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5)
     standalone(e) = ComponentSystem((evaporator = e,);
         nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)), fixed = (T_in = 278.,))
-    coupled(e) = ComponentSystem((evaporator = e, borehole = bhx);
-        nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout)))
+    coupled(e; Tb = 283.15) = ComponentSystem((evaporator = e, borehole = bhx);
+        nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
+                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
     g = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.)
 
     @testset "defaults and declarations" begin
@@ -120,5 +121,30 @@ using NonlinearSolve, ForwardDiff
         end
         @test sols[1].evaporator.Te ≈ sols[2].evaporator.Te atol = 1e-8
         @test sols[1].evaporator.Qe ≈ sols[2].evaporator.Qe rtol = 1e-9
+    end
+
+    # The ground temperature is a port of the borehole (a fixed node here): a new value is a new node
+    # value of the same system (set_fixed), not a rebuilt component, e.g. at each time step of a
+    # dynamic borehole model.
+    @testset "ground temperature as a port" begin
+        @test keys(ports(bhx)) == (:Tin, :Tout, :Tb)
+        @test_throws ArgumentError BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5, Tb = 283.15)
+        e = evap(cla)
+        S = coupled(e)
+        @test length(S) == 9                                     # a fixed node adds no unknown
+        S2 = @inferred set_fixed(S; T_ground = 280.15)
+        @test typeof(S2) === typeof(S)                           # same type: nothing to recompile
+        @test physical(S2, zeros(length(S2))).nodes.T_ground == 280.15
+        @test physical(S, zeros(length(S))).nodes.T_ground == 283.15       # S unchanged
+        u0 = initial_guess(S; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))
+        sol(sys) = physical(sys, solve(NonlinearProblem(sys, u0), NewtonRaphson(); abstol = 1e-10).u)
+        x2 = sol(S2)
+        @test x2.evaporator.Te ≈ sol(coupled(e; Tb = 280.15)).evaporator.Te rtol = 1e-12   # = rebuilt system
+        @test x2.evaporator.Te < sol(S).evaporator.Te                                      # colder ground
+        bs = borehole_solution(bhx, port_values(S2, u0, :borehole))
+        @test bs.Tb == 280.15
+        # only fixed nodes can be set
+        @test_throws ArgumentError set_fixed(S; T_cold = 270.)
+        @test_throws ArgumentError set_fixed(S; T_x = 270.)
     end
 end

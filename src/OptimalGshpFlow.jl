@@ -82,7 +82,7 @@ export compressor_power, condenser_power
 
 # from "components/"
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
-export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation
+export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
 export pressure_drop, pumping_power
 
