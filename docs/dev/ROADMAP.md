@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-16 (test/efficiency).
+Last updated: 2026-11-16 (docs/precompile-finding).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -29,7 +29,8 @@ unconstrained solvers can be used.
 | 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | merged (#34) |
 | B7 | `fix/pressure-drop-transition` | pipe friction factor jumped ×1.65 at Re = 2300 (pump power 344 → 216 W in the study); smooth blend 2300–4000, `SharpTransition()` keeps the original | merged (#36) |
 | B8 | `fix/inferable-component-system` | `ComponentSystem` type not inferred → callers inferred NonlinearSolve/Clapeyron on abstract types; unknowns now a plain `Vector{Float64}` (no ComponentArrays); first call of the Clapeyron study 366 → 52 s | merged (#40) |
-| T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | PR #41 |
+| T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
+| P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -471,9 +472,37 @@ Open:
    `study` body pointed at it directly. After the fix: first call 52.5 s, second 0.1 s (was 1.2 s).
    Remaining first-call costs (fresh session, stage by stage): `ClapeyronRefrigerant("R290")`
    22.5 s, `compressor_power` (`T_ps`) 17.9 s, first `solve` 7.8 s. Next candidates: own Newton
-   for `T_ps` of a pure fluid; PrecompileTools workload (refrigerant construction + one solve).
+   for `T_ps` of a pure fluid. A PrecompileTools workload was tried and dropped (P1, below).
    Pitfall seen while measuring: a closure capturing a non-`const` global refrigerant makes the
    same blow-up (515 s for `continuation`).
+
+   **Precompile workload (P1, 2026-11-16, dropped).** PrecompileTools workload in the package
+   (`ClapeyronRefrigerant("R290")`, saturation and single-phase properties, `T_ps`/`h_ps`,
+   compression, the residual of an evaporator + borehole system) and in the NonlinearSolve
+   extension (one `NewtonRaphson` and one `TrustRegion` solve, post-processing). Measured (Julia
+   1.13, native CPU target):
+
+   | | without | with workload |
+   |---|---|---|
+   | precompile, package + extension | 4.7 + 4.6 s | 40.2 + 12.8 s |
+   | load of the example | 12.0 s | 5.3 s |
+   | first call of the study (39 points) | 52.5 s | 1.0 s |
+   | test suite | 190 s | ≈ 105 s (partly; tests failed) |
+
+   **Why dropped:** it breaks every mixture. ForwardDiff orders the tags of nested Duals with
+   `tagcount`, a `@generated` function that bakes the value of a global counter (`TAGCOUNT`,
+   ForwardDiff 1.4.7 `src/config.jl`) into the compiled code. The counter restarts at 0 in every
+   session, and the values baked into our package image during precompilation collide with tags
+   created at runtime. Clapeyron's mixture critical point (`mixture_critical_constraint`: a Hessian
+   nested in a gradient) then throws `DualMismatchError: Cannot determine ordering of Dual tags`, so
+   constructing any mixture `ClapeyronRefrigerant` fails (8 tests). Pure fluids passed, no silently
+   wrong value was seen. No safe fix on our side: it would mean changing ForwardDiff's internal
+   counter, and Clapeyron uses ForwardDiff almost everywhere, so the workload cannot avoid baking
+   tags. Possible later: (a) an upstream ForwardDiff fix (tag counts that do not restart per
+   session; report it with a minimal reproducer), after which the workload can come back;
+   (b) for fast first calls in one's own studies, a local PackageCompiler sysimage (a single
+   image also stores the counter, so no collision expected; untested). The experiment was commit
+   ae3fe2f on a local branch, not pushed.
 2. ~~Pressure-drop continuity at the laminar–turbulent transition~~ (fixed, B7, see above).
 3. ~~Test-suite time~~ (T1, 2026-11-16): 386 → 200 s in a fresh session (compile 354 → 185 s).
    Main cause: `ForwardDiff.derivative/gradient/jacobian` tag the Duals with the closure type, so
@@ -483,8 +512,7 @@ Open:
    `SPL_R290` (3.3 s per construction, built 7 times). Boxed variables fixed (`u` in
    property_interface, `p` in tv_state). Per file: property_interface 131 → 37 s, components
    60 → 16 s, tv_state 35 → 9 s. Remaining: `properties_clapeyron.jl` ≈ 105 s, the first use of
-   Clapeyron's code paths (same type for all pure fluids, nothing duplicated): only a package
-   precompile workload can cut it (moves the cost to precompilation, redone on CI when `src/`
-   changes; with the multi-target `JULIA_CPU_TARGET` native code costs more). Rule for new tests:
+   Clapeyron's code paths (same type for all pure fluids, nothing duplicated): a package
+   precompile workload would cut it (≈ 102 → 42 s) but was dropped (P1, item 1). Rule for new tests:
    differentiate through the helpers, not `ForwardDiff.*` on closures.
 4. Possible follow-ups: pump-power helper in the library; `Tb` as a port (step 8 note).
