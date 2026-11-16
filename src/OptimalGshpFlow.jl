@@ -6,7 +6,6 @@ using StaticArrays, Parameters, ExponentialUtilities
 using RequiredInterfaces
 using LambertW
 import Clapeyron, EntropyScaling, ForwardDiff
-using ComponentArrays: ComponentVector, getaxes
 
 include("utilities.jl")
 export linearmap_01_to_ab, linearmap_ab_to_01

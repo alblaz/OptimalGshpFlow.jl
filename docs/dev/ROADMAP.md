@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-14 (fix/pressure-drop-transition).
+Last updated: 2026-11-16 (fix/inferable-component-system).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -23,7 +23,7 @@ unconstrained solvers can be used.
 | 1 | `feature/clapeyron-properties` | `ClapeyronRefrigerant` | merged (#23) |
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
-| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve | merged (#30) |
+| 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve (ComponentArrays dropped in B8) | merged (#30) |
 | 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
 | 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | merged (#31) |
 | 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | merged (#34) |
@@ -283,7 +283,8 @@ Design:
   evaporator secondary outlet and the borehole inlet) into one unknown, or fixes them to a value
   (e.g. a given source temperature). No connection equations: the evaporator alone stays 8 × 8 and
   evaporator + borehole 9 × 9, as today.
-- **System:** unknowns in a `ComponentVector` (`u.evaporator.Qe`, `u.nodes.T_cold`, ...), square
+- **System:** unknowns in a `ComponentVector` (`u.evaporator.Qe`, `u.nodes.T_cold`, ...; a plain
+  `Vector{Float64}` since B8, names through `physical`), square
   check, `residual!(du, u, sys)`, `initial_guess(sys; ...)` from physical values and
   `physical(sys, u)` back. Generic in the number type (ForwardDiff).
 - **Scaling:** unknowns through the transforms (new `Linear(x0, scale)`, e.g. heat flows in units
@@ -458,9 +459,19 @@ Results (R290, MEA-28 %, Tb = −5 °C, Tc = 40 °C, ηis 0.7, ηpump 0.3; 39 fl
     in this study.
 
 Open:
-1. First-call compile of the Clapeyron study (366 s) vs spline (14 s): profile with JET /
-   SnoopCompile (`T_ps` alone ≈ 20 s); candidates: own Newton for `T_ps` of a pure fluid,
-   PrecompileTools workload.
+1. First-call compile of the Clapeyron study (366 s) vs spline (14 s). **Main cause found and
+   fixed (B8, 2026-11-16):** the `ComponentSystem` constructor was not inferable (port-node tuples
+   from a generator, offsets in boxed captured variables, `ComponentVector(::NamedTuple)` which
+   ComponentArrays cannot infer), so inside `study` the system, `u0` and everything downstream
+   (`continuation` → `_solve` → NonlinearSolve, `evaporator_solution` → Clapeyron) were inferred on
+   abstract types: ≈ 330 s of compilation for a 2-point study, although inference proper was only
+   40 s (SnoopCompile) and each stage compiled at top level took < 25 s. JET `@report_opt` on the
+   `study` body pointed at it directly. After the fix: first call 52.5 s, second 0.1 s (was 1.2 s).
+   Remaining first-call costs (fresh session, stage by stage): `ClapeyronRefrigerant("R290")`
+   22.5 s, `compressor_power` (`T_ps`) 17.9 s, first `solve` 7.8 s. Next candidates: own Newton
+   for `T_ps` of a pure fluid; PrecompileTools workload (refrigerant construction + one solve).
+   Pitfall seen while measuring: a closure capturing a non-`const` global refrigerant makes the
+   same blow-up (515 s for `continuation`).
 2. ~~Pressure-drop continuity at the laminar–turbulent transition~~ (fixed, B7, see above).
 3. `test/tv_state.jl` (boxes `p`, `r`) and `test/property_interface.jl` (boxes `u`, 137 s
    runtime): same closure pattern as `operating_envelope.jl`.
