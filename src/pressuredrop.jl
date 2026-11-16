@@ -1,34 +1,49 @@
 
-"""
-    `fDarcy(Re)`
+const RE_FRICTION_TURBULENT = 4000.   # start of the turbulent smooth-pipe fit in `fDarcy`
 
-compute the Darcy friction factor fD given the Reynolds number
+fdarcy_laminar(Re) = 64 / Re
+fdarcy_turbulent(Re) = (1 / (0.838 * lambertw(0.629 * Re)))^2   # smooth pipe (Colebrook fit)
+
 """
-function fDarcy(Re)
-    fD = Re<2300. ? 64/Re : (1/(0.838*lambertw(0.629*Re)))^2
-    return fD
+    fDarcy(Re, transition = SmoothTransition())
+
+Darcy friction factor of fully developed flow in a smooth circular pipe.
+
+- `Re < 2300`: laminar, `64/Re`
+- `Re ≥ 4000`: turbulent smooth-pipe fit `(1/(0.838 W(0.629 Re)))²` (`W` Lambert function)
+- in between, `transition` (see [`NusseltTransition`](@ref)):
+  `SmoothTransition()` interpolates linearly in `Re` between the laminar value at 2300 and the
+  turbulent one at 4000, so `fD` (and the pressure drop) is continuous in the flow rate;
+  `SharpTransition()` is the original model: the turbulent fit from `Re = 2300`, a ×1.65 jump.
+"""
+function fDarcy(Re, transition::NusseltTransition = SmoothTransition())
+    Re < RE_LAMINAR && return fdarcy_laminar(Re)
+    (transition isa SharpTransition || Re ≥ RE_FRICTION_TURBULENT) && return fdarcy_turbulent(Re)
+    γ = (Re - RE_LAMINAR) / (RE_FRICTION_TURBULENT - RE_LAMINAR)
+    return (1 - γ) * fdarcy_laminar(RE_LAMINAR) + γ * fdarcy_turbulent(RE_FRICTION_TURBULENT)
 end
 
 
 """
-    `pressure_drop(D,H,V,fluidproperties::SecondaryFluid,T)`
+    `pressure_drop(H, V, D, fluidproperties::SecondaryFluid, T; transition = SmoothTransition())`
 
-compute the the pressure drop for a circulat pipe
+compute the pressure drop for a circular pipe
 
+`H` is the pipe length,
+`V` is the volume flow rate (m^3/s),
 `D` is the pipe diameter,
-`H` is the pipe Length,
-`V` is the volume flow rate (m^3/s)
 `fluidproperties::SecondaryFluid`,
-`T` is the mean temperature along the pipe.
+`T` is the mean temperature along the pipe,
+`transition` is the laminar-turbulent transition model of the friction factor, see [`fDarcy`](@ref).
 """
-function pressure_drop(H,V,D,fluidproperties,T)
+function pressure_drop(H,V,D,fluidproperties,T; transition::NusseltTransition = SmoothTransition())
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
 
     v = V/(π*D^2/4)
     Re = ρ*v*D/μ
-    fD = fDarcy(Re) 
-    
+    fD = fDarcy(Re, transition)
+
     Δp = fD * H/D * v^2 * ρ/2
     return Δp
 end
@@ -96,15 +111,16 @@ Compute the pumping power given
 `H` the pipe Length,
 `V` the volume flow rate (m^3/s),
 `fluidproperties::SecondaryFluid`,
-`T` the mean temperature along the pipe.   
+`T` the mean temperature along the pipe,
+`transition` the friction-factor transition model (keyword), see [`fDarcy`](@ref).
 """
 function pumping_power(Δp, V, η)
     P = Δp * V / η
     return P
 end
 
-function pumping_power(η, H, V, D, fluidproperties, T)
-    Δp = pressure_drop(H,V,D,fluidproperties,T)
+function pumping_power(η, H, V, D, fluidproperties, T; transition::NusseltTransition = SmoothTransition())
+    Δp = pressure_drop(H,V,D,fluidproperties,T; transition = transition)
     P = Δp * V / η
     return P
 end
