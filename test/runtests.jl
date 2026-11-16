@@ -2,7 +2,8 @@ using OptimalGshpFlow
 using Test
 using CoolProp
 
-include("./utilities.jl") 
+include("./helpers.jl")        # shared ForwardDiff tag (compile time)
+include("./utilities.jl")
 include("./transforms.jl")
 include("./fluidproperties.jl")
 include("./pipeflow.jl")

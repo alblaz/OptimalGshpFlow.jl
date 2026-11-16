@@ -23,27 +23,29 @@ using ForwardDiff
             @test volume_from_R(r, -20.) > r.vmin
             # AD in (T, v) agrees with central differences
             for f in (p_Tv, h_Tv, s_Tv, cp_Tv, μ_Tv, λ_Tv)
-                g = ForwardDiff.gradient(x -> f(r, x[1], x[2]), [T, v])
+                g = dgradient(x -> f(r, x[1], x[2]), [T, v])
                 @test g[1] ≈ (f(r, T + 1e-3, v) - f(r, T - 1e-3, v)) / 2e-3 rtol = 1e-5
                 @test g[2] ≈ (f(r, T, v * (1 + 1e-6)) - f(r, T, v * (1 - 1e-6))) / (2e-6 * v) rtol = 1e-5
             end
         end
     end
 
-    # a (T, v) state closed by Newton on the pressure residual, from an ideal-gas guess
-    r = ClapeyronRefrigerant("R290")
-    p, T = 4.7e5, T_dew(r, 4.7e5) + 5
-    u = volume_to_R(r, 8.314462618 * T / p)
-    for _ in 1:20
-        f = pressure_residual(r, T, volume_from_R(r, u), p)
-        abs(f) < 1e-13 && break
-        u -= f / ForwardDiff.derivative(x -> pressure_residual(r, T, volume_from_R(r, x), p), u)
-    end
-    @test volume_from_R(r, u) ≈ volume_pT(r, p, T; phase = :vapor) rtol = 1e-10
+    # a (T, v) state closed by Newton on the pressure residual, from an ideal-gas guess.
+    # In a `let`: `p` is also assigned in the loop above, and a closure capturing a variable assigned
+    # in two places is boxed (abstract types down into Clapeyron).
+    let r = ClapeyronRefrigerant("R290"), p = 4.7e5, T = T_dew(r, p) + 5
+        u = volume_to_R(r, 8.314462618 * T / p)
+        for _ in 1:20
+            f = pressure_residual(r, T, volume_from_R(r, u), p)
+            abs(f) < 1e-13 && break
+            u -= f / dderivative(x -> pressure_residual(r, T, volume_from_R(r, x), p), u)
+        end
+        @test volume_from_R(r, u) ≈ volume_pT(r, p, T; phase = :vapor) rtol = 1e-10
 
-    # CoolProp transport through the cached AbstractState equals PropsSI
-    @test μ_pT(r, p, T) == PropsSI("V", "P", p, "T", T, "R290")
-    @test λ_dew(r, p) == PropsSI("CONDUCTIVITY", "P", p, "Q", 1, "R290")
+        # CoolProp transport through the cached AbstractState equals PropsSI
+        @test μ_pT(r, p, T) == PropsSI("V", "P", p, "T", T, "R290")
+        @test λ_dew(r, p) == PropsSI("CONDUCTIVITY", "P", p, "Q", 1, "R290")
+    end
 end
 
 @testset "explicit saturation at T (superancillaries)" begin
@@ -64,7 +66,7 @@ end
             @test vl ≈ vls rtol = 1e-9
             @test vv ≈ vvs rtol = 1e-9
             # exact AD: Clausius-Clapeyron
-            @test ForwardDiff.derivative(t -> p_sat(r, t), T) ≈ r.M * (h_Tv(r, T, vv) - h_Tv(r, T, vl)) / (T * (vv - vl)) rtol = 1e-9   # h per kg, v molar
+            @test dderivative(t -> p_sat(r, t), T) ≈ r.M * (h_Tv(r, T, vv) - h_Tv(r, T, vl)) / (T * (vv - vl)) rtol = 1e-9   # h per kg, v molar
         end
         @test isnan(p_sat(r, r.Tcrit + 1))
         @test r.Ttriple < 0.6 * r.Tcrit
@@ -87,6 +89,6 @@ end
         @test T_dew(r, p) ≈ PropsSI("T", "P", p, "Q", 1, "R744") rtol = 1e-9
         @test T_bubble(r, p) ≈ PropsSI("T", "P", p, "Q", 0, "R744") rtol = 1e-9
         @test h_dew(r, p) - h_bubble(r, p) ≈ PropsSI("H", "P", p, "Q", 1, "R744") - PropsSI("H", "P", p, "Q", 0, "R744") rtol = 1e-7
-        @test ForwardDiff.derivative(q -> T_dew(r, q), p) ≈ (T_dew(r, p + 1) - T_dew(r, p - 1)) / 2 rtol = 1e-6
+        @test dderivative(q -> T_dew(r, q), p) ≈ (T_dew(r, p + 1) - T_dew(r, p - 1)) / 2 rtol = 1e-6
     end
 end

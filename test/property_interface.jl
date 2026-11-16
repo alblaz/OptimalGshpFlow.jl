@@ -112,25 +112,13 @@ function legacy_evaporatorborehole_model!(du, u, p)
     return nothing
 end
 
-# plain Newton with a ForwardDiff Jacobian (NonlinearSolve is not a test dependency)
-function newton_solve(f!, u; maxit = 30, tol = 1e-8)
-    du = similar(u)
-    for it in 1:maxit
-        J = ForwardDiff.jacobian(f!, du, u)
-        f!(du, u)
-        maximum(abs, du) < tol && return u, it
-        u = u - J \ du
-    end
-    return u, -1
-end
-
 @testset "refrigerant property interface" begin
     sfname = "INCOMP::MEA-28%"
     sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), sfname)
     ev  = EvaporatorDesign(6000., 273., 273 + 40, "R290", sfname; U = 2000., ΔTs = 3., ΔT_l = 1.5)
     phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
     bh  = SingleUPipeBorehole(H = 200., D = 4., λg = 3., pipe_position = ((0.04, 0.), (-0.04, 0.)))
-    spl = Refrigerant("R290")
+    spl = SPL_R290
     cla = ClapeyronRefrigerant("R290")
     @test spl isa AbstractRefrigerant && cla isa AbstractRefrigerant
 
@@ -206,9 +194,10 @@ end
         sols = map((NestedPressure(), SaturationTemperature(), ExplicitTv())) do F
             u0 = guess(F, Ts_h)
             @test length(u0) == nb + n_extra_unknowns(F)
-            u, it = newton_solve((d, x) -> f!(d, x, p, F), u0)
+            # (not `u`: assigned below in the testset too, it would be boxed in this closure)
+            usol, it = newton_solve((d, x) -> f!(d, x, p, F), u0)
             @test it > 0
-            un = nested_unknowns(F, r, u, nb)
+            un = nested_unknowns(F, r, usol, nb)
             # the nested residuals vanish at the converted solution
             d = zeros(nb); f!(d, un, p)
             @test maximum(abs, d) < 1e-6
@@ -243,7 +232,7 @@ end
         F isa ExplicitTv && @test x[end] ≈ volume_pT(r, p_sat(r, 270.), 272.5; phase = :vapor) rtol = 1e-12
     end
     # the Te-based formulations need a ClapeyronRefrigerant
-    spl = Refrigerant("R290")
+    spl = SPL_R290
     ps = EvaporatorParameters(refrigerant = spl, secondaryfluid = sf, plateheatexchanger = phx,
              hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)
     @test_throws MethodError evaporator_model!(zeros(8), zeros(8), ps, SaturationTemperature())

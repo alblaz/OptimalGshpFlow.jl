@@ -4,7 +4,7 @@
     sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), sfname)
     ev  = EvaporatorDesign(6000., 273., 273 + 40, "R290", sfname; U = 2000., ΔTs = 3., ΔT_l = 1.5)
     phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
-    spl = Refrigerant("R290")
+    spl = SPL_R290
     cla = ClapeyronRefrigerant("R290")
     p = EvaporatorParameters(refrigerant = spl, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei,
                              Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)

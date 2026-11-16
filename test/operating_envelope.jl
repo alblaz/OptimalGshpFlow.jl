@@ -29,7 +29,7 @@ using NonlinearSolve
         @test default_Te_min(r) ≈ T_dew(r, 0.01r.pcrit) rtol = 1e-12          # −60 °C
         r744 = ClapeyronRefrigerant("R744")
         @test isfinite(default_Te_min(r744)) && default_Te_min(r744) > r744.Ttriple   # 0.01 pcrit < ptriple
-        @test default_Te_min(Refrigerant("R290")) ≈ default_Te_min(r) atol = 0.05
+        @test default_Te_min(SPL_R290) ≈ default_Te_min(r) atol = 0.05
         e = evap()
         @test e.Te_min == default_Te_min(r)
         @test bounds(unknowns(e).Te) == (e.Te_min, r.Tcrit)
