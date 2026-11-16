@@ -1,7 +1,16 @@
 name: CI
-# Keep CI fast and lean: run on PRs only (a merge commit was already tested on its PR), skip
-# docs-only changes, and run 'pre' only on manual dispatch.
+# Keep CI fast and lean: skip docs-only changes and run 'pre' only on manual dispatch. Pushes to
+# main still run once: PR runs can only restore caches of their own branch or of main, so the
+# main run keeps a fresh depot cache that every new PR starts from.
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'examples/**'
+      - '.github/workflows/CompatHelper.yml'
+      - '.github/workflows/TagBot.yml'
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -45,6 +54,11 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
+        with:
+          # Versioned name: the cache key does not include build settings (CPU target, coverage),
+          # and a depot built with other settings is restored, then rejected at load time
+          # ("Precompiled image ... not available with flags"). Bump when those settings change.
+          cache-name: julia-cache-v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
