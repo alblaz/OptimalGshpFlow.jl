@@ -16,6 +16,9 @@ Read it at the start of a session and update it when a branch is finished.
   second commit.
 - Open PRs with `/opt/homebrew/bin/gh` (it is not on the PATH of the Bash tool). PR bodies
   end with the Claude Code attribution line.
+- CI minutes are limited (private repo, 2000 min/month): CI runs on PRs only, without `pre`.
+  Before asking to merge, run the test suite locally on Julia 1.10 (`julia_cmd = "julia +1.10"`)
+  and on the release, and report both in the PR body. Avoid reruns and diagnostic pushes.
 - Never discard uncommitted work: no `git reset --hard` or `git checkout -- .` with a dirty
   tree; use `git stash` or a separate worktree.
 - `assets/docs/` holds reference papers (gitignored): Qiao 2025 on ε-NTU with glide, and an

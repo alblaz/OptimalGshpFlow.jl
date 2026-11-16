@@ -1,10 +1,14 @@
 name: CI
+# Private repo: Actions minutes are limited (2000/month). Run on PRs only (a merge commit was
+# already tested on its PR), skip docs-only changes, and run 'pre' only on manual dispatch.
 on:
-  push:
-    branches:
-      - main
-    tags: ['*']
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'examples/**'
+      - '.github/workflows/CompatHelper.yml'
+      - '.github/workflows/TagBot.yml'
   workflow_dispatch:
 concurrency:
   # Skip intermediate builds: always.
@@ -27,11 +31,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1'      # latest stable release
-          - 'min'    # minimum version allowed by the julia compat entry in Project.toml (1.10,
-                     # also the current LTS: no separate 'lts' job)
-          - 'pre'    # upcoming release
+        # '1': latest stable release; 'min': minimum version allowed by the julia compat entry
+        # (1.10, also the current LTS: no separate 'lts' job); 'pre': upcoming release, manual only
+        version: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["1", "min", "pre"]' || '["1", "min"]') }}
         os:
           - ubuntu-latest
         arch:
