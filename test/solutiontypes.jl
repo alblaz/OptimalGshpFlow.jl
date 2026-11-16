@@ -61,16 +61,17 @@ end
     @test isconcretetype(only(Base.return_types(evaporator_model, (Vector{Float64}, typeof(p)))))
     e = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei, Vs = ev.Vs,
                    Vref = ev.Vref, ΔTsup = 5.)
-    b = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3., Tb = 280.)
+    b = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.)
     @test allconcrete(e) && allconcrete(b)
     x  = (Te = 268., Qe = 5e3, Qsup = 300., ϵe = 0.5, ϵsup = 0.5, xs = 0.5, Ts_m = 276.)
     pv = (Ts_in = 278., Ts_out = 274.)
     @test isconcretetype(only(Base.return_types(evaporator_solution, (typeof(e), typeof(x), typeof(pv)))))
-    @test isconcretetype(only(Base.return_types(borehole_solution, (typeof(b), typeof((Tin = 270., Tout = 272.))))))
+    @test isconcretetype(only(Base.return_types(borehole_solution, (typeof(b), typeof((Tin = 270., Tout = 272., Tb = 280.))))))
 
     # physical values of a system solution (input of the post-processing above)
     sys = ComponentSystem((evaporator = e, borehole = b);
-        nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout)))
+        nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
+                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = 280.,))
     u = initial_guess(sys; evaporator = (Te = 268., Qe = 5e3, Qsup = 300., Ts_m = 276.), nodes = (T_cold = 274., T_warm = 279.))
     ph = @inferred physical(sys, u)
     @test keys(ph) == (:evaporator, :nodes)                  # no entry for the borehole (no unknowns)

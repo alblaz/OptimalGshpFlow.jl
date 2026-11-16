@@ -91,7 +91,11 @@ Example, evaporator coupled to a borehole:
 
     sys = ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
-                 T_warm = (:evaporator => :Ts_in,  :borehole => :Tout)))
+                 T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
+                 T_ground = (:borehole => :Tb,)),
+        fixed = (T_ground = 281.15,))         # undisturbed ground, e.g. ≈ 8 °C (Stockholm)
+
+Fixed values are changed with [`set_fixed`](@ref).
 """
 struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <: Tuple, I <: Tuple}
     components::C
@@ -155,6 +159,26 @@ _node_index(fixed::Tuple, next) = first(fixed) === nothing ?
     (next, _node_index(Base.tail(fixed), next + 1)...) : (0, _node_index(Base.tail(fixed), next)...)
 
 Base.length(sys::ComponentSystem) = sys.n
+
+"""
+    set_fixed(sys::ComponentSystem; node = value, ...) -> ComponentSystem
+
+Copy of `sys` with new values of fixed nodes (e.g. the ground temperature at each time step of a
+dynamic simulation). The copy has the same type as `sys`, so nothing is compiled again, and the
+unknowns keep their layout: the previous solution is a warm start.
+"""
+function set_fixed(sys::ComponentSystem; values...)
+    names = _nodenames(sys)
+    for k in keys(values)
+        i = findfirst(==(k), names)
+        i === nothing && throw(ArgumentError("set_fixed: no node $k"))
+        sys.nodefixed[i] === nothing && throw(ArgumentError("set_fixed: node $k is free, not fixed"))
+    end
+    nodefixed = map(names, sys.nodefixed) do k, v
+        v === nothing ? v : (haskey(values, k) ? Float64(values[k]) : v)
+    end
+    return ComponentSystem(sys.components, sys.blocks, sys.nodenames, sys.nodetransforms, nodefixed, sys.nodeindex, sys.n)
+end
 
 function Base.show(io::IO, sys::ComponentSystem)
     print(io, "ComponentSystem(", join(keys(sys.components), ", "), "; ", sys.n, " unknowns, nodes: ",
