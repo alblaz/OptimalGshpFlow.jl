@@ -5,10 +5,15 @@ evaporator coupled to the borehole by continuation, post-process compressor, con
 and find the flow that maximises the COP. Each point is checked with `validity_issues` (e.g. brine
 below its freezing point at low flow).
 
+`study_tb` repeats the sweep over a range of ground temperatures `Tb` (the ground cools down
+during the heating season), to see how the optimal flow moves with the operating point and the
+brine viscosity.
+
 Needs NonlinearSolve in the environment. Usage:
     include("examples/optimalflow_components.jl")
     rows = study(ClapeyronRefrigerant("R290")); report(rows)
     old  = original(); compare(rows, old)          # original API (spline Refrigerant)
+    tb = study_tb(ClapeyronRefrigerant("R290")); report_tb(tb)
 =#
 using OptimalGshpFlow, NonlinearSolve, CoolProp, LinearAlgebra, Printf
 
@@ -27,6 +32,7 @@ const ΔTSUP = 3.5
 const ηPUMP = 0.3
 const TCOND, ηIS = 273.15 + 40, 0.7
 const FLOWS = 2:-0.05:0.1                             # × design brine flow, from high to low
+const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
 
 # ---- model ----
 function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB)
@@ -57,29 +63,89 @@ function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf)
     return (W = W, Q1 = Q1, Q2 = Q2, Ppump = P, COP1 = Q1/(W + P), COP2 = Q2/(W + P))
 end
 
-"""
-    study(r; flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion()) -> Vector
+# borehole Reynolds number at the mean brine temperature
+function reynolds(bs::BoreholeSolution, sf)
+    T = (bs.Tin + bs.Tout)/2
+    D = 2BOREHOLE.rpi
+    return 4sf.ρ(T) * bs.Vs / (π * D * sf.μ(T))
+end
 
-Continuation in the brine flow, from `first(flows)` down; one row per flow with the physical
-solution, the performance and the validity issues.
-"""
-function study(r; flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion())
-    S1 = heatpump(r, first(flows); sf = sf)
-    u0 = initial_guess(S1; evaporator = (Te = TB - 8, Qe = 0.9DESIGN.Qnom, Qsup = 0.1DESIGN.Qnom, Ts_m = TB - 4),
-                       nodes = (T_cold = TB - 6, T_warm = TB - 2))
-    res = continuation(Vf -> heatpump(r, Vf; sf = sf), flows, u0, alg; abstol = 1e-9)
+# post-processing of the continuation results `res` (ground temperature `Tb`)
+function postprocess(r, res, Tb, sf)
     rows = []
     for x in res
-        x.ok || (@warn "no solution at $(x.λ) × design flow"; continue)
-        S = heatpump(r, x.λ; sf = sf)
+        x.ok || (@warn "no solution at $(x.λ) × design flow, Tb = $(Tb - 273.15) °C"; continue)
+        S = heatpump(r, x.λ; sf = sf, Tb = Tb)
         ph = physical(S, x.u)
         es = evaporator_solution(S.components.evaporator, ph.evaporator, port_values(S, x.u, :evaporator))
         bs = borehole_solution(S.components.borehole, port_values(S, x.u, :borehole))
         push!(rows, (Vf = x.λ, Vs = x.λ * DESIGN.Vs, Te = es.twophase_region.Tcl, Ts_out = ph.nodes.T_cold,
-                     Ts_in = ph.nodes.T_warm, iterations = x.iterations, performance(es, bs, r, sf)...,
-                     issues = unique(i.message for i in validity_issues(S, x.u))))
+                     Ts_in = ph.nodes.T_warm, Re = reynolds(bs, sf), iterations = x.iterations,
+                     performance(es, bs, r, sf)..., issues = unique(i.message for i in validity_issues(S, x.u))))
     end
     return rows
+end
+
+first_guess(S, Tb) = initial_guess(S; evaporator = (Te = Tb - 8, Qe = 0.9DESIGN.Qnom, Qsup = 0.1DESIGN.Qnom, Ts_m = Tb - 4),
+                                   nodes = (T_cold = Tb - 6, T_warm = Tb - 2))
+
+"""
+    study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, alg = TrustRegion()) -> Vector
+
+Continuation in the brine flow, from `first(flows)` down; one row per flow with the physical
+solution, the performance and the validity issues.
+"""
+function study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, alg = TrustRegion())
+    u0 = first_guess(heatpump(r, first(flows); sf = sf, Tb = Tb), Tb)
+    res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = Tb), flows, u0, alg; abstol = 1e-9)
+    return postprocess(r, res, Tb, sf)
+end
+
+"""
+    optimum(rows, k; valid = true) -> NamedTuple
+
+Flow factor `Vf` that maximises `k` (`:COP1` or `:COP2`), refined by a parabola through the best
+grid point and its two neighbours (no extra solve); with `valid = true`, among the points without
+validity issues only. `at_bound = true` when the best point is the first or last of the grid.
+"""
+function optimum(rows, k; valid = true)
+    pts = valid ? filter(x -> isempty(x.issues), rows) : rows
+    sort!(pts; by = x -> x.Vf)
+    y = [getfield(x, k) for x in pts]
+    i = argmax(y)
+    (i == 1 || i == length(pts)) && return (Vf = pts[i].Vf, value = y[i], row = pts[i], at_bound = true)
+    x0, x1, x2 = pts[i-1].Vf, pts[i].Vf, pts[i+1].Vf
+    y0, y1, y2 = y[i-1], y[i], y[i+1]
+    # vertex of the parabola through the three points
+    d01, d12 = (y1 - y0)/(x1 - x0), (y2 - y1)/(x2 - x1)
+    a = (d12 - d01)/(x2 - x0)
+    a < 0 || return (Vf = x1, value = y1, row = pts[i], at_bound = false)    # flat: no vertex
+    # parabola y = y0 + d01 (x - x0) + a (x - x0)(x - x1); dy/dx = 0 at xv
+    xv = (x0 + x1)/2 - d01/(2a)
+    yv = y0 + d01*(xv - x0) + a*(xv - x0)*(xv - x1)
+    return (Vf = xv, value = yv, row = pts[i], at_bound = false)
+end
+
+"""
+    study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion()) -> Vector
+
+The flow sweep of `study` for each ground temperature in `Tbs` (from warm to cold, as over a
+heating season). A continuation in `Tb` at the first flow gives the starting point of each sweep
+(warm start from the previous `Tb`). One entry per `Tb`: `(Tb, rows, COP1, COP2)` with the optima
+of [`optimum`](@ref).
+"""
+function study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion())
+    Vf1 = float(first(flows))
+    u0 = first_guess(heatpump(r, Vf1; sf = sf, Tb = first(Tbs)), first(Tbs))
+    starts = continuation(Tb -> heatpump(r, Vf1; sf = sf, Tb = Tb), Tbs, u0, alg; abstol = 1e-9)
+    out = []
+    for s in starts
+        s.ok || (@warn "no solution at Tb = $(s.λ - 273.15) °C, $Vf1 × design flow"; break)
+        res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = s.λ), flows, s.u, alg; abstol = 1e-9)
+        rows = postprocess(r, res, s.λ, sf)
+        push!(out, (Tb = s.λ, rows = rows, COP1 = optimum(rows, :COP1), COP2 = optimum(rows, :COP2)))
+    end
+    return out
 end
 
 function report(rows)
@@ -126,6 +192,22 @@ function original(; flows = FLOWS)
                      performance(s.evaporator, s.borehole, r, BRINE_PROPS)...))
     end
     return rows
+end
+
+function report_tb(tb)
+    @printf("%7s | %6s %8s %7s %6s %8s %7s | %6s %7s  %s\n", "Tb[°C]", "Vf*", "Vs*[l/s]", "COP1*", "Re", "Te[°C]",
+            "Q2[W]", "Vf*", "COP2*", "notes")
+    for x in tb
+        o1, o2 = x.COP1, x.COP2
+        notes = String[]
+        o1.at_bound && push!(notes, "COP1 optimum at the grid bound")
+        o2.at_bound && push!(notes, "COP2 optimum at the grid bound")
+        length(x.rows) < length(FLOWS) && push!(notes, "$(length(FLOWS) - length(x.rows)) flows unsolved")
+        @printf("%7.1f | %6.3f %8.3f %7.3f %6.0f %8.2f %7.0f | %6.3f %7.3f  %s\n", x.Tb - 273.15, o1.Vf,
+                1e3o1.Vf * DESIGN.Vs, o1.value, o1.row.Re, o1.row.Te - 273.15, o1.row.Q2, o2.Vf, o2.value,
+                join(notes, "; "))
+    end
+    println("Vf*: optimal flow (× design, parabola through the grid); Re, Te, Q2 at the best grid point.")
 end
 
 function compare(new, old)
