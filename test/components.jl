@@ -48,6 +48,18 @@ using NonlinearSolve, ForwardDiff
             nodes = (T_out = (:evaporator => :Ts_out, :evaporator => :Tx), T_in = (:evaporator => :Ts_in,)), fixed = (T_in = 1.,))
     end
 
+    # The system and its unknowns must be inferred from the component types: with an abstract
+    # system, every caller (e.g. a continuation loop in a function) infers NonlinearSolve and
+    # Clapeyron on abstract types, ≈ 5 min of compilation in the optimal-flow study.
+    @testset "system and unknowns are inferred" begin
+        e = evap(cla)
+        S = @inferred coupled(e)
+        @test isconcretetype(typeof(S))
+        @test isconcretetype(typeof(@inferred standalone(e)))
+        u = @inferred initial_guess(S; evaporator = g, nodes = (T_cold = 276., T_warm = 279.))
+        @test length(u) == length(S)
+    end
+
     @testset "residuals = original model residuals / scales ($(F), $(nameof(typeof(r))))" for (r, F) in
             ((cla, NestedPressure()), (cla, SaturationTemperature()), (cla, ExplicitTv()), (spl, NestedPressure()))
         e = evap(r, F)
