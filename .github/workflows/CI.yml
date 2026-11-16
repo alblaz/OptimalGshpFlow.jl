@@ -1,10 +1,23 @@
 name: CI
+# Keep CI fast and lean: skip docs-only changes and run 'pre' only on manual dispatch. Pushes to
+# main still run once: PR runs can only restore caches of their own branch or of main, so the
+# main run keeps a fresh depot cache that every new PR starts from.
 on:
   push:
-    branches:
-      - main
-    tags: ['*']
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'examples/**'
+      - '.github/workflows/CompatHelper.yml'
+      - '.github/workflows/TagBot.yml'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'examples/**'
+      - '.github/workflows/CompatHelper.yml'
+      - '.github/workflows/TagBot.yml'
   workflow_dispatch:
 concurrency:
   # Skip intermediate builds: always.
@@ -27,11 +40,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1'      # latest stable release
-          - 'min'    # minimum version allowed by the julia compat entry in Project.toml (1.10,
-                     # also the current LTS: no separate 'lts' job)
-          - 'pre'    # upcoming release
+        # '1': latest stable release; 'min': minimum version allowed by the julia compat entry
+        # (1.10, also the current LTS: no separate 'lts' job); 'pre': upcoming release, manual only
+        version: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["1", "min", "pre"]' || '["1", "min"]') }}
         os:
           - ubuntu-latest
         arch:
@@ -43,6 +54,11 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
+        with:
+          # Versioned name: the cache key does not include build settings (CPU target, coverage),
+          # and a depot built with other settings is restored, then rejected at load time
+          # ("Precompiled image ... not available with flags"). Bump when those settings change.
+          cache-name: julia-cache-v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
