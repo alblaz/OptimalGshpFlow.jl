@@ -9,7 +9,7 @@ using ForwardDiff
     sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), sfname)
     ev  = EvaporatorDesign(6000., 273., 273 + 40, "R290", sfname; U = 2000., ΔTs = 3., ΔT_l = 1.5)
     phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
-    r   = Refrigerant("R290")
+    r   = SPL_R290
     p   = EvaporatorParameters(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei,
                                Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)
     u   = [to_R(pressure_transform(r), PropsSI("P", "T", 270., "Q", 1., "R290")), 5000., 300., 0., 0., 0., 274., 276.]

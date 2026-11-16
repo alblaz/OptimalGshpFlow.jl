@@ -8,7 +8,7 @@ using NonlinearSolve, ForwardDiff
     phx = PlateHeatExchanger(ev.A, 0.5, 0.15)
     bh  = SingleUPipeBorehole(H = 200., D = 4., λg = 3., pipe_position = ((0.04, 0.), (-0.04, 0.)))
     cla = ClapeyronRefrigerant("R290")
-    spl = Refrigerant("R290")
+    spl = SPL_R290
     evap(r, F = default_formulation(r); kw...) = Evaporator(; refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx,
         hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., formulation = F, kw...)
     bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5, Tb = 283.15)
@@ -79,7 +79,7 @@ using NonlinearSolve, ForwardDiff
         @test xp.nodes == (T_out = 274., T_in = 278.)
         @test port_values(sys, u, :evaporator) == (Ts_in = 278., Ts_out = 274.)
         # Duals pass through
-        J = ForwardDiff.jacobian((d, v) -> residual!(d, v, sys), similar(du), u)
+        J = djacobian((d, v) -> residual!(d, v, sys), similar(du), u)
         @test all(isfinite, J) && size(J) == (8 + nx, 8 + nx)
     end
 
@@ -95,8 +95,9 @@ using NonlinearSolve, ForwardDiff
         pb = EvaporatorBoreholeParameters(refrigerant = cla, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei,
                  Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., borehole = bh, λground = 3.5, Tb = 283.15)
         uo = evaporator_unknowns(F, cla, 5.; Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_l = 274., Ts_m = 276., Ts_h = 279.)
-        solo = solve(NonlinearProblem((d, u, p) -> evaporatorborehole_model!(d, u, p, F), uo, pb), NewtonRaphson(); abstol = 1e-8)
-        xo = map(from_R, evaporator_transforms(F, cla; borehole = true), solo.u)
+        uso, its = newton_solve((d, u) -> evaporatorborehole_model!(d, u, pb, F), uo)   # as in property_interface.jl
+        @test its > 0
+        xo = map(from_R, evaporator_transforms(F, cla; borehole = true), uso)
         # the borehole component takes the fluid density at its own mean temperature (see ROADMAP)
         @test x.evaporator.Te ≈ xo[1] atol = 1e-3
         @test x.evaporator.Qe ≈ xo[2] rtol = 1e-3

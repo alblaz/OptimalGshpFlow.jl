@@ -76,10 +76,10 @@ end
                       (t -> λ_pT(r, p, t), T, 1e-3),
                       (t -> λ_pT(rc, p, t), T, 1e-3),
                       (q -> λ_dew(rc, q), p, 1.))
-        @test ForwardDiff.derivative(f, x) ≈ fd(f, x, h) rtol = 1e-4
+        @test dderivative(f, x) ≈ fd(f, x, h) rtol = 1e-4
     end
     # dh/ds at constant p is the temperature
-    @test ForwardDiff.derivative(x -> h_ps(r, 15e5, x), s) ≈ T_ps(r, 15e5, s) rtol = 1e-8
+    @test dderivative(x -> h_ps(r, 15e5, x), s) ≈ T_ps(r, 15e5, s) rtol = 1e-8
     # phase hint and initial guess give the same result
     @test h_ps(r, 15e5, s; phase = :vapor, T0 = 330.) ≈ h_ps(r, 15e5, s) rtol = 1e-10
     @test h_pT(r, p, T; phase = :vapor) ≈ h_pT(r, p, T) rtol = 1e-12
@@ -99,7 +99,7 @@ end
     # dew and bubble states are consistent with single-phase evaluations just outside the dome
     @test h_pT(mx, p, T_dew(mx, p) + 1e-3; phase = :vapor) ≈ h_dew(mx, p) rtol = 1e-5
     @test h_pT(mx, p, T_bubble(mx, p) - 1e-3; phase = :liquid) ≈ h_bubble(mx, p) rtol = 1e-5
-    @test ForwardDiff.derivative(q -> T_dew(mx, q), p) ≈ (T_dew(mx, p + 1) - T_dew(mx, p - 1)) / 2 rtol = 1e-4
+    @test dderivative(q -> T_dew(mx, q), p) ≈ (T_dew(mx, p + 1) - T_dew(mx, p - 1)) / 2 rtol = 1e-4
     @test cp_twophase(ClapeyronRefrigerant("R290"), p) == Inf
     @test_throws ArgumentError ClapeyronRefrigerant(["R32", "R1234yf"])
 end

@@ -25,6 +25,9 @@ Read it at the start of a session and update it when a branch is finished.
   JET `@report_opt` / `@inferred`, see Julia below); tests must stay cheap (small cases, shared
   setup, no needless new specializations, e.g. closures over non-`const` globals or boxed
   variables in `@testset`). Report compile and run time when a change may affect them.
+  In tests, differentiate through `test/helpers.jl` (`dderivative`, `dgradient`, `djacobian`,
+  `newton_solve`: one ForwardDiff tag), never `ForwardDiff.*` on a new closure, which recompiles
+  the model and Clapeyron for a new Dual type; reuse its shared fixtures (`SPL_R290`).
 - Never discard uncommitted work: no `git reset --hard` or `git checkout -- .` with a dirty
   tree; use `git stash` or a separate worktree.
 - `assets/docs/` holds reference papers (gitignored): Qiao 2025 on ε-NTU with glide, and an
