@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-16 (docs/precompile-finding).
+Last updated: 2026-11-16 (perf/t-ps-newton).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -31,6 +31,7 @@ unconstrained solvers can be used.
 | B8 | `fix/inferable-component-system` | `ComponentSystem` type not inferred → callers inferred NonlinearSolve/Clapeyron on abstract types; unknowns now a plain `Vector{Float64}` (no ComponentArrays); first call of the Clapeyron study 366 → 52 s | merged (#40) |
 | T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
 | P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
+| P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | PR open |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -471,8 +472,20 @@ Open:
    40 s (SnoopCompile) and each stage compiled at top level took < 25 s. JET `@report_opt` on the
    `study` body pointed at it directly. After the fix: first call 52.5 s, second 0.1 s (was 1.2 s).
    Remaining first-call costs (fresh session, stage by stage): `ClapeyronRefrigerant("R290")`
-   22.5 s, `compressor_power` (`T_ps`) 17.9 s, first `solve` 7.8 s. Next candidates: own Newton
-   for `T_ps` of a pure fluid. A PrecompileTools workload was tried and dropped (P1, below).
+   22.5 s, `compressor_power` (`T_ps`) 17.9 s, first `solve` 7.8 s. A PrecompileTools workload
+   was tried and dropped (P1, below).
+
+   **`T_ps` (P2, 2026-11-16).** SnoopCompile on the first `compressor_power`: 15.8 of its 17.6 s
+   of inference were `Clapeyron.PS.temperature`, and its result inferred as `Any`, so `T_ps`,
+   `h_pT` and `compressor_power` were abstract too. Now: with `phase = :vapor` and a subcritical
+   vapour state (`s ≥ s_dew(p)`), Newton in T at constant p (`ds = cp dT/T`, guess from the dew
+   point with constant cp; iterations on primal values, final step with the Duals: exact
+   derivatives). Other states (wet, supercritical, `:unknown`) still use the flash, called
+   through `Base.inferencebarrier` (compiled only if used) with its result converted and asserted
+   to the promoted number type. Note: a branch that is never taken is still inferred and compiled
+   when its call is concrete; an inference barrier is the way to keep a heavy fallback out.
+   First `compressor_power` after a solve: 17.9 → 0.2 s; `h_ps(:vapor)` 58 → 53 µs; Newton =
+   flash within 6e-14 K; CoolProp agreement 1e-9 (R290, R134a, R32, R744).
    Pitfall seen while measuring: a closure capturing a non-`const` global refrigerant makes the
    same blow-up (515 s for `continuation`).
 

@@ -272,10 +272,50 @@ cp_pT(r::ClapeyronRefrigerant, p, T; phase = :unknown) = Clapeyron.isobaric_heat
 # isentropic           #
 ########################
 
-"Temperature [K] at pressure `p` and specific entropy `s` [J/kg/K] (p-s flash). `T0`: optional initial guess."
-T_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing) =
+"""
+    T_ps(r, p, s; phase = :unknown, T0 = nothing)
+
+Temperature [K] at pressure `p` and specific entropy `s` [J/kg/K]. `T0`: optional initial guess.
+
+With `phase = :vapor`, a vapour state below the critical pressure (`s ≥ s_dew(p)`, e.g. an
+isentropic compressor outlet) is solved by Newton in `T` at constant `p` (`ds = cp dT / T`), which
+reuses the single-phase functions of the model; any other case goes to Clapeyron's p-s flash.
+"""
+function T_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing)
+    if phase === :vapor
+        T = _T_ps_vapor(r, p, s, T0)
+        T === nothing || return T
+    end
+    # Clapeyron's flash behind an inference barrier: inferring it costs ≈ 16 s of compilation, paid
+    # only when it is actually called; its result (inferred `Any`) is converted to a concrete type
+    Tf = Base.inferencebarrier(_T_ps_flash)(r, p, s, phase, T0)
+    TT = promote_type(typeof(p), typeof(s), Float64)
+    return convert(TT, Tf)::TT
+end
+
+_T_ps_flash(r, p, s, phase, T0) =
     T0 === nothing ? Clapeyron.PS.temperature(r.eos, p, s * r.M, r.z; phase = phase) :
                      Clapeyron.PS.temperature(r.eos, p, s * r.M, r.z; phase = phase, T0 = T0)
+
+# Newton in T at constant p for a vapour state; `nothing` if the state is not a subcritical vapour
+# or if Newton does not converge (the caller then uses Clapeyron's flash). Iterates on the primal
+# values; the final step, with the Duals of `p` and `s`, gives the exact derivatives (implicit
+# function theorem: ∂T/∂s = T/cp, ∂T/∂p = -T/cp ∂s/∂p).
+function _T_ps_vapor(r::ClapeyronRefrigerant, p, s, T0)
+    pp, ss = _primal(p), _primal(s)
+    pp < r.pcrit || return nothing
+    Td = T_dew(r, pp)
+    (isfinite(Td) && ss >= s_dew(r, pp)) || return nothing
+    newton_step(p, s, T) = (s_pT(r, p, T; phase = :vapor) - s) * T / cp_pT(r, p, T; phase = :vapor)
+    # initial guess: constant cp from the dew point
+    T = T0 === nothing ? Td * exp((ss - s_dew(r, pp)) / cp_pT(r, pp, Td; phase = :vapor)) : float(_primal(T0))
+    for _ in 1:50
+        ΔT = newton_step(pp, ss, T)
+        T = max(T - ΔT, Td)
+        abs(ΔT) < 1e-10 * T && return T - newton_step(p, s, T)
+    end
+    return nothing
+end
 "Specific enthalpy [J/kg] at pressure `p` and specific entropy `s` (e.g. isentropic compressor outlet: `phase = :vapor`)."
 h_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing) = h_pT(r, p, T_ps(r, p, s; phase = phase, T0 = T0); phase = phase)
 
