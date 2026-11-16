@@ -80,9 +80,12 @@ node name => tuple of `component_name => port_name` pairs; every port belongs to
 node. A node listed in `fixed` (node name => physical value) is a known value, the others are
 unknowns.
 
-The unknowns, in ℝ, are a `ComponentVector` with one block per component that has internal
-unknowns, and a block `nodes` with the free nodes: build it with [`initial_guess`](@ref),
-evaluate with [`residual!`](@ref), and read the physical values with [`physical`](@ref).
+The unknowns, in ℝ, are a `Vector{Float64}`: the internal unknowns of each component (in the
+order of `components`), then the free nodes. Build it with [`initial_guess`](@ref), evaluate with
+[`residual!`](@ref), and read the physical values by name with [`physical`](@ref). The type of the
+system is inferred from the types of the components, so code that builds a system inside a
+function stays concretely typed (node transforms: all ports of a given transform type, e.g.
+`Free()`, give a concrete type).
 
 Example, evaporator coupled to a borehole:
 
@@ -90,7 +93,7 @@ Example, evaporator coupled to a borehole:
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout)))
 """
-struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <: Tuple, I <: Tuple, AX}
+struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <: Tuple, I <: Tuple}
     components::C
     blocks::B
     nodenames::NN           # Val((names...)): node names in the type, so that results keyed by them are inferred
@@ -98,7 +101,6 @@ struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <:
     nodefixed::F            # `nothing` (free) or the fixed value, per node
     nodeindex::I            # index in u of each free node (0 if fixed)
     n::Int
-    ax::AX
 end
 
 function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::NamedTuple = (;))
@@ -126,27 +128,31 @@ function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::Named
     end
     nodefixed = map(k -> haskey(fixed, k) ? Float64(fixed[k]) : nothing, nodenames)
 
-    # layout of u: components with internal unknowns, then the free nodes
-    uoff, roff = 0, 0
-    blocks = map(keys(components)) do cname
-        c = components[cname]
-        b = ComponentBlock(c, uoff, roff, Tuple(owner[(cname, p)] for p in keys(ports(c))),
-                           Tuple(float.(residual_scales(c))))
-        uoff += length(unknowns(c)); roff += nresiduals(c)
-        b
-    end
-    nodeindex = map(nodefixed) do v
-        v === nothing ? (uoff += 1) : 0
-    end
-    uoff == roff || throw(ArgumentError("system is not square: $uoff unknowns, $roff residuals"))
-
-    freenodes = Tuple(k for (k, v) in zip(nodenames, nodefixed) if v === nothing)
-    proto = (; (cname => NamedTuple{keys(unknowns(components[cname]))}(zeros(length(unknowns(components[cname]))))
-                for cname in keys(components) if !isempty(unknowns(components[cname])))...)
-    isempty(freenodes) || (proto = (; proto..., nodes = NamedTuple{freenodes}(zeros(length(freenodes)))))
-    ax = getaxes(ComponentVector(proto))
-    return ComponentSystem(components, blocks, Val(nodenames), nodetransforms, nodefixed, nodeindex, uoff, ax)
+    # layout of u: components with internal unknowns, then the free nodes. Built by recursion
+    # over the tuples (no counters captured in closures), so that the system type is inferred.
+    blocks = _blocks(keys(components), values(components), owner, 0, 0)
+    nu, nr = _block_sizes(blocks)
+    nodeindex = _node_index(nodefixed, nu + 1)
+    n = nu + count(v -> v === nothing, nodefixed)
+    n == nr || throw(ArgumentError("system is not square: $n unknowns, $nr residuals"))
+    return ComponentSystem(components, blocks, Val(nodenames), nodetransforms, nodefixed, nodeindex, n)
 end
+
+_blocks(::Tuple{}, ::Tuple{}, owner, uoff, roff) = ()
+function _blocks(names::Tuple, comps::Tuple, owner, uoff, roff)
+    c, cname = first(comps), first(names)
+    b = ComponentBlock(c, uoff, roff, map(p -> owner[(cname, p)], keys(ports(c))), map(float, residual_scales(c)))
+    return (b, _blocks(Base.tail(names), Base.tail(comps), owner, uoff + length(unknowns(c)), roff + nresiduals(c))...)
+end
+
+# number of internal unknowns and of residuals of all blocks
+_block_sizes(blocks) = (sum(b -> length(unknowns(b.component)), blocks; init = 0),
+                        sum(b -> length(b.scales), blocks; init = 0))
+
+# index in u of each free node (0 for a fixed node), from `next` on
+_node_index(::Tuple{}, next) = ()
+_node_index(fixed::Tuple, next) = first(fixed) === nothing ?
+    (next, _node_index(Base.tail(fixed), next + 1)...) : (0, _node_index(Base.tail(fixed), next)...)
 
 Base.length(sys::ComponentSystem) = sys.n
 
@@ -172,8 +178,8 @@ _port_values(b::ComponentBlock, nodevals) =
 """
     residual!(du, u, sys::ComponentSystem)
 
-Scaled residuals of the system at the unknowns `u` (in ℝ; a `ComponentVector` or any vector with
-the same layout). Signature compatible with `NonlinearProblem(f!, u0, sys)`.
+Scaled residuals of the system at the unknowns `u` (in ℝ, layout as in
+[`ComponentSystem`](@ref)). Signature compatible with `NonlinearProblem(f!, u0, sys)`.
 """
 function residual!(du, u, sys::ComponentSystem)
     nodevals = _node_values(sys, u)
@@ -192,12 +198,12 @@ end
 """
     initial_guess(sys::ComponentSystem; nodes = (;), <component name> = (; kwargs...), ...)
 
-Unknowns in ℝ (a `ComponentVector`) from physical values: for each component with internal
+Unknowns in ℝ (a `Vector{Float64}`) from physical values: for each component with internal
 unknowns, the keyword arguments of its [`guess`](@ref) method; `nodes`, the values of the free
 nodes.
 """
 function initial_guess(sys::ComponentSystem; nodes::NamedTuple = (;), kwargs...)
-    u = ComponentVector(zeros(sys.n), sys.ax)
+    u = zeros(sys.n)
     for b in sys.blocks
         ts = unknowns(b.component)
         isempty(ts) && continue
