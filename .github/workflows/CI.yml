@@ -1,6 +1,6 @@
 name: CI
-# Private repo: Actions minutes are limited (2000/month). Run on PRs only (a merge commit was
-# already tested on its PR), skip docs-only changes, and run 'pre' only on manual dispatch.
+# Keep CI fast and lean: run on PRs only (a merge commit was already tested on its PR), skip
+# docs-only changes, and run 'pre' only on manual dispatch.
 on:
   pull_request:
     paths-ignore:

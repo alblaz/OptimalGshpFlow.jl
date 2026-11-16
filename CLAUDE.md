@@ -16,9 +16,14 @@ Read it at the start of a session and update it when a branch is finished.
   second commit.
 - Open PRs with `/opt/homebrew/bin/gh` (it is not on the PATH of the Bash tool). PR bodies
   end with the Claude Code attribution line.
-- CI minutes are limited (private repo, 2000 min/month): CI runs on PRs only, without `pre`.
-  Before asking to merge, run the test suite locally on Julia 1.10 (`julia_cmd = "julia +1.10"`)
-  and on the release, and report both in the PR body. Avoid reruns and diagnostic pushes.
+- Keep CI fast: it runs on PRs only (Julia 1 and 1.10; `pre` on manual dispatch,
+  `gh workflow run CI --ref <branch>`), not for docs-only changes. Local test runs are optional
+  (1.10: `julia_cmd = "julia +1.10"`); avoid needless reruns and diagnostic pushes.
+- Efficiency is a requirement, for the code and for the tests: no unnecessary compile-time or
+  runtime overhead. New code must infer concretely when called from inside a function (check with
+  JET `@report_opt` / `@inferred`, see Julia below); tests must stay cheap (small cases, shared
+  setup, no needless new specializations, e.g. closures over non-`const` globals or boxed
+  variables in `@testset`). Report compile and run time when a change may affect them.
 - Never discard uncommitted work: no `git reset --hard` or `git checkout -- .` with a dirty
   tree; use `git stash` or a separate worktree.
 - `assets/docs/` holds reference papers (gitignored): Qiao 2025 on ε-NTU with glide, and an
