@@ -418,6 +418,14 @@ Goal (agreed 2026-11-13): port `examples/heatpumpborehole_optimalflowrate.jl` (t
 is named after: COP vs brine flow, evaporator + borehole, R290, ground −5 °C, ΔTsup 3.5 K) to the
 component API, validate it against the original pipeline, and fix the gaps it exposes.
 
+Purpose of the study (user, 2026-11-16): how the optimal brine flow changes over the heating
+season. The ground temperature `Tb` is highest at the start of the season and decreases during
+extraction; this moves the heat-pump operating point (evaporation temperature, capacity) and the
+brine viscosity, hence the flow regime, the heat transfer and the hydraulic performance. So the
+study is a sweep over a range of `Tb`, not one value: the −5 °C of the original script is one end
+(undisturbed ground is ≈ 8–9 °C in e.g. Stockholm; designs keep the brine ≥ 0 °C over the
+lifetime). Next step: optimal flow vs `Tb` (e.g. 9 → −5 °C) with `set_fixed` (8a) and warm starts.
+
 Content:
 - `src/compressor.jl`: `compressor_power` / `condenser_power` accept any `AbstractRefrigerant`
   (`compression(r, pe, Tsuc, pc, ηis)`; spline backend keeps the original CoolProp-by-name calls,
