@@ -158,7 +158,7 @@ Borehole heat exchanger (Hellström, uniform borehole wall temperature `Tb`), as
 [`borehole_model!`](@ref).
 
 - Ports: `Tin`, `Tout` (secondary fluid) and `Tb`, the ground (borehole wall) temperature:
-  usually a fixed node, e.g. `nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = 268.15,)`.
+  usually a fixed node, e.g. `nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = 281.15,)` (8 °C).
   Change it with [`set_fixed`](@ref) (same system type, nothing recompiled), or connect it to a
   component that computes it (e.g. a dynamic ground model).
 - No internal unknowns; one residual `kin Tin - Tout + (1 - kin) Tb` [K], with the coefficient

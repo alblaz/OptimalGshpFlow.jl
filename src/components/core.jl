@@ -93,7 +93,7 @@ Example, evaporator coupled to a borehole:
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
                  T_ground = (:borehole => :Tb,)),
-        fixed = (T_ground = 268.15,))
+        fixed = (T_ground = 281.15,))         # undisturbed ground, e.g. ≈ 8 °C (Stockholm)
 
 Fixed values are changed with [`set_fixed`](@ref).
 """
