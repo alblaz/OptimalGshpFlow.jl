@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-16 (feature/tb-port).
+Last updated: 2026-11-16 (feature/optimal-flow-vs-tb).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -32,6 +32,7 @@ unconstrained solvers can be used.
 | T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
 | P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
 | P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | merged (#43) |
+| 6d | `feature/optimal-flow-vs-tb` | the optimal-flow study as a sweep over the ground temperature (`study_tb`, 9 → −5 °C) | PR #45 |
 | B9 | `fix/spline-study-compile` | spline `Refrigerant` had untyped fields (all property calls `Any`): first call of the spline study ≈ 450 → 4.9 s | PR #46 |
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | PR #44 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
@@ -545,6 +546,39 @@ Open:
    ΔTb = -0.1 K, warm start from the previous `u`: 1.3 ms and 3 Newton iterations per step (R290,
    NewtonRaphson). `BoreholeHX(…; Tb)` now throws an `ArgumentError` pointing to the node.
 
+## `feature/optimal-flow-vs-tb` (results 2026-11-16)
+`examples/optimalflow_components.jl`: `study_tb(r; Tbs = 9 → −5 °C)` runs the flow sweep of `study`
+(2 → 0.1 × design) at each ground temperature. A continuation in `Tb` at the first flow gives the
+warm start of each sweep. `optimum(rows, :COP1)` refines the best grid point with a parabola through
+its neighbours (no extra solves; valid points only). `report_tb` prints the table. Shared
+post-processing (`postprocess`) now also gives the borehole Reynolds number.
+
+Results (spline R290, same settings as the study; 15 Tb × 39 flows, 1.7 s after compilation):
+
+| Tb [°C] | Vf* COP1 | COP1* | Re at opt. | Te [°C] | Vf* COP2 | COP2* |
+|---|---|---|---|---|---|---|
+| 9 | 0.97 | 4.374 | 2940 | 0.3 | 1.00 | 3.478 |
+| 5 | 1.07 | 3.972 | 2670 | −3.2 | 1.10 | 3.082 |
+| 1 | 1.24 | 3.586 | 2610 | −6.5 | 1.26 | 2.714 |
+| 0 | 0.67 | 3.515 | 1190 | −9.3 | 1.32 | 2.625 |
+| −1 | 0.65 | 3.451 | 1130 | −10.1 | 0.72 | 2.543 |
+| −5 | 0.57 | 3.209 | 770 | −13.7 | 0.64 | 2.302 |
+
+- Two local COP maxima: one just above the laminar–turbulent transition (Re ≈ 2600–2900, the
+  extra heat transfer pays for the pumping) and one in laminar flow (Re < 1200). In warm ground
+  the transitional one wins and the optimal flow *rises* as the ground cools (0.97 → 1.24 ×
+  design from 9 to 1 °C: the brine gets more viscous, so more flow is needed to stay above the
+  transition). Between 1 and 0 °C (COP1) or 0 and −1 °C (COP2) the laminar maximum takes over and
+  the optimal flow jumps down to ≈ 0.65–0.7 × design, then falls slowly (0.57 × at −5 °C).
+- At −5 °C it reproduces `study` (COP1 = 3.209 at 0.570 ×, grid point 0.55 ×).
+- The transitional maximum sits where the Nusselt blend (linear in Re from 2300) is steep, so its
+  position depends on the transition model (see the Te kink of B7); a C¹ Nusselt blend (Gnielinski)
+  is worth checking before drawing design conclusions.
+
+**Regression found (pre-existing on main 669de5b):** the first call of `study(Refrigerant("R290"))`
+(spline backend), even with 3 flows, takes ≈ 445 s in a fresh session (was 14 s, before B8); the
+call after is fast. JET `@report_opt` on it did not finish in 15 min (inference blow-up). To fix in
+its own `fix/` branch.
 ## `fix/spline-study-compile` (2026-11-18)
 First call of `study(Refrigerant("R290"))` (spline backend, fresh session, Julia 1.13.3): ≈ 450 s,
 same on main 669de5b; the 14 s of the table above was measured earlier (probably on another Julia
