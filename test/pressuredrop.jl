@@ -62,3 +62,18 @@ end
                                 3., 272., 276., 281.15, V, 1.5e3, 6e3, 0.1)
     @test pressure_drop(bs_sharp, sf) ≈ pressure_drop(400., V, 0.0376, sf, 274.; transition = SharpTransition())
 end
+
+# Plate evaporator, brine side: the channel cross-section is width × gap (W b per channel), as in
+# the heat transfer correlation (V/(H W)); it used the plate length L instead of W.
+@testset "plate pressure drop: channel velocity" begin
+    sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), "INCOMP::MEA-28%")
+    phx = PlateHeatExchanger(1.5, 0.5, 0.15)                # L = 0.5 m, W = 0.15 m
+    V, T = 4e-4, 274.
+    Nc = (phx.np - 1)/2
+    dh = 2phx.b/phx.ϕ
+    v = V/(phx.W * phx.b * Nc)
+    @test v ≈ V/(phx.H * phx.W)                             # same velocity as h_platehex_wanniarachchi
+    Re = sf.ρ(T) * v * dh / sf.μ(T)
+    Δp_ref = OptimalGshpFlow.f_Martin(Re, phx.β) * phx.L/dh * v^2 * sf.ρ(T)/2
+    @test pressure_drop_evap(V, phx, sf, T) ≈ Δp_ref
+end
