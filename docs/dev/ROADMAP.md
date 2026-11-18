@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-18 (fix/dittus-boelter-exponent).
+Last updated: 2026-11-18 (feature/gnielinski-default).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -36,7 +36,8 @@ unconstrained solvers can be used.
 | B9 | `fix/spline-study-compile` | spline `Refrigerant` had untyped fields (all property calls `Any`): first call of the spline study ≈ 450 → 4.9 s | merged (#46) |
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
-| B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | PR #49 |
+| B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
+| 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | PR #50 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -61,7 +62,8 @@ B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the r
 
 ## Decisions
 - Composition framework: lightweight custom layer, not ModelingToolkit (MTK is evaluated in step 7).
-- Laminar-turbulent transition: keep both models; the smooth one is the default.
+- Laminar-turbulent transition: keep all models; `GnielinskiTransition()` (C¹) is the default since
+  2026-11-18 (before: `SmoothTransition()`, B6). Results recorded before that date use the old default.
 - Transport properties: CoolProp for pure fluids (reference values), EntropyScaling for mixtures.
 - Keep the legacy code on the `legacy` branch.
 
@@ -649,3 +651,11 @@ every model above Re = 1e4 except `GnielinskiTransition`. Effect on the optimal-
 "linear, DB `Pr^0.4`" column above: laminar branch and cold-ground results unchanged; warm ground
 COP1 +0.5 % (4.374 → 4.396 at 9 °C), optimal flow −0.02…−0.05 × design; COP1 switch still between
 1 and 0 °C, COP2 switch moves from 0/−1 to −1/−2 °C.
+
+## `feature/gnielinski-default` (6f, 2026-11-18)
+Default `transition` of `SingleUPipeBorehole`, `nusselt_circularpipe`, `h_circularpipe`, `fDarcy`,
+`pressure_drop` and `pumping_power`: `SmoothTransition()` → `GnielinskiTransition()`. The friction
+factor is the same for both, so only the borehole heat transfer changes (Re ≥ 2300). The study
+results under the new default are the "Gnielinski C¹" column of #48: COP1 optimum 1.10 × design
+(4.305) at 9 °C, switch to the laminar branch between 5 and 4 °C, unchanged below ≈ 2 °C
+(−5 °C: 0.55 ×, 3.209). The tables of #45 and B7 above were computed with `SmoothTransition()`.

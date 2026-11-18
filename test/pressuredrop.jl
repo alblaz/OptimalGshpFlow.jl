@@ -27,7 +27,7 @@ end
     fturb(Re) = (1 / (0.838 * OptimalGshpFlow.lambertw(0.629 * Re)))^2
     for Re in (1500., 2299., 2300., 3000., 3999., 4000., 2e4)
         @test fD(Re, SharpTransition()) == (Re < 2300 ? 64 / Re : fturb(Re))
-        @test fD(Re) == fD(Re, SmoothTransition())
+        @test fD(Re) == fD(Re, GnielinskiTransition()) == fD(Re, SmoothTransition())
         Re ≥ 4000 && @test fD(Re) == fturb(Re)
     end
     @test fD(2300. + 1e-6, SharpTransition()) > 1.6 * fD(2300. - 1e-6, SharpTransition())

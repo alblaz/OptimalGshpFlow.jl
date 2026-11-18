@@ -95,7 +95,7 @@ first_guess(S, Tb) = initial_guess(S; evaporator = (Te = Tb - 8, Qe = 0.9DESIGN.
 
 Continuation in the brine flow, from `first(flows)` down; one row per flow with the physical
 solution, the performance and the validity issues. `bh`: the borehole, e.g.
-`SingleUPipeBorehole(BOREHOLE; transition = GnielinskiTransition())` for another heat-transfer
+`SingleUPipeBorehole(BOREHOLE; transition = SmoothTransition())` for another heat-transfer
 model in the laminar-turbulent transition.
 """
 function study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, alg = TrustRegion())
