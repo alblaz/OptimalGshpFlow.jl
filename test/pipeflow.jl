@@ -57,3 +57,27 @@ end
     @test k_sharp(mf_trans) != k_smooth(mf_trans)
     @test k_sharp(mf_lam) == k_smooth(mf_lam)
 end
+
+# Gnielinski (VDI 2013) turbulent branch joined to the laminar value by a C¹ blend
+@testset "GnielinskiTransition" begin
+    Nu = OptimalGshpFlow.nusselt_circularpipe
+    G = GnielinskiTransition()
+    gn(Re, Pr) = (ξ = (1.8 * log10(Re) - 1.5)^(-2); (ξ/8) * Re * Pr / (1 + 12.7 * sqrt(ξ/8) * (Pr^(2/3) - 1)))
+    for Pr in (0.7, 7., 30.)
+        f = Re -> Nu(Re, Pr; transition = G)
+        @test f(1500.) == 3.657
+        @test f(2e4) ≈ gn(2e4, Pr)
+        @test f(1e4) ≈ gn(1e4, Pr)
+        # analytic slope of the turbulent correlation
+        @test OptimalGshpFlow.dnusselt_gnielinski2013(1e4, Pr) ≈ dderivative(Re -> gn(Re, Pr), 1e4)
+        # C¹: value and slope continuous at both ends of the transition range
+        δ = 1e-6
+        for Rec in (2300., 1e4)
+            @test f(Rec - δ) ≈ f(Rec + δ) rtol = 1e-6
+            @test dderivative(f, Rec - δ) ≈ dderivative(f, Rec + δ) rtol = 1e-5 atol = 1e-9
+        end
+        Res = range(500., 3e4, 500)
+        @test all(diff(f.(Res)) .>= 0)
+    end
+    @test SingleUPipeBorehole(H = 200., D = 4., transition = G).transition isa GnielinskiTransition
+end
