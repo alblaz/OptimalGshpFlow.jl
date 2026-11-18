@@ -106,6 +106,67 @@ Plus manifold/port losses (≈ 1.5 velocity heads, as in Shah & Focke) and the a
   equation. Their finding: at high saturation temperature all general correlations (Amalfi
   included) overpredict strongly; Amalfi's refrigerant data cover T_sat −3…35 °C, our evaporation
   is ≈ −6…−14 °C, slightly below: one more reason for the comparison with Longo.
+- **Amalfi, Vakili-Farahani & Thome 2016** (Int. J. Refrig. 61; parts 1 and 2 in `assets/docs`):
+  - frictional (part 1 eq. 18): `Δp_f = 2 f_tp L_p G²/(d_h ρ_m)`, `ρ_m` homogeneous at the mean
+    quality `x_m` (part 1 eq. 17: `1/ρ_m = x_m/ρ_v + (1−x_m)/ρ_l`), `d_h = 2b/ϕ` (part 1 eq. 6,
+    `b` the gap = 2 × corrugation amplitude: our `PlateHeatExchanger.b`);
+  - `f_tp = C · 15.698 · We_m^−0.475 · Bd^0.255 · ρ*^−0.571` (part 2 eq. 7),
+    `C = 2.125 β*^9.993 + 0.955` (eq. 8), `β* = β/70°`, β the chevron angle from the flow
+    (vertical) axis, as Martin's angle in `f_Martin` (our `PlateHeatExchanger.β`);
+    `We_m = G² d_h/(ρ_m σ)`, `Bd = (ρ_l − ρ_v) g d_h²/σ`, `ρ* = ρ_l/ρ_v` (part 2 eq. 5);
+  - fit: 1513 points, MAE 21.5 %, 90.9 % within ±50 %; refrigerants T_sat −3…35 °C;
+  - other terms (part 1 eqs. 8–11): `Δp = Δp_g + Δp_acc + Δp_f + Δp_p`, `Δp_g = ρ_m g L_p`,
+    `Δp_acc = G² Δx (1/ρ_v − 1/ρ_l)`, ports and manifolds (Shah & Focke)
+    `Δp_p = 0.75 N_pass [(G_p²/2ρ)_in + (G_p²/2ρ)_out]`, `G_p` the port mass flux.
+  - Needs the surface tension σ (not in the refrigerant interface yet: CoolProp `I` through the
+    cached state, which also handles Duals by finite differences).
+- **Longo et al. 2016** (Appl. Therm. Eng. 108, 1401–1408): same BPHE family as their R290 work
+  (L = 278 mm, W = 72 mm, chevron 65°, corrugation depth b = 2 mm, pitch 8 mm, 10 plates,
+  `d_h = 2b` without enlargement factor); `Δp_f [kPa] = 1.667 KE/V [J m⁻³]`, `KE/V = G²/(2ρ_m)`
+  (eqs. 22–23), MAPD 10.8 %, **fitted to HFC404A at 20 °C**; HC290 and HC1270 lie above HFC404A
+  at the same mass flux (Fig. 11) but their own fit is in **Longo 2012** (ASME J. Heat Transfer
+  134, 101801, "Hydrocarbon refrigerant vaporisation inside a brazed plate heat exchanger"),
+  not in the folder. Longo et al. 2023 (local HTC of R290/R1270) refers to Longo 2012 for the
+  pressure drop. To transfer a KE/V fit to another plate: `Δp_f = ζ KE/V` with `ζ = 4 f_eq L/d_h`,
+  i.e. an equivalent constant Fanning factor `f_eq = ζ_ref d_h,ref/(4 L_ref)` (HFC404A:
+  ζ = 1667, f_eq ≈ 6.0): an assumption to state.
+- **Q1 comparison status**: Amalfi can be implemented now; the R290-specific comparison needs
+  Longo 2012 (or the Longo et al. 2015 computational procedure, IJHMT, if it gives Δp).
+
+## Open questions
+- **Q1** Pressure-drop correlation: Amalfi et al. 2016 (general, recommended) or Longo (R290
+  specific), or one you already use? Include port/manifold losses?
+- **Q2** Eliminate `ϵe` (recommended) or keep it with a wider bound?
+- **Q3** Also the superheat-zone pressure drop and the lower suction pressure in the compressor
+  (recommended: yes, it is part of the same effect on COP)?
+- **Q4** Plate geometry for the refrigerant side: the `PlateHeatExchanger` has the brine-side
+  data (plates, gap `b`, enlargement `ϕ`, chevron `β`); same channels for the refrigerant
+  (symmetric BPHE), or separate data?
+
+## Decisions (user, 2026-11-18)
+- **Q1**: implement the general correlation (Amalfi et al. 2016) **and** the R290-specific one
+  (Longo) and compare them on our operating range; if they agree, use the general one.
+- **Q2**: eliminate `ϵe`. The set of unknowns is then **the same with and without** the
+  refrigerant pressure drop (γ = 0 gives `ε = 1 − e^{−NTU}` explicitly): the pressure drop is a
+  model option of the `Evaporator` (e.g. `refrigerant_pressure_drop = nothing | Amalfi() |
+  Longo()`), so the two cases can be compared at the same points, with the same guesses, or by a
+  continuation that scales the pressure drop from 0 to 1. A test locks that the option off
+  reproduces the current model.
+- **Q3**: yes, superheat-zone pressure drop and suction pressure in the compressor.
+- **Q4**: same channels for both fluids (brazed plates stacked: symmetric geometry), i.e. the
+  `PlateHeatExchanger` data serve both sides.
+
+## Sources found so far
+- Desideri et al. 2017 (Int. J. Heat Mass Transfer 113, 6–21; open access, DTU Orbit) gives the
+  non-frictional terms used in BPHE data reduction (from Claesson): momentum
+  `Δp_mom = G² (1/ρ_tp,out − 1/ρ_tp,in)` with the homogeneous density
+  `ρ_tp = (x/ρ_v + (1−x)/ρ_l)⁻¹` (eqs. 16–17); gravity `ρ_m g L_p` (18–19); manifolds and ports
+  `Δp_mp = 1.5 G_port²/(2ρ_m)` (20); and the Longo-type frictional form
+  `Δp_f = C G²/(2ρ_m)` (linear in the kinetic energy per unit volume, eq. 38–39; their C = 138
+  is fitted to ORC fluids at 100–130 °C, **not** Longo's R290 value). It does not give Amalfi's
+  equation. Their finding: at high saturation temperature all general correlations (Amalfi
+  included) overpredict strongly; Amalfi's refrigerant data cover T_sat −3…35 °C, our evaporation
+  is ≈ −6…−14 °C, slightly below: one more reason for the comparison with Longo.
 - Still needed (exact equations): Amalfi, Vakili-Farahani & Thome 2016, Int. J. Refrig. 61,
   185–203 (part 2, frictional pressure gradient); Longo et al., R290 (HC290) vaporisation in BPHE
   (frictional constant of the kinetic-energy correlation, and its geometry/range).
