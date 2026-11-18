@@ -5,6 +5,7 @@ using CoolProp, Interpolations
 using StaticArrays, Parameters, ExponentialUtilities
 using RequiredInterfaces
 using LambertW
+using SpecialFunctions: expint
 import Clapeyron, EntropyScaling, ForwardDiff
 
 include("utilities.jl")
@@ -45,6 +46,7 @@ include("evaporator_formulations.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
+include("ground.jl")
 include("components/core.jl")
 include("components/evaporator.jl")
 
@@ -85,6 +87,7 @@ export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
 export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
 export pressure_drop, pumping_power
+export ILS, InfiniteLineSource, borehole_wall_temperature
 
 __init__() = _init_coolprop_indices()
 
