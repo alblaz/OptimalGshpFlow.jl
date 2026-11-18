@@ -124,3 +124,42 @@ function pumping_power(η, H, V, D, fluidproperties, T; transition::NusseltTrans
     P = Δp * V / η
     return P
 end
+#############################################
+# pressure drop and pumping power of solutions
+#############################################
+
+"""
+    pressure_drop(es::EvaporatorSolution, sf::SecondaryFluid)
+    pressure_drop(bs::BoreholeSolution, sf::SecondaryFluid)
+
+Secondary-fluid (brine) pressure drop [Pa] of a solved component:
+- evaporator: plate heat exchanger ([`pressure_drop_evap`](@ref), Martin), at the brine flow and the
+  mean brine temperature of the solution;
+- borehole (single U-pipe): pipe of length `2H` and diameter `2rpi` ([`pressure_drop`](@ref)), at
+  the mean of the inlet and outlet temperatures, with the borehole's `transition` model.
+
+`sf` is the secondary fluid the component was solved with (solutions do not store it).
+"""
+function pressure_drop(es::EvaporatorSolution, sf::SecondaryFluid)
+    Tmean = (es.superheat_region.Thh + es.twophase_region.Thl)/2
+    return pressure_drop_evap(es.superheat_region.Vh, es.plateheatexchanger, sf, Tmean)
+end
+
+function pressure_drop(bs::BoreholeSolution{<:SingleUPipeBorehole}, sf::SecondaryFluid)
+    bh = bs.borehole
+    return pressure_drop(2bh.H, bs.Vs, 2bh.rpi, sf, (bs.Tin + bs.Tout)/2; transition = bh.transition)
+end
+
+_brine_flow(es::EvaporatorSolution) = es.superheat_region.Vh
+_brine_flow(bs::BoreholeSolution) = bs.Vs
+
+"""
+    pumping_power(s, sf::SecondaryFluid, η)
+
+Pumping power [W] for the brine pressure drop of the solved component `s` (an
+`EvaporatorSolution` or a `BoreholeSolution`, see [`pressure_drop`](@ref)) at its brine flow, with
+pump efficiency `η`. For a loop, sum the components, e.g.
+`pumping_power(es, sf, η) + pumping_power(bs, sf, η)`.
+"""
+pumping_power(s::Union{EvaporatorSolution, BoreholeSolution}, sf::SecondaryFluid, η) =
+    pumping_power(pressure_drop(s, sf), _brine_flow(s), η)

@@ -39,3 +39,26 @@ end
     @test pumping_power(0.3, H, V3000, D, sf, T; transition = SharpTransition()) ≈
           pressure_drop(H, V3000, D, sf, T; transition = SharpTransition()) * V3000 / 0.3
 end
+
+# Pressure drop and pumping power of solved components (secondary-fluid loop)
+@testset "pressure drop and pumping power of solutions" begin
+    sf  = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), "INCOMP::MEA-28%")
+    phx = PlateHeatExchanger(1.5, 0.5, 0.15)
+    bh  = SingleUPipeBorehole(H = 200., D = 4., rpi = 0.0188)
+    V   = 4e-4
+    hx(Q, Thh, Thl) = HeatExchangerSolution(Q, Thh, Thl, 270., 268., 1e3, 1e3, V, 1e-4, 1e3, 1e3, 300., 0.6, 1.0)
+    es  = OptimalGshpFlow.EvaporatorSolution(phx, 0.9, hx(5e3, 275., 272.), hx(300., 276., 275.))
+    bs  = BoreholeSolution(bh, 3., 272., 276., 281.15, V, 1.5e3, 6e3, 0.1)
+    Δp_e = pressure_drop_evap(V, phx, sf, (276. + 272.)/2)
+    Δp_b = pressure_drop(400., V, 0.0376, sf, 274.; transition = bh.transition)
+    @test pressure_drop(es, sf) == Δp_e
+    @test pressure_drop(bs, sf) ≈ Δp_b
+    @test pumping_power(es, sf, 0.3) ≈ Δp_e * V / 0.3
+    @test pumping_power(bs, sf, 0.3) ≈ Δp_b * V / 0.3
+    @test (@inferred pumping_power(es, sf, 0.3)) isa Float64
+    @test (@inferred pumping_power(bs, sf, 0.3)) isa Float64
+    # the borehole's transition model reaches the friction factor
+    bs_sharp = BoreholeSolution(SingleUPipeBorehole(H = 200., D = 4., rpi = 0.0188, transition = SharpTransition()),
+                                3., 272., 276., 281.15, V, 1.5e3, 6e3, 0.1)
+    @test pressure_drop(bs_sharp, sf) ≈ pressure_drop(400., V, 0.0376, sf, 274.; transition = SharpTransition())
+end

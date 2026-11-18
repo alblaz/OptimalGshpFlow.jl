@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-18 (feature/gnielinski-default).
+Last updated: 2026-11-18 (feature/pump-power).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -37,7 +37,8 @@ unconstrained solvers can be used.
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
-| 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | PR #50 |
+| 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
+| 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | PR #51 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -543,7 +544,10 @@ Open:
    Clapeyron's code paths (same type for all pure fluids, nothing duplicated): a package
    precompile workload would cut it (≈ 102 → 42 s) but was dropped (P1, item 1). Rule for new tests:
    differentiate through the helpers, not `ForwardDiff.*` on closures.
-4. Possible follow-ups: pump-power helper in the library. ~~`Tb` as a port~~ (8a, 2026-11-16):
+4. ~~Pump-power helper in the library~~ (4b, 2026-11-18): `pressure_drop(es_or_bs, sf)` and
+   `pumping_power(es_or_bs, sf, η)` for an `EvaporatorSolution` (plates, Martin, mean brine
+   temperature) or a `BoreholeSolution` (U-pipe 2H, its `transition`); the example sums the two,
+   same values as before. ~~`Tb` as a port~~ (8a, 2026-11-16):
    `BoreholeHX` has ports `Tin`, `Tout`, `Tb`; `Tb` is usually a fixed node
    (`T_ground = (:borehole => :Tb,)`, `fixed = (T_ground = …,)`), and `set_fixed(sys; T_ground = …)`
    returns a copy of the same type (≈ 1.6 µs, no allocation, nothing recompiled). Time steps with
