@@ -228,10 +228,11 @@ nodes.
 """
 function initial_guess(sys::ComponentSystem; nodes::NamedTuple = (;), kwargs...)
     u = zeros(sys.n)
-    for b in sys.blocks
+    # blocks are in the order of the components (no identity search: `===` on a large inline
+    # immutable block was seen to return false for the same value on Julia 1.13)
+    for (cname, b) in zip(keys(sys.components), sys.blocks)
         ts = unknowns(b.component)
         isempty(ts) && continue
-        cname = _block_name(sys, b)
         x = guess(b.component; get(kwargs, cname, (;))...)
         keys(x) == keys(ts) || throw(ArgumentError("guess for $cname has keys $(keys(x)), expected $(keys(ts))"))
         for (i, (t, xi)) in enumerate(zip(values(ts), values(x)))
@@ -245,9 +246,6 @@ function initial_guess(sys::ComponentSystem; nodes::NamedTuple = (;), kwargs...)
     end
     return u
 end
-
-_block_name(sys::ComponentSystem, b::ComponentBlock) =
-    keys(sys.components)[findfirst(x -> x === b, sys.blocks)]
 
 """
     physical(sys::ComponentSystem, u) -> NamedTuple

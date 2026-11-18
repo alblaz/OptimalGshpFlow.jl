@@ -78,25 +78,24 @@ function secondary_fluid(Trange, secondaryfluid_name)
 end
 
 
-struct RefrigerantSaturatedVapor
-    h
-    T
-    ρ
-    cp
-    μ
-    λ
-    s
- end
+struct RefrigerantSaturatedVapor{S}
+    h::S
+    T::S
+    ρ::S
+    cp::S
+    μ::S
+    λ::S
+    s::S
+end
 
- struct RefrigerantSuperHeatedVapor
-    h
-    ρ
-    cp
-    μ
-    λ
-    s
-    # his
- end
+struct RefrigerantSuperHeatedVapor{S}
+    h::S
+    ρ::S
+    cp::S
+    μ::S
+    λ::S
+    s::S
+end
 
 """
   struct Refrigerant
@@ -111,15 +110,15 @@ struct RefrigerantSaturatedVapor
   - `pmin`, `pmax`: sampled pressure range [Pa] (the [`pressure_bounds`](@ref))
 
 """
-struct Refrigerant <: AbstractRefrigerant
+struct Refrigerant{SV <: RefrigerantSaturatedVapor, SH <: RefrigerantSuperHeatedVapor} <: AbstractRefrigerant
     name::String
-    saturated_vapor::RefrigerantSaturatedVapor
-    superheated_vapor::RefrigerantSuperHeatedVapor
-    pcrit
-    pr_min
-    M
-    pmin    # sampled pressure range [Pa], see log10p_grid
-    pmax
+    saturated_vapor::SV
+    superheated_vapor::SH
+    pcrit::Float64
+    pr_min::Float64
+    M::Float64
+    pmin::Float64    # sampled pressure range [Pa], see log10p_grid
+    pmax::Float64
 end
 
 """
