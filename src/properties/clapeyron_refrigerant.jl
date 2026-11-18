@@ -348,22 +348,9 @@ _transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
 
 _coolprop_key(prop) = prop === :viscosity ? COOLPROP_V : COOLPROP_L
 
-
-# CoolProp output for the input pair (x1, x2); for ForwardDiff.Dual inputs the derivatives are
-# central differences with relative steps rel1, rel2
-function _coolprop(cs::CoolPropState, pair, key, x1, x2, rel1, rel2)
-    (x1 isa ForwardDiff.Dual || x2 isa ForwardDiff.Dual) || return _coolprop_value(cs, pair, key, x1, x2)
-    a, b = ForwardDiff.value(x1), ForwardDiff.value(x2)
-    f = _coolprop_value(cs, pair, key, a, b)
-    D = x1 isa ForwardDiff.Dual ? typeof(x1) : typeof(x2)
-    ∂ = zero(ForwardDiff.partials(one(D)))
-    if x1 isa ForwardDiff.Dual
-        h = rel1 * a
-        ∂ += (_coolprop_value(cs, pair, key, a + h, b) - _coolprop_value(cs, pair, key, a - h, b)) / (2h) * ForwardDiff.partials(x1)
-    end
-    if x2 isa ForwardDiff.Dual
-        h = rel2 * b
-        ∂ += (_coolprop_value(cs, pair, key, a, b + h) - _coolprop_value(cs, pair, key, a, b - h)) / (2h) * ForwardDiff.partials(x2)
-    end
-    return D(f, ∂)
+# surface tension: CoolProp (pure fluids with CoolProp transport)
+function surface_tension(r::ClapeyronRefrigerant, p)
+    cs = r.transport_model
+    cs isa CoolPropState || throw(ArgumentError("surface_tension needs a pure fluid with CoolPropTransport"))
+    return _coolprop(cs, COOLPROP_PQ, COOLPROP_I, p, 0.0, 1e-6, 0.0)
 end

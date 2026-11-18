@@ -329,3 +329,7 @@ s_pT(r::Refrigerant, p, T; phase = :vapor)  = s_superheated(r, p, _spline_superh
 cp_pT(r::Refrigerant, p, T; phase = :vapor) = cp_superheated(r, p, _spline_superheat(r, p, T, phase))
 μ_pT(r::Refrigerant, p, T; phase = :vapor)  = μ_superheated(r, p, _spline_superheat(r, p, T, phase))
 λ_pT(r::Refrigerant, p, T; phase = :vapor)  = λ_superheated(r, p, _spline_superheat(r, p, T, phase))
+
+# saturated liquid (not sampled by the splines): CoolProp through the cached state
+ρ_bubble(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_D, p, 0.0, 1e-6, 0.0)
+surface_tension(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_I, p, 0.0, 1e-6, 0.0)

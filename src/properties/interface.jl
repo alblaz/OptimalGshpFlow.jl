@@ -72,6 +72,7 @@ function s_dew end
 function cp_dew end
 function μ_dew end
 function λ_dew end
+function surface_tension end   # saturated liquid, at the pressure p [N/m]
 
 # single phase at (p, T); keyword `phase = :unknown | :vapor | :liquid`
 function h_pT end
