@@ -42,7 +42,7 @@ unconstrained solvers can be used.
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
-| 8b | `feature/ils-ground` | first dynamic ground model: infinite line source with temporal superposition, explicit coupling over a heating season (`examples/season_ils.jl`) | in progress |
+| 8b | `feature/ils-ground` | first dynamic ground model: infinite line source with temporal superposition, explicit coupling over a heating season (`examples/season_ils.jl`) | PR #52 |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
