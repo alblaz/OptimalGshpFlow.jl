@@ -46,6 +46,11 @@ end
     r   = ClapeyronRefrigerant("R290")
     @test allconcrete(sf)
     @test (@inferred (s -> s.ρ(270.))(sf)) isa Float64
+    # spline refrigerant: untyped fields made every property call `Any`; a study calling it inside
+    # a function then took ≈ 450 s to compile (backedges for abstract calls, Julia 1.13)
+    @test allconcrete(SPL_R290) && allconcrete(SPL_R290.saturated_vapor) && allconcrete(SPL_R290.superheated_vapor)
+    @test (@inferred T_dew(SPL_R290, 4e5)) isa Float64
+    @test (@inferred h_pT(SPL_R290, 4e5, 270.; phase = :vapor)) isa Float64
 
     p = EvaporatorParameters(refrigerant = r, secondaryfluid = sf, plateheatexchanger = phx, hei = ev.hei,
                              Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., Ts_h = 278.)

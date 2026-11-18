@@ -32,8 +32,9 @@ unconstrained solvers can be used.
 | T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
 | P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
 | P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | merged (#43) |
-| 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
 | 6d | `feature/optimal-flow-vs-tb` | the optimal-flow study as a sweep over the ground temperature (`study_tb`, 9 → −5 °C) | PR #45 |
+| B9 | `fix/spline-study-compile` | spline `Refrigerant` had untyped fields (all property calls `Any`): first call of the spline study ≈ 450 → 4.9 s | PR #46 |
+| 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | PR #44 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -578,3 +579,20 @@ Results (spline R290, same settings as the study; 15 Tb × 39 flows, 1.7 s after
 (spline backend), even with 3 flows, takes ≈ 445 s in a fresh session (was 14 s, before B8); the
 call after is fast. JET `@report_opt` on it did not finish in 15 min (inference blow-up). To fix in
 its own `fix/` branch.
+## `fix/spline-study-compile` (2026-11-18)
+First call of `study(Refrigerant("R290"))` (spline backend, fresh session, Julia 1.13.3): ≈ 450 s,
+same on main 669de5b; the 14 s of the table above was measured earlier (probably on another Julia
+version, not checked). Every stage compiled at top level took < 2 s (7 s in total), and
+SnoopCompile counted only 20 s of inference, so the time was not in inference proper: a profile
+put ≈ 210 of the 390 s of compilation in `store_backedges → _typename_add_backedge`, the
+backedges Julia 1.13 registers for calls inferred on abstract types. Cause: `Refrigerant`,
+`RefrigerantSaturatedVapor` and `RefrigerantSuperHeatedVapor` had untyped fields, so `T_dew`,
+`h_pT`, … on a spline refrigerant inferred as `Any` and the whole study downstream was abstract.
+JET `@report_opt` on the study did not finish in 15 min, which is itself a hint of this.
+Fix: type parameters for the splines, `Float64` scalars. First call 4.9 s, second 0.11 s, results
+unchanged (COP1 3.209 at 0.55 × design flow). Clapeyron study first call unchanged (36 s).
+Test: `test/solutiontypes.jl` (concrete fields, `@inferred` `T_dew` / `h_pT`).
+Side effect found by the tests: `initial_guess` named each block by searching `sys.blocks` with
+`===`. With the refrigerant now stored inline in the (large, immutable) evaporator block, that
+search returned `nothing` on Julia 1.13 although `b === b` was true (not pinned down; probably
+egal on a copied inline struct). Now the names and blocks are zipped (same order by construction).
