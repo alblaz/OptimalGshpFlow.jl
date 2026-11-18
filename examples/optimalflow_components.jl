@@ -46,15 +46,8 @@ function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE)
                  T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
 end
 
-# pumping power: borehole (U-pipe, 2H) and evaporator plates (as in the original script)
-function pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf)
-    Vh = es.superheat_region.Vh
-    bh = bs.borehole
-    P_bh = pumping_power(ηPUMP, 2bh.H, Vh, 2bh.rpi, sf, (bs.Tin + bs.Tout)/2; transition = bh.transition)
-    Tmean = (es.superheat_region.Thh + es.twophase_region.Thl)/2
-    P_ev = pumping_power(pressure_drop_evap(Vh, PHX, sf, Tmean), Vh, ηPUMP)
-    return P_bh + P_ev
-end
+# pumping power: borehole U-pipe (2H) and evaporator plates
+pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf) = pumping_power(es, sf, ηPUMP) + pumping_power(bs, sf, ηPUMP)
 
 function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf)
     W  = compressor_power(TCOND, ηIS, es, r)
