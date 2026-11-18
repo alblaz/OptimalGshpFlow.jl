@@ -38,7 +38,7 @@ unconstrained solvers can be used.
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
-| 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | in progress |
+| 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | PR #51 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
