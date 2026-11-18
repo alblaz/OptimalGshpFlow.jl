@@ -31,7 +31,8 @@ struct SmoothTransition <: NusseltTransition end
 struct SharpTransition  <: NusseltTransition end
 struct GnielinskiTransition <: NusseltTransition end
 
-nusselt_dittusboelter(Re, Pr; mode = "heating") = 0.023 * Re^0.8 * Pr^(mode == "heating" ? 0.3 : 0.4)
+# Dittus-Boelter: exponent 0.4 when the fluid is heated (wall warmer), 0.3 when it is cooled
+nusselt_dittusboelter(Re, Pr; mode = "heating") = 0.023 * Re^0.8 * Pr^(mode == "heating" ? 0.4 : 0.3)
 
 function nusselt_gnielinski(Re, Pr)
     f = (1.58*log(Re) - 3.28)^(-2)     # Fanning friction factor
