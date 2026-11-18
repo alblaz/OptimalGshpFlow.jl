@@ -5,18 +5,18 @@ fdarcy_laminar(Re) = 64 / Re
 fdarcy_turbulent(Re) = (1 / (0.838 * lambertw(0.629 * Re)))^2   # smooth pipe (Colebrook fit)
 
 """
-    fDarcy(Re, transition = SmoothTransition())
+    fDarcy(Re, transition = GnielinskiTransition())
 
 Darcy friction factor of fully developed flow in a smooth circular pipe.
 
 - `Re < 2300`: laminar, `64/Re`
 - `Re ≥ 4000`: turbulent smooth-pipe fit `(1/(0.838 W(0.629 Re)))²` (`W` Lambert function)
 - in between, `transition` (see [`NusseltTransition`](@ref)):
-  `SmoothTransition()` interpolates linearly in `Re` between the laminar value at 2300 and the
+  `GnielinskiTransition()` (default) and `SmoothTransition()` interpolate linearly in `Re` between the laminar value at 2300 and the
   turbulent one at 4000, so `fD` (and the pressure drop) is continuous in the flow rate;
   `SharpTransition()` is the original model: the turbulent fit from `Re = 2300`, a ×1.65 jump.
 """
-function fDarcy(Re, transition::NusseltTransition = SmoothTransition())
+function fDarcy(Re, transition::NusseltTransition = GnielinskiTransition())
     Re < RE_LAMINAR && return fdarcy_laminar(Re)
     (transition isa SharpTransition || Re ≥ RE_FRICTION_TURBULENT) && return fdarcy_turbulent(Re)
     γ = (Re - RE_LAMINAR) / (RE_FRICTION_TURBULENT - RE_LAMINAR)
@@ -25,7 +25,7 @@ end
 
 
 """
-    `pressure_drop(H, V, D, fluidproperties::SecondaryFluid, T; transition = SmoothTransition())`
+    `pressure_drop(H, V, D, fluidproperties::SecondaryFluid, T; transition = GnielinskiTransition())`
 
 compute the pressure drop for a circular pipe
 
@@ -36,7 +36,7 @@ compute the pressure drop for a circular pipe
 `T` is the mean temperature along the pipe,
 `transition` is the laminar-turbulent transition model of the friction factor, see [`fDarcy`](@ref).
 """
-function pressure_drop(H,V,D,fluidproperties,T; transition::NusseltTransition = SmoothTransition())
+function pressure_drop(H,V,D,fluidproperties,T; transition::NusseltTransition = GnielinskiTransition())
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
 
@@ -119,7 +119,7 @@ function pumping_power(Δp, V, η)
     return P
 end
 
-function pumping_power(η, H, V, D, fluidproperties, T; transition::NusseltTransition = SmoothTransition())
+function pumping_power(η, H, V, D, fluidproperties, T; transition::NusseltTransition = GnielinskiTransition())
     Δp = pressure_drop(H,V,D,fluidproperties,T; transition = transition)
     P = Δp * V / η
     return P

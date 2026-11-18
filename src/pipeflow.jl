@@ -1,7 +1,7 @@
 # Nusselt number for fully developed flow in a circular pipe.
 # Laminar (Re < 2300): constant wall temperature value 3.657.
-# Turbulent (Re ≥ 1e4): Dittus-Boelter, which requires knowing whether the fluid is heated or cooled
-# (default: heated).
+# Turbulent (Re ≥ 1e4): Gnielinski (default model) or Dittus-Boelter, which requires knowing whether
+# the fluid is heated or cooled (default: heated).
 # Transition (2300 ≤ Re < 1e4): depends on the transition model, see `NusseltTransition`.
 const RE_LAMINAR   = 2300.
 const RE_TURBULENT = 1e4
@@ -12,12 +12,13 @@ const NU_LAMINAR   = 3.657
 
 Model for the Nusselt number in the laminar-turbulent transition range `2300 ≤ Re < 1e4`.
 
-- `SmoothTransition()` (default): linear interpolation in `Re` between the laminar value and
+- `SmoothTransition()`: linear interpolation in `Re` between the laminar value and
   Dittus-Boelter at `Re = 1e4` (Gnielinski 2013 / VDI Heat Atlas). `Nu` is continuous in `Re`,
-  so model solutions vary continuously with flow rate and temperature.
+  so model solutions vary continuously with flow rate and temperature, but its slope jumps at
+  `Re = 2300` and `1e4`. The default from B6 to B10 (2026-11).
 - `SharpTransition()`: Gnielinski correlation from `Re = 2300`, i.e. `Nu` jumps at `Re = 2300`
   (×2–7 depending on `Pr`) and at `Re = 1e4`. This is the original model of the package.
-- `GnielinskiTransition()`: turbulent Gnielinski correlation (VDI Heat Atlas, 2013 form) for
+- `GnielinskiTransition()` (default): turbulent Gnielinski correlation (VDI Heat Atlas, 2013 form) for
   `Re ≥ 1e4` instead of Dittus-Boelter (`mode` is ignored), joined to the laminar value by a cubic
   Hermite blend in `Re`: `Nu` and `dNu/dRe` are continuous at `Re = 2300` and `1e4` (C¹), so
   the solutions have no kink in the flow rate.
@@ -72,7 +73,7 @@ nusselt_turbulent(::NusseltTransition, Re, Pr; mode = "heating") = nusselt_dittu
 nusselt_turbulent(::GnielinskiTransition, Re, Pr; mode = "heating") = nusselt_gnielinski2013(Re, Pr)
 
 """
-`Nu = nusselt_circularpipe(Re, Pr; mode = "heating", transition = SmoothTransition())`
+`Nu = nusselt_circularpipe(Re, Pr; mode = "heating", transition = GnielinskiTransition())`
 
 `Nu`,`Re` and `Pr` are respectively the Nusselt, Reynold and the Prandtl numbers. `mode` takes either
 "heating" or "cooling" (Dittus-Boelter exponent). `transition` selects the model in the
@@ -80,9 +81,9 @@ laminar-turbulent transition range, see [`NusseltTransition`](@ref).
 
 - `Re < 2300`: laminar, `Nu = 3.657`
 - `2300 ≤ Re < 1e4`: transition model
-- `Re ≥ 1e4`: turbulent, Dittus-Boelter (Gnielinski with `GnielinskiTransition()`)
+- `Re ≥ 1e4`: turbulent, Gnielinski (default) or Dittus-Boelter (`SmoothTransition()`, `SharpTransition()`)
 """
-function nusselt_circularpipe(Re, Pr; mode = "heating", transition::NusseltTransition = SmoothTransition())
+function nusselt_circularpipe(Re, Pr; mode = "heating", transition::NusseltTransition = GnielinskiTransition())
     if Re < RE_LAMINAR
         return NU_LAMINAR + zero(Re * Pr)
     elseif Re < RE_TURBULENT
@@ -95,7 +96,7 @@ end
 
 # Evaluate the heat transfer coefficient  
 """
-`h_circularpipe(mf, Tref, rp, fluid_properties; transition = SmoothTransition())`
+`h_circularpipe(mf, Tref, rp, fluid_properties; transition = GnielinskiTransition())`
 
 Compute the heat transfer coefficient for circular pipe
 
@@ -105,7 +106,7 @@ Compute the heat transfer coefficient for circular pipe
 `fluid_properties` is an object containing a set of functions `f(Tref)` that returns various fluid properties\\
 `transition` laminar-turbulent transition model, see [`NusseltTransition`](@ref)
 """
-function h_circularpipe(mf, Tref, rp, fluid_properties; transition::NusseltTransition = SmoothTransition())
+function h_circularpipe(mf, Tref, rp, fluid_properties; transition::NusseltTransition = GnielinskiTransition())
     # rp = get_rp(borehole)
     ρ= fluid_properties.ρ(Tref)
     μ = fluid_properties.μ(Tref)

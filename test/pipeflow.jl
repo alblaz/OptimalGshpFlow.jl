@@ -1,5 +1,5 @@
-@testset "nusselt_circularpipe" begin
-    Nu = OptimalGshpFlow.nusselt_circularpipe
+@testset "nusselt_circularpipe (SmoothTransition, Dittus-Boelter)" begin
+    Nu(Re, Pr; kw...) = OptimalGshpFlow.nusselt_circularpipe(Re, Pr; transition = SmoothTransition(), kw...)
     δ = 1e-6
 
     for Pr in (0.7, 7., 30.), mode in ("heating", "cooling")
@@ -35,14 +35,15 @@ end
 
     for Pr in (0.7, 7., 30.), mode in ("heating", "cooling"), Re in (1500., 2299., 2300., 2500., 5000., 9999., 1e4, 2e4)
         @test Nu(Re, Pr; mode = mode, transition = SharpTransition()) == nu_sharp_reference(Re, Pr, mode)
-        @test Nu(Re, Pr; mode = mode) == Nu(Re, Pr; mode = mode, transition = SmoothTransition())
+        @test Nu(Re, Pr; mode = mode) == Nu(Re, Pr; mode = mode, transition = GnielinskiTransition())   # default
     end
     # the sharp model really has a jump at Re = 2300
     @test Nu(2300. + 1e-6, 7.; transition = SharpTransition()) > 2 * Nu(2300. - 1e-6, 7.; transition = SharpTransition())
 
     # the choice reaches the borehole model
     sf = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), "INCOMP::MEA-28%")
-    bh_smooth = SingleUPipeBorehole(H = 200., D = 4.)
+    bh_smooth = SingleUPipeBorehole(H = 200., D = 4., transition = SmoothTransition())
+    @test SingleUPipeBorehole(H = 200., D = 4.).transition isa GnielinskiTransition   # default
     bh_sharp  = SingleUPipeBorehole(H = 200., D = 4., transition = SharpTransition())
     @test bh_smooth.transition isa SmoothTransition
     @test bh_sharp.transition isa SharpTransition
@@ -51,7 +52,7 @@ end
     mf_trans = 3000. * π * rp * sf.μ(T) / 2          # Re = 3000: transition range
     mf_lam   = 1500. * π * rp * sf.μ(T) / 2          # Re = 1500: laminar
     @test Re(mf_trans) ≈ 3000.
-    @test h_circularpipe(mf_trans, T, rp, sf; transition = SharpTransition()) > h_circularpipe(mf_trans, T, rp, sf)
+    @test h_circularpipe(mf_trans, T, rp, sf; transition = SharpTransition()) > h_circularpipe(mf_trans, T, rp, sf; transition = SmoothTransition())
     k_smooth(mf) = OptimalGshpFlow.uniform_Tb_coeffs(bh_smooth, 3., mf, T, sf)
     k_sharp(mf)  = OptimalGshpFlow.uniform_Tb_coeffs(bh_sharp, 3., mf, T, sf)
     @test k_sharp(mf_trans) != k_smooth(mf_trans)
