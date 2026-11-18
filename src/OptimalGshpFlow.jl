@@ -22,6 +22,7 @@ export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_de
 export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT
 export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superheated, λ_superheated
 
+include("properties/coolprop_state.jl")
 include("fluidproperties.jl")
 # export interpolate_sf_properties, interpolate_ref_properties_twophaseregion, interpolate_ref_properties_superheatedregion
 export SecondaryFluid, freezing_point
@@ -80,7 +81,7 @@ export PropertyFormulation, NestedPressure, SaturationTemperature, ExplicitTv
 export n_extra_unknowns, temperature_bounds, temperature_transform, evaporator_transforms
 export evaporator_unknowns, nested_unknowns
 
-export compressor_power, condenser_power
+export compressor_power, condenser_power, compressor_condenser_power
 
 # from "components/"
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess

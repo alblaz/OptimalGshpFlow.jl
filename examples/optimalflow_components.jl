@@ -50,8 +50,7 @@ end
 pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf) = pumping_power(es, sf, ηPUMP) + pumping_power(bs, sf, ηPUMP)
 
 function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf)
-    W  = compressor_power(TCOND, ηIS, es, r)
-    Q1 = condenser_power(TCOND, ηIS, es, r)
+    W, Q1 = compressor_condenser_power(TCOND, ηIS, es, r)
     Q2 = es.twophase_region.Q + es.superheat_region.Q
     P  = pump_power(es, bs, sf)
     return (W = W, Q1 = Q1, Q2 = Q2, Ppump = P, COP1 = Q1/(W + P), COP2 = Q2/(W + P))
