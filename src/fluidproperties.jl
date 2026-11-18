@@ -119,6 +119,7 @@ struct Refrigerant{SV <: RefrigerantSaturatedVapor, SH <: RefrigerantSuperHeated
     M::Float64
     pmin::Float64    # sampled pressure range [Pa], see log10p_grid
     pmax::Float64
+    coolprop::CoolPropState   # cached CoolProp state (compressor, saturation pressures)
 end
 
 """
@@ -156,7 +157,8 @@ function Refrigerant(refrigerant_name; superheating_range = 0:1.:40., ns = 100, 
     pr_min,
     M,
     first(ps),
-    last(ps))
+    last(ps),
+    CoolPropState(refrigerant_name))
 end
 
 """

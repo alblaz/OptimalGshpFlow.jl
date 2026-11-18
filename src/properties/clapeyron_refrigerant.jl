@@ -346,48 +346,8 @@ _transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
 # CoolProp low level   #
 ########################
 
-"""
-    CoolPropState(fluid)
-
-Cached CoolProp `AbstractState` (HEOS backend) of a pure fluid, used for transport properties.
-Updating it and reading outputs costs ≈ 3 µs, against ≈ 100 µs for one `PropsSI` call, with
-identical results. A lock serialises access, so a refrigerant can be shared between threads.
-"""
-mutable struct CoolPropState
-    fluid::String
-    handle::Clong
-    lock::ReentrantLock
-    function CoolPropState(fluid::AbstractString)
-        cs = new(String(fluid), CoolProp.AbstractState_factory("HEOS", fluid), ReentrantLock())
-        finalizer(x -> CoolProp.AbstractState_free(x.handle), cs)
-        return cs
-    end
-end
-Base.show(io::IO, cs::CoolPropState) = print(io, "CoolPropState(", cs.fluid, ")")
-
-const COOLPROP_PT = Ref{Clong}(-1)
-const COOLPROP_PQ = Ref{Clong}(-1)
-const COOLPROP_DT = Ref{Clong}(-1)
-const COOLPROP_V  = Ref{Clong}(-1)
-const COOLPROP_L  = Ref{Clong}(-1)
-
-function _init_coolprop_indices()
-    COOLPROP_PT[] = CoolProp.get_input_pair_index("PT_INPUTS")
-    COOLPROP_PQ[] = CoolProp.get_input_pair_index("PQ_INPUTS")
-    COOLPROP_DT[] = CoolProp.get_input_pair_index("DmassT_INPUTS")
-    COOLPROP_V[]  = CoolProp.get_param_index("V")
-    COOLPROP_L[]  = CoolProp.get_param_index("CONDUCTIVITY")
-    return nothing
-end
-
 _coolprop_key(prop) = prop === :viscosity ? COOLPROP_V : COOLPROP_L
 
-function _coolprop_value(cs::CoolPropState, pair, key, x1, x2)
-    lock(cs.lock) do
-        CoolProp.AbstractState_update(cs.handle, pair[], x1, x2)
-        CoolProp.AbstractState_keyed_output(cs.handle, key[])
-    end
-end
 
 # CoolProp output for the input pair (x1, x2); for ForwardDiff.Dual inputs the derivatives are
 # central differences with relative steps rel1, rel2

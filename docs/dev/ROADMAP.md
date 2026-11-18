@@ -39,6 +39,7 @@ unconstrained solvers can be used.
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | PR #51 |
+| P3 | `perf/postprocessing` | spline `Refrigerant` compressor/condenser through a cached CoolProp state instead of `PropsSI`; `compressor_condenser_power` (one compression): post-processing 2.2 ms → 30 µs per point | in progress |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -663,3 +664,24 @@ factor is the same for both, so only the borehole heat transfer changes (Re ≥ 
 results under the new default are the "Gnielinski C¹" column of #48: COP1 optimum 1.10 × design
 (4.305) at 9 °C, switch to the laminar branch between 5 and 4 °C, unchanged below ≈ 2 °C
 (−5 °C: 0.55 ×, 3.209). The tables of #45 and B7 above were computed with `SmoothTransition()`.
+
+## `perf/postprocessing` (P3, 2026-11-18)
+Post-processing of one operating point with the spline `Refrigerant` took ≈ 2.2 ms, ≈ 2000 × the
+residual (1.4 µs): `compressor_power` 1.07 ms and `condenser_power` 1.17 ms, each ≈ 7 `PropsSI`
+calls by fluid name (≈ 150 µs each), the compression computed twice. Everything else ≤ 1 µs.
+Fix: `CoolPropState` (cached HEOS `AbstractState`, so far only for the transport properties of
+`ClapeyronRefrigerant`) moved to `src/properties/coolprop_state.jl`; the spline `Refrigerant` holds
+one; one flash per state with several outputs (`_coolprop_values`): suction (p, T) → h, s, ρ;
+isentropic outlet (p, s) → h; bubble/dew (Q, T) → p, h. Same HEOS backend as `PropsSI`: results
+equal to 1e-15 (the test against the `PropsSI` reference, rtol 1e-13, unchanged). New
+`compressor_condenser_power` → `(; W, Q1)` from one compression; the example uses it.
+
+| per point (spline R290) | before | after |
+|---|---|---|
+| `compressor_power` | 1070 µs | 29 µs |
+| `condenser_power` | 1170 µs | 32 µs |
+| both (`compressor_condenser_power`) | 2240 µs | 30 µs |
+| `study` (39 flows, compiled) | 0.11 s | 0.009 s |
+
+`ClapeyronRefrigerant`: 42 + 44 µs (property interface, unchanged). The dew pressure of the spline
+backend (`_p_dew`, guesses and post-processing) also uses the cached state now.

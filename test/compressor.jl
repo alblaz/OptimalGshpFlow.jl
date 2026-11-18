@@ -24,6 +24,10 @@
     Q1_ref = ρ * es.twophase_region.Vc * (h1 + Δh - PropsSI("H", "T", Tc, "Q", 0, "R290"))
     @test compressor_power(Tc, ηis, es, spl) ≈ W_ref rtol = 1e-13
     @test condenser_power(Tc, ηis, es, spl) ≈ Q1_ref rtol = 1e-13
+    for r in (spl, cla)
+        @test compressor_condenser_power(Tc, ηis, es, r) == (W = compressor_power(Tc, ηis, es, r), Q1 = condenser_power(Tc, ηis, es, r))
+    end
+    @test (@inferred compressor_condenser_power(Tc, ηis, es, spl)) isa NamedTuple{(:W, :Q1), Tuple{Float64, Float64}}
 
     # Clapeyron backend: same thermodynamics (Helmholtz EoS of the CoolProp fluid files)
     @test compressor_power(Tc, ηis, es, cla) ≈ W_ref rtol = 1e-6

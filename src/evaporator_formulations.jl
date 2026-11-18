@@ -145,7 +145,7 @@ _superheat_state(r, pe, Te, vv, Tsup, vsup, Tm, vm) =
 ########################
 
 # dew pressure at temperature T, for building initial guesses
-_p_dew(r::Refrigerant, T) = PropsSI("P", "T", T, "Q", 1, r.name)
+_p_dew(r::Refrigerant, T) = _coolprop_value(r.coolprop, COOLPROP_QT, COOLPROP_P, 1.0, T)
 _p_dew(r::ClapeyronRefrigerant, T) = ispure(r) ? p_sat(r, T) : Clapeyron.dew_pressure(r.eos, T, r.z)[1]
 
 """
