@@ -81,11 +81,11 @@ Compute the pressure drop for a plate heat exchanger.
 function pressure_drop_evap(V, platehex::PlateHeatExchanger, fluidproperties,T;D_port=0.04,N_pass=1)    
     ρ = fluidproperties.ρ(T)
     μ = fluidproperties.μ(T)
-    @unpack np,b,ϕ,β,L = platehex
+    @unpack np,b,ϕ,β,L,W = platehex
     Nc=(np-1)/2 #number of channels
     Dₕ=2*b/ϕ # hydraulic diameter 4*A/P
 
-    v = V/(L*b*Nc) # velocity per channel
+    v = V/(W*b*Nc) # velocity per channel (cross-section W b of each channel)
     Re = ρ*v*Dₕ/μ #Reynolds number per channel
     fD = f_Martin(Re,β)
 
