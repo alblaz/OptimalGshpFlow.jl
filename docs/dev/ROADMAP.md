@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-18 (feature/pump-power).
+Last updated: 2026-11-18 (feature/ils-ground).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -24,7 +24,7 @@ unconstrained solvers can be used.
 | 2 | `feature/property-interface` | refrigerant interface + (T, v) state formulation, see below | merged (#27) |
 | 3 | `feature/bounded-variables` | transforms as types (`LogBox` for pressure, `Box`, `Unit`); fix the absolute `pr_min` bound (B4) | merged (#28) |
 | 4 | `feature/component-core` | lightweight components (bounded unknowns + scaled residuals + ports), ComponentArrays + NonlinearSolve (ComponentArrays dropped in B8) | merged (#30) |
-| 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | lower priority (natural refrigerants are pure); R125 blocker, see below |
+| 5 | `feature/glide-epsntu` | Qiao 2025 counter-flow ε-NTU with glide (eq. 56); pure fluid as the φ → 0 limit; Te := dew temperature | **raised priority** (2026-11-18): the refrigerant pressure drop gives a glide even for pure fluids, see below; R125 blocks only the zeotropic examples |
 | 6 | `feature/evaporator-operating-envelope` (was `robust-moving-boundary`) | Te lower bound (spurious zero-flow root), validity reports (brine freezing, issue #14), continuation helper; PTC evaluated | merged (#31) |
 | 6c | `feature/optimal-flow-components` | port of the optimal-flow study to the component API; compressor/condenser on the property interface; validated against the original (needs PR #32) | merged (#34) |
 | B7 | `fix/pressure-drop-transition` | pipe friction factor jumped ×1.65 at Re = 2300 (pump power 344 → 216 W in the study); smooth blend 2300–4000, `SharpTransition()` keeps the original | merged (#36) |
@@ -38,11 +38,11 @@ unconstrained solvers can be used.
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
-| 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | PR #51 |
-| P3 | `perf/postprocessing` | spline `Refrigerant` compressor/condenser through a cached CoolProp state instead of `PropsSI`; `compressor_condenser_power` (one compression): post-processing 2.2 ms → 30 µs per point | PR #53 |
+| 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
+| 8b | `feature/ils-ground` | first dynamic ground model: infinite line source with temporal superposition, explicit coupling over a heating season (`examples/season_ils.jl`) | PR #52 |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
@@ -63,6 +63,14 @@ B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the r
   own branch. Check the Cooper correlation in `href_e` at R744's higher reduced pressure.
 
 ## Decisions
+- Glide (step 5) is not only for zeotropic blends (user, 2026-11-18): with the refrigerant-side
+  pressure drop in the evaporator, the saturation temperature of a pure fluid falls along the
+  two-phase zone, i.e. a glide of the opposite sign to a zeotropic one (temperature decreasing
+  along the flow). The ε-NTU with glide must allow that sign; it needs a refrigerant pressure-drop
+  model in the evaporator (see the old PR #12 "Pressure drop evap").
+- First dynamic ground model (step 8, user, 2026-11-18): infinite line source,
+  `ILS(Fo) = ½ E₁(1/(4Fo))`, `Fo = α t / r²`. Not good for multi-year dynamics, which are not the
+  focus now.
 - Composition framework: lightweight custom layer, not ModelingToolkit (MTK is evaluated in step 7).
 - Laminar-turbulent transition: keep all models; `GnielinskiTransition()` (C¹) is the default since
   2026-11-18 (before: `SmoothTransition()`, B6). Results recorded before that date use the old default.
@@ -665,23 +673,42 @@ results under the new default are the "Gnielinski C¹" column of #48: COP1 optim
 (4.305) at 9 °C, switch to the laminar branch between 5 and 4 °C, unchanged below ≈ 2 °C
 (−5 °C: 0.55 ×, 3.209). The tables of #45 and B7 above were computed with `SmoothTransition()`.
 
-## `perf/postprocessing` (P3, 2026-11-18)
-Post-processing of one operating point with the spline `Refrigerant` took ≈ 2.2 ms, ≈ 2000 × the
-residual (1.4 µs): `compressor_power` 1.07 ms and `condenser_power` 1.17 ms, each ≈ 7 `PropsSI`
-calls by fluid name (≈ 150 µs each), the compression computed twice. Everything else ≤ 1 µs.
-Fix: `CoolPropState` (cached HEOS `AbstractState`, so far only for the transport properties of
-`ClapeyronRefrigerant`) moved to `src/properties/coolprop_state.jl`; the spline `Refrigerant` holds
-one; one flash per state with several outputs (`_coolprop_values`): suction (p, T) → h, s, ρ;
-isentropic outlet (p, s) → h; bubble/dew (Q, T) → p, h. Same HEOS backend as `PropsSI`: results
-equal to 1e-15 (the test against the `PropsSI` reference, rtol 1e-13, unchanged). New
-`compressor_condenser_power` → `(; W, Q1)` from one compression; the example uses it.
+## `feature/ils-ground` (8b, 2026-11-18)
+`src/ground.jl`: `ILS(Fo)`, `ILS(t, r, α)` (SpecialFunctions `expint`, new direct dependency, already
+in the manifest through Clapeyron), `InfiniteLineSource(; λ, α, rb, Tg)` and
+`borehole_wall_temperature(g, tq, q, t)`: temporal superposition of piecewise-constant extraction
+steps `q` [W/m] (O(steps) per call, no load aggregation). The wall temperature is the `Tb` port of
+`BoreholeHX` (Hellström gives the fluid-to-wall part).
 
-| per point (spline R290) | before | after |
+`examples/season_ils.jl`: `season(r; flow, days = 180, dt = 1 h)`. Explicit coupling: `Tb` at the
+start of a step from the loads before it, `set_fixed(S; T_ground = Tb)`, Newton from the previous
+`u`; the extraction `Qb/H` of the solution is the load of the step. `flow` fixed, or `:optimal`
+(COP1 optimum of the flow sweep once a day, grid 0.05 × design).
+
+Results (spline R290, continuous full-load operation, λ = 3, α = 1e-6 m²/s, rb = 0.115 m,
+Tg = 8 °C, GnielinskiTransition):
+
+| | fixed 1.0 × design | daily optimal flow |
 |---|---|---|
-| `compressor_power` | 1070 µs | 29 µs |
-| `condenser_power` | 1170 µs | 32 µs |
-| both (`compressor_condenser_power`) | 2240 µs | 30 µs |
-| `study` (39 flows, compiled) | 0.11 s | 0.009 s |
+| seasonal COP1 | 3.740 | 3.761 (+0.6 %) |
+| heat delivered | 28 164 kWh | 27 960 kWh (−0.7 %) |
+| electricity (compressor + pumps) | 7 531 kWh | 7 434 kWh |
+| pump energy | 229 kWh | 143 kWh |
+| Tb after 180 days | 2.89 °C | 2.94 °C |
+| time (first run includes compilation) | 18 s | 32 s |
 
-`ClapeyronRefrigerant`: 42 + 44 µs (property interface, unchanged). The dew pressure of the spline
-backend (`_p_dew`, guesses and post-processing) also uses the cached state now.
+- Cost (season, compiled 10 s): superposition 0.1 s with `expint` at every step (9.3 M calls),
+  0.008 s with the tabulated responses of `UniformLoadHistory` (uniform step: the response depends
+  only on n − i; `ILS(k dt)` computed once, each step a dot product, same result to 1e-13).
+  20 years hourly (175 200 steps): 13.6 s tabulated (≈ 165 s with the general method, O(n²)).
+  Load aggregation (Claesson & Javed 2012, as in pygfunction; Bernier's MLAA) would make it
+  ≈ O(n log n) and allow variable steps: postponed to the long-term (g-function) model.
+  The rest of the 10 s is post-processing (2.2 ms per step, mostly outside the solve): to fix
+  separately.
+- Tb falls 2 K on the first day, 4 K in the first month, then slowly (≈ log t), 25–29 W/m.
+- The optimal flow starts on the transitional branch (1.1–1.2 × design) and switches to the
+  laminar one (0.8 → 0.75 ×) on day 7, at Tb ≈ 4.7 °C, as in the static Tb sweep (5 → 4 °C).
+- No validity issues (brine stays above its freezing point).
+- Caveats: continuous full-load operation (no load profile or on/off cycling); explicit coupling
+  (one-step lag); `rb = 0.115` in the example is used as a radius, but 0.115 m is a typical
+  borehole *diameter* (the package default is `rb = 0.115/2`), to check.
