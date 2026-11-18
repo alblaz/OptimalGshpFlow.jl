@@ -15,7 +15,7 @@
 
         # unchanged regimes: laminar (fully developed) and turbulent (Dittus-Boelter)
         @test Nu(1500., Pr; mode = mode) == 3.657
-        n = mode == "heating" ? 0.3 : 0.4
+        n = mode == "heating" ? 0.4 : 0.3          # Dittus-Boelter: 0.4 for a heated fluid
         @test Nu(2e4, Pr; mode = mode) ≈ 0.023 * 2e4^0.8 * Pr^n
     end
 end
@@ -30,7 +30,7 @@ end
             f = (1.58 * log(Re) - 3.28)^(-2)
             return (0.5 * f * (Re - 1000.) * Pr) / (1 + 12.7 * sqrt(0.5 * f) * (Pr^(2/3) - 1))
         end
-        return 0.023 * Re^0.8 * Pr^(mode == "heating" ? 0.3 : 0.4)
+        return 0.023 * Re^0.8 * Pr^(mode == "heating" ? 0.4 : 0.3)
     end
 
     for Pr in (0.7, 7., 30.), mode in ("heating", "cooling"), Re in (1500., 2299., 2300., 2500., 5000., 9999., 1e4, 2e4)
