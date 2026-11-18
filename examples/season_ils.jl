@@ -44,7 +44,7 @@ Continuous operation over `days`, time step `dt` [s]; `flow` a fixed flow factor
 COPs and validity issues.
 """
 function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PROPS, bh = BOREHOLE)
-    tq, q = Float64[], Float64[]
+    hist = UniformLoadHistory(g, dt)          # tabulated ILS responses: O(n) per step, no expint
     rows = []
     Vf, u = flow === :optimal ? optimal_point(r, g.Tg; sf = sf, bh = bh) :
             (float(flow), last(continuation(λ -> heatpump(r, λ; sf = sf, Tb = g.Tg, bh = bh), 2.0:-0.05:float(flow),
@@ -52,7 +52,7 @@ function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PR
     S = heatpump(r, Vf; sf = sf, Tb = g.Tg, bh = bh)
     for n in 0:round(Int, days * DAY / dt) - 1
         t = n * dt
-        Tb = borehole_wall_temperature(g, tq, q, t)
+        Tb = borehole_wall_temperature(hist)
         if flow === :optimal && n > 0 && t % DAY == 0
             Vf, u = optimal_point(r, Tb; sf = sf, bh = bh)
             S = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh)
@@ -64,7 +64,7 @@ function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PR
         ph = physical(S, u)
         es = evaporator_solution(S.components.evaporator, ph.evaporator, port_values(S, u, :evaporator))
         bs = borehole_solution(S.components.borehole, port_values(S, u, :borehole))
-        push!(tq, t); push!(q, bs.Qb / bh.H)
+        push_load!(hist, bs.Qb / bh.H)
         push!(rows, (t = t, Tb = Tb, Vf = Vf, Te = es.twophase_region.Tcl, qb = bs.Qb / bh.H,
                      performance(es, bs, r, sf)..., issues = unique(i.message for i in validity_issues(S, u))))
     end

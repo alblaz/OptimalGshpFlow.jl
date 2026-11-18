@@ -697,6 +697,14 @@ Tg = 8 °C, GnielinskiTransition):
 | Tb after 180 days | 2.89 °C | 2.94 °C |
 | time (first run includes compilation) | 18 s | 32 s |
 
+- Cost (season, compiled 10 s): superposition 0.1 s with `expint` at every step (9.3 M calls),
+  0.008 s with the tabulated responses of `UniformLoadHistory` (uniform step: the response depends
+  only on n − i; `ILS(k dt)` computed once, each step a dot product, same result to 1e-13).
+  20 years hourly (175 200 steps): 13.6 s tabulated (≈ 165 s with the general method, O(n²)).
+  Load aggregation (Claesson & Javed 2012, as in pygfunction; Bernier's MLAA) would make it
+  ≈ O(n log n) and allow variable steps: postponed to the long-term (g-function) model.
+  The rest of the 10 s is post-processing (2.2 ms per step, mostly outside the solve): to fix
+  separately.
 - Tb falls 2 K on the first day, 4 K in the first month, then slowly (≈ log t), 25–29 W/m.
 - The optimal flow starts on the transitional branch (1.1–1.2 × design) and switches to the
   laminar one (0.8 → 0.75 ×) on day 7, at Tb ≈ 4.7 °C, as in the static Tb sweep (5 → 4 °C).

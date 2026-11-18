@@ -54,3 +54,52 @@ function borehole_wall_temperature(g::InfiniteLineSource, tq, q, t)
     end
     return g.Tg - s / (2π * g.λ)
 end
+
+"""
+    UniformLoadHistory(g::InfiniteLineSource, dt)
+
+Load history with a uniform time step `dt` [s] for [`borehole_wall_temperature`](@ref): the load
+of step `i` acts from `(i-1) dt`, so the response of a load step at `n dt` depends only on `n − i`.
+The responses `ILS(k dt, rb, α)/(2πλ)` are tabulated once (the table grows with the history), and
+each wall temperature is a dot product: no `expint` calls, same result as the general method.
+Use [`push_load!`](@ref) to append the load of the next step.
+"""
+struct UniformLoadHistory{T <: Real}
+    g::InfiniteLineSource{T}
+    dt::T
+    h::Vector{T}          # h[k] = ILS(k dt)/(2πλ)
+    q::Vector{T}          # q[i]: load [W/m] of step i, from (i-1) dt to i dt
+end
+UniformLoadHistory(g::InfiniteLineSource{T}, dt) where {T} = UniformLoadHistory(g, T(dt), T[], T[])
+
+"""
+    push_load!(H::UniformLoadHistory, q) -> H
+
+Append the load `q` [W/m, > 0 when heat is extracted] of the next time step.
+"""
+function push_load!(H::UniformLoadHistory, q)
+    push!(H.q, q)
+    n = length(H.q)
+    g = H.g
+    while length(H.h) < n
+        push!(H.h, ILS((length(H.h) + 1) * H.dt, g.rb, g.α) / (2π * g.λ))
+    end
+    return H
+end
+
+"""
+    borehole_wall_temperature(H::UniformLoadHistory) -> Tb
+
+Wall temperature at the end of the history, time `length(H.q) * H.dt`.
+"""
+function borehole_wall_temperature(H::UniformLoadHistory)
+    q, h = H.q, H.h
+    n = length(q)
+    s = zero(eltype(h))
+    qprev = zero(eltype(q))
+    @inbounds for i in 1:n
+        s += (q[i] - qprev) * h[n - i + 1]
+        qprev = q[i]
+    end
+    return H.g.Tg - s
+end

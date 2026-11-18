@@ -20,4 +20,14 @@
     @test Tb2 ≈ g.Tg - 30/(2π*3) * (ILS(15day, 0.06, 1e-6) - ILS(5day, 0.06, 1e-6))
     @test Tb1 < Tb2 < g.Tg
     @test (@inferred borehole_wall_temperature(g, [0., 10day], [30., 20.], 15day)) isa Float64
+
+    # tabulated response for a uniform step = general superposition
+    H = UniformLoadHistory(g, 3600.)
+    @test borehole_wall_temperature(H) == g.Tg
+    qs = [30., 28., 0., 25., 25., 31.]
+    for (n, qn) in enumerate(qs)
+        push_load!(H, qn)
+        @test borehole_wall_temperature(H) ≈ borehole_wall_temperature(g, 3600. .* (0:n-1), qs[1:n], n * 3600.) rtol = 1e-13
+    end
+    @test (@inferred borehole_wall_temperature(H)) isa Float64
 end
