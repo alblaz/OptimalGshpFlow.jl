@@ -33,6 +33,7 @@ const COOLPROP_P  = Ref{Clong}(-1)
 const COOLPROP_H  = Ref{Clong}(-1)
 const COOLPROP_S  = Ref{Clong}(-1)
 const COOLPROP_D  = Ref{Clong}(-1)
+const COOLPROP_I  = Ref{Clong}(-1)    # surface tension
 
 function _init_coolprop_indices()
     COOLPROP_PT[] = CoolProp.get_input_pair_index("PT_INPUTS")
@@ -46,6 +47,7 @@ function _init_coolprop_indices()
     COOLPROP_H[]  = CoolProp.get_param_index("Hmass")
     COOLPROP_S[]  = CoolProp.get_param_index("Smass")
     COOLPROP_D[]  = CoolProp.get_param_index("Dmass")
+    COOLPROP_I[]  = CoolProp.get_param_index("I")
     return nothing
 end
 
@@ -62,4 +64,23 @@ function _coolprop_values(cs::CoolPropState, pair, x1, x2, keys::Tuple)
         CoolProp.AbstractState_update(cs.handle, pair[], x1, x2)
         map(k -> CoolProp.AbstractState_keyed_output(cs.handle, k[]), keys)
     end
+end
+
+# CoolProp output for the input pair (x1, x2); for ForwardDiff.Dual inputs the derivatives are
+# central differences with relative steps rel1, rel2
+function _coolprop(cs::CoolPropState, pair, key, x1, x2, rel1, rel2)
+    (x1 isa ForwardDiff.Dual || x2 isa ForwardDiff.Dual) || return _coolprop_value(cs, pair, key, x1, x2)
+    a, b = ForwardDiff.value(x1), ForwardDiff.value(x2)
+    f = _coolprop_value(cs, pair, key, a, b)
+    D = x1 isa ForwardDiff.Dual ? typeof(x1) : typeof(x2)
+    ∂ = zero(ForwardDiff.partials(one(D)))
+    if x1 isa ForwardDiff.Dual
+        h = rel1 * a
+        ∂ += (_coolprop_value(cs, pair, key, a + h, b) - _coolprop_value(cs, pair, key, a - h, b)) / (2h) * ForwardDiff.partials(x1)
+    end
+    if x2 isa ForwardDiff.Dual
+        h = rel2 * b
+        ∂ += (_coolprop_value(cs, pair, key, a, b + h) - _coolprop_value(cs, pair, key, a, b - h)) / (2h) * ForwardDiff.partials(x2)
+    end
+    return D(f, ∂)
 end

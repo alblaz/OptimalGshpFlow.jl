@@ -18,7 +18,7 @@ export VariableTransform, Free, Linear, Unit, Box, LogBox, Above, from_R, to_R, 
 
 include("properties/interface.jl")
 export AbstractRefrigerant, critical_pressure, molar_mass, pressure_transform
-export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew
+export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew, surface_tension
 export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT
 export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superheated, λ_superheated
 
@@ -47,6 +47,7 @@ include("evaporator_formulations.jl")
 include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
+include("refrigerant_pressuredrop.jl")
 include("ground.jl")
 include("components/core.jl")
 include("components/evaporator.jl")
@@ -88,6 +89,8 @@ export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
 export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
 export pressure_drop, pumping_power
+export TwoPhaseFriction, Amalfi2016, KineticEnergyFriction, LONGO_FITS, twophase_pressure_drop, friction_pressure_drop
+export acceleration_pressure_drop, gravity_pressure_drop, port_pressure_drop, vapour_pressure_drop, homogeneous_density, channel_mass_flux
 export ILS, InfiniteLineSource, borehole_wall_temperature, UniformLoadHistory, push_load!
 
 __init__() = _init_coolprop_indices()
