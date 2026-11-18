@@ -56,7 +56,7 @@ export Borehole, SingleUPipeBorehole
 
 # from "pipeflow.jl"
 export nusselt_circularpipe, h_circularpipe
-export NusseltTransition, SmoothTransition, SharpTransition
+export NusseltTransition, SmoothTransition, SharpTransition, GnielinskiTransition
 
 # from "plateheatexchanger.jl"
 export PlateHeatExchanger, h_platehex_wanniarachchi

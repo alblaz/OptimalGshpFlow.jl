@@ -35,11 +35,11 @@ const FLOWS = 2:-0.05:0.1                             # × design brine flow, fr
 const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
 
 # ---- model ----
-function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB)
+function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE)
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = DESIGN.hei,
                       Vs = Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP)
-    bhx = BoreholeHX(borehole = BOREHOLE, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
+    bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
@@ -49,7 +49,8 @@ end
 # pumping power: borehole (U-pipe, 2H) and evaporator plates (as in the original script)
 function pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf)
     Vh = es.superheat_region.Vh
-    P_bh = pumping_power(ηPUMP, 2BOREHOLE.H, Vh, 2BOREHOLE.rpi, sf, (bs.Tin + bs.Tout)/2)
+    bh = bs.borehole
+    P_bh = pumping_power(ηPUMP, 2bh.H, Vh, 2bh.rpi, sf, (bs.Tin + bs.Tout)/2; transition = bh.transition)
     Tmean = (es.superheat_region.Thh + es.twophase_region.Thl)/2
     P_ev = pumping_power(pressure_drop_evap(Vh, PHX, sf, Tmean), Vh, ηPUMP)
     return P_bh + P_ev
@@ -66,16 +67,16 @@ end
 # borehole Reynolds number at the mean brine temperature
 function reynolds(bs::BoreholeSolution, sf)
     T = (bs.Tin + bs.Tout)/2
-    D = 2BOREHOLE.rpi
+    D = 2bs.borehole.rpi
     return 4sf.ρ(T) * bs.Vs / (π * D * sf.μ(T))
 end
 
 # post-processing of the continuation results `res` (ground temperature `Tb`)
-function postprocess(r, res, Tb, sf)
+function postprocess(r, res, Tb, sf, bh = BOREHOLE)
     rows = []
     for x in res
         x.ok || (@warn "no solution at $(x.λ) × design flow, Tb = $(Tb - 273.15) °C"; continue)
-        S = heatpump(r, x.λ; sf = sf, Tb = Tb)
+        S = heatpump(r, x.λ; sf = sf, Tb = Tb, bh = bh)
         ph = physical(S, x.u)
         es = evaporator_solution(S.components.evaporator, ph.evaporator, port_values(S, x.u, :evaporator))
         bs = borehole_solution(S.components.borehole, port_values(S, x.u, :borehole))
@@ -90,15 +91,17 @@ first_guess(S, Tb) = initial_guess(S; evaporator = (Te = Tb - 8, Qe = 0.9DESIGN.
                                    nodes = (T_cold = Tb - 6, T_warm = Tb - 2))
 
 """
-    study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, alg = TrustRegion()) -> Vector
+    study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, alg = TrustRegion()) -> Vector
 
 Continuation in the brine flow, from `first(flows)` down; one row per flow with the physical
-solution, the performance and the validity issues.
+solution, the performance and the validity issues. `bh`: the borehole, e.g.
+`SingleUPipeBorehole(BOREHOLE; transition = GnielinskiTransition())` for another heat-transfer
+model in the laminar-turbulent transition.
 """
-function study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, alg = TrustRegion())
-    u0 = first_guess(heatpump(r, first(flows); sf = sf, Tb = Tb), Tb)
-    res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = Tb), flows, u0, alg; abstol = 1e-9)
-    return postprocess(r, res, Tb, sf)
+function study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, alg = TrustRegion())
+    u0 = first_guess(heatpump(r, first(flows); sf = sf, Tb = Tb, bh = bh), Tb)
+    res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh), flows, u0, alg; abstol = 1e-9)
+    return postprocess(r, res, Tb, sf, bh)
 end
 
 """
@@ -127,22 +130,22 @@ function optimum(rows, k; valid = true)
 end
 
 """
-    study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion()) -> Vector
+    study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, alg = TrustRegion()) -> Vector
 
 The flow sweep of `study` for each ground temperature in `Tbs` (from warm to cold, as over a
 heating season). A continuation in `Tb` at the first flow gives the starting point of each sweep
 (warm start from the previous `Tb`). One entry per `Tb`: `(Tb, rows, COP1, COP2)` with the optima
 of [`optimum`](@ref).
 """
-function study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, alg = TrustRegion())
+function study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, alg = TrustRegion())
     Vf1 = float(first(flows))
-    u0 = first_guess(heatpump(r, Vf1; sf = sf, Tb = first(Tbs)), first(Tbs))
-    starts = continuation(Tb -> heatpump(r, Vf1; sf = sf, Tb = Tb), Tbs, u0, alg; abstol = 1e-9)
+    u0 = first_guess(heatpump(r, Vf1; sf = sf, Tb = first(Tbs), bh = bh), first(Tbs))
+    starts = continuation(Tb -> heatpump(r, Vf1; sf = sf, Tb = Tb, bh = bh), Tbs, u0, alg; abstol = 1e-9)
     out = []
     for s in starts
         s.ok || (@warn "no solution at Tb = $(s.λ - 273.15) °C, $Vf1 × design flow"; break)
-        res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = s.λ), flows, s.u, alg; abstol = 1e-9)
-        rows = postprocess(r, res, s.λ, sf)
+        res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = s.λ, bh = bh), flows, s.u, alg; abstol = 1e-9)
+        rows = postprocess(r, res, s.λ, sf, bh)
         push!(out, (Tb = s.λ, rows = rows, COP1 = optimum(rows, :COP1), COP2 = optimum(rows, :COP2)))
     end
     return out

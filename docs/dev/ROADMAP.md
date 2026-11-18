@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-18 (#45, #46 merged).
+Last updated: 2026-11-18 (feature/nusselt-gnielinski).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -35,6 +35,7 @@ unconstrained solvers can be used.
 | 6d | `feature/optimal-flow-vs-tb` | the optimal-flow study as a sweep over the ground temperature (`study_tb`, 9 → −5 °C) | merged (#45) |
 | B9 | `fix/spline-study-compile` | spline `Refrigerant` had untyped fields (all property calls `Any`): first call of the spline study ≈ 450 → 4.9 s | merged (#46) |
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
+| 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | in progress |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -594,3 +595,48 @@ Side effect found by the tests: `initial_guess` named each block by searching `s
 `===`. With the refrigerant now stored inline in the (large, immutable) evaporator block, that
 search returned `nothing` on Julia 1.13 although `b === b` was true (not pinned down; probably
 egal on a copied inline struct). Now the names and blocks are zipped (same order by construction).
+
+## `feature/nusselt-gnielinski` (2026-11-18)
+Question from #45: is the jump of the optimal flow (transitional → laminar COP maximum) a product of
+the linear Nusselt blend, which has a kink at Re = 2300?
+
+New model `GnielinskiTransition()`: Gnielinski (VDI Heat Atlas, 2013 form, fully developed) for
+`Re ≥ 1e4`, joined to the laminar 3.657 by a cubic Hermite blend in Re (value and slope continuous
+at 2300 and 1e4, flat on the laminar side). Friction: same blend as `SmoothTransition`. The example
+takes `bh = SingleUPipeBorehole(BOREHOLE; transition = …)`; pump power and Re use the borehole of
+the solution.
+
+Also found: `nusselt_dittusboelter(…; mode = "heating")` uses `Pr^0.3`. Dittus-Boelter uses 0.4 for a
+fluid being heated (the brine in the borehole) and 0.3 for cooling, so the code looks reversed (the
+test locks it). For the brine (Pr ≈ 30) the turbulent end of `SmoothTransition` is ≈ 30 % low:
+Nu(1e4, Pr 32) = 103 vs 146 with `Pr^0.4`, 151 with Gnielinski. To fix in its own `fix/` branch
+(or make `GnielinskiTransition` the default, which no longer uses Dittus-Boelter).
+
+Optimal flow vs Tb (spline R290, 15 Tb × 39 flows, grid 0.05 × design), three transition models;
+COP1 local maxima (flow × design, COP1, borehole Re):
+
+| Tb [°C] | linear, DB `Pr^0.3` (current default) | linear, DB `Pr^0.4` | Gnielinski C¹ |
+|---|---|---|---|
+| 9 | 0.95, 4.374, Re 2940 | 0.95, 4.396 | 1.10, 4.305, Re 3380 |
+| 5 | 0.80, 3.872 / **1.05, 3.970** | 0.80, 3.872 / **1.05, 3.995** | 0.80, 3.872 / **1.20, 3.877** |
+| 3 | 0.75, 3.723 / **1.15, 3.778** | 0.75, 3.723 / **1.10, 3.802** | **0.75, 3.723** / 1.25, 3.675 |
+| 1 | 0.70, 3.582 / **1.25, 3.586** | 0.70, 3.582 / **1.20, 3.612** | **0.70, 3.582** (only one) |
+| −5 | **0.55, 3.209** / 1.65, 2.967 (Re 2444) | **0.55, 3.209** / 1.65, 2.989 | **0.55, 3.209** (only one) |
+
+(bold: global maximum)
+- **The two-branch structure is robust**: in all three models there is a laminar maximum (Re < 2200)
+  and, in warm ground, a transitional one (Re ≈ 2500–3400); the optimal flow jumps from one to the
+  other as the ground cools. The laminar branch is identical in all models (same laminar Nu and
+  friction).
+- **Where the jump happens is not**: COP1 between 1 and 0 °C (linear blends), between 5 and 4 °C
+  (Gnielinski C¹); COP2 between 0/−1 °C, −1/−2 °C and 4/3 °C. The C¹ blend makes h rise slowly
+  just above 2300, so the transitional optimum moves to higher Re (≈ 3000–3400, 1.1–1.2 × design)
+  and is worth less.
+- **The cold-ground transitional maximum of the linear blends is an artefact** of the kink at
+  Re = 2300 (e.g. 1.65 × at −5 °C, Re 2444, the spurious maximum noted in #36): with the C¹ blend it
+  is gone below 3 °C.
+- **COP is flat between the branches near the switch**: e.g. 3.877 vs 3.872 at 5 °C (Gnielinski),
+  3.586 vs 3.582 at 1 °C (linear): < 0.2 %. In practice, from ≈ 5 °C down the laminar flow
+  (≈ 0.7–0.8 × design, lower pump power) costs almost nothing; the exact switch temperature is
+  within the uncertainty of the transition heat transfer (± 4 K here).
+- Grid 0.05 × design; a finer grid would sharpen the switch temperatures, not change the picture.

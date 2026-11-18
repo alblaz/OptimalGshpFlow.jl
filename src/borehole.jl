@@ -40,7 +40,8 @@ Model a borehole with a single U-pipe with burial depth `D` and length `H`.
 - `pipe_position::NTuple{2, Tuple{T, T}} = [(0.03, 0.0), (-0.03, 0.0)]`: positions of the downward and upward branches of the pipe. (0, 0) represents the center of the borehole.
 - `rb = 0.115/2`: borehole radius
 - `transition = SmoothTransition()`: laminar-turbulent transition model for the fluid-to-pipe heat
-  transfer coefficient, `SmoothTransition()` or `SharpTransition()` (see `NusseltTransition`)
+  transfer coefficient, `SmoothTransition()`, `SharpTransition()` or `GnielinskiTransition()`
+  (see `NusseltTransition`)
 """
 @with_kw struct SingleUPipeBorehole{T <: Real} <: Borehole @deftype T
     λg = 2.5                            # grout conductivity
