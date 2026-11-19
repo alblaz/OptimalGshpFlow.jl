@@ -12,6 +12,7 @@ Usage:
     r = Refrigerant("R290")
     fixed = season(r; flow = 1.0); opt = season(r; flow = :optimal)
     report_season(fixed); report_season(opt)
+    nodp = season(r; flow = 1.0, refrigerant_pressure_drop = nothing)    # without the refrigerant Δp
 =#
 include(joinpath(@__DIR__, "optimalflow_components.jl"))
 
@@ -28,45 +29,48 @@ function solve_point(S, u)
 end
 
 # flow sweep at Tb: COP1 optimum on the grid (valid points) and the solution there
-function optimal_point(r, Tb; sf = BRINE_PROPS, bh = BOREHOLE, flows = FLOWS)
-    u0 = first_guess(heatpump(r, first(flows); sf = sf, Tb = Tb, bh = bh), Tb)
-    res = continuation(Vf -> heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh), flows, u0, TrustRegion(); abstol = 1e-9)
-    o = optimum(postprocess(r, res, Tb, sf, bh), :COP1)
+function optimal_point(r, Tb; sf = BRINE_PROPS, bh = BOREHOLE, flows = FLOWS,
+                       refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
+    hp(Vf) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
+    u0 = first_guess(hp(first(flows)), Tb)
+    res = continuation(hp, flows, u0, TrustRegion(); abstol = 1e-9)
+    o = optimum(postprocess(r, res, Tb, sf, bh; refrigerant_pressure_drop = refrigerant_pressure_drop), :COP1)
     x = res[findfirst(x -> x.λ == o.row.Vf, res)]
     return x.λ, x.u
 end
 
 """
-    season(r; flow = 1.0, days = 180, dt = 3600, g = GROUND, sf = BRINE_PROPS, bh = BOREHOLE) -> Vector
+    season(r; flow = 1.0, days = 180, dt = 3600, g = GROUND, sf = BRINE_PROPS, bh = BOREHOLE,
+           refrigerant_pressure_drop = default_refrigerant_pressure_drop(r)) -> Vector
 
 Continuous operation over `days`, time step `dt` [s]; `flow` a fixed flow factor or `:optimal`
 (re-optimised daily). One row per step: time, `Tb`, flow, evaporation temperature, duties, powers,
-COPs and validity issues.
+COPs and validity issues. `refrigerant_pressure_drop = nothing`: the original equations.
 """
-function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PROPS, bh = BOREHOLE)
+function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PROPS, bh = BOREHOLE,
+                refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
+    hp(Vf, Tb) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
     hist = UniformLoadHistory(g, dt)          # tabulated ILS responses: O(n) per step, no expint
     rows = []
-    Vf, u = flow === :optimal ? optimal_point(r, g.Tg; sf = sf, bh = bh) :
-            (float(flow), last(continuation(λ -> heatpump(r, λ; sf = sf, Tb = g.Tg, bh = bh), 2.0:-0.05:float(flow),
-                first_guess(heatpump(r, 2.0; sf = sf, Tb = g.Tg, bh = bh), g.Tg), TrustRegion(); abstol = 1e-9)).u)
-    S = heatpump(r, Vf; sf = sf, Tb = g.Tg, bh = bh)
+    Vf, u = flow === :optimal ? optimal_point(r, g.Tg; sf = sf, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop) :
+            (float(flow), last(continuation(λ -> hp(λ, g.Tg), 2.0:-0.05:float(flow),
+                first_guess(hp(2.0, g.Tg), g.Tg), TrustRegion(); abstol = 1e-9)).u)
+    S = hp(Vf, g.Tg)
     for n in 0:round(Int, days * DAY / dt) - 1
         t = n * dt
         Tb = borehole_wall_temperature(hist)
         if flow === :optimal && n > 0 && t % DAY == 0
-            Vf, u = optimal_point(r, Tb; sf = sf, bh = bh)
-            S = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh)
+            Vf, u = optimal_point(r, Tb; sf = sf, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
+            S = hp(Vf, Tb)
         end
         S = set_fixed(S; T_ground = Tb)
         un = solve_point(S, u)
         un === nothing && (@warn "no solution at t = $(t/DAY) d, Tb = $(Tb - 273.15) °C"; break)
         u = un
-        ph = physical(S, u)
-        es = evaporator_solution(S.components.evaporator, ph.evaporator, port_values(S, u, :evaporator))
-        bs = borehole_solution(S.components.borehole, port_values(S, u, :borehole))
-        push_load!(hist, bs.Qb / bh.H)
-        push!(rows, (t = t, Tb = Tb, Vf = Vf, Te = es.twophase_region.Tcl, qb = bs.Qb / bh.H,
-                     performance(es, bs, r, sf)..., issues = unique(i.message for i in validity_issues(S, u))))
+        v = evaluate(S, u, r, sf)
+        push_load!(hist, v.bs.Qb / bh.H)
+        push!(rows, (t = t, Tb = Tb, Vf = Vf, Te = v.es.twophase_region.Tcl, qb = v.bs.Qb / bh.H, Δp = v.Δp,
+                     v.perf..., issues = unique(i.message for i in validity_issues(S, u))))
     end
     return rows
 end
