@@ -67,9 +67,10 @@ Candidates, roughly in order:
 2. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
    temperature of a mixture; then allow the pressure drop for mixtures.
 3. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
-4. The `rb` radius/diameter question of the ILS example (8b caveats); post-processing cost already
+4. Suction line (lumped Δp, L ≈ 0.3–0.5 m for packaged units), low priority, after B11.
+5. The `rb` radius/diameter question of the ILS example (8b caveats); post-processing cost already
    fixed in #53 (2.2 ms → 30 µs per point).
-5. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
+6. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
    load aggregation (Claesson & Javed) for multi-year runs.
 Test pitfall to remember: in a `@testset`, a closure calling a local keyword function of the
 testset (e.g. `map(...) do e; coupled(e); end`) boxes it and makes NonlinearSolve/Clapeyron infer
@@ -791,8 +792,16 @@ relative to no refrigerant Δp; Longo-type = the upper estimate of Δp):
 - At half speed and design flow or more, the capacity barely changes (≤ 0.01 %) despite
   0.5–1.5 kPa. Likely cause, not checked: the moving boundary gives the two-phase zone more area
   from an oversized superheat zone.
-- Not modelled: the suction line and ports between evaporator and compressor, usually a larger Δp
-  than the 13 Pa of the superheat zone; it would lower ρ_suction (capacity) directly.
+- Not modelled: the suction line between evaporator and compressor; it would lower ρ_suction
+  (capacity) directly. Packaged units ≤ 10 kW have short lines (user, 2026-11-19: take the lower
+  end, ≈ 0.3–0.5 m, a few bends). Estimate (R290, −10 °C, ṁ ≈ 0.015 kg/s, 1 m + 4 bends): 5/8" tube
+  ≈ 1.5 kPa (0.12 K, capacity ≈ −0.4 %), 1/2" ≈ 4.4 kPa (0.37 K, ≈ −1.2 %); strongly dependent on
+  D (friction ∝ D⁻⁵, fittings ∝ D⁻⁴). Same order as the two-phase Δp, not larger. The pressure
+  drop inside a hermetic compressor belongs to its measured efficiencies (do not count it twice).
+  Plan: B11 first (below), then optionally a lumped `(f L/D + ΣK) ρv²/2` line, off by default.
+- B11 (found here): with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp, T_suc) Vref while the
+  evaporator delivers ρ(pe, T_suc) Vref (mass not conserved), and its inlet enthalpy at (pe − Δp,
+  T_suc) instead of the evaporator outlet enthalpy. Fix in `fix/suction-mass-balance`.
 
 Season (spline R290, 180 days hourly, as 8b):
 
