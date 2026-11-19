@@ -157,34 +157,40 @@ function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs)
     Tr_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, rs.ρsup * c.Vref, xs)
     NTU = U * phx.A * xs / Cs
     γ = (rs.Te - Tr_in) / (Tr_in - Ts_m)
-    return (Cs = Cs, NTU = NTU, γ = γ, ϵ = effectiveness_counterflow(NTU, γ), Tr_in = Tr_in, Δp = Δp)
+    return (U = U, Cs = Cs, NTU = NTU, γ = γ, ϵ = effectiveness_counterflow(NTU, γ), Tr_in = Tr_in, Δp = Δp)
+end
+
+# superheat zone: U value, capacities of the secondary fluid and of the refrigerant (mean over the
+# superheat), NTU referred to the smaller capacity, capacity ratio
+function _superheat_zone(c::Evaporator, xs, Ts_h, Ts_m, rs)
+    sf, phx = c.secondaryfluid, c.plateheatexchanger
+    Tsm = (Ts_h + Ts_m)/2
+    U, _, _ = evaporator_uvalue_superheat(Tsm, c.Vs, c.Vref, rs, sf, phx)
+    Cs = sf.ρ(Tsm) * sf.cp(Tsm) * c.Vs
+    Cref = rs.ρsup * c.Vref * (rs.hsup - rs.hes) / c.ΔTsup
+    Cmin = min(Cref, Cs)
+    return (U = U, Cs = Cs, Cref = Cref, Cmin = Cmin, Cr = Cmin / max(Cref, Cs), NTU = U * phx.A * (1 - xs) / Cmin)
 end
 
 function _evaporator_balances!(du, c::Evaporator, x, Ts_h, Ts_l, rs)
     (; Qe, Qsup, ϵsup, xs, Ts_m) = x
-    sf, phx, ΔTsup = c.secondaryfluid, c.plateheatexchanger, c.ΔTsup
-    (; Te, hes, hsup, ρsup) = rs
+    ΔTsup = c.ΔTsup
+    (; Te, hes, ρsup) = rs
     m = ρsup * c.Vref
 
     # two-phase (counter-flow, refrigerant temperature changing with the pressure drop)
     z = _twophase_zone(c, Qe, xs, Ts_l, Ts_m, rs)
 
     # superheat (as evaporator_balances!)
-    Tsm_sup = (Ts_h + Ts_m)/2
-    Usup, _, _ = evaporator_uvalue_superheat(Tsm_sup, c.Vs, c.Vref, rs, sf, phx)
-    Cs_sup = sf.ρ(Tsm_sup) * sf.cp(Tsm_sup) * c.Vs
-    Cref_sup = m * (hsup - hes) / ΔTsup
-    Cmin_sup = min(Cref_sup, Cs_sup)
-    Cr = Cmin_sup / max(Cref_sup, Cs_sup)
+    h = _superheat_zone(c, xs, Ts_h, Ts_m, rs)
 
     du[1] = z.Cs * (Ts_m - Ts_l) - Qe                 # secondary fluid, two-phase zone
     du[2] = m * (hes - c.hei) - Qe                     # refrigerant, two-phase zone
     du[3] = z.ϵ * z.Cs * (Ts_m - z.Tr_in) - Qe         # ε-NTU (Qiao)
-    du[4] = Cs_sup * (Ts_h - Ts_m) - Qsup              # secondary fluid, superheat
-    du[5] = Cref_sup * ΔTsup - Qsup                    # refrigerant, superheat
-    du[6] = ϵsup * Cmin_sup * (Ts_h - Te) - Qsup       # ε-NTU
-    NTUsup = Usup * phx.A * (1 - xs) / Cmin_sup
-    du[7] = (1 - exp(-NTUsup * (1 - Cr))) / (1 - Cr * exp(-NTUsup * (1 - Cr))) - ϵsup
+    du[4] = h.Cs * (Ts_h - Ts_m) - Qsup                # secondary fluid, superheat
+    du[5] = h.Cref * ΔTsup - Qsup                      # refrigerant, superheat
+    du[6] = ϵsup * h.Cmin * (Ts_h - Te) - Qsup         # ε-NTU
+    du[7] = (1 - exp(-h.NTU * (1 - h.Cr))) / (1 - h.Cr * exp(-h.NTU * (1 - h.Cr))) - ϵsup
     return nothing
 end
 
@@ -230,6 +236,28 @@ function evaporator_solution(c::Evaporator, x, p)
 end
 
 _pe(c::Evaporator, x) = c.formulation isa NestedPressure ? x[1] : p_sat(c.refrigerant, x[1])
+
+"""
+    evaporator_zones(c::Evaporator, x, p) -> (; twophase, superheat)
+
+Zone quantities of a solution (`x` physical unknowns, `p` port values), as used in the residuals:
+- `twophase`: U value `U`, brine capacity `Cs`, `NTU = U A xs / Cs`, `γ`, refrigerant temperatures
+  `Tr_in` (inlet) and `Te` (end of the zone), pressure drop `Δp`;
+- `superheat`: `U`, brine and refrigerant capacities `Cs`, `Cref` (mean over the superheat),
+  `NTU_s = U A (1 − xs)/Cs` and `NTU_r = U A (1 − xs)/Cref`.
+Constant within each zone, so the temperature profiles follow in closed form (e.g.
+`examples/evaporator_profiles.jl`). The refrigerant state is evaluated from the pressure
+(`NestedPressure`) whatever the formulation.
+"""
+function evaporator_zones(c::Evaporator, x, p)
+    pe = _pe(c, x)
+    rs = refrigerant_state!(nothing, NestedPressure(), c.refrigerant, pe, (), c.ΔTsup)
+    z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs)
+    h = _superheat_zone(c, x.xs, p.Ts_in, x.Ts_m, rs)
+    Asup = c.plateheatexchanger.A * (1 - x.xs)
+    return (twophase = (U = z.U, Cs = z.Cs, NTU = z.NTU, γ = z.γ, Tr_in = z.Tr_in, Te = rs.Te, Δp = z.Δp),
+            superheat = (U = h.U, Cs = h.Cs, Cref = h.Cref, NTU_s = h.U * Asup / h.Cs, NTU_r = h.U * Asup / h.Cref))
+end
 
 """
     evaporator_pressure_drop(c::Evaporator, x, p) -> NamedTuple

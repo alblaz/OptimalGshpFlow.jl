@@ -162,6 +162,17 @@ using NonlinearSolve, ForwardDiff
         @test 0 < dp.Δp_twophase < 2e4 && dp.Tr_in > dp.Te && dp.γ > 0 && dp.Δp_superheat > 0
         # the refrigerant enters the two-phase zone warmer: the evaporation temperature falls a little
         @test 0 < x0.evaporator.Te - x1.evaporator.Te < 1
+        # zone quantities: the closed-form profiles of both zones reach the solved far-end temperatures
+        pv1 = port_values(S1, sol1.u, :evaporator)
+        zn = evaporator_zones(e1, x1.evaporator, pv1)
+        @test zn.twophase.Tr_in ≈ dp.Tr_in && zn.twophase.Δp ≈ dp.Δp_twophase
+        Nt, ΔTs = zn.twophase.NTU, zn.twophase.Te - zn.twophase.Tr_in
+        D1 = (pv1.Ts_out - zn.twophase.Tr_in - ΔTs/Nt) * exp(Nt) + ΔTs/Nt          # brine − refrigerant at xs
+        @test D1 ≈ x1.evaporator.Ts_m - zn.twophase.Te atol = 1e-8
+        k = zn.superheat.NTU_s - zn.superheat.NTU_r
+        Ik = (x1.evaporator.Ts_m - zn.twophase.Te) * (exp(k) - 1) / k
+        @test zn.twophase.Te + zn.superheat.NTU_r * Ik ≈ zn.twophase.Te + e1.ΔTsup atol = 1e-6
+        @test x1.evaporator.Ts_m + zn.superheat.NTU_s * Ik ≈ pv1.Ts_in atol = 1e-6
         # the suction pressure reaches the compressor
         es = evaporator_solution(e1, x1.evaporator, port_values(S1, sol1.u, :evaporator))
         @test compressor_power(313.15, 0.7, es, cla; Δp_suction = 1e3) > compressor_power(313.15, 0.7, es, cla)

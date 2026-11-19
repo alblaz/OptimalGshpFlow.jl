@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-19 (feature/ils-ground).
+Last updated: 2026-11-19 (feature/evaporator-zone-profiles).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -40,7 +40,8 @@ unconstrained solvers can be used.
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
-| 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles) | PR #56 |
+| 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles, compressor speed sweep) | merged (#56) |
+| 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | PR #57 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -49,6 +50,26 @@ unconstrained solvers can be used.
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
 `pr_min` read as Pa (1e-2 Pa) instead of a pressure.
+
+## Next steps (handoff 2026-11-19)
+Done in the last sessions: Tb sweep and season (ILS ground, `UniformLoadHistory`), Gnielinski C¹
+default, plate Δp fix, post-processing speed, refrigerant pressure drop (Amalfi default, Longo-type
+fits) in the evaporator with Qiao's ε, profiles and speed sweep (`examples/evaporator_profiles.jl`;
+design and results in `docs/dev/glide.md`).
+Candidates, roughly in order:
+1. Effect of the refrigerant pressure drop on the studies: `study_tb` / `season` with and without
+   (Te, COP, optimal flow); cheap, uses `heatpump(...; refrigerant_pressure_drop)`.
+2. Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
+   add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
+   low end of Amalfi's database).
+3. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
+   temperature of a mixture; then allow the pressure drop for mixtures.
+4. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
+5. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
+   load aggregation (Claesson & Javed) for multi-year runs.
+Test pitfall to remember: in a `@testset`, a closure calling a local keyword function of the
+testset (e.g. `map(...) do e; coupled(e); end`) boxes it and makes NonlinearSolve/Clapeyron infer
+on abstract types (25 min); write straight-line code.
 
 ## Refrigerants of interest
 - **Priority: natural, low-GWP pure fluids** (European move away from HFCs): R290 (main case),
