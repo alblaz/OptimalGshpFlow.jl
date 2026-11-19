@@ -42,7 +42,7 @@ unconstrained solvers can be used.
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
 | 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles, compressor speed sweep) | merged (#56) |
 | 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | merged (#57) |
-| 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, optimal flow unchanged); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | PR #58 |
+| 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | PR #58 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -57,8 +57,9 @@ Done in the last sessions: Tb sweep and season (ILS ground, `UniformLoadHistory`
 default, plate Δp fix, post-processing speed, refrigerant pressure drop (Amalfi default, Longo-type
 fits) in the evaporator with Qiao's ε, profiles and speed sweep (`examples/evaporator_profiles.jl`;
 design and results in `docs/dev/glide.md`).
-Done (5d): the refrigerant pressure drop changes COP1 by only −0.2 % and leaves the optimal flow
-unchanged (`feature/pressure-drop-studies` below).
+Done (5d): the refrigerant pressure drop changes COP1 by only −0.2 % and capacity by −0.3 % at
+design speed and leaves the optimal flow unchanged; at high compressor speed capacity drops up to
+0.5 % (Amalfi) or 2.5 % (Longo-type) (`feature/pressure-drop-studies` below).
 Candidates, roughly in order:
 1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
@@ -745,7 +746,8 @@ Examples only. `study`, `study_tb`, `postprocess`, `season`, `optimal_point` tak
 fluid; `nothing` = original equations). Shared `evaluate(S, u, r, sf)`: with a Δp model the
 superheat-zone Δp now lowers the compressor suction pressure (`Δp_suction`; before, the examples
 left it at 0). Rows carry `Δp`, `Δp_sup`, `Tr_in`. `pressure_drop_tb(r)` / `report_pressure_drop_tb`
-compare the two cases.
+compare the two cases; `pressure_drop_grid` / `report_pressure_drop_grid`: capacity and COP1 over
+Tb × compressor speed × brine flow for none / Amalfi / Longo-type.
 
 Tb sweep (Clapeyron R290, 15 Tb × 39 flows, 7.6 s for both cases after compilation):
 
@@ -762,6 +764,35 @@ Tb sweep (Clapeyron R290, 15 Tb × 39 flows, 7.6 s for both cases after compilat
   are tied (COP1 3.8677 vs 3.8677 without, 3.8597 vs 3.8591 with): the jump 0.77 → 1.19 is a
   tie-break, not an effect of the pressure drop.
 - Suction Δp of the superheat zone: 13 Pa (Tb 0 °C, design flow), no effect on W.
+- Capacity (evaporator duty Q2 = ṁ Δh, ṁ = ρ_suction V_ref, user's point 2026-11-19): at design
+  flow −0.29/−0.30 % at every Tb, i.e. about 1.5× the COP1 change. ρ_suction follows the dew
+  pressure: ≈ 3.3 %/K of Te against ≈ 2.3 %/K for COP1 (W falls too). Over the whole flow grid
+  −0.14 % (Vf 2, Tb −5) to −0.37 % (Vf 0.25, Tb −5): the low brine flows lose most.
+
+Capacity vs compressor speed × brine flow (`pressure_drop_grid`, spline R290, 1.6 s; changes
+relative to no refrigerant Δp; Longo-type = the upper estimate of Δp):
+
+| Tb | speed | Vf | Q2 (no Δp) | Amalfi Δp | ΔQ2 / ΔCOP1 Amalfi | Longo-type Δp | ΔQ2 / ΔCOP1 Longo |
+|---|---|---|---|---|---|---|---|
+| −5 | 0.5 | 0.25 | 2015 W | 1.2 kPa | −0.19 / −0.11 % | 2.1 kPa | −0.33 / −0.18 % |
+| −5 | 0.5 | 1.0 | 2109 W | 0.8 kPa | −0.01 / −0.01 % | 1.3 kPa | −0.01 / −0.01 % |
+| −5 | 1.0 | 0.25 | 3449 W | 2.2 kPa | −0.37 / −0.19 % | 7.4 kPa | −1.23 / −0.62 % |
+| −5 | 1.0 | 1.0 | 3849 W | 2.2 kPa | −0.29 / −0.16 % | 7.4 kPa | −0.98 / −0.53 % |
+| −5 | 1.5 | 0.25 | 4557 W | 3.1 kPa | −0.52 / −0.24 % | 15.0 kPa | −2.54 / −1.17 % |
+| −5 | 1.5 | 1.0 | 5269 W | 3.2 kPa | −0.46 / −0.24 % | 16.0 kPa | −2.30 / −1.16 % |
+| 9 | 1.0 | 1.0 | 6006 W | 3.3 kPa | −0.30 / −0.24 % | 10.7 kPa | −0.97 / −0.76 % |
+| 9 | 1.5 | 0.25 | 6536 W | 4.2 kPa | −0.51 / −0.30 % | 20.1 kPa | −2.40 / −1.43 % |
+| 9 | 1.5 | 2.0 | 8923 W | 4.9 kPa | −0.44 / −0.34 % | 23.4 kPa | −2.14 / −1.62 % |
+
+- Capacity loses about twice as much as COP1. The loss grows with compressor speed (G, Δp) and
+  at low brine flow. With Amalfi it stays ≤ 0.5 %. With the Longo-type fit (Δp ∝ G²) it reaches
+  2.5 % at 1.5× speed, so the choice of correlation (Longo 2012 R290 data) matters for capacity at
+  high speed.
+- At half speed and design flow or more, the capacity barely changes (≤ 0.01 %) despite
+  0.5–1.5 kPa. Likely cause, not checked: the moving boundary gives the two-phase zone more area
+  from an oversized superheat zone.
+- Not modelled: the suction line and ports between evaporator and compressor, usually a larger Δp
+  than the 13 Pa of the superheat zone; it would lower ρ_suction (capacity) directly.
 
 Season (spline R290, 180 days hourly, as 8b):
 

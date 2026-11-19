@@ -15,6 +15,7 @@ Needs NonlinearSolve in the environment. Usage:
     old  = original(); compare(rows, old)          # original API (spline Refrigerant)
     tb = study_tb(ClapeyronRefrigerant("R290")); report_tb(tb)
     c = pressure_drop_tb(ClapeyronRefrigerant("R290")); report_pressure_drop_tb(c)   # with/without refrigerant Δp
+    g = pressure_drop_grid(Refrigerant("R290")); report_pressure_drop_grid(g)          # capacity vs speed × flow
 =#
 using OptimalGshpFlow, NonlinearSolve, CoolProp, LinearAlgebra, Printf
 
@@ -252,18 +253,64 @@ pressure_drop_tb(r; Tbs = TBS, kwargs...) =
     report_pressure_drop_tb(c)
 
 Per ground temperature, at the COP1 optimum of each case: optimal flow, COP1, evaporation (dew)
-temperature and two-phase Δp (with) at the best grid point; then the change of COP1 at a fixed flow
-(design flow, both cases at the same grid point).
+temperature and two-phase Δp (with) at the best grid point; then the change of COP1 and of the
+evaporator duty Q2 (capacity) at a fixed flow (design flow, both cases at the same grid point).
 """
 function report_pressure_drop_tb(c)
-    @printf("%7s | %6s %7s %8s | %6s %7s %8s %8s %7s | %8s %7s\n", "Tb[°C]", "Vf*", "COP1*", "Te[°C]", "Vf*", "COP1*",
-            "Te[°C]", "Δp[kPa]", "ΔTsat", "ΔCOP1*", "ΔCOP1@1")
+    @printf("%7s | %6s %7s %8s | %6s %7s %8s %8s %7s | %8s %7s %7s\n", "Tb[°C]", "Vf*", "COP1*", "Te[°C]", "Vf*", "COP1*",
+            "Te[°C]", "Δp[kPa]", "ΔTsat", "ΔCOP1*", "ΔCOP1@1", "ΔQ2@1")
     for (a, b) in zip(c.without, c.with)
         oa, ob = a.COP1, b.COP1
         ra = a.rows[findfirst(x -> x.Vf ≈ 1, a.rows)]; rb = b.rows[findfirst(x -> x.Vf ≈ 1, b.rows)]
-        @printf("%7.1f | %6.3f %7.3f %8.2f | %6.3f %7.3f %8.2f %8.2f %7.3f | %7.2f%% %6.2f%%\n", a.Tb - 273.15,
+        @printf("%7.1f | %6.3f %7.3f %8.2f | %6.3f %7.3f %8.2f %8.2f %7.3f | %7.2f%% %6.2f%% %6.2f%%\n", a.Tb - 273.15,
                 oa.Vf, oa.value, oa.row.Te - 273.15, ob.Vf, ob.value, ob.row.Te - 273.15, ob.row.Δp/1e3,
-                ob.row.Tr_in - ob.row.Te, 100(ob.value/oa.value - 1), 100(rb.COP1/ra.COP1 - 1))
+                ob.row.Tr_in - ob.row.Te, 100(ob.value/oa.value - 1), 100(rb.COP1/ra.COP1 - 1), 100(rb.Q2/ra.Q2 - 1))
     end
     println("left: without refrigerant Δp; right: with (Amalfi 2016). ΔTsat = T_r,in − Te (two-phase zone).")
+end
+
+const PRESSURE_DROP_MODELS = (none = nothing, amalfi = Amalfi2016(), longo = LONGO_FITS.r404a_vaporisation)
+
+"""
+    pressure_drop_grid(r; Tbs = (268.15, 282.15), speeds = (0.5, 1.0, 1.5), flows = FLOWS,
+                       models = PRESSURE_DROP_MODELS) -> Dict
+
+Capacity and COP over ground temperature × compressor speed × brine flow for each refrigerant
+pressure-drop model (`nothing`, Amalfi 2016, Longo-type fit: the upper end of the Δp estimates).
+`Dict((model, Tb, speed) => Dict(Vf => (Q2, COP1, Te, Δp)))`; see [`report_pressure_drop_grid`](@ref).
+"""
+function pressure_drop_grid(r; Tbs = (268.15, 282.15), speeds = (0.5, 1.0, 1.5), flows = FLOWS,
+                            models = PRESSURE_DROP_MODELS)
+    out = Dict{Tuple{Symbol, Float64, Float64}, Dict{Float64, Any}}()
+    for k in keys(models), Tb in Tbs, s in speeds
+        hp(Vf) = heatpump(r, Vf; Tb = Tb, speed = s, refrigerant_pressure_drop = models[k])
+        res = continuation(hp, flows, first_guess(hp(first(flows)), Tb), TrustRegion(); abstol = 1e-9)
+        d = Dict{Float64, Any}()
+        for x in res
+            x.ok || (@warn "$k: no solution at Tb = $(Tb - 273.15) °C, speed $s, $(x.λ) × design flow"; continue)
+            v = evaluate(hp(x.λ), x.u, r, BRINE_PROPS)
+            d[round(x.λ, digits = 2)] = (Q2 = v.perf.Q2, COP1 = v.perf.COP1, Te = v.es.twophase_region.Tcl, Δp = v.Δp)
+        end
+        out[(k, Tb, s)] = d
+    end
+    return out
+end
+
+"""
+    report_pressure_drop_grid(g; Vfs = (0.25, 0.5, 1.0, 2.0))
+
+Changes of the evaporator duty Q2 (capacity) and of COP1 with the Amalfi and Longo-type pressure
+drops, relative to no refrigerant pressure drop, at the flows `Vfs` of [`pressure_drop_grid`](@ref).
+"""
+function report_pressure_drop_grid(g; Vfs = (0.25, 0.5, 1.0, 2.0))
+    @printf("%5s %5s %5s | %7s %7s | %7s %7s %7s | %7s %7s %7s\n", "Tb", "speed", "Vf", "Q2[W]", "Te[°C]",
+            "ΔpA kPa", "dQ2 A%", "dCOP A%", "ΔpL kPa", "dQ2 L%", "dCOP L%")
+    for (k, Tb, s) in sort!(collect(filter(k -> k[1] === :none, keys(g))); by = k -> (k[2], k[3])), Vf in Vfs
+        a = get(g[(:none, Tb, s)], Vf, nothing); b = get(g[(:amalfi, Tb, s)], Vf, nothing); l = get(g[(:longo, Tb, s)], Vf, nothing)
+        (a === nothing || b === nothing || l === nothing) && continue
+        @printf("%5.0f %5.1f %5.2f | %7.0f %7.2f | %7.2f %7.2f %7.2f | %7.2f %7.2f %7.2f\n", Tb - 273.15, s, Vf, a.Q2,
+                a.Te - 273.15, b.Δp/1e3, 100(b.Q2/a.Q2 - 1), 100(b.COP1/a.COP1 - 1), l.Δp/1e3, 100(l.Q2/a.Q2 - 1),
+                100(l.COP1/a.COP1 - 1))
+    end
+    println("A: Amalfi 2016; L: Longo-type fit (ζ = 1.667). Q2 and Te without refrigerant Δp.")
 end
