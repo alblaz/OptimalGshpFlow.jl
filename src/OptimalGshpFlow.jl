@@ -35,7 +35,7 @@ include("properties/tv_state.jl")
 export volume_pT, p_Tv, h_Tv, s_Tv, cp_Tv, ρ_Tv, μ_Tv, λ_Tv, pressure_residual
 export volume_transform, volume_to_R, volume_from_R, saturation_T, p_sat
 export ClapeyronRefrigerant, TransportBackend, EntropyScalingTransport, CoolPropTransport
-export cp_twophase, T_ps, h_ps
+export cp_twophase, T_ps, h_ps, T_ph
 
 include("evaporatordesign.jl")
 include("pipeflow.jl")        # before borehole.jl: defines NusseltTransition

@@ -47,11 +47,26 @@ by the pressure drop and the glide (Qiao 2025, Appl. Therm. Eng. 279, 127896, eq
 with `ε = (T_f,out − T_f,in)/(T_r,in − T_f,in)` (`f` the single-phase fluid, `r` the refrigerant),
 `NTU = U A / C_f`, `γ = ΔT_sat/(T_r,in − T_f,in)` (`ΔT_sat` the change of the refrigerant
 saturation temperature over the zone caused by the pressure drop) and `φ = C_f/C_r` (glide; 0 for
-a pure fluid). Limits: `γ = 0`, `φ = 0` → `1 − e^{−NTU}`; `φ = 0` → Qiao eq. 58. In an evaporator
-`γ > 0` and `ε` can exceed 1 (the refrigerant enters warmer than it leaves).
+a pure fluid). Limits: `γ = 0`, `φ = 0` → `1 − e^{−NTU}`; `φ = 0` → Qiao eq. 58;
+`φ = 1` (balanced) → `NTU (1 + γ/2)/(1 + NTU)`. In an evaporator `γ > 0` and `ε` can exceed 1 (the
+refrigerant enters warmer than it leaves).
+
+Evaluated as `ε = [E + γ G] / (1/NTU + φ E)` with `a = (1 − φ) NTU`, `E = (1 − e^{−a})/a` and
+`G = (E − e^{−a})/a` (eq. 56 divided by `a`; series near `a = 0`): finite and smooth through
+`φ = 1`.
 """
 function effectiveness_counterflow(NTU, γ, φ = zero(NTU))
     a = (1 - φ) * NTU
+    E, G = _glide_EG(a)
+    return (E + γ * G) / (1/NTU + φ * E)
+end
+
+# E = (1 − e^{−a})/a and G = (E − e^{−a})/a, with their series for |a| < 1e-3 (error ≈ a⁴/100)
+function _glide_EG(a)
+    if abs(a) < 1e-3
+        return (1 - a/2 + a^2/6 - a^3/24, 1/2 - a/3 + a^2/8 - a^3/30)
+    end
     e = exp(-a)
-    return (1 + γ/a - (γ + γ/a + 1) * e) / (1 - φ * e)
+    E = -expm1(-a) / a
+    return (E, (E - e) / a)
 end
