@@ -259,3 +259,18 @@ as a sensitivity bound. Either way the effect is a few tenths of a kelvin at des
   the effect is negligible in both. The mass fluxes of this evaporator (3–13 kg/(m² s)) are at the
   low end of Amalfi's database (5.5–610): the Longo 2012 R290 data would settle which one holds.
   Without refrigerant Δp the COP1 maximum is at ≈ 0.5 × speed (4.097, part-load benefit).
+- Profiles from the model (5c): `evaporator_zones(e, x, p)` gives U, capacities and NTU of each
+  zone; the superheat profile is integrated with `NTU_s`, `NTU_r` of the model (before: an
+  exponential fitted to the end temperatures). In both zones the far-end temperatures are
+  reproduced to 6e-14 K (test in `test/components.jl`).
+- Cost of the refrigerant pressure drop (compiled, per call; design point, Tb = 5 °C):
+
+  | | residual | warm Newton | cold TrustRegion |
+  |---|---|---|---|
+  | spline, no Δp / Amalfi | 1.2 / 4.5 µs | 0.04 / 0.21 ms | 0.15 / 0.82 ms (7 / 8 it) |
+  | Clapeyron, no Δp / Amalfi | 10.8 / 26.0 µs | 0.56 / 0.89 ms | 2.15 / 3.42 ms (7 / 8 it) |
+
+  The extra cost is property calls in the residual: ρ_bubble, h_bubble and σ (three separate
+  CoolProp updates; with Duals, three each for the finite differences) and `T_dew(pe + Δp)`
+  (an inversion for Clapeyron). Possible savings if it matters: one CoolProp update for the
+  three saturated-liquid properties (`_coolprop_values`), and `T_dew(pe + Δp) ≈ Te + (dT/dp) Δp`.
