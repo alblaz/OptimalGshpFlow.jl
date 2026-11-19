@@ -35,11 +35,12 @@ const FLOWS = 2:-0.05:0.1                             # × design brine flow, fr
 const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
 
 # ---- model ----
-function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE,
+# `speed`: compressor speed factor (variable-speed compressor): the displaced volume flow `Vref`
+function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, speed = 1.0,
                   refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = DESIGN.hei,
-                      Vs = Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP, refrigerant_pressure_drop = refrigerant_pressure_drop)
+                      Vs = Vs, Vref = speed * DESIGN.Vref, ΔTsup = ΔTSUP, refrigerant_pressure_drop = refrigerant_pressure_drop)
     bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
@@ -50,8 +51,8 @@ end
 # pumping power: borehole U-pipe (2H) and evaporator plates
 pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf) = pumping_power(es, sf, ηPUMP) + pumping_power(bs, sf, ηPUMP)
 
-function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf)
-    W, Q1 = compressor_condenser_power(TCOND, ηIS, es, r)
+function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf; Δp_suction = 0.0)
+    W, Q1 = compressor_condenser_power(TCOND, ηIS, es, r; Δp_suction = Δp_suction)
     Q2 = es.twophase_region.Q + es.superheat_region.Q
     P  = pump_power(es, bs, sf)
     return (W = W, Q1 = Q1, Q2 = Q2, Ppump = P, COP1 = Q1/(W + P), COP2 = Q2/(W + P))

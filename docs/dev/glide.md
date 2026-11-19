@@ -243,3 +243,19 @@ as a sensitivity bound. Either way the effect is a few tenths of a kelvin at des
   The refrigerant enters the two-phase zone warmer and leaves it colder; the brine profiles hardly
   change. Te (and so the compressor suction) falls by 0.09 K (Amalfi) to 0.29 K (Longo-type), the
   two-phase duty by 0.3–1 %.
+- Variable speed (`speed_sweep` in the same example; figure `examples/figures/evaporator_speed.png`):
+  compressor speed (displaced volume flow `Vref`) 0.3 → 1.5 × design at design brine flow,
+  Tb = 5 °C; suction pressure lowered by the superheat-zone Δp.
+
+  | speed | G [kg/(m² s)] | Amalfi Δp / T_r,in − Te | Longo-type Δp / T_r,in − Te | COP1 change Amalfi / Longo-type |
+  |---|---|---|---|---|
+  | 0.3 | 3.4 | 0.4 kPa / 0.03 K | 0.4 kPa / 0.03 K | ≈ 0 / ≈ 0 |
+  | 0.5 | 5.5 | 1.3 kPa / 0.09 K | 2.1 kPa / 0.15 K | −0.05 % / −0.07 % |
+  | 1.0 | 9.8 | 2.9 kPa / 0.22 K | 9.5 kPa / 0.73 K | −0.2 % / −0.7 % |
+  | 1.5 | 13.4 | 4.2 kPa / 0.35 K | 20.1 kPa / 1.65 K | −0.3 % / −1.4 % |
+
+  The effect grows with speed: Amalfi ≈ linearly in G (`f_tp ∝ We^−0.475`), the Longo form as
+  G², so the two models differ most at high speed (factor 4.8 at 1.5 ×). At part load (≤ 0.5 ×)
+  the effect is negligible in both. The mass fluxes of this evaporator (3–13 kg/(m² s)) are at the
+  low end of Amalfi's database (5.5–610): the Longo 2012 R290 data would settle which one holds.
+  Without refrigerant Δp the COP1 maximum is at ≈ 0.5 × speed (4.097, part-load benefit).

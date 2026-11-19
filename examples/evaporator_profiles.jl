@@ -10,10 +10,16 @@ Profiles from the solution of the evaporator + borehole system (`optimalflow_com
 - superheat zone (xs … 1): counter-flow single-phase profiles, exponential in the area, matched to
   the four end temperatures of the zone.
 
+`speed_sweep` varies the compressor speed (displaced volume flow, i.e. the refrigerant flow, of a
+variable-speed heat pump) at a fixed brine flow: pressure drop, refrigerant temperatures and COP.
+
 Needs NonlinearSolve and CairoMakie in the environment. Usage:
     include("examples/evaporator_profiles.jl")
-    cases = profile_cases(Refrigerant("R290"); Tb = 273.15 + 5, Vf = 1.0)
+    r = Refrigerant("R290")
+    cases = profile_cases(r; Tb = 273.15 + 5, Vf = 1.0)
     fig = plot_profiles(cases); save("examples/figures/evaporator_profiles.png", fig)
+    sw = speed_sweep(r); report_speed(sw)
+    save("examples/figures/evaporator_speed.png", plot_speed(sw))
 =#
 include(joinpath(@__DIR__, "optimalflow_components.jl"))
 using CairoMakie
@@ -101,4 +107,81 @@ function report_profiles(cases)
         @printf("%-24s Δp = %6.0f Pa  T_r,in = %6.2f °C  Te = %6.2f °C  γ = %.3f  Qe = %5.0f W  xs = %.3f\n", c.label,
                 c.dp.Δp_twophase, c.dp.Tr_in - 273.15, c.dp.Te - 273.15, c.dp.γ, c.Qe, c.xs)
     end
+end
+
+const PRESSURE_DROP_CASES = (("no refrigerant Δp", nothing), ("Amalfi 2016", Amalfi2016()),
+                             ("Longo-type, ζ = 1.667", LONGO_FITS.r404a_vaporisation))
+
+# one operating point of the speed sweep
+function speed_point(r, S, u, sf = BRINE_PROPS)
+    e = S.components.evaporator
+    ph = physical(S, u)
+    pv = port_values(S, u, :evaporator)
+    dp = evaporator_pressure_drop(e, ph.evaporator, pv)
+    es = evaporator_solution(e, ph.evaporator, pv)
+    bs = borehole_solution(S.components.borehole, port_values(S, u, :borehole))
+    m = e.Vref * ρ_superheated(e.refrigerant, OptimalGshpFlow._pe(e, ph.evaporator), e.ΔTsup)
+    perf = performance(es, bs, r, sf; Δp_suction = dp.Δp_superheat)
+    return (G = channel_mass_flux(e.plateheatexchanger, m), m = m, Δp = dp.Δp_twophase, Tr_in = dp.Tr_in, Te = dp.Te,
+            γ = dp.γ, Δp_sup = dp.Δp_superheat, perf...)
+end
+
+"""
+    speed_sweep(r; speeds = 0.3:0.1:1.5, Tb = 278.15, Vf = 1.0) -> Vector
+
+For each refrigerant pressure-drop case (none, Amalfi, Longo-type), continuation in the compressor
+speed (from 1 down to `minimum(speeds)` and up to `maximum(speeds)`) at the brine flow `Vf` ×
+design and ground temperature `Tb`. One entry per case: `(label, rows)`, rows sorted by speed.
+"""
+function speed_sweep(r; speeds = 0.3:0.1:1.5, Tb = 273.15 + 5, Vf = 1.0)
+    out = []
+    for (label, model) in PRESSURE_DROP_CASES
+        build(s) = heatpump(r, Vf; Tb = Tb, speed = s, refrigerant_pressure_drop = model)
+        S1, u1 = solve_point(r, Vf, Tb; refrigerant_pressure_drop = model)      # design speed
+        down = sort(filter(≤(1.0), collect(speeds)); rev = true)
+        up = sort(filter(≥(1.0), collect(speeds)))
+        rows = []
+        for branch in (down, up)
+            isempty(branch) && continue
+            res = continuation(build, branch, u1, TrustRegion(); abstol = 1e-9)
+            for x in res
+                x.ok || (@warn "$label: no solution at speed $(x.λ)"; continue)
+                push!(rows, (speed = x.λ, speed_point(r, build(x.λ), x.u)...))
+            end
+        end
+        rows = unique(x -> x.speed, sort(rows; by = x -> x.speed))
+        push!(out, (label = label, rows = rows))
+    end
+    return out
+end
+
+function report_speed(sw)
+    for c in sw
+        println("== ", c.label)
+        @printf("%6s %8s %8s %8s %8s %8s %7s %7s %7s\n", "speed", "G", "Δp[kPa]", "ΔTsat[K]", "Te[°C]", "Q2[W]", "W[W]",
+                "COP1", "γ")
+        for x in c.rows
+            @printf("%6.2f %8.1f %8.2f %8.3f %8.2f %8.0f %7.0f %7.3f %7.3f\n", x.speed, x.G, x.Δp/1e3, x.Tr_in - x.Te,
+                    x.Te - 273.15, x.Q2, x.W, x.COP1, x.γ)
+        end
+    end
+end
+
+function plot_speed(sw)
+    fig = Figure(size = (1100, 380))
+    ax1 = Axis(fig[1, 1]; xlabel = "compressor speed (× design)", ylabel = "two-phase Δp [kPa]",
+               title = "Refrigerant pressure drop")
+    ax2 = Axis(fig[1, 2]; xlabel = "compressor speed (× design)", ylabel = "T_r,in − Te [K]",
+               title = "Saturation temperature drop")
+    ax3 = Axis(fig[1, 3]; xlabel = "compressor speed (× design)", ylabel = "COP1 change [%]",
+               title = "COP1 vs no refrigerant Δp")
+    ref = Dict(x.speed => x.COP1 for x in first(sw).rows)
+    for (c, ls) in zip(sw, (:dash, :solid, :dot))
+        s = [x.speed for x in c.rows]
+        lines!(ax1, s, [x.Δp/1e3 for x in c.rows]; color = :firebrick, linestyle = ls, label = c.label)
+        lines!(ax2, s, [x.Tr_in - x.Te for x in c.rows]; color = :firebrick, linestyle = ls)
+        lines!(ax3, s, [100 * (x.COP1 / ref[x.speed] - 1) for x in c.rows]; color = :firebrick, linestyle = ls)
+    end
+    Legend(fig[2, 1:3], ax1; orientation = :horizontal, framevisible = false)
+    return fig
 end
