@@ -36,3 +36,22 @@ function counterflow_heatexchanger(heatexchanger_solution::HeatExchangerSolution
 
     return x,Tc,Th
 end
+"""
+    effectiveness_counterflow(NTU, γ, φ = 0)
+
+Effectiveness of a counter-flow zone in which the refrigerant temperature changes along the flow
+by the pressure drop and the glide (Qiao 2025, Appl. Therm. Eng. 279, 127896, eq. 56):
+
+`ε = [1 + γ/((1−φ)NTU) − (γ + γ/((1−φ)NTU) + 1) e^{−(1−φ)NTU}] / (1 − φ e^{−(1−φ)NTU})`
+
+with `ε = (T_f,out − T_f,in)/(T_r,in − T_f,in)` (`f` the single-phase fluid, `r` the refrigerant),
+`NTU = U A / C_f`, `γ = ΔT_sat/(T_r,in − T_f,in)` (`ΔT_sat` the change of the refrigerant
+saturation temperature over the zone caused by the pressure drop) and `φ = C_f/C_r` (glide; 0 for
+a pure fluid). Limits: `γ = 0`, `φ = 0` → `1 − e^{−NTU}`; `φ = 0` → Qiao eq. 58. In an evaporator
+`γ > 0` and `ε` can exceed 1 (the refrigerant enters warmer than it leaves).
+"""
+function effectiveness_counterflow(NTU, γ, φ = zero(NTU))
+    a = (1 - φ) * NTU
+    e = exp(-a)
+    return (1 + γ/a - (γ + γ/a + 1) * e) / (1 - φ * e)
+end

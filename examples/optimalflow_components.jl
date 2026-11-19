@@ -35,10 +35,11 @@ const FLOWS = 2:-0.05:0.1                             # × design brine flow, fr
 const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
 
 # ---- model ----
-function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE)
+function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE,
+                  refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = DESIGN.hei,
-                      Vs = Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP)
+                      Vs = Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP, refrigerant_pressure_drop = refrigerant_pressure_drop)
     bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),

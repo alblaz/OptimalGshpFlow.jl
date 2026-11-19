@@ -68,7 +68,7 @@ end
                    Vref = ev.Vref, ΔTsup = 5.)
     b = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.)
     @test allconcrete(e) && allconcrete(b)
-    x  = (Te = 268., Qe = 5e3, Qsup = 300., ϵe = 0.5, ϵsup = 0.5, xs = 0.5, Ts_m = 276.)
+    x  = (Te = 268., Qe = 5e3, Qsup = 300., ϵsup = 0.5, xs = 0.5, Ts_m = 276.)
     pv = (Ts_in = 278., Ts_out = 274.)
     @test isconcretetype(only(Base.return_types(evaporator_solution, (typeof(e), typeof(x), typeof(pv)))))
     @test isconcretetype(only(Base.return_types(borehole_solution, (typeof(b), typeof((Tin = 270., Tout = 272., Tb = 280.))))))
