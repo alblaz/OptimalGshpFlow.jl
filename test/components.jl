@@ -141,6 +141,14 @@ using NonlinearSolve, ForwardDiff
             Tf += h/6 * (k1 + 2k2 + 2k3 + k4); a += h
         end
         @test (Tf - Tfin) / (Trin - Tfin) ≈ effectiveness_counterflow(NTU, ΔTsat / (Trin - Tfin)) rtol = 1e-8
+        # glide (φ = C_f/C_r): balanced counter-flow φ = 1 is finite and continuous (NTU/(1 + NTU)
+        # for γ = 0); a blend in a brine-flow sweep crosses it
+        @test effectiveness_counterflow(2.0, 0.0, 1.0) ≈ 2/3 rtol = 1e-14
+        for γ in (0.0, 0.2), φ in (1 - 1e-7, 1 + 1e-7)
+            @test effectiveness_counterflow(2.0, γ, φ) ≈ effectiveness_counterflow(2.0, γ, 1.0) rtol = 1e-6
+        end
+        @test effectiveness_counterflow(2.0, 0.0, 0.5) ≈ (1 - exp(-1)) / (1 - 0.5exp(-1)) rtol = 1e-14
+        @test effectiveness_counterflow(2.0, 0.0, 2.0) ≈ (1 - exp(2)) / (1 - 2exp(2)) rtol = 1e-14
     end
 
     @testset "evaporator with refrigerant pressure drop" begin
