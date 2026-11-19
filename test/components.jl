@@ -22,21 +22,26 @@ using NonlinearSolve, ForwardDiff
     @testset "defaults and declarations" begin
         @test default_formulation(cla) == SaturationTemperature()
         @test default_formulation(spl) == NestedPressure()
-        @test default_formulation(ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])) == NestedPressure()
+        mix = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])
+        @test default_formulation(mix) == NestedPressure()
+        @test default_refrigerant_pressure_drop(cla) == default_refrigerant_pressure_drop(spl) == Amalfi2016()
+        @test default_refrigerant_pressure_drop(mix) === nothing                # needs the glide
+        @test_throws ArgumentError evap(mix; refrigerant_pressure_drop = Amalfi2016())
         @test nominal_duty(cla, ev.Vref, ev.hei) ≈ ev.Qnom rtol = 0.05      # design point Te = 273 K
         for F in (NestedPressure(), SaturationTemperature(), ExplicitTv())
             e = evap(cla, F)
             @test keys(unknowns(e))[1] == (F isa NestedPressure ? :pe : :Te)
-            @test length(unknowns(e)) == length(residual_scales(e)) - 1 == 7 + n_extra_unknowns(F)
+            @test length(unknowns(e)) == length(residual_scales(e)) - 1 == 6 + n_extra_unknowns(F)
+            @test keys(unknowns(e)) == keys(unknowns(evap(cla, F; refrigerant_pressure_drop = nothing)))
             @test keys(ports(e)) == (:Ts_in, :Ts_out)
         end
     end
 
     @testset "system assembly checks" begin
         e = evap(cla)
-        @test length(standalone(e)) == 8
-        @test length(coupled(e)) == 9
-        @test length(coupled(evap(cla, ExplicitTv()))) == 11
+        @test length(standalone(e)) == 7
+        @test length(coupled(e)) == 8
+        @test length(coupled(evap(cla, ExplicitTv()))) == 10
         # unconnected port, port in two nodes, unknown fixed node, non-square system
         @test_throws ArgumentError ComponentSystem((evaporator = e,); nodes = (T_out = (:evaporator => :Ts_out,),))
         @test_throws ArgumentError ComponentSystem((evaporator = e,);
@@ -44,7 +49,7 @@ using NonlinearSolve, ForwardDiff
         @test_throws ArgumentError ComponentSystem((evaporator = e,);
             nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)), fixed = (T_x = 1.,))
         @test_throws ArgumentError ComponentSystem((evaporator = e,);
-            nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)))   # 9 unknowns, 8 residuals
+            nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)))   # 8 unknowns, 7 residuals
         @test_throws ArgumentError ComponentSystem((evaporator = e,);
             nodes = (T_out = (:evaporator => :Ts_out, :evaporator => :Tx), T_in = (:evaporator => :Ts_in,)), fixed = (T_in = 1.,))
     end
@@ -63,17 +68,23 @@ using NonlinearSolve, ForwardDiff
 
     @testset "residuals = original model residuals / scales ($(F), $(nameof(typeof(r))))" for (r, F) in
             ((cla, NestedPressure()), (cla, SaturationTemperature()), (cla, ExplicitTv()), (spl, NestedPressure()))
-        e = evap(r, F)
+        # without refrigerant pressure drop the component has the original equations, with the
+        # two-phase effectiveness explicit (ϵe = 1 - exp(-NTU)) instead of an unknown
+        e = evap(r, F; refrigerant_pressure_drop = nothing)
         nx = n_extra_unknowns(F)
         # standalone, at a point away from the solution
         sys = standalone(e)
-        x = (Te = 270., Qe = 5e3, Qsup = 300., Ts_m = 276., ϵe = 0.6, ϵsup = 0.7, xs = 0.8)
+        x = (Te = 270., Qe = 5e3, Qsup = 300., Ts_m = 276., ϵsup = 0.7, xs = 0.8)
         u = initial_guess(sys; evaporator = x, nodes = (T_out = 274.,))
-        uo = evaporator_unknowns(F, r, 5.; Te = 270., Qe = 5e3, Qsup = 300., ϵe = 0.6, ϵsup = 0.7, xs = 0.8, Ts_l = 274., Ts_m = 276.)
-        du, duo = zeros(8 + nx), zeros(8 + nx)
+        pe = OptimalGshpFlow._p_dew(r, 270.)
+        U = OptimalGshpFlow.evaporator_uvalue_twophase(275., e.Vs, 5e3, pe, 0.8, sf, r, phx)[1]
+        ϵe = 1 - exp(-U * phx.A * 0.8 / (sf.ρ(275.) * sf.cp(275.) * e.Vs))
+        uo = evaporator_unknowns(F, r, 5.; Te = 270., Qe = 5e3, Qsup = 300., ϵe = ϵe, ϵsup = 0.7, xs = 0.8, Ts_l = 274., Ts_m = 276.)
+        du, duo = zeros(7 + nx), zeros(8 + nx)
         residual!(du, u, sys)
         evaporator_model!(duo, uo, EvaporatorParameters(e, 278.), F)
-        @test du .* collect(residual_scales(e)) ≈ duo rtol = 1e-12
+        @test abs(duo[4]) < 1e-12
+        @test du .* collect(residual_scales(e)) ≈ duo[[1:3; 5:8 + nx]] rtol = 1e-10
         # physical values back
         xp = physical(sys, u)
         @test xp.evaporator.Qe ≈ 5e3 rtol = 1e-14
@@ -81,11 +92,11 @@ using NonlinearSolve, ForwardDiff
         @test port_values(sys, u, :evaporator) == (Ts_in = 278., Ts_out = 274.)
         # Duals pass through
         J = djacobian((d, v) -> residual!(d, v, sys), similar(du), u)
-        @test all(isfinite, J) && size(J) == (8 + nx, 8 + nx)
+        @test all(isfinite, J) && size(J) == (7 + nx, 7 + nx)
     end
 
     @testset "coupled system: same root as evaporatorborehole_model!" begin
-        e = evap(cla)
+        e = evap(cla; refrigerant_pressure_drop = nothing)
         sys = coupled(e)
         u0 = initial_guess(sys; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))
         sol = solve(NonlinearProblem(sys, u0), NewtonRaphson(); abstol = 1e-10)
@@ -113,6 +124,49 @@ using NonlinearSolve, ForwardDiff
         @test bs isa BoreholeSolution
     end
 
+    # Two-phase zone with the refrigerant pressure drop (Qiao 2025, docs/dev/glide.md)
+    @testset "effectiveness with pressure drop (Qiao 2025)" begin
+        @test effectiveness_counterflow(2.0, 0.0) ≈ 1 - exp(-2)
+        @test effectiveness_counterflow(2.0, 1.0) ≈ (1 - exp(-2)) * (1 + 1/2) - exp(-2)     # eq. 58
+        @test effectiveness_counterflow(2.0, 0.2, 1e-9) ≈ effectiveness_counterflow(2.0, 0.2) rtol = 1e-7
+        @test effectiveness_counterflow(4.0, 0.17) > 1          # the refrigerant enters warmer than it leaves
+        # reference: discretised zone, refrigerant temperature linear in the area, RK4 on the fluid
+        # (which flows from a = 1 to a = 0, a = A/A_zone along the refrigerant)
+        Trin, ΔTsat, Tfin, NTU = 268.0, -0.8, 276.0, 2.5
+        Tr(a) = Trin + ΔTsat * a
+        f(a, T) = NTU * (T - Tr(a))
+        n = 2000; h = -1/n; Tf = Tfin; a = 1.0
+        for _ in 1:n
+            k1 = f(a, Tf); k2 = f(a + h/2, Tf + h/2 * k1); k3 = f(a + h/2, Tf + h/2 * k2); k4 = f(a + h, Tf + h * k3)
+            Tf += h/6 * (k1 + 2k2 + 2k3 + k4); a += h
+        end
+        @test (Tf - Tfin) / (Trin - Tfin) ≈ effectiveness_counterflow(NTU, ΔTsat / (Trin - Tfin)) rtol = 1e-8
+    end
+
+    @testset "evaporator with refrigerant pressure drop" begin
+        e0, e1 = evap(cla; refrigerant_pressure_drop = nothing), evap(cla)
+        @test e1.pressure_drop isa Amalfi2016
+        S1 = @inferred coupled(e1)
+        # straight-line code: a closure (map ... do) calling the local keyword function `coupled`
+        # boxed it, and NonlinearSolve and Clapeyron were inferred on abstract types (25 min)
+        S0 = coupled(e0)
+        sol0 = solve(NonlinearProblem(S0, initial_guess(S0; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))),
+                     NewtonRaphson(); abstol = 1e-10)
+        sol1 = solve(NonlinearProblem(S1, initial_guess(S1; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))),
+                     NewtonRaphson(); abstol = 1e-10)
+        @test NonlinearSolve.SciMLBase.successful_retcode(sol0) && NonlinearSolve.SciMLBase.successful_retcode(sol1)
+        x0, x1 = physical(S0, sol0.u), physical(S1, sol1.u)
+        dp0 = evaporator_pressure_drop(e0, x0.evaporator, port_values(S0, sol0.u, :evaporator))
+        dp = evaporator_pressure_drop(e1, x1.evaporator, port_values(S1, sol1.u, :evaporator))
+        @test dp0.Δp_twophase == 0 && dp0.Tr_in == dp0.Te
+        @test 0 < dp.Δp_twophase < 2e4 && dp.Tr_in > dp.Te && dp.γ > 0 && dp.Δp_superheat > 0
+        # the refrigerant enters the two-phase zone warmer: the evaporation temperature falls a little
+        @test 0 < x0.evaporator.Te - x1.evaporator.Te < 1
+        # the suction pressure reaches the compressor
+        es = evaporator_solution(e1, x1.evaporator, port_values(S1, sol1.u, :evaporator))
+        @test compressor_power(313.15, 0.7, es, cla; Δp_suction = 1e3) > compressor_power(313.15, 0.7, es, cla)
+    end
+
     @testset "unscaled system (Qscale = 1) has the same root" begin
         s1 = coupled(evap(cla; Qscale = 1.0)); s2 = coupled(evap(cla))
         sols = map((s1, s2)) do sys
@@ -131,7 +185,7 @@ using NonlinearSolve, ForwardDiff
         @test_throws ArgumentError BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = ev.Vs, λground = 3.5, Tb = 283.15)
         e = evap(cla)
         S = coupled(e)
-        @test length(S) == 9                                     # a fixed node adds no unknown
+        @test length(S) == 8                                     # a fixed node adds no unknown
         S2 = @inferred set_fixed(S; T_ground = 280.15)
         @test typeof(S2) === typeof(S)                           # same type: nothing to recompile
         @test physical(S2, zeros(length(S2))).nodes.T_ground == 280.15

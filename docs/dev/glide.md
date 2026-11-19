@@ -212,3 +212,50 @@ angle (65° there, 30° here); Amalfi's β-dependence alone is a factor 2.07 bet
 Recommendation: Amalfi as the default (general, contains the chevron angle), the Longo-type fits
 as a sensitivity bound. Either way the effect is a few tenths of a kelvin at design flow, i.e.
 γ = ΔT_sat/(T_r,in − T_f,in) ≈ 0.05–0.2: small but not negligible against a 3–5 K approach.
+
+## Step 5b: the model (2026-11-19, `feature/epsntu-pressure-drop`)
+- Component `Evaporator` only (the original API `evaporator_model!` is the frozen reference, Q5):
+  unknowns `(pe|Te, Qe, Qsup, ϵsup, xs, Ts_m, …)`: `ϵe` eliminated, 7 residuals.
+- Two-phase zone: `Qe = ε C_s (T_s,m − T_r,in)`, `ε = effectiveness_counterflow(NTU, γ)` (Qiao
+  eq. 56, φ = 0), `T_r,in = T_dew(pe + Δp)`, `Δp = twophase_pressure_drop(model, …; L = xs L)`
+  (friction + acceleration + gravity, upward flow), inlet quality at `pe`.
+  `refrigerant_pressure_drop = nothing`: `T_r,in = Te`, γ = 0: exactly the original equations
+  (test: component residuals = original residuals with `ϵe = 1 − e^{−NTU}`).
+- Default `default_refrigerant_pressure_drop(r)`: `Amalfi2016()` for pure fluids, `nothing` for
+  mixtures (type-determined, inferred); a mixture with a pressure-drop model is refused.
+- Post-processing: `evaporator_pressure_drop(e, x, p)` → Δp, `T_r,in`, Te, γ, NTU, superheat-zone
+  Δp; `compressor_power(…; Δp_suction)` (also condenser and `compressor_condenser_power`).
+- Validation: Qiao's closed form against an RK4 integration of the zone (1e-8); limits.
+- Design point (R290, Tb = 5 °C, design flow; Clapeyron): Δp = 3.2 kPa, `T_r,in − Te` = 0.21 K,
+  γ = 0.037, NTU = 0.82; superheat-zone Δp 29 Pa.
+- Pitfall found (tests): a closure (`map(...) do`) calling a local keyword function of the
+  testset (`coupled`) made the testset compile for 25 min (abstract NonlinearSolve/Clapeyron
+  inference); straight-line code: 39 s.
+- Example `examples/evaporator_profiles.jl` (spline R290, Tb = 5 °C, design flow; figure in
+  `examples/figures/evaporator_profiles.png`, not tracked):
+
+  | case | two-phase Δp | T_r,in | Te | γ | Qe |
+  |---|---|---|---|---|---|
+  | no refrigerant Δp | 0 | −4.60 °C | −4.60 °C | 0 | 5062 W |
+  | Amalfi 2016 (default) | 2.9 kPa | −4.47 °C | −4.69 °C | 0.046 | 5047 W |
+  | Longo-type ζ = 1.667 | 9.5 kPa | −4.16 °C | −4.89 °C | 0.160 | 5012 W |
+
+  The refrigerant enters the two-phase zone warmer and leaves it colder; the brine profiles hardly
+  change. Te (and so the compressor suction) falls by 0.09 K (Amalfi) to 0.29 K (Longo-type), the
+  two-phase duty by 0.3–1 %.
+- Variable speed (`speed_sweep` in the same example; figure `examples/figures/evaporator_speed.png`):
+  compressor speed (displaced volume flow `Vref`) 0.3 → 1.5 × design at design brine flow,
+  Tb = 5 °C; suction pressure lowered by the superheat-zone Δp.
+
+  | speed | G [kg/(m² s)] | Amalfi Δp / T_r,in − Te | Longo-type Δp / T_r,in − Te | COP1 change Amalfi / Longo-type |
+  |---|---|---|---|---|
+  | 0.3 | 3.4 | 0.4 kPa / 0.03 K | 0.4 kPa / 0.03 K | ≈ 0 / ≈ 0 |
+  | 0.5 | 5.5 | 1.3 kPa / 0.09 K | 2.1 kPa / 0.15 K | −0.05 % / −0.07 % |
+  | 1.0 | 9.8 | 2.9 kPa / 0.22 K | 9.5 kPa / 0.73 K | −0.2 % / −0.7 % |
+  | 1.5 | 13.4 | 4.2 kPa / 0.35 K | 20.1 kPa / 1.65 K | −0.3 % / −1.4 % |
+
+  The effect grows with speed: Amalfi ≈ linearly in G (`f_tp ∝ We^−0.475`), the Longo form as
+  G², so the two models differ most at high speed (factor 4.8 at 1.5 ×). At part load (≤ 0.5 ×)
+  the effect is negligible in both. The mass fluxes of this evaporator (3–13 kg/(m² s)) are at the
+  low end of Amalfi's database (5.5–610): the Longo 2012 R290 data would settle which one holds.
+  Without refrigerant Δp the COP1 maximum is at ≈ 0.5 × speed (4.097, part-load benefit).

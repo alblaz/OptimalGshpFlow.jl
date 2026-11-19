@@ -35,9 +35,9 @@ end
 _h_condenser_outlet(r::Refrigerant, Tc, pc) = _coolprop_value(r.coolprop, COOLPROP_QT, COOLPROP_H, 0.0, Tc)
 _h_condenser_outlet(r::ClapeyronRefrigerant, Tc, pc) = h_bubble(r, pc)
 
-function _compression(Tc, ηis, es::EvaporatorSolution, r)
+function _compression(Tc, ηis, es::EvaporatorSolution, r, Δp_suction)
     pc = _p_bubble(r, Tc)                                  # condensation pressure
-    pe = _p_dew(r, es.twophase_region.Tcl)                 # evaporation pressure
+    pe = _p_dew(r, es.twophase_region.Tcl) - Δp_suction    # suction pressure
     return pc, compression(r, pe, es.superheat_region.Tch, pc, ηis)
 end
 
@@ -51,13 +51,15 @@ Power delivered by the compressor [W].
 - `evaporator_solution`: results of the evaporator (refrigerant volume flow, evaporation and
   suction temperatures);
 - `ξ`: fraction of heat lost through the compressor envelope, default 7 % (lower for large
-  hermetic compressors, larger for non-hermetic ones).
+  hermetic compressors, larger for non-hermetic ones);
+- `Δp_suction`: pressure drop from the end of the two-phase zone to the compressor inlet [Pa]
+  (e.g. the superheat zone, [`evaporator_pressure_drop`](@ref)); default 0.
 
 Spline `Refrigerant`: CoolProp (HEOS, cached state); `ClapeyronRefrigerant`: the property
 interface. For both powers use [`compressor_condenser_power`](@ref) (one compression).
 """
-function compressor_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant; ξ = 0.07)
-    _, c = _compression(Tc, ηis, es, r)
+function compressor_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant; ξ = 0.07, Δp_suction = 0.0)
+    _, c = _compression(Tc, ηis, es, r, Δp_suction)
     return c.ρ_in * es.twophase_region.Vc * (c.h_out - c.h_in) / (1 - ξ)
 end
 
@@ -67,8 +69,8 @@ end
 Power delivered at the condenser [W]: refrigerant mass flow × (compressor outlet enthalpy −
 saturated-liquid enthalpy at `Tc`; no subcooling). Arguments as [`compressor_power`](@ref).
 """
-function condenser_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant)
-    pc, c = _compression(Tc, ηis, es, r)
+function condenser_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant; Δp_suction = 0.0)
+    pc, c = _compression(Tc, ηis, es, r, Δp_suction)
     return c.ρ_in * es.twophase_region.Vc * (c.h_out - _h_condenser_outlet(r, Tc, pc))
 end
 
@@ -78,8 +80,8 @@ end
 [`compressor_power`](@ref) `W` and [`condenser_power`](@ref) `Q1` from one compression
 calculation (half the cost of calling both).
 """
-function compressor_condenser_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant; ξ = 0.07)
-    pc, c = _compression(Tc, ηis, es, r)
+function compressor_condenser_power(Tc, ηis, es::EvaporatorSolution, r::AbstractRefrigerant; ξ = 0.07, Δp_suction = 0.0)
+    pc, c = _compression(Tc, ηis, es, r, Δp_suction)
     m = c.ρ_in * es.twophase_region.Vc
     return (W = m * (c.h_out - c.h_in) / (1 - ξ), Q1 = m * (c.h_out - _h_condenser_outlet(r, Tc, pc)))
 end

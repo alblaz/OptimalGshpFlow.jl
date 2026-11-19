@@ -9,7 +9,7 @@ using ForwardDiff
 
 struct TestTag end
 const TT{V} = ForwardDiff.Tag{TestTag, V}
-const JAC_CHUNK = ForwardDiff.Chunk{8}()      # model unknowns: 8 to 11
+const JAC_CHUNK = ForwardDiff.Chunk{7}()      # model unknowns: 7 to 11
 
 """Derivative of the scalar function `f` at `x`."""
 dderivative(f, x::Real) = ForwardDiff.extract_derivative(TT{typeof(x)}, f(ForwardDiff.Dual{TT{typeof(x)}}(x, one(x))))
