@@ -37,6 +37,18 @@
     Q2 = es.twophase_region.Q + es.superheat_region.Q
     @test isfinite(Q2) && condenser_power(Tc, ηis, es, cla) > compressor_power(Tc, ηis, es, cla; ξ = 0.)
 
+    # B11: with a suction pressure drop the compressor takes the evaporator's mass flow and outlet
+    # enthalpy (adiabatic suction line): Q1 − (1 − ξ) W = ṁ (h_e − h_cond), both backends
+    m_e = ρ * es.twophase_region.Vc
+    for r in (spl, cla)
+        c0 = compressor_condenser_power(Tc, ηis, es, r)
+        c = compressor_condenser_power(Tc, ηis, es, r; Δp_suction = 2e4)
+        @test c.Q1 - (1 - 0.07) * c.W ≈ c0.Q1 - (1 - 0.07) * c0.W rtol = 1e-9     # same ṁ (h_e − h_cond)
+        @test c.W > c0.W                                                            # higher pressure ratio
+    end
+    @test condenser_power(Tc, ηis, es, spl; Δp_suction = 2e4) - (1 - 0.07) * compressor_power(Tc, ηis, es, spl; Δp_suction = 2e4) ≈
+          m_e * (h1 - PropsSI("H", "T", Tc, "Q", 0, "R290")) rtol = 1e-9
+
     # a zeotropic mixture runs through the interface (bubble pressure at Tc)
     mix = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])
     @test isfinite(compressor_power(Tc, ηis, es, mix)) && compressor_power(Tc, ηis, es, mix) > 0
