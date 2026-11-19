@@ -45,16 +45,18 @@ Two-zone (two-phase + superheat) moving-boundary plate evaporator, ε-NTU in eac
 
 Two-phase zone: `Qe = ε C_s (T_s,m − T_r,in)` with the effectiveness of Qiao (2025,
 [`effectiveness_counterflow`](@ref)): the refrigerant pressure drop over the zone
-(`refrigerant_pressure_drop`, a [`TwoPhaseFriction`](@ref) model, by default [`Amalfi2016`](@ref)
-for pure fluids; see [`twophase_pressure_drop`](@ref)) makes it enter at
+(`refrigerant_pressure_drop`, a [`TwoPhaseFriction`](@ref) model, by default [`Amalfi2016`](@ref);
+see [`twophase_pressure_drop`](@ref)) makes it enter at
 `T_r,in = T_dew(pe + Δp)`, warmer than `Te = T_dew(pe)` at the end of the zone.
 `refrigerant_pressure_drop = nothing` gives `T_r,in = Te`, `ε = 1 − e^{−NTU}`: the equations of
 [`evaporator_model!`](@ref). The set of unknowns is the same in both cases.
-Zeotropic blend (`ClapeyronRefrigerant` mixture): the refrigerant enters at `T_r,in = T_ph(pe, hei)`
-(flash at the inlet enthalpy), below `Te = T_dew(pe)`, and warms linearly along the zone with the
-pseudo capacity `C_r = ṁ (h_dew − hei)/(Te − T_r,in)`: `φ = C_s/C_r` in the effectiveness. No
-refrigerant pressure drop for blends yet. The boiling heat-transfer coefficient is the pure-fluid
-correlation (the mass-transfer degradation of blends is not modelled). The inlet quality is
+Zeotropic blend (`ClapeyronRefrigerant` mixture): the refrigerant enters at `T_r,in = T_ph(p_in, hei)`
+(flash at the inlet enthalpy and pressure `p_in = pe + Δp`), below the dew temperature, and its
+temperature changes linearly along the zone: the glide `T_dew(p_in) − T_r,in` with the pseudo
+capacity `C_r = ṁ (h_dew − hei)/glide` (`φ = C_s/C_r`), and the saturation shift
+`Te − T_dew(p_in)` of the pressure drop (`γ`). The surface tension of a blend is a mole-fraction
+average of its components ([`surface_tension`](@ref)). The boiling heat-transfer coefficient is the
+pure-fluid correlation (the mass-transfer degradation of blends is not modelled). The inlet quality is
 taken at `pe`; the superheat zone has no pressure drop inside the model (see
 [`evaporator_pressure_drop`](@ref) for the compressor suction pressure).
 
@@ -88,19 +90,15 @@ end
 """
     default_refrigerant_pressure_drop(refrigerant)
 
-[`Amalfi2016`](@ref) for pure fluids; `nothing` (no refrigerant pressure drop) for mixtures: the
-glide is modelled, its combination with the pressure drop not yet. Determined by the
-refrigerant type, so that an `Evaporator` built with the default is inferred.
+[`Amalfi2016`](@ref) for every refrigerant (pure fluids and blends; `nothing` in `Evaporator`
+for no refrigerant pressure drop).
 """
 default_refrigerant_pressure_drop(::AbstractRefrigerant) = Amalfi2016()
-default_refrigerant_pressure_drop(r::ClapeyronRefrigerant) = ispure(r) ? Amalfi2016() : nothing
 
 function Evaporator(; refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup,
                     formulation::PropertyFormulation = default_formulation(refrigerant),
                     Qscale = nominal_duty(refrigerant, Vref, hei), Te_min = default_Te_min(refrigerant),
                     refrigerant_pressure_drop::Union{Nothing, TwoPhaseFriction} = default_refrigerant_pressure_drop(refrigerant))
-    refrigerant_pressure_drop === nothing || refrigerant isa ClapeyronRefrigerant && !ispure(refrigerant) &&
-        throw(ArgumentError("refrigerant pressure drop: pure fluids only so far (blends: glide without pressure drop)"))
     hei, Vs, Vref, ΔTsup, Qscale, Te_min = promote(float.((hei, Vs, Vref, ΔTsup, Qscale, Te_min))...)
     x1 = _first_transform(formulation, refrigerant, Te_min)
     return Evaporator(refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, formulation, Qscale,
@@ -168,10 +166,13 @@ function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs)
     U, _, _ = evaporator_uvalue_twophase(Tsm, c.Vs, Qe, rs.pe, xs, sf, c.refrigerant, phx)
     Cs = sf.ρ(Tsm) * sf.cp(Tsm) * c.Vs
     m = rs.ρsup * c.Vref
+    # pressure drop: dew temperature at the inlet pressure p_in = pe + Δp (Tsat_in); blends enter
+    # below it by the glide, T_r,in = T(p_in, hei). Te − T_r,in = (Te − Tsat_in) + glide: the
+    # saturation shift goes into γ, the glide into φ.
     Tsat_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, m, xs)
-    glide = rs.Te - _glide_inlet_T(c.refrigerant, rs.pe, c.hei, rs.Te)
+    Tr_in = _glide_inlet_T(c.refrigerant, rs.pe + Δp, c.hei, Tsat_in)
+    glide = Tsat_in - Tr_in
     φ = Cs * glide / (m * (rs.hes - c.hei))
-    Tr_in = Tsat_in - glide
     NTU = U * phx.A * xs / Cs
     γ = (rs.Te - Tsat_in) / (Tr_in - Ts_m)
     return (U = U, Cs = Cs, NTU = NTU, γ = γ, φ = φ, ϵ = effectiveness_counterflow(NTU, γ, φ), Tr_in = Tr_in, Δp = Δp)
@@ -243,8 +244,8 @@ from [`physical`](@ref) and [`port_values`](@ref)).
 function evaporator_solution(c::Evaporator, x, p)
     r = c.refrigerant
     pe = _pe(c, x)
-    # the original solution types: two-phase effectiveness referred to the coldest refrigerant
-    # temperature (≤ 1): Te at the end of the zone, or the inlet temperature of a blend (glide)
+    # the original solution types: two-phase effectiveness referred to a lower bound of the
+    # refrigerant temperature (so ≤ 1): Te at the end of the zone, or T(pe, hei) of a blend
     Tsm = (p.Ts_out + x.Ts_m)/2
     Te = T_dew(r, pe)
     ϵe = x.Qe / (c.secondaryfluid.ρ(Tsm) * c.secondaryfluid.cp(Tsm) * c.Vs * (x.Ts_m - _glide_inlet_T(r, pe, c.hei, Te)))
