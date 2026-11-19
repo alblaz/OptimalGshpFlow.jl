@@ -37,7 +37,7 @@ unconstrained solvers can be used.
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
-| B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | PR pending |
+| B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | PR #59 |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
