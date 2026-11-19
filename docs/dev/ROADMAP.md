@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-19 (feature/evaporator-zone-profiles).
+Last updated: 2026-11-19 (feature/pressure-drop-studies).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -41,11 +41,12 @@ unconstrained solvers can be used.
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
 | 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles, compressor speed sweep) | merged (#56) |
-| 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | PR #57 |
+| 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | merged (#57) |
+| 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | PR #58 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
-| 8b | `feature/ils-ground` | first dynamic ground model: infinite line source with temporal superposition, explicit coupling over a heating season (`examples/season_ils.jl`) | PR #52 |
+| 8b | `feature/ils-ground` | first dynamic ground model: infinite line source with temporal superposition, explicit coupling over a heating season (`examples/season_ils.jl`) | merged (#52) |
 | – | `docs/dev-notes`, `ci/julia-versions` | this file and CLAUDE.md; CI on Julia `1`, `lts`, `min`, `pre` | merged (#24, #25) |
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
@@ -56,16 +57,20 @@ Done in the last sessions: Tb sweep and season (ILS ground, `UniformLoadHistory`
 default, plate Δp fix, post-processing speed, refrigerant pressure drop (Amalfi default, Longo-type
 fits) in the evaporator with Qiao's ε, profiles and speed sweep (`examples/evaporator_profiles.jl`;
 design and results in `docs/dev/glide.md`).
+Done (5d): the refrigerant pressure drop changes COP1 by only −0.2 % and capacity by −0.3 % at
+design speed and leaves the optimal flow unchanged; at high compressor speed capacity drops up to
+0.5 % (Amalfi) or 2.5 % (Longo-type) (`feature/pressure-drop-studies` below).
 Candidates, roughly in order:
-1. Effect of the refrigerant pressure drop on the studies: `study_tb` / `season` with and without
-   (Te, COP, optimal flow); cheap, uses `heatpump(...; refrigerant_pressure_drop)`.
-2. Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
+1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
    low end of Amalfi's database).
-3. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
+2. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
    temperature of a mixture; then allow the pressure drop for mixtures.
-4. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
-5. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
+3. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
+4. Suction line (lumped Δp, L ≈ 0.3–0.5 m for packaged units), low priority, after B11.
+5. The `rb` radius/diameter question of the ILS example (8b caveats); post-processing cost already
+   fixed in #53 (2.2 ms → 30 µs per point).
+6. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
    load aggregation (Claesson & Javed) for multi-year runs.
 Test pitfall to remember: in a `@testset`, a closure calling a local keyword function of the
 testset (e.g. `map(...) do e; coupled(e); end`) boxes it and makes NonlinearSolve/Clapeyron infer
@@ -735,3 +740,82 @@ Tg = 8 °C, GnielinskiTransition):
 - Caveats: continuous full-load operation (no load profile or on/off cycling); explicit coupling
   (one-step lag); `rb = 0.115` in the example is used as a radius, but 0.115 m is a typical
   borehole *diameter* (the package default is `rb = 0.115/2`), to check.
+
+## `feature/pressure-drop-studies` (5d, 2026-11-19)
+Examples only. `study`, `study_tb`, `postprocess`, `season`, `optimal_point` take
+`refrigerant_pressure_drop` (default `default_refrigerant_pressure_drop(r)`, Amalfi 2016 for a pure
+fluid; `nothing` = original equations). Shared `evaluate(S, u, r, sf)`: with a Δp model the
+superheat-zone Δp now lowers the compressor suction pressure (`Δp_suction`; before, the examples
+left it at 0). Rows carry `Δp`, `Δp_sup`, `Tr_in`. `pressure_drop_tb(r)` / `report_pressure_drop_tb`
+compare the two cases; `pressure_drop_grid` / `report_pressure_drop_grid`: capacity and COP1 over
+Tb × compressor speed × brine flow for none / Amalfi / Longo-type.
+
+Tb sweep (Clapeyron R290, 15 Tb × 39 flows, 7.6 s for both cases after compilation):
+
+| Tb [°C] | Vf* without | COP1* without | Vf* with | COP1* with | Δp two-phase | T_r,in − Te | ΔCOP1* |
+|---|---|---|---|---|---|---|---|
+| 9 | 1.082 | 4.298 | 1.082 | 4.287 | 3.36 kPa | 0.23 K | −0.25 % |
+| 5 | 0.769 | 3.868 | 1.187 | 3.860 | 2.96 kPa | 0.22 K | −0.20 % |
+| 0 | 0.662 | 3.512 | 0.664 | 3.505 | 2.61 kPa | 0.22 K | −0.20 % |
+| −5 | 0.561 | 3.206 | 0.562 | 3.200 | 2.29 kPa | 0.22 K | −0.18 % |
+
+- The dew temperature at the evaporator outlet drops ≈ 0.09 K. The two-phase inlet is ≈ 0.22 K warmer
+  (smaller mean ΔT to the brine), so COP1 falls by 0.16–0.25 % at every Tb and flow.
+- The optimal flow does not move (≤ 0.003 × design). At 5 °C the transitional and laminar maxima
+  are tied (COP1 3.8677 vs 3.8677 without, 3.8597 vs 3.8591 with): the jump 0.77 → 1.19 is a
+  tie-break, not an effect of the pressure drop.
+- Suction Δp of the superheat zone: 13 Pa (Tb 0 °C, design flow), no effect on W.
+- Capacity (evaporator duty Q2 = ṁ Δh, ṁ = ρ_suction V_ref, user's point 2026-11-19): at design
+  flow −0.29/−0.30 % at every Tb, i.e. about 1.5× the COP1 change. ρ_suction follows the dew
+  pressure: ≈ 3.3 %/K of Te against ≈ 2.3 %/K for COP1 (W falls too). Over the whole flow grid
+  −0.14 % (Vf 2, Tb −5) to −0.37 % (Vf 0.25, Tb −5): the low brine flows lose most.
+
+Capacity vs compressor speed × brine flow (`pressure_drop_grid`, spline R290, 1.6 s; changes
+relative to no refrigerant Δp; Longo-type = the upper estimate of Δp):
+
+| Tb | speed | Vf | Q2 (no Δp) | Amalfi Δp | ΔQ2 / ΔCOP1 Amalfi | Longo-type Δp | ΔQ2 / ΔCOP1 Longo |
+|---|---|---|---|---|---|---|---|
+| −5 | 0.5 | 0.25 | 2015 W | 1.2 kPa | −0.19 / −0.11 % | 2.1 kPa | −0.33 / −0.18 % |
+| −5 | 0.5 | 1.0 | 2109 W | 0.8 kPa | −0.01 / −0.01 % | 1.3 kPa | −0.01 / −0.01 % |
+| −5 | 1.0 | 0.25 | 3449 W | 2.2 kPa | −0.37 / −0.19 % | 7.4 kPa | −1.23 / −0.62 % |
+| −5 | 1.0 | 1.0 | 3849 W | 2.2 kPa | −0.29 / −0.16 % | 7.4 kPa | −0.98 / −0.53 % |
+| −5 | 1.5 | 0.25 | 4557 W | 3.1 kPa | −0.52 / −0.24 % | 15.0 kPa | −2.54 / −1.17 % |
+| −5 | 1.5 | 1.0 | 5269 W | 3.2 kPa | −0.46 / −0.24 % | 16.0 kPa | −2.30 / −1.16 % |
+| 9 | 1.0 | 1.0 | 6006 W | 3.3 kPa | −0.30 / −0.24 % | 10.7 kPa | −0.97 / −0.76 % |
+| 9 | 1.5 | 0.25 | 6536 W | 4.2 kPa | −0.51 / −0.30 % | 20.1 kPa | −2.40 / −1.43 % |
+| 9 | 1.5 | 2.0 | 8923 W | 4.9 kPa | −0.44 / −0.34 % | 23.4 kPa | −2.14 / −1.62 % |
+
+- Capacity loses about twice as much as COP1. The loss grows with compressor speed (G, Δp) and
+  at low brine flow. With Amalfi it stays ≤ 0.5 %. With the Longo-type fit (Δp ∝ G²) it reaches
+  2.5 % at 1.5× speed, so the choice of correlation (Longo 2012 R290 data) matters for capacity at
+  high speed.
+- At half speed and design flow or more, the capacity barely changes (≤ 0.01 %) despite
+  0.5–1.5 kPa. Likely cause, not checked: the moving boundary gives the two-phase zone more area
+  from an oversized superheat zone.
+- Not modelled: the suction line between evaporator and compressor; it would lower ρ_suction
+  (capacity) directly. Packaged units ≤ 10 kW have short lines (user, 2026-11-19: take the lower
+  end, ≈ 0.3–0.5 m, a few bends). Estimate (R290, −10 °C, ṁ ≈ 0.015 kg/s, 1 m + 4 bends): 5/8" tube
+  ≈ 1.5 kPa (0.12 K, capacity ≈ −0.4 %), 1/2" ≈ 4.4 kPa (0.37 K, ≈ −1.2 %); strongly dependent on
+  D (friction ∝ D⁻⁵, fittings ∝ D⁻⁴). Same order as the two-phase Δp, not larger. The pressure
+  drop inside a hermetic compressor belongs to its measured efficiencies (do not count it twice).
+  Plan: B11 first (below), then optionally a lumped `(f L/D + ΣK) ρv²/2` line, off by default.
+- B11 (found here): with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp, T_suc) Vref while the
+  evaporator delivers ρ(pe, T_suc) Vref (mass not conserved), and its inlet enthalpy at (pe − Δp,
+  T_suc) instead of the evaporator outlet enthalpy. Fix in `fix/suction-mass-balance`.
+
+Season (spline R290, 180 days hourly, as 8b):
+
+| | fixed 1.0 without | fixed 1.0 with | daily optimal without | daily optimal with |
+|---|---|---|---|---|
+| seasonal COP1 | 3.733 | 3.726 (−0.17 %) | 3.757 | 3.750 (−0.19 %) |
+| heat delivered | 28 164 kWh | 28 104 kWh | 27 938 kWh | 27 881 kWh |
+| electricity | 7 545 kWh | 7 542 kWh | 7 436 kWh | 7 435 kWh |
+| pump energy | 244 kWh | 244 kWh | 145 kWh | 147 kWh |
+| Tb after 180 days | 2.890 °C | 2.904 °C | 2.957 °C | 2.960 °C |
+
+- The gain of the daily optimal flow is the same with and without (+0.65 %); switch to the laminar
+  branch on day 5 in both.
+- The "without" column differs from the 8b table (3.740, pumps 229 kWh, switch on day 7): changes
+  merged since 8b, probably the plate Δp fix (pump energy); not investigated, the 8b numbers are outdated.
+- Conclusion: for R290 at these mass fluxes (G ≈ 3–13 kg/(m² s)) the refrigerant pressure drop is a
+  second-order effect on the optimal-flow question; it matters more for blends (glide) and higher G.
