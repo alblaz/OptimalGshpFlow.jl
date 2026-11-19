@@ -66,8 +66,8 @@ Candidates, roughly in order:
 2. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
    temperature of a mixture; then allow the pressure drop for mixtures.
 3. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
-4. Post-processing cost of the season (2.2 ms per step, see 8b) and the `rb` radius/diameter
-   question of the ILS example.
+4. The `rb` radius/diameter question of the ILS example (8b caveats); post-processing cost already
+   fixed in #53 (2.2 ms → 30 µs per point).
 5. Step 8 (dynamic vs steady), step 7 (MTK), 6b (zone switching), g-function ground model with
    load aggregation (Claesson & Javed) for multi-year runs.
 Test pitfall to remember: in a `@testset`, a closure calling a local keyword function of the
