@@ -49,7 +49,12 @@ Two-phase zone: `Qe = ε C_s (T_s,m − T_r,in)` with the effectiveness of Qiao 
 for pure fluids; see [`twophase_pressure_drop`](@ref)) makes it enter at
 `T_r,in = T_dew(pe + Δp)`, warmer than `Te = T_dew(pe)` at the end of the zone.
 `refrigerant_pressure_drop = nothing` gives `T_r,in = Te`, `ε = 1 − e^{−NTU}`: the equations of
-[`evaporator_model!`](@ref). The set of unknowns is the same in both cases. The inlet quality is
+[`evaporator_model!`](@ref). The set of unknowns is the same in both cases.
+Zeotropic blend (`ClapeyronRefrigerant` mixture): the refrigerant enters at `T_r,in = T_ph(pe, hei)`
+(flash at the inlet enthalpy), below `Te = T_dew(pe)`, and warms linearly along the zone with the
+pseudo capacity `C_r = ṁ (h_dew − hei)/(Te − T_r,in)`: `φ = C_s/C_r` in the effectiveness. No
+refrigerant pressure drop for blends yet. The boiling heat-transfer coefficient is the pure-fluid
+correlation (the mass-transfer degradation of blends is not modelled). The inlet quality is
 taken at `pe`; the superheat zone has no pressure drop inside the model (see
 [`evaporator_pressure_drop`](@ref) for the compressor suction pressure).
 
@@ -83,8 +88,8 @@ end
 """
     default_refrigerant_pressure_drop(refrigerant)
 
-[`Amalfi2016`](@ref) for pure fluids; `nothing` (no refrigerant pressure drop) for mixtures, whose
-two-phase inlet temperature also needs the glide (not implemented yet). Determined by the
+[`Amalfi2016`](@ref) for pure fluids; `nothing` (no refrigerant pressure drop) for mixtures: the
+glide is modelled, its combination with the pressure drop not yet. Determined by the
 refrigerant type, so that an `Evaporator` built with the default is inferred.
 """
 default_refrigerant_pressure_drop(::AbstractRefrigerant) = Amalfi2016()
@@ -95,7 +100,7 @@ function Evaporator(; refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, 
                     Qscale = nominal_duty(refrigerant, Vref, hei), Te_min = default_Te_min(refrigerant),
                     refrigerant_pressure_drop::Union{Nothing, TwoPhaseFriction} = default_refrigerant_pressure_drop(refrigerant))
     refrigerant_pressure_drop === nothing || refrigerant isa ClapeyronRefrigerant && !ispure(refrigerant) &&
-        throw(ArgumentError("refrigerant pressure drop: pure fluids only so far (mixtures need the glide)"))
+        throw(ArgumentError("refrigerant pressure drop: pure fluids only so far (blends: glide without pressure drop)"))
     hei, Vs, Vref, ΔTsup, Qscale, Te_min = promote(float.((hei, Vs, Vref, ΔTsup, Qscale, Te_min))...)
     x1 = _first_transform(formulation, refrigerant, Te_min)
     return Evaporator(refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, formulation, Qscale,
@@ -148,16 +153,28 @@ function _twophase_inlet(model::TwoPhaseFriction, c::Evaporator, rs, m, xs)
     return (T_dew(r, pe + Δp), Δp)
 end
 
-# two-phase zone: capacity of the secondary fluid, NTU, effectiveness and refrigerant inlet temperature
+# refrigerant temperature at the inlet of the two-phase zone at the pressure pe, from the inlet
+# enthalpy (flash): below Te = T_dew(pe) for a zeotropic blend (glide), Te for a pure fluid
+_glide_inlet_T(::AbstractRefrigerant, pe, hei, Te) = Te
+_glide_inlet_T(r::ClapeyronRefrigerant, pe, hei, Te) = ispure(r) ? Te : T_ph(r, pe, hei)
+
+# two-phase zone: capacity of the secondary fluid, NTU, effectiveness and refrigerant inlet
+# temperature. Refrigerant temperature linear along the zone (Qiao 2025): it rises by the glide
+# Te − T_in (blends; capacity C_r = ṁ (h_dew − hei)/(Te − T_in), φ = Cs/C_r) and falls by the
+# saturation shift of the pressure drop, Te − T_dew(pe + Δp) < 0 (γ).
 function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs)
     sf, phx = c.secondaryfluid, c.plateheatexchanger
     Tsm = (Ts_l + Ts_m)/2
     U, _, _ = evaporator_uvalue_twophase(Tsm, c.Vs, Qe, rs.pe, xs, sf, c.refrigerant, phx)
     Cs = sf.ρ(Tsm) * sf.cp(Tsm) * c.Vs
-    Tr_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, rs.ρsup * c.Vref, xs)
+    m = rs.ρsup * c.Vref
+    Tsat_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, m, xs)
+    glide = rs.Te - _glide_inlet_T(c.refrigerant, rs.pe, c.hei, rs.Te)
+    φ = Cs * glide / (m * (rs.hes - c.hei))
+    Tr_in = Tsat_in - glide
     NTU = U * phx.A * xs / Cs
-    γ = (rs.Te - Tr_in) / (Tr_in - Ts_m)
-    return (U = U, Cs = Cs, NTU = NTU, γ = γ, ϵ = effectiveness_counterflow(NTU, γ), Tr_in = Tr_in, Δp = Δp)
+    γ = (rs.Te - Tsat_in) / (Tr_in - Ts_m)
+    return (U = U, Cs = Cs, NTU = NTU, γ = γ, φ = φ, ϵ = effectiveness_counterflow(NTU, γ, φ), Tr_in = Tr_in, Δp = Δp)
 end
 
 # superheat zone: U value, capacities of the secondary fluid and of the refrigerant (mean over the
@@ -226,10 +243,11 @@ from [`physical`](@ref) and [`port_values`](@ref)).
 function evaporator_solution(c::Evaporator, x, p)
     r = c.refrigerant
     pe = _pe(c, x)
-    # the original solution types: two-phase effectiveness in the classical definition, i.e.
-    # referred to the refrigerant temperature Te at the end of the zone
+    # the original solution types: two-phase effectiveness referred to the coldest refrigerant
+    # temperature (≤ 1): Te at the end of the zone, or the inlet temperature of a blend (glide)
     Tsm = (p.Ts_out + x.Ts_m)/2
-    ϵe = x.Qe / (c.secondaryfluid.ρ(Tsm) * c.secondaryfluid.cp(Tsm) * c.Vs * (x.Ts_m - T_dew(r, pe)))
+    Te = T_dew(r, pe)
+    ϵe = x.Qe / (c.secondaryfluid.ρ(Tsm) * c.secondaryfluid.cp(Tsm) * c.Vs * (x.Ts_m - _glide_inlet_T(r, pe, c.hei, Te)))
     u = [to_R(pressure_transform(r), pe), x.Qe, x.Qsup, to_R(Unit(), ϵe), to_R(Unit(), x.ϵsup),
          to_R(Unit(), x.xs), p.Ts_out, x.Ts_m]
     return evaporator_model(u, EvaporatorParameters(c, p.Ts_in))
@@ -241,8 +259,9 @@ _pe(c::Evaporator, x) = c.formulation isa NestedPressure ? x[1] : p_sat(c.refrig
     evaporator_zones(c::Evaporator, x, p) -> (; twophase, superheat)
 
 Zone quantities of a solution (`x` physical unknowns, `p` port values), as used in the residuals:
-- `twophase`: U value `U`, brine capacity `Cs`, `NTU = U A xs / Cs`, `γ`, refrigerant temperatures
-  `Tr_in` (inlet) and `Te` (end of the zone), pressure drop `Δp`;
+- `twophase`: U value `U`, brine capacity `Cs`, `NTU = U A xs / Cs`, `γ` (pressure drop), `φ`
+  (glide: brine capacity over the refrigerant pseudo capacity, 0 for a pure fluid), refrigerant
+  temperatures `Tr_in` (inlet) and `Te` (end of the zone), pressure drop `Δp`;
 - `superheat`: `U`, brine and refrigerant capacities `Cs`, `Cref` (mean over the superheat),
   `NTU_s = U A (1 − xs)/Cs` and `NTU_r = U A (1 − xs)/Cref`.
 Constant within each zone, so the temperature profiles follow in closed form (e.g.
@@ -255,7 +274,7 @@ function evaporator_zones(c::Evaporator, x, p)
     z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs)
     h = _superheat_zone(c, x.xs, p.Ts_in, x.Ts_m, rs)
     Asup = c.plateheatexchanger.A * (1 - x.xs)
-    return (twophase = (U = z.U, Cs = z.Cs, NTU = z.NTU, γ = z.γ, Tr_in = z.Tr_in, Te = rs.Te, Δp = z.Δp),
+    return (twophase = (U = z.U, Cs = z.Cs, NTU = z.NTU, γ = z.γ, φ = z.φ, Tr_in = z.Tr_in, Te = rs.Te, Δp = z.Δp),
             superheat = (U = h.U, Cs = h.Cs, Cref = h.Cref, NTU_s = h.U * Asup / h.Cs, NTU_r = h.U * Asup / h.Cref))
 end
 
@@ -328,7 +347,8 @@ Issues reported for an evaporator solution:
 - secondary fluid (`Ts_in`, `Ts_m`, `Ts_out`) below its freezing point or outside its property
   table;
 - evaporation temperature at its lower bound `Te_min` (within 0.01 K): not a physical solution;
-- pinch (within `ΔTpinch`): `Ts_out - Te` (two-phase zone) or `Ts_in - (Te + ΔTsup)` (superheat);
+- pinch (within `ΔTpinch`): `Ts_out - T_r,in` (two-phase zone, brine outlet against the refrigerant
+  inlet: below `Te` for a blend, above it with a pressure drop) or `Ts_in - (Te + ΔTsup)` (superheat);
 - a zone almost vanished: `xs < xs_tol` or `xs > 1 - xs_tol`.
 """
 function validity(c::Evaporator, x, p; ΔTpinch = 0.1, xs_tol = 1e-3)
@@ -337,8 +357,9 @@ function validity(c::Evaporator, x, p; ΔTpinch = 0.1, xs_tol = 1e-3)
     Te = c.formulation isa NestedPressure ? T_dew(c.refrigerant, x.pe) : x.Te
     Te < c.Te_min + 0.01 &&
         push!(issues, _issue(:Te, Te, c.Te_min, "evaporation temperature at its lower bound Te_min"))
-    p.Ts_out - Te < ΔTpinch &&
-        push!(issues, _issue(:Te, Te, p.Ts_out - ΔTpinch, "two-phase pinch: Ts_out - Te below ΔTpinch"))
+    Tr_in = evaporator_zones(c, x, p).twophase.Tr_in
+    p.Ts_out - Tr_in < ΔTpinch &&
+        push!(issues, _issue(:Te, Te, Te - (Tr_in - p.Ts_out) - ΔTpinch, "two-phase pinch: Ts_out - T_r,in below ΔTpinch"))
     p.Ts_in - (Te + c.ΔTsup) < ΔTpinch &&
         push!(issues, _issue(:Te, Te, p.Ts_in - c.ΔTsup - ΔTpinch, "superheat pinch: Ts_in - (Te + ΔTsup) below ΔTpinch"))
     x.xs < xs_tol && push!(issues, _issue(:xs, x.xs, xs_tol, "two-phase zone almost vanished"))

@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-19 (feature/pressure-drop-studies).
+Last updated: 2026-11-19 (feature/blend-glide).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -37,13 +37,14 @@ unconstrained solvers can be used.
 | 8a | `feature/tb-port` | ground temperature `Tb` as a port of `BoreholeHX` (fixed node), `set_fixed` for new fixed values without rebuilding (step 8 groundwork) | merged (#44) |
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
-| B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | PR #59 |
+| B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | merged (#59) |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
 | 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles, compressor speed sweep) | merged (#56) |
 | 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | merged (#57) |
-| 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | PR #58 |
+| 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | merged (#58) |
+| 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | PR pending |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -65,9 +66,13 @@ Candidates, roughly in order:
 1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
    low end of Amalfi's database).
-2. Blends: φ ≠ 0 in `effectiveness_counterflow` (zeotropic glide, R454C); two-phase inlet
-   temperature of a mixture; then allow the pressure drop for mixtures.
-3. Validity: brine outlet above the refrigerant temperature (pinch) in `validity_issues`.
+2. Blends, next steps (5e done the glide): the pressure drop for blends (Amalfi needs the blend's
+   surface tension and transport, check them first); boiling heat-transfer degradation of blends
+   (mass-transfer resistance, e.g. Silver–Bell–Ghaly / Thome); first-call compile of a blend solve
+   (≈ 85 s: Clapeyron mixture code with Duals, EntropyScaling transport not inferable); blends in
+   the optimal-flow study (needs a design for R454C: Vref, hei).
+3. Validity: the two-phase pinch now compares the brine outlet with T_r,in (5e); a pinch inside a
+   zone cannot occur (D monotonic along each zone), so this item is done.
 4. Suction line (lumped Δp, L ≈ 0.3–0.5 m for packaged units), low priority, after B11.
 5. The `rb` radius/diameter question of the ILS example (8b caveats); post-processing cost already
    fixed in #53 (2.2 ms → 30 µs per point).
@@ -76,6 +81,11 @@ Candidates, roughly in order:
 Test pitfall to remember: in a `@testset`, a closure calling a local keyword function of the
 testset (e.g. `map(...) do e; coupled(e); end`) boxes it and makes NonlinearSolve/Clapeyron infer
 on abstract types (25 min); write straight-line code.
+Example pitfall (5e): rows collected with `push!` into `[]` (a `Vector{Any}`) and a report function
+calling model functions on their fields (`reference_error(x.S, x.u)`) infers the model, Clapeyron
+included, on `Any`: 320 s of compilation, 32 GB. Build rows with a comprehension (concrete eltype).
+Also put an inference barrier (type assertion) on non-inferable Clapeyron calls (`T_ph`: the p-h
+flash returns `Any`).
 
 ## Refrigerants of interest
 - **Priority: natural, low-GWP pure fluids** (European move away from HFCs): R290 (main case),
@@ -820,3 +830,44 @@ Season (spline R290, 180 days hourly, as 8b):
   merged since 8b, probably the plate Δp fix (pump energy); not investigated, the 8b numbers are outdated.
 - Conclusion: for R290 at these mass fluxes (G ≈ 3–13 kg/(m² s)) the refrigerant pressure drop is a
   second-order effect on the optimal-flow question; it matters more for blends (glide) and higher G.
+
+## `feature/blend-glide` (5e, 2026-11-19)
+Zeotropic glide in the two-phase zone of the component `Evaporator` (design: `docs/dev/glide.md`,
+item 6 of "Consequences"). R454C (R32/R1234yf 21.5/78.5 %, ≈ 8 K bubble–dew glide) as the case.
+- `T_ph(r, p, h)`: Clapeyron p-h flash, with an inference barrier (`::float(promote_type(p, h))`;
+  without it everything downstream inferred `Any`). ≈ 0.5–0.7 ms per call (Float64 or Dual).
+- Two-phase zone: refrigerant enters at `T_r,in = T_ph(pe, hei)` (below `Te = T_dew(pe)`), linear
+  temperature along the zone, pseudo capacity `C_r = ṁ (h_dew − hei)/(Te − T_r,in)`, `φ = C_s/C_r` in
+  `effectiveness_counterflow`. Pure fluids: φ = 0 exactly, no flash (dispatch on the type).
+  Decision (user, 2026-11-19): exact flash for T_r,in rather than linear bubble–dew interpolation
+  (0.25 K too warm at the inlet for R454C, x_in ≈ 0.4).
+- `effectiveness_counterflow` was 0/0 = NaN at φ = 1 (balanced counter-flow, crossed by a blend in a
+  brine-flow sweep); now `ε = [E + γ G]/(1/NTU + φ E)` with series near `a = (1 − φ) NTU = 0`
+  (test commit, then fix).
+- `evaporator_solution`: ϵe referred to the coldest refrigerant temperature (≤ 1). `validity`: the
+  two-phase pinch compares the brine outlet with `T_r,in` (blend: brine may leave below Te; pure
+  fluid with Δp: slightly stricter than before). `evaporator_zones` reports `φ`.
+- Cost (R454C residual 0.79 ms before): + one flash ≈ 0.7 ms (×1.9 residual). First call of a blend
+  solve ≈ 85 s of compilation (pre-existing mixture cost dominates); the blend test is Float64 only
+  (+7 s in the suite).
+
+Results (`examples/blend_glide.jl`, standalone evaporator, brine in 5 °C, ΔTsup 3.5 K, design
+Vref of the R290 example, sweep 2 → 0.3 × design brine flow, 0.9 s after compilation):
+
+| Vf | Te | T_r,in | glide | φ | Qe | Ts,out | ΔQe exact profile |
+|---|---|---|---|---|---|---|---|
+| 2.0 | 1.44 °C | −3.97 °C | 5.40 K | 3.66 | 5909 W | 3.48 °C | −1.06 % |
+| 1.0 | 1.04 | −4.35 | 5.39 | 1.85 | 5823 | 2.01 | −1.24 % |
+| 0.5 | −0.65 | −5.99 | 5.33 | 0.98 | 5469 | −0.61 | −1.43 % |
+| 0.3 | −3.00 | −8.25 | 5.25 | 0.63 | 5008 | −3.57 | −1.56 % |
+
+- The zone glide is ≈ 5.4 K (inlet quality ≈ 0.4 of the 8 K bubble–dew glide). φ passes through 1
+  near 0.49 × design flow, smoothly.
+- The brine leaves below the dew temperature at design flow and below (Ts,out < Te): only possible
+  with the glide; the pinch check uses T_r,in.
+- Exact T(h) (flash at every RK4 step, `reference_error`) vs the linear profile: the exact curve is
+  concave (T rises faster near the inlet), the refrigerant is warmer in mid-zone, so the linear
+  model overestimates the two-phase duty by 1.1–1.6 % (brine end temperature off by ≤ 0.13 K).
+  A two-segment linearisation would reduce it, if it matters.
+- Superheat pinch at Vf ≥ 1.7: Te + ΔTsup reaches the 5 °C brine inlet (operating point, not a
+  model issue).

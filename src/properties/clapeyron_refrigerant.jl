@@ -251,6 +251,18 @@ function cp_twophase(r::ClapeyronRefrigerant, p)
     return (h_dew(r, p) - h_bubble(r, p)) / (T_dew(r, p) - T_bubble(r, p))
 end
 
+"""
+    T_ph(r, p, h)
+
+Temperature [K] at pressure `p` and specific enthalpy `h` [J/kg] (Clapeyron p-h flash): in the
+two-phase region of a zeotropic mixture it lies between `T_bubble(r, p)` and `T_dew(r, p)`. Used
+for the refrigerant temperature at the evaporator inlet (glide). An iterative flash: ≈ 0.5–0.7 ms
+for a binary mixture, about as much as all the saturation calls of an evaporator residual.
+Clapeyron's flash is not inferable: the result is asserted to the promoted type of `p` and `h`
+(an inference barrier; without it everything downstream, e.g. the evaporator residual, infers `Any`).
+"""
+T_ph(r::ClapeyronRefrigerant, p, h) = Clapeyron.PH.temperature(r.eos, p, h * r.M, r.z)::float(promote_type(typeof(p), typeof(h)))
+
 ########################
 # single phase (p, T)  #
 ########################

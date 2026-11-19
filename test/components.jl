@@ -149,6 +149,43 @@ using NonlinearSolve, ForwardDiff
         end
         @test effectiveness_counterflow(2.0, 0.0, 0.5) ≈ (1 - exp(-1)) / (1 - 0.5exp(-1)) rtol = 1e-14
         @test effectiveness_counterflow(2.0, 0.0, 2.0) ≈ (1 - exp(2)) / (1 - 2exp(2)) rtol = 1e-14
+        # glide and pressure drop together: the zone integrated from the refrigerant inlet (a = 0),
+        # with the fluid outlet from ε, returns the fluid inlet temperature at a = 1
+        # (dTf/da = NTU (Tf − Tr), dTr/da = ΔTsat + φ NTU (Tf − Tr))
+        # (names unique in the file: a local `g(y) = …` here would overwrite the guess `g` above)
+        for φg in (0.6, 1.0, 1.9)
+            εg = effectiveness_counterflow(NTU, ΔTsat / (Trin - Tfin), φg)
+            glide_rhs(yg) = (d = NTU * (yg[1] - yg[2]); (d, ΔTsat + φg * d))
+            yg = (Tfin + εg * (Trin - Tfin), Trin); hg = 1/n
+            for _ in 1:n
+                k1 = glide_rhs(yg); k2 = glide_rhs(yg .+ hg/2 .* k1); k3 = glide_rhs(yg .+ hg/2 .* k2)
+                k4 = glide_rhs(yg .+ hg .* k3)
+                yg = yg .+ hg/6 .* (k1 .+ 2 .* k2 .+ 2 .* k3 .+ k4)
+            end
+            @test yg[1] ≈ Tfin atol = 1e-9
+        end
+    end
+
+    # Zeotropic blend: glide in the two-phase zone. Float64 evaluations only (a solve compiles the
+    # mixture code for Duals, ≈ 70 s; see examples/blend_glide.jl)
+    @testset "blend glide (R454C), zone quantities" begin
+        mx = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785], name = "R454C")
+        hei = h_bubble(mx, OptimalGshpFlow._p_bubble(mx, 313.15))
+        e = Evaporator(; refrigerant = mx, secondaryfluid = sf, plateheatexchanger = phx, hei = hei,
+                       Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5.)
+        pe = 4.5e5
+        x = (pe = pe, Qe = 5500., Qsup = 200., ϵsup = 0.5, xs = 0.5, Ts_m = 277.9)
+        p = (Ts_in = 278.15, Ts_out = 275.1)
+        z = evaporator_zones(e, x, p).twophase
+        Te = T_dew(mx, pe)
+        @test z.Te ≈ Te && z.Tr_in ≈ T_ph(mx, pe, hei)
+        @test T_bubble(mx, pe) < z.Tr_in < Te - 4                     # ≈ 5 K glide over the zone
+        m = ρ_pT(mx, pe, Te + 5.; phase = :vapor) * ev.Vref
+        @test z.φ ≈ z.Cs * (Te - z.Tr_in) / (m * (h_dew(mx, pe) - hei)) rtol = 1e-12
+        @test z.γ == 0 && z.Δp == 0
+        # two-phase pinch against the refrigerant inlet: brine leaving below Te is fine above T_r,in
+        pinch(Ts_out) = any(i -> occursin("two-phase pinch", i.message), validity(e, x, (Ts_in = p.Ts_in, Ts_out = Ts_out)))
+        @test !pinch(Te - 1) && pinch(z.Tr_in)
     end
 
     @testset "evaporator with refrigerant pressure drop" begin

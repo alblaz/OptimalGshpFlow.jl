@@ -274,3 +274,10 @@ as a sensitivity bound. Either way the effect is a few tenths of a kelvin at des
   CoolProp updates; with Duals, three each for the finite differences) and `T_dew(pe + Δp)`
   (an inversion for Clapeyron). Possible savings if it matters: one CoolProp update for the
   three saturated-liquid properties (`_coolprop_values`), and `T_dew(pe + Δp) ≈ Te + (dT/dp) Δp`.
+
+## Step 5e: glide of blends (2026-11-19, `feature/blend-glide`)
+Implemented as item 6 above, with the exact inlet temperature (p-h flash) instead of the
+bubble-point secant (user decision): `C_r = ṁ (h_dew − hei)/(T_dew − T_in)`, `φ = C_s/C_r`, no
+refrigerant pressure drop for blends yet. Results and costs: ROADMAP, section `feature/blend-glide`.
+Linear-profile error for R454C: the two-phase duty is overestimated by 1.1–1.6 % (exact T(h) is
+concave).

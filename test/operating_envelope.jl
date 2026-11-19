@@ -50,7 +50,7 @@ using NonlinearSolve
         msgs = [i.message for i in validity_issues(sys, u)]
         @test "secondary fluid below its freezing point" in msgs
         @test "secondary fluid outside its property table (properties extrapolated flat)" in msgs
-        @test "two-phase pinch: Ts_out - Te below ΔTpinch" in msgs
+        @test "two-phase pinch: Ts_out - T_r,in below ΔTpinch" in msgs
         @test all(i.component == :evaporator for i in validity_issues(sys, u))
         # superheat pinch, Te at its bound, zone vanishing
         u = initial_guess(sys; evaporator = (Te = 273.1, Qe = 5e3, Qsup = 300., Ts_m = 276., xs = 1 - 1e-5), nodes = (T_out = 274.,))

@@ -74,6 +74,9 @@ function μ_dew end
 function λ_dew end
 function surface_tension end   # saturated liquid, at the pressure p [N/m]
 
+# temperature at (p, h), any phase (two-phase flash): `ClapeyronRefrigerant` only
+function T_ph end
+
 # single phase at (p, T); keyword `phase = :unknown | :vapor | :liquid`
 function h_pT end
 function s_pT end
