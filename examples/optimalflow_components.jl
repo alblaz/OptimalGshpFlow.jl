@@ -16,6 +16,10 @@ Needs NonlinearSolve in the environment. Usage:
     tb = study_tb(ClapeyronRefrigerant("R290")); report_tb(tb)
     c = pressure_drop_tb(ClapeyronRefrigerant("R290")); report_pressure_drop_tb(c)   # with/without refrigerant Δp
     g = pressure_drop_grid(Refrigerant("R290")); report_pressure_drop_grid(g)          # capacity vs speed × flow
+    r454c = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785], name = "R454C")
+    report_refrigerants_tb("R290" => study_tb(ClapeyronRefrigerant("R290")), "R454C" => study_tb(r454c))  # midpoint
+    report_refrigerants_tb((string(c) => study_tb(r454c; design = refrigerant_design(r454c; condenser = c))
+                            for c in (:bubble, :midpoint, :dew))...)                                     # conventions
 =#
 using OptimalGshpFlow, NonlinearSolve, CoolProp, LinearAlgebra, Printf
 
@@ -37,12 +41,52 @@ const FLOWS = 2:-0.05:0.1                             # × design brine flow, fr
 const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
 
 # ---- model ----
+"""
+    condenser_bubble_T(r, condenser = :midpoint; T = TCOND) -> Tc
+
+Bubble temperature of the condenser (what `compressor_condenser_power` takes: condensing pressure
+`p_bubble(Tc)`, liquid at the bubble point) for the condensing temperature `T` and the convention
+`condenser` for a blend with glide: `:bubble` (bubble point at `T`), `:midpoint` (mean of bubble
+and dew temperature at `T`) or `:dew` (dew point at `T`). `T` for a pure fluid.
+"""
+condenser_bubble_T(r, condenser = :midpoint; T = TCOND) = T
+function condenser_bubble_T(r::ClapeyronRefrigerant, condenser = :midpoint; T = TCOND)
+    (OptimalGshpFlow.ispure(r) || condenser === :bubble) && return T
+    w = condenser === :midpoint ? 0.5 : condenser === :dew ? 1.0 :
+        throw(ArgumentError("condenser: :bubble, :midpoint or :dew"))
+    Tb = T                             # fixed point Tb = T − w glide(Tb); the glide varies slowly
+    for _ in 1:50
+        Tn = T - w * (T_dew(r, OptimalGshpFlow._p_bubble(r, Tb)) - Tb)
+        abs(Tn - Tb) < 1e-9 && return Tn
+        Tb = Tn
+    end
+    return Tb
+end
+
+"""
+    refrigerant_design(r; condenser = :midpoint) -> (; hei, Vref, Tc)
+
+Expansion-valve inlet enthalpy, compressor displacement and condenser bubble temperature `Tc`
+([`condenser_bubble_T`](@ref)) for the refrigerant `r`: the design of the example (R290, `DESIGN`)
+for pure fluids. For a zeotropic blend the same machine size: the same nominal two-phase duty
+`DESIGN.Qnom` at the design dew temperature `DESIGN.Te`, with the liquid at the condenser bubble
+point.
+"""
+refrigerant_design(r; condenser = :midpoint) = (hei = DESIGN.hei, Vref = DESIGN.Vref, Tc = TCOND)
+function refrigerant_design(r::ClapeyronRefrigerant; condenser = :midpoint)
+    OptimalGshpFlow.ispure(r) && return (hei = DESIGN.hei, Vref = DESIGN.Vref, Tc = TCOND)
+    Tc = condenser_bubble_T(r, condenser)
+    hei = h_bubble(r, OptimalGshpFlow._p_bubble(r, Tc))
+    p = OptimalGshpFlow._p_dew(r, DESIGN.Te)
+    return (hei = hei, Vref = DESIGN.Qnom / (ρ_dew(r, p) * (h_dew(r, p) - hei)), Tc = Tc)
+end
+
 # `speed`: compressor speed factor (variable-speed compressor): the displaced volume flow `Vref`
 function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, speed = 1.0,
-                  refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
+                  refrigerant_pressure_drop = default_refrigerant_pressure_drop(r), design = refrigerant_design(r))
     Vs = Vf * DESIGN.Vs
-    evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = DESIGN.hei,
-                      Vs = Vs, Vref = speed * DESIGN.Vref, ΔTsup = ΔTSUP, refrigerant_pressure_drop = refrigerant_pressure_drop)
+    evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = design.hei,
+                      Vs = Vs, Vref = speed * design.Vref, ΔTsup = ΔTSUP, refrigerant_pressure_drop = refrigerant_pressure_drop)
     bhx = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
@@ -53,8 +97,8 @@ end
 # pumping power: borehole U-pipe (2H) and evaporator plates
 pump_power(es::EvaporatorSolution, bs::BoreholeSolution, sf) = pumping_power(es, sf, ηPUMP) + pumping_power(bs, sf, ηPUMP)
 
-function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf; Δp_suction = 0.0)
-    W, Q1 = compressor_condenser_power(TCOND, ηIS, es, r; Δp_suction = Δp_suction)
+function performance(es::EvaporatorSolution, bs::BoreholeSolution, r, sf; Δp_suction = 0.0, Tc = condenser_bubble_T(r))
+    W, Q1 = compressor_condenser_power(Tc, ηIS, es, r; Δp_suction = Δp_suction)
     Q2 = es.twophase_region.Q + es.superheat_region.Q
     P  = pump_power(es, bs, sf)
     return (W = W, Q1 = Q1, Q2 = Q2, Ppump = P, COP1 = Q1/(W + P), COP2 = Q2/(W + P))
@@ -70,7 +114,7 @@ end
 # one solution `u` of the system `S`: physical state, refrigerant pressure drops and performance.
 # With a refrigerant pressure-drop model, the superheat-zone Δp lowers the compressor suction
 # pressure; without one (`nothing`, the original equations) the suction is at the dew pressure.
-function evaluate(S, u, r, sf)
+function evaluate(S, u, r, sf; Tc = condenser_bubble_T(r))
     e = S.components.evaporator
     ph = physical(S, u)
     pv = port_values(S, u, :evaporator)
@@ -79,16 +123,17 @@ function evaluate(S, u, r, sf)
     dp = evaporator_pressure_drop(e, ph.evaporator, pv)
     Δp_suction = e.pressure_drop === nothing ? 0.0 : dp.Δp_superheat
     return (ph = ph, es = es, bs = bs, Δp = dp.Δp_twophase, Δp_sup = Δp_suction, Tr_in = dp.Tr_in,
-            perf = performance(es, bs, r, sf; Δp_suction = Δp_suction))
+            perf = performance(es, bs, r, sf; Δp_suction = Δp_suction, Tc = Tc))
 end
 
 # post-processing of the continuation results `res` (ground temperature `Tb`)
-function postprocess(r, res, Tb, sf, bh = BOREHOLE; refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
+function postprocess(r, res, Tb, sf, bh = BOREHOLE; refrigerant_pressure_drop = default_refrigerant_pressure_drop(r),
+                     design = refrigerant_design(r))
     rows = []
     for x in res
         x.ok || (@warn "no solution at $(x.λ) × design flow, Tb = $(Tb - 273.15) °C"; continue)
-        S = heatpump(r, x.λ; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
-        v = evaluate(S, x.u, r, sf)
+        S = heatpump(r, x.λ; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop, design = design)
+        v = evaluate(S, x.u, r, sf; Tc = design.Tc)
         push!(rows, (Vf = x.λ, Vs = x.λ * DESIGN.Vs, Te = v.es.twophase_region.Tcl, Tr_in = v.Tr_in, Δp = v.Δp,
                      Δp_sup = v.Δp_sup, Ts_out = v.ph.nodes.T_cold, Ts_in = v.ph.nodes.T_warm, Re = reynolds(v.bs, sf),
                      iterations = x.iterations, v.perf..., issues = unique(i.message for i in validity_issues(S, x.u))))
@@ -110,11 +155,11 @@ model in the laminar-turbulent transition. `refrigerant_pressure_drop = nothing`
 equations (no refrigerant Δp in the evaporator, suction at the dew pressure).
 """
 function study(r; flows = FLOWS, sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, alg = TrustRegion(),
-               refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
-    hp(Vf) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
+               refrigerant_pressure_drop = default_refrigerant_pressure_drop(r), design = refrigerant_design(r))
+    hp(Vf) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop, design = design)
     u0 = first_guess(hp(first(flows)), Tb)
     res = continuation(hp, flows, u0, alg; abstol = 1e-9)
-    return postprocess(r, res, Tb, sf, bh; refrigerant_pressure_drop = refrigerant_pressure_drop)
+    return postprocess(r, res, Tb, sf, bh; refrigerant_pressure_drop = refrigerant_pressure_drop, design = design)
 end
 
 """
@@ -144,7 +189,7 @@ end
 
 """
     study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, alg = TrustRegion(),
-             refrigerant_pressure_drop = default_refrigerant_pressure_drop(r)) -> Vector
+             refrigerant_pressure_drop = default_refrigerant_pressure_drop(r), design = refrigerant_design(r)) -> Vector
 
 The flow sweep of `study` for each ground temperature in `Tbs` (from warm to cold, as over a
 heating season). A continuation in `Tb` at the first flow gives the starting point of each sweep
@@ -152,8 +197,8 @@ heating season). A continuation in `Tb` at the first flow gives the starting poi
 of [`optimum`](@ref).
 """
 function study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, alg = TrustRegion(),
-                  refrigerant_pressure_drop = default_refrigerant_pressure_drop(r))
-    hp(Vf, Tb) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
+                  refrigerant_pressure_drop = default_refrigerant_pressure_drop(r), design = refrigerant_design(r))
+    hp(Vf, Tb) = heatpump(r, Vf; sf = sf, Tb = Tb, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop, design = design)
     Vf1 = float(first(flows))
     u0 = first_guess(hp(Vf1, first(Tbs)), first(Tbs))
     starts = continuation(Tb -> hp(Vf1, Tb), Tbs, u0, alg; abstol = 1e-9)
@@ -161,7 +206,7 @@ function study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, 
     for s in starts
         s.ok || (@warn "no solution at Tb = $(s.λ - 273.15) °C, $Vf1 × design flow"; break)
         res = continuation(Vf -> hp(Vf, s.λ), flows, s.u, alg; abstol = 1e-9)
-        rows = postprocess(r, res, s.λ, sf, bh; refrigerant_pressure_drop = refrigerant_pressure_drop)
+        rows = postprocess(r, res, s.λ, sf, bh; refrigerant_pressure_drop = refrigerant_pressure_drop, design = design)
         push!(out, (Tb = s.λ, rows = rows, COP1 = optimum(rows, :COP1), COP2 = optimum(rows, :COP2)))
     end
     return out
@@ -313,4 +358,32 @@ function report_pressure_drop_grid(g; Vfs = (0.25, 0.5, 1.0, 2.0))
                 100(l.COP1/a.COP1 - 1))
     end
     println("A: Amalfi 2016; L: Longo-type fit (ζ = 1.667). Q2 and Te without refrigerant Δp.")
+end
+
+"""
+    report_refrigerants_tb(tbs::Pair...)
+
+Side by side, per ground temperature, the COP1 optimum of several `study_tb` results, e.g.
+`report_refrigerants_tb("R290" => tb290, "R454C" => tb454)`: optimal flow, COP1, evaporation (dew)
+temperature and evaporator duty Q2 at the best grid point.
+"""
+function report_refrigerants_tb(tbs::Pair...)
+    @printf("%7s", "Tb[°C]")
+    for (name, _) in tbs
+        @printf(" | %-28s", name)
+    end
+    println()
+    @printf("%7s", "")
+    for _ in tbs
+        @printf(" | %6s %6s %7s %6s", "Vf*", "COP1*", "Te[°C]", "Q2[W]")
+    end
+    println()
+    for i in eachindex(last(first(tbs)))
+        @printf("%7.1f", last(first(tbs))[i].Tb - 273.15)
+        for (_, tb) in tbs
+            o = tb[i].COP1
+            @printf(" | %6.3f %6.3f %7.2f %6.0f", o.Vf, o.value, o.row.Te - 273.15, o.row.Q2)
+        end
+        println()
+    end
 end

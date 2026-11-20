@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/blend-boiling-htc).
+Last updated: 2026-11-20 (feature/blend-optimal-flow).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -46,7 +46,9 @@ unconstrained solvers can be used.
 | 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | merged (#58) |
 | 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
 | 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
-| 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | PR #62 |
+| 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
+| 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | PR #63 |
+| 9 | `feature/condenser` | condenser component on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; with 6b for zone switching | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -68,9 +70,9 @@ Candidates, roughly in order:
 1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
    low end of Amalfi's database).
-2. Blends, next steps (5e glide, 5f pressure drop, 5g boiling degradation done): first-call compile of a blend solve
-   (≈ 85 s: Clapeyron mixture code with Duals, EntropyScaling transport not inferable); blends in
-   the optimal-flow study (needs a design for R454C: Vref, hei).
+2. Blends, next steps (5e–5h done): condenser on the water side (step 9: the COP comparison of a
+   blend depends on it, see 5h); first-call compile of a blend solve (≈ 70–85 s: Clapeyron mixture
+   code with Duals, EntropyScaling transport not inferable).
 3. Validity: the two-phase pinch now compares the brine outlet with T_r,in (5e); a pinch inside a
    zone cannot occur (D monotonic along each zone), so this item is done.
 4. Suction line (lumped Δp, L ≈ 0.3–0.5 m for packaged units), low priority, after B11.
@@ -929,3 +931,32 @@ R454C, `examples/blend_glide.jl` (`glide_sweep`, with Δp), brine in 5 °C, ΔTs
 - Not validated against blend data in a plate exchanger (none at hand); β_L = 0.0003 m/s is
   Thome's generic value. Cooper itself (pure, ×1.5) is the original model's choice; a flow-boiling
   plate correlation (e.g. Amalfi 2016 part 2, Longo) would be a separate step for all fluids.
+
+## `feature/blend-optimal-flow` (5h, 2026-11-20)
+`examples/optimalflow_components.jl`: `refrigerant_design(r; condenser)` gives `(hei, Vref, Tc)`.
+Pure fluids: the R290 design of the example. Blend: the same machine size (nominal two-phase duty
+`DESIGN.Qnom` at the design dew temperature, same exchanger, brine, borehole), liquid at the
+condenser bubble point. `condenser_bubble_T(r, condenser)`: the condenser is fixed at 40 °C as
+the bubble point (`:bubble`), the mean of bubble and dew (`:midpoint`, default) or the dew point
+(`:dew`); R454C condenser glide 6.7 K → bubble 40.0 / 36.6 / 33.05 °C, `Vref` 2.29 / 2.20 / 2.11 l/s
+(R290: 2.17). `design` is threaded through `heatpump`, `postprocess`, `study`, `study_tb`;
+`evaluate`/`performance` default to `condenser_bubble_T(r)` (consistent with the default design).
+`report_refrigerants_tb(pairs...)` prints the optima side by side.
+
+COP1 optimum (valid points), R454C (Clapeyron, Δp, glide, Thome–Shakir) vs R290:
+
+| Tb | R290 Vf* / COP1* | R454C bubble | R454C midpoint | R454C dew |
+|---|---|---|---|---|
+| 9 °C | 1.082 / 4.287 | 1.087 / 3.679 | 1.083 / 3.975 (−7.3 %) | 1.079 / 4.331 |
+| 5 °C | 1.187 / 3.860 | 0.677 / 3.364 | 0.666 / 3.616 (−6.3 %) | 0.655 / 3.915 |
+| 0 °C | 0.664 / 3.505 | 0.588 / 3.092 | 0.578 / 3.305 (−5.7 %) | 0.569 / 3.555 |
+| −5 °C | 0.562 / 3.200 | 0.504 / 2.852 | 0.496 / 3.033 (−5.2 %) | 0.488 / 3.244 |
+
+- The COP comparison is set by the condenser convention: R454C −14…−11 % (bubble), −7…−5 %
+  (midpoint), +1…+1.4 % (dew). The evaporator side (5e–5g) moves Te by < 0.1 K between them. Only a
+  condenser on the water side (step 9) decides it.
+- Independent of the convention: on the laminar branch the optimal brine flow of R454C is
+  8–13 % lower (0.58 vs 0.66 × design at 0 °C); the laminar maximum takes over at 5 °C (R290: 4 °C;
+  6 °C with `:dew`); the dew temperature is 0.6–1.1 K higher (the glide follows the brine); Q2 within
+  ±2 % (same nominal duty).
+- Cost: R454C `study_tb` 116 s first call (70 s compilation), R290 11 s.
