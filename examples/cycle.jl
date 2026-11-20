@@ -14,7 +14,9 @@ Usage:
     include("examples/cycle.jl")
     r290 = ClapeyronRefrigerant("R290")
     r454c = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785], name = "R454C")
-    rows = compare_cycle([r290, r454c]); report_cycle(rows)
+    rows = [compare_cycle(r290); compare_cycle(r454c)]; report_cycle(rows)
+(one refrigerant per call: a vector of both has an abstract element type, and the loop body would
+be inferred on the abstract `ClapeyronRefrigerant`, Clapeyron included: no result in 30 min)
 =#
 include(joinpath(@__DIR__, "condenser.jl"))
 using ForwardDiff
@@ -80,27 +82,25 @@ function open_point(r, Tb, conv; Vf = 1.0, u0 = nothing)
 end
 
 """
-    compare_cycle(refrigerants; Tbs = TBS_CYCLE, Vf = 1.0) -> Vector
+    compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0) -> Vector
 
-For each refrigerant and ground temperature: the closed cycle (continuation in `Tb` from the
-warmest) and the open cycle with each condenser convention (`:bubble`, `:midpoint`, `:dew`; one
-for a pure fluid).
+For the refrigerant `r` and each borehole wall temperature: the closed cycle (Newton, warm start
+from the previous `Tb`, warmest first) and the open cycle with each condenser convention
+(`:bubble`, `:midpoint`, `:dew`; one for a pure fluid).
 """
-function compare_cycle(refrigerants; Tbs = TBS_CYCLE, Vf = 1.0)
+function compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0)
+    S = cycle_system(r; Vf = Vf, Tb = first(Tbs))
+    u = cycle_guess(S, first(Tbs))
+    convs = OptimalGshpFlow.ispure(r) ? (:midpoint,) : (:bubble, :midpoint, :dew)
     rows = []
-    for r in refrigerants
-        S = cycle_system(r; Vf = Vf, Tb = first(Tbs))
-        u = cycle_guess(S, first(Tbs))
-        convs = OptimalGshpFlow.ispure(r) ? (:midpoint,) : (:bubble, :midpoint, :dew)
-        for Tb in Tbs                                  # warm start from the previous Tb
-            St = set_fixed(S; Tb = Tb)
-            x = cycle_newton(St, u)
-            x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(Tb - 273.15) °C"; break)
-            u = x.u
-            c = cycle_point(St, u)
-            opens = map(conv -> conv => open_point(r, Tb, conv; Vf = Vf), convs)
-            push!(rows, (name = r.name, Tb = Tb, closed = c, open = opens))
-        end
+    for Tb in Tbs
+        St = set_fixed(S; Tb = Tb)
+        x = cycle_newton(St, u)
+        x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(Tb - 273.15) °C"; break)
+        u = x.u
+        c = cycle_point(St, u)
+        opens = map(conv -> conv => open_point(r, Tb, conv; Vf = Vf), convs)
+        push!(rows, (name = r.name, Tb = Tb, closed = c, open = opens))
     end
     return rows
 end
