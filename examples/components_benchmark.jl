@@ -27,7 +27,7 @@ function build(sys, scaled, r, ev, phx, Vf, T)
     b = BoreholeHX(borehole = BH, secondaryfluid = SF, Vs = Vf * ev.Vs, λground = 3.)
     return ComponentSystem((evaporator = e, borehole = b);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = T,))
+                 Tb = (:borehole => :Tb,)), fixed = (Tb = T,))
 end
 
 # design state shifted to the source temperature (as `shifted_guess` in formulations_benchmark.jl)

@@ -76,7 +76,7 @@ end
     # physical values of a system solution (input of the post-processing above)
     sys = ComponentSystem((evaporator = e, borehole = b);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = 280.,))
+                 Tb = (:borehole => :Tb,)), fixed = (Tb = 280.,))
     u = initial_guess(sys; evaporator = (Te = 268., Qe = 5e3, Qsup = 300., Ts_m = 276.), nodes = (T_cold = 274., T_warm = 279.))
     ph = @inferred physical(sys, u)
     @test keys(ph) == (:evaporator, :nodes)                  # no entry for the borehole (no unknowns)

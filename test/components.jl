@@ -16,7 +16,7 @@ using NonlinearSolve, ForwardDiff
         nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)), fixed = (T_in = 278.,))
     coupled(e; Tb = 283.15) = ComponentSystem((evaporator = e, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
+                 Tb = (:borehole => :Tb,)), fixed = (Tb = Tb,))
     g = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.)
 
     @testset "defaults and declarations" begin
@@ -272,10 +272,10 @@ using NonlinearSolve, ForwardDiff
         e = evap(cla)
         S = coupled(e)
         @test length(S) == 8                                     # a fixed node adds no unknown
-        S2 = @inferred set_fixed(S; T_ground = 280.15)
+        S2 = @inferred set_fixed(S; Tb = 280.15)
         @test typeof(S2) === typeof(S)                           # same type: nothing to recompile
-        @test physical(S2, zeros(length(S2))).nodes.T_ground == 280.15
-        @test physical(S, zeros(length(S))).nodes.T_ground == 283.15       # S unchanged
+        @test physical(S2, zeros(length(S2))).nodes.Tb == 280.15
+        @test physical(S, zeros(length(S))).nodes.Tb == 283.15       # S unchanged
         u0 = initial_guess(S; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))
         sol(sys) = physical(sys, solve(NonlinearProblem(sys, u0), NewtonRaphson(); abstol = 1e-10).u)
         x2 = sol(S2)
@@ -287,4 +287,24 @@ using NonlinearSolve, ForwardDiff
         @test_throws ArgumentError set_fixed(S; T_cold = 270.)
         @test_throws ArgumentError set_fixed(S; T_x = 270.)
     end
+end
+
+# initial_guess with more component types than inference keeps in a union: each `guess` must be
+# called with concrete types (a loop over the blocks widened them to an abstract type and inferred
+# the guesses, i.e. property code and Clapeyron, on `Any`: 560 s for the closed cycle of step 9d).
+# Four cheap dummy component types; no runtime dispatch shows as no allocation beyond `u`.
+struct GuessDummy{N} <: OptimalGshpFlow.AbstractComponent end
+OptimalGshpFlow.unknowns(::GuessDummy) = (x = OptimalGshpFlow.Linear(1.0, 2.0), y = OptimalGshpFlow.Unit())
+OptimalGshpFlow.ports(::GuessDummy) = (a = OptimalGshpFlow.Free(),)
+OptimalGshpFlow.residual_scales(::GuessDummy) = (1.0, 1.0)
+OptimalGshpFlow.residuals!(r, ::GuessDummy, x, p) = (r .= x.x - p.a; nothing)
+OptimalGshpFlow.guess(::GuessDummy; x, y = 0.5) = (x = x, y = y)
+guess_dummies(S) = initial_guess(S; d1 = (x = 1.0,), d2 = (x = 2.0,), d3 = (x = 3.0,), d4 = (x = 4.0, y = 0.5))
+
+@testset "initial_guess: concrete guesses with four component types" begin
+    S = ComponentSystem((d1 = GuessDummy{1}(), d2 = GuessDummy{2}(), d3 = GuessDummy{3}(), d4 = GuessDummy{4}());
+                        nodes = (a = (:d1 => :a, :d2 => :a, :d3 => :a, :d4 => :a),), fixed = (a = 1.0,))
+    u = guess_dummies(S)
+    @test u ≈ [0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 1.5, 0.0] atol = 1e-14
+    @test (@allocated guess_dummies(S)) <= (@allocated zeros(length(S)))
 end

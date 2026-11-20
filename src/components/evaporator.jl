@@ -340,8 +340,8 @@ end
 Borehole heat exchanger (Hellström, uniform borehole wall temperature `Tb`), as in
 [`borehole_model!`](@ref).
 
-- Ports: `Tin`, `Tout` (secondary fluid) and `Tb`, the ground (borehole wall) temperature:
-  usually a fixed node, e.g. `nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = 281.15,)` (8 °C).
+- Ports: `Tin`, `Tout` (secondary fluid) and `Tb`, the borehole wall temperature (not the undisturbed ground `Tg`, see [`InfiniteLineSource`](@ref)):
+  usually a fixed node, e.g. `nodes = (…, Tb = (:borehole => :Tb,)), fixed = (Tb = 278.15,)`.
   Change it with [`set_fixed`](@ref) (same system type, nothing recompiled), or connect it to a
   component that computes it (e.g. a dynamic ground model).
 - No internal unknowns; one residual `kin Tin - Tout + (1 - kin) Tb` [K], with the coefficient
@@ -355,7 +355,7 @@ struct BoreholeHX{B <: Borehole, T <: Real, S <: SecondaryFluid} <: AbstractComp
 end
 function BoreholeHX(; borehole, secondaryfluid, Vs, λground, Tb = nothing)
     Tb === nothing || throw(ArgumentError("BoreholeHX: `Tb` is a port; connect it to a node, e.g. " *
-        "`nodes = (…, T_ground = (:borehole => :Tb,)), fixed = (T_ground = $Tb,)`"))
+        "`nodes = (…, Tb = (:borehole => :Tb,)), fixed = (Tb = $Tb,)`"))
     Vs, λground = promote(float(Vs), float(λground))
     return BoreholeHX(borehole, secondaryfluid, Vs, λground)
 end

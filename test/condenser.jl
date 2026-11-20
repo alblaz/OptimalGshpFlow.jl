@@ -1,5 +1,4 @@
 # Condenser component (step 9c): desuperheating + condensation against water, counter-flow
-using NonlinearSolve
 
 @testset "condenser" begin
     r = SPL_R290
@@ -23,10 +22,11 @@ using NonlinearSolve
             fixed = (Tw_in = 303.15, m = m, h_in = h_in))
     u0 = initial_guess(S; condenser = (Qd = 0.15Q1, Qc = 0.85Q1, Tw_m = 307.),
                        nodes = (Tw_out = 308.15, pc = pc0, h_out = h_bubble(r, pc0)))
-    sol = solve(NonlinearProblem(S, u0), NewtonRaphson(); abstol = 1e-9)
-    @test SciMLBase.successful_retcode(sol)
-    x = physical(S, sol.u).condenser
-    pv = port_values(S, sol.u, :condenser)
+    # shared-tag Newton (a NonlinearProblem compiles NonlinearSolve again for this system: +4 s)
+    u, its = newton_solve((du, u) -> OptimalGshpFlow.residual!(du, u, S), u0; tol = 1e-11)
+    @test its > 0
+    x = physical(S, u).condenser
+    pv = port_values(S, u, :condenser)
     z = condenser_zones(cond, x, pv)
     # energy: refrigerant from the discharge to saturated liquid, water 30 → ≈ 35 °C
     @test x.Qd + x.Qc ≈ m * (h_in - h_bubble(r, pv.pc)) rtol = 1e-9
@@ -37,7 +37,7 @@ using NonlinearSolve
     @test z.Tdis > z.Td > x.Tw_m > pv.Tw_in && 0 < x.xd < 0.5
     # pure fluid: condensation zone with ε = 1 − e^{−NTU}: Td − Tw_m = (Td − Tw_in) e^{−NTU}
     @test z.Td - x.Tw_m ≈ (z.Td - pv.Tw_in) * exp(-z.condensation.NTU) rtol = 1e-8
-    @test isempty(validity_issues(S, sol.u))
+    @test isempty(validity_issues(S, u))
     # pinch at the refrigerant outlet when the water comes in at the bubble temperature
     @test any(i -> occursin("refrigerant outlet", i.message), validity(cond, x, merge(pv, (Tw_in = z.Tb,))))
 end

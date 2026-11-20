@@ -30,6 +30,7 @@ unconstrained solvers can be used.
 | B7 | `fix/pressure-drop-transition` | pipe friction factor jumped ×1.65 at Re = 2300 (pump power 344 → 216 W in the study); smooth blend 2300–4000, `SharpTransition()` keeps the original | merged (#36) |
 | B8 | `fix/inferable-component-system` | `ComponentSystem` type not inferred → callers inferred NonlinearSolve/Clapeyron on abstract types; unknowns now a plain `Vector{Float64}` (no ComponentArrays); first call of the Clapeyron study 366 → 52 s | merged (#40) |
 | T1 | `test/efficiency` | test suite 386 → 200 s (fresh session): shared ForwardDiff tag and Newton helper in `test/helpers.jl`, one spline `Refrigerant("R290")`, boxed test variables | merged (#41) |
+| T2 | `test/condenser-newton` | CI runtest +60 s on Julia min after 9b/9c (331 → 390 s): condensation testset ≈ 55 s (first compile of the R454C mixture transport, partly moved from later testsets; the fix is `perf/entropyscaling-barrier`), condenser ≈ 13 s (NonlinearSolve compiled again for the condenser system): condenser test on `newton_solve` (`chunk` keyword), −3.7 s locally | PR #67 |
 | P1 | `perf/precompile-workload` | PrecompileTools workload: first call of the study 52.5 → 1.0 s, but breaks mixtures (ForwardDiff tag-count collision), see open item 1 | dropped |
 | P2 | `perf/t-ps-newton` | `T_ps(…; phase = :vapor)`: Newton in T at constant p; Clapeyron's p-s flash behind an inference barrier; first `compressor_power` 17.9 → 0.2 s | merged (#43) |
 | 6d | `feature/optimal-flow-vs-tb` | the optimal-flow study as a sweep over the ground temperature (`study_tb`, 9 → −5 °C) | merged (#45) |
@@ -38,6 +39,7 @@ unconstrained solvers can be used.
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
 | B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | merged (#59) |
+| B12 | `fix/initial-guess-inference` | `initial_guess` looped over the blocks: with four component types (closed cycle, 9d) the block widened to an abstract type and `guess` was inferred on `Any` (Clapeyron): 564 s first call; now recursion over the tuples, 0.3 s | PR #68 |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
@@ -53,6 +55,7 @@ unconstrained solvers can be used.
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | in progress |
+| 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -1057,6 +1060,33 @@ Next: 9d (closed cycle: evaporator +
 compressor link + condenser + borehole; `hei` from the condenser outlet, pc from the water side;
 node scaling for `m`, `h_in` ports, now `Free()`); then `perf/entropyscaling-barrier`.
 
+## `fix/borehole-groundwater` (B13, 2026-11-20)
+The study borehole (`examples/optimalflow_components.jl`) had three geometry errors: `rb = 0.115`
+(the 115 mm diameter as the radius: a 230 mm borehole), `rpi = 0.04 (1 − 1/17)/2` (SDR 17 wall halved:
+ID 37.6 instead of 35.3 mm) and no `rpo` (struct default 0.0223, a 44.6 mm OD). Found from the
+effective borehole resistance, 0.193 m K/W (user: far too large). Now `borehole(; Db = 0.115,
+Dpo = 0.040, SDR = 17, λfill = 0.57, H = 200., gap = 0.0025)`: the Swedish reference, 115 mm
+groundwater-filled (user, 2026-11-20; stagnant water, conduction only), PE 40 × 2.4, legs 2.5 mm
+from the wall (±35 mm). `ORIGINAL_BOREHOLE` keeps the old geometry for `original()`/`compare`.
+Naming (user): `Tb` borehole wall, `Tg` undisturbed ground (as `InfiniteLineSource`); the node
+`T_ground` of examples, tests and docstrings is now `Tb`. `season_ils` takes `rb` from `BOREHOLE`:
+the ILS radius item of 8b is fixed with it.
+
+`study_tb(R290)`, optimum of COP1 (old geometry → reference borehole):
+
+| Tb [°C] | Vf* | Vs* [l/s] | COP1* | Te [°C] |
+|---|---|---|---|---|
+| 9 | 1.082 → 1.008 | 0.531 → 0.495 | 4.287 → 4.221 | 0.32 → −0.28 |
+| 5 | 1.187 → 0.698 (laminar) | 0.582 → 0.343 | 3.860 → 3.823 | −3.39 → −5.41 |
+| 0 | 0.664 → 0.600 | 0.326 → 0.294 | 3.505 → 3.477 | −9.37 → −9.69 |
+| −5 | 0.562 → 0.508 | 0.276 → 0.249 | 3.200 → 3.178 | −13.79 → −14.10 |
+
+- COP1 −0.7…−1.5 %, optimal flow −7…−10 %; the laminar optimum takes over at 5 °C (was 4 °C).
+- The corrections cancel only partly: the smaller borehole lowers the filling resistance, but
+  stagnant water (0.57) conducts less than the grout (2), and the smaller ID raises the pump power
+  (Re +7 % at the same flow helps the heat transfer). Natural convection in the groundwater would
+  lower Rb: a candidate for step 10 (borehole sizing).
+
 ## `feature/cycle` (9d, 2026-11-20)
 Closed cycle as one `ComponentSystem` (design agreed with the user, 2026-11-20): links are ports
 with residuals in the component that computes them; the isenthalpic valve is a shared node.
@@ -1071,12 +1101,14 @@ with residuals in the component that computes them; the isenthalpic valve is a s
   as more specific than `ports(::Evaporator)` (constrained type variable `H <: Union{Nothing, T}`).
 - `Condenser`: `pc` is now a port (was an internal unknown), new port `h_out` (`h_bubble(pc)`).
 - `src/components/heatpump.jl`: `heatpump_cycle(; evaporator, compressor, condenser, borehole,
-  T_ground, Tw_in)` (nodes `T_cold`, `T_warm`, `Tb`, `p_suc`, `T_suc`, `m`, `pc`, `h_dis`,
+  Tb, Tw_in)` (nodes `T_cold`, `T_warm`, `Tb`, `p_suc`, `T_suc`, `m`, `pc`, `h_dis`,
   `h_liq`, `Tw_in`, `Tw_out`; 19 unknowns), `heatpump_guess(sys; Te, Tc, T_cold, T_warm, Tw_out)`.
 - `test/cycle.jl` (16 tests, spline R290, `newton_solve`): energy balance to 1e-10, W and Q1 equal the
   open-cycle post-processing (`compressor_condenser_power`, CoolProp compression) within 1e-7.
-- R290 spline, Tb 8 °C, water 30 °C in: Te −1.37 °C, condensation 41.1 °C, Tdis 59.7 °C, water out
+- R290 spline, old study borehole (before B13), Tb 8 °C, water 30 °C in: Te −1.37 °C, condensation 41.1 °C, Tdis 59.7 °C, water out
   34.80 °C, Q2 5703 W, W 1753 W, Q1 7334 W, COP1 (no pumps) 4.18. 6 Newton steps from the guess;
   residual 19 µs, second solve 5 ms; `residual!` inferred, JET clean except a pre-existing runtime
   dispatch in `uniform_Tb_coeffs` (keyword call of `h_circularpipe` with an abstract `transition`):
   separate fix.
+- `heatpump_guess` first call took 564 s (Clapeyron R290): `initial_guess` inferred `guess` on
+  `Any` with four component types; fixed in B12 (#68), now 0.3 s; first closed-cycle solve 19 s.
