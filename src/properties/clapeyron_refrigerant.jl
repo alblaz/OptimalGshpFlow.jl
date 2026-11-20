@@ -343,11 +343,15 @@ h_ps(r::ClapeyronRefrigerant, p, s; phase = :unknown, T0 = nothing) = h_pT(r, p,
 # transport internals  #
 ########################
 
+# EntropyScaling's results are not inferred (`Any`): inference barrier (type assertion), as `T_ph`,
+# or the `Any` propagates into the callers (e.g. the suction pressure drop into the compression,
+# which was then inferred on `Any`, Clapeyron included)
 function _transport(r::ClapeyronRefrigerant{<:Any, EntropyScalingTransport}, prop, p, T, phase)
+    F = float(promote_type(typeof(p), typeof(T)))
     if prop === :viscosity
-        return EntropyScaling.viscosity(r.transport_model, p, T, r.z; phase = phase)
+        return EntropyScaling.viscosity(r.transport_model, p, T, r.z; phase = phase)::F
     else
-        return EntropyScaling.thermal_conductivity(r.transport_model, p, T, r.z; phase = phase)
+        return EntropyScaling.thermal_conductivity(r.transport_model, p, T, r.z; phase = phase)::F
     end
 end
 
