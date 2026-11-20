@@ -199,6 +199,23 @@ using NonlinearSolve, ForwardDiff
         Tb = T_bubble(mx, pe)
         σi = [PropsSI("I", "T", Tb, "Q", 0, c) for c in ("R32", "R1234yf")]
         @test surface_tension(mx, pe) ≈ sum(mx.z .* σi) rtol = 1e-10
+        # nucleate boiling of the blend (Thome & Shakir 1987): F = 1 for pure fluids; for R454C
+        # F = [1 + (h/q) ΔT_bp (1 − e^{−q/(ρ_l Δh_lv β_L)})]⁻¹, → [1 + h ΔT_bp/(ρ_l Δh_lv β_L)]⁻¹ at q → 0
+        @test mixture_boiling_factor(cla, pe, 2e4, 3e3) == mixture_boiling_factor(spl, pe, 2e4, 3e3) == 1
+        ΔTbp, ρl, Δhlv = Te - Tb, ρ_bubble(mx, pe), h_dew(mx, pe) - h_bubble(mx, pe)
+        qb, hb = 2e4, 3e3
+        Fb = mixture_boiling_factor(mx, pe, qb, hb)
+        @test Fb ≈ inv(1 + hb / qb * ΔTbp * (1 - exp(-qb / (ρl * Δhlv * 3e-4)))) rtol = 1e-12
+        @test 0.6 < Fb < 0.9
+        @test mixture_boiling_factor(mx, pe, 0.0, hb) ≈ inv(1 + hb * ΔTbp / (ρl * Δhlv * 3e-4)) rtol = 1e-12
+        @test mixture_boiling_factor(mx, pe, 1e-9, hb) ≈ mixture_boiling_factor(mx, pe, 0.0, hb) rtol = 1e-9
+        # the zone's U value includes it: refrigerant side h_ideal F in series with the brine side
+        U, hs, href = OptimalGshpFlow.evaporator_uvalue_twophase((p.Ts_out + x.Ts_m)/2, ev.Vs, x.Qe, pe, x.xs, sf, mx, phx)
+        qz = x.Qe / (phx.A * x.xs)
+        prz = pe / OptimalGshpFlow.critical_pressure(mx)
+        h_ideal = 1.5 * 55 * prz^0.12 / ((-log10(prz))^0.55 * (OptimalGshpFlow.molar_mass(mx) * 1000)^0.5) * qz^0.67
+        @test href ≈ h_ideal * mixture_boiling_factor(mx, pe, qz, h_ideal) rtol = 1e-12
+        @test U ≈ inv(1/hs + 1/href) rtol = 1e-12
     end
 
     @testset "evaporator with refrigerant pressure drop" begin

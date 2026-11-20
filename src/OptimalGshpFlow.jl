@@ -88,7 +88,8 @@ export compressor_power, condenser_power, compressor_condenser_power
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
 export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
-export default_refrigerant_pressure_drop, evaporator_pressure_drop, evaporator_zones, effectiveness_counterflow
+export default_refrigerant_pressure_drop, evaporator_pressure_drop, evaporator_zones, effectiveness_counterflow,
+       mixture_boiling_factor
 export pressure_drop, pumping_power
 export TwoPhaseFriction, Amalfi2016, KineticEnergyFriction, LONGO_FITS, twophase_pressure_drop, friction_pressure_drop
 export acceleration_pressure_drop, gravity_pressure_drop, port_pressure_drop, vapour_pressure_drop, homogeneous_density, channel_mass_flux
