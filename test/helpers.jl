@@ -18,16 +18,17 @@ dderivative(f, x::Real) = ForwardDiff.extract_derivative(TT{typeof(x)}, f(Forwar
 dgradient(f, x::AbstractVector) =
     ForwardDiff.gradient(f, x, ForwardDiff.GradientConfig(f, x, ForwardDiff.Chunk{length(x)}(), TT{eltype(x)}()), Val(false))
 
-"""Jacobian of the in-place function `f!(y, x)` at `x`."""
-djacobian(f!, y::AbstractVector, x::AbstractVector) =
-    ForwardDiff.jacobian(f!, y, x, ForwardDiff.JacobianConfig(f!, y, x, JAC_CHUNK, TT{eltype(x)}()), Val(false))
+"""Jacobian of the in-place function `f!(y, x)` at `x` (`chunk`: at most `length(x)`; keep the
+default where possible, another chunk size is another Dual type)."""
+djacobian(f!, y::AbstractVector, x::AbstractVector, chunk = JAC_CHUNK) =
+    ForwardDiff.jacobian(f!, y, x, ForwardDiff.JacobianConfig(f!, y, x, chunk, TT{eltype(x)}()), Val(false))
 
 # Plain Newton with the shared-tag Jacobian: solving one model in several test files compiles it once
 # (a NonlinearProblem with a new closure compiles the whole NonlinearSolve stack again).
-function newton_solve(f!, u; maxit = 30, tol = 1e-8)
+function newton_solve(f!, u; maxit = 30, tol = 1e-8, chunk = JAC_CHUNK)
     du = similar(u)
     for it in 1:maxit
-        J = djacobian(f!, du, u)
+        J = djacobian(f!, du, u, chunk)
         f!(du, u)
         maximum(abs, du) < tol && return u, it
         u = u - J \ du
