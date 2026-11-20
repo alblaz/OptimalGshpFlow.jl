@@ -13,48 +13,53 @@ Two-zone (desuperheating + condensation) moving-boundary plate condenser; the wa
 fluid, volume flow `Vs`) flows against the refrigerant. The refrigerant leaves as saturated
 liquid.
 
-- Ports: `Tw_in`, `Tw_out` (water), `m` (refrigerant mass flow [kg/s]) and `h_in` (refrigerant
-  enthalpy at the inlet, the compressor discharge [J/kg]). In a closed cycle `m` and `h_in` come
-  from the compressor; standalone, fix them.
-- Unknowns: `pc` (condensing pressure, `LogBox` over `pressure_bounds`), `Qd`, `Qc` (duties of the
-  desuperheating and condensation zones, `Linear(0, Qscale)`), `xd` (area fraction of the
-  desuperheating zone, `Unit()`), `Tw_m` (water at the zone boundary).
+- Ports: `Tw_in`, `Tw_out` (water), `m` (refrigerant mass flow [kg/s]), `h_in` (refrigerant
+  enthalpy at the inlet, the compressor discharge [J/kg]), `pc` (condensing pressure) and `h_out`
+  (outlet enthalpy, saturated liquid: to the expansion valve). In a closed cycle `m` and `h_in`
+  come from the compressor; standalone, fix them and leave `pc`, `h_out` free. Transforms of the
+  refrigerant ports from [`CyclePorts`](@ref).
+- Unknowns: `Qd`, `Qc` (duties of the desuperheating and condensation zones,
+  `Linear(0, Qscale)`), `xd` (area fraction of the desuperheating zone, `Unit()`), `Tw_m` (water
+  at the zone boundary).
 - Residuals (W, scaled by `Qscale`): in each zone the refrigerant balance, the water balance and
   the counter-flow ε-NTU relation ([`effectiveness_counterflow`](@ref); desuperheating with the
-  capacity ratio of the vapour, condensation with `φ` for the glide of a blend).
+  capacity ratio of the vapour, condensation with `φ` for the glide of a blend); and
+  `h_out − h_bubble(pc)` (scaled by the latent heat).
 - U values: condensation [`condensation_htc`](@ref) (`condensation`, default [`Longo2010`](@ref),
   over the zone length) in series with the water (Wanniarachchi); desuperheating: vapour and water
   both with Wanniarachchi. No refrigerant pressure drop.
 
-Guess: `guess(cond; Tc, Qd, Qc, Tw_m, xd = 0.2)` (`Tc`: dew temperature of the guessed pressure).
+Guess: `guess(cond; Qd, Qc, Tw_m, xd = 0.2)`; the nodes `pc` (e.g. the dew pressure at the
+expected condensing temperature) and `h_out` (`h_bubble(pc)`) are guessed with the other nodes.
 Post-processing: [`condenser_zones`](@ref).
 """
 struct Condenser{R <: AbstractRefrigerant, P <: PlateHeatExchanger, T <: Real, S <: SecondaryFluid,
-                 M <: CondensationModel, X <: VariableTransform} <: AbstractComponent
+                 M <: CondensationModel, X <: CyclePorts} <: AbstractComponent
     refrigerant::R
     secondaryfluid::S
     plateheatexchanger::P
     Vs::T
     Qscale::T
     condensation::M
-    pctransform::X
+    cycleports::X
 end
 
 function Condenser(; refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation::CondensationModel = Longo2010())
     Vs, Qscale = promote(float(Vs), float(Qscale))
-    return Condenser(refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation, pressure_transform(refrigerant))
+    return Condenser(refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation, CyclePorts(refrigerant))
 end
 
 function unknowns(c::Condenser)
     Q = Linear(0, c.Qscale)
-    return (pc = c.pctransform, Qd = Q, Qc = Q, xd = Unit(), Tw_m = Free())
+    return (Qd = Q, Qc = Q, xd = Unit(), Tw_m = Free())
 end
-ports(::Condenser) = (Tw_in = Free(), Tw_out = Free(), m = Free(), h_in = Free())
-residual_scales(c::Condenser) = ntuple(_ -> c.Qscale, 6)
+function ports(c::Condenser)
+    cp = c.cycleports
+    return (Tw_in = Free(), Tw_out = Free(), m = cp.m, h_in = cp.h, pc = cp.p, h_out = cp.h)
+end
+residual_scales(c::Condenser) = (ntuple(_ -> c.Qscale, 6)..., c.cycleports.hscale)
 
-function guess(c::Condenser; Tc, Qd, Qc, Tw_m, xd = 0.2)
-    return (pc = _p_dew(c.refrigerant, Tc), Qd = Qd, Qc = Qc, xd = xd, Tw_m = Tw_m)
-end
+guess(c::Condenser; Qd, Qc, Tw_m, xd = 0.2) = (Qd = Qd, Qc = Qc, xd = xd, Tw_m = Tw_m)
 
 """
     vapour_T_ph(r, p, h) -> T
@@ -75,7 +80,7 @@ end
 # zone quantities shared by the residuals and the post-processing
 function _condenser_zones(c::Condenser, x, p)
     r, sf, phx = c.refrigerant, c.secondaryfluid, c.plateheatexchanger
-    pc, m = x.pc, p.m
+    pc, m = p.pc, p.m
     Td, Tb = T_dew(r, pc), T_bubble(r, pc)
     hd, hb = h_dew(r, pc), h_bubble(r, pc)
     Tdis = vapour_T_ph(r, pc, p.h_in)
@@ -117,6 +122,7 @@ function residuals!(r, c::Condenser, x, p)
     r[4] = zc.Cw * (x.Tw_m - p.Tw_in) - x.Qc               # water, condensation zone
     r[5] = zc.ε * zc.Cw * (z.Td - p.Tw_in) - x.Qc          # ε-NTU, condensation (refrigerant enters at the dew point)
     r[6] = zd.ε * zd.Cw * (z.Tdis - x.Tw_m) - x.Qd         # ε-NTU, desuperheating
+    r[7] = p.h_out - z.hb                                   # saturated liquid at the outlet
     return nothing
 end
 

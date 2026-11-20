@@ -61,7 +61,11 @@ average of its components ([`surface_tension`](@ref)). The boiling heat-transfer
 taken at `pe`; the superheat zone has no pressure drop inside the model (see
 [`evaporator_pressure_drop`](@ref) for the compressor suction pressure).
 
-- Ports: `Ts_in` (secondary-fluid inlet, the warm side), `Ts_out` (outlet).
+- Ports: `Ts_in` (secondary-fluid inlet, the warm side), `Ts_out` (outlet). In a closed cycle
+  (`hei = nothing`, give `hei_nominal` for the scales and the guess) also `hei` (refrigerant inlet
+  enthalpy, from the condenser outlet through the expansion valve) and the outlet ports `p_suc`
+  (`pe`), `T_suc` (`Te + ΔTsup`) and `m` (`ρ_sup Vref`), each with its residual; transforms from
+  [`CyclePorts`](@ref).
 - Unknowns: `pe` (`NestedPressure`, `LogBox` from the dew pressure at `Te_min` to the upper
   pressure bound) or `Te` (otherwise, `Box(Te_min, Tcrit)`), `Qe`, `Qsup` (`Linear(0, Qscale)`),
   `ϵsup`, `xs` (`Unit()`), `Ts_m` (secondary fluid at the moving boundary), and for
@@ -73,11 +77,12 @@ taken at `pe`; the superheat zone has no pressure drop inside the model (see
 Guess: `guess(evap; Te, Qe, Qsup, Ts_m, ϵsup = 0.5, xs = 0.5)`.
 """
 struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: PlateHeatExchanger, T <: Real,
-                  X <: VariableTransform, S <: SecondaryFluid, D <: Union{Nothing, TwoPhaseFriction}} <: AbstractComponent
+                  X <: VariableTransform, S <: SecondaryFluid, D <: Union{Nothing, TwoPhaseFriction},
+                  H <: Union{Nothing, T}, K <: Union{Nothing, CyclePorts{T}}} <: AbstractComponent
     refrigerant::R
     secondaryfluid::S
     plateheatexchanger::P
-    hei::T
+    hei::H                  # refrigerant inlet enthalpy; nothing: a port (closed cycle)
     Vs::T
     Vref::T
     ΔTsup::T
@@ -86,7 +91,9 @@ struct Evaporator{R <: AbstractRefrigerant, F <: PropertyFormulation, P <: Plate
     Te_min::T
     x1transform::X          # map of the first unknown (pe or Te), from Te_min
     pressure_drop::D        # refrigerant two-phase pressure drop model (nothing: none)
+    cycleports::K           # transforms of the cycle ports (hei = nothing), else nothing
 end
+
 
 """
     default_refrigerant_pressure_drop(refrigerant)
@@ -98,13 +105,21 @@ default_refrigerant_pressure_drop(::AbstractRefrigerant) = Amalfi2016()
 
 function Evaporator(; refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup,
                     formulation::PropertyFormulation = default_formulation(refrigerant),
-                    Qscale = nominal_duty(refrigerant, Vref, hei), Te_min = default_Te_min(refrigerant),
+                    hei_nominal = hei, Qscale = nothing, Te_min = default_Te_min(refrigerant),
                     refrigerant_pressure_drop::Union{Nothing, TwoPhaseFriction} = default_refrigerant_pressure_drop(refrigerant))
-    hei, Vs, Vref, ΔTsup, Qscale, Te_min = promote(float.((hei, Vs, Vref, ΔTsup, Qscale, Te_min))...)
+    hei_nominal === nothing && throw(ArgumentError("Evaporator: with `hei = nothing` (closed cycle) give `hei_nominal`"))
+    Qscale = something(Qscale, nominal_duty(refrigerant, Vref, hei_nominal))
+    Vs, Vref, ΔTsup, Qscale, Te_min = promote(float.((Vs, Vref, ΔTsup, Qscale, Te_min))...)
     x1 = _first_transform(formulation, refrigerant, Te_min)
+    hei, cp = hei === nothing ? (nothing, CyclePorts(refrigerant)) : (convert(typeof(Vs), hei), nothing)
     return Evaporator(refrigerant, secondaryfluid, plateheatexchanger, hei, Vs, Vref, ΔTsup, formulation, Qscale,
-                      Te_min, x1, refrigerant_pressure_drop)
+                      Te_min, x1, refrigerant_pressure_drop, cp)
 end
+
+# inlet enthalpy: the parameter, or the port of a cycle evaporator
+_hei(hei::Real, p) = hei
+_hei(::Nothing, p) = p.hei
+_hei(c::Evaporator, p) = _hei(c.hei, p)
 
 function _first_transform(::NestedPressure, r, Te_min)
     pmin, pmax = pressure_bounds(r)
@@ -126,28 +141,44 @@ function unknowns(c::Evaporator)
     return NamedTuple{names}((c.x1transform, Q, Q, Unit(), Unit(), Free(), extra_transforms(F, r)...))
 end
 
-ports(::Evaporator) = (Ts_in = Free(), Ts_out = Free())
+# a closed-cycle evaporator (cycleports, hei = nothing): inlet enthalpy and outlet state as ports
+# (dispatch on the field: a method on Evaporator{…, Nothing} is not taken as more specific)
+ports(c::Evaporator) = _evaporator_ports(c.cycleports)
+_evaporator_ports(::Nothing) = (Ts_in = Free(), Ts_out = Free())
+_evaporator_ports(cp::CyclePorts) = (Ts_in = Free(), Ts_out = Free(), hei = cp.h, p_suc = cp.p, T_suc = Free(), m = cp.m)
 
 function residual_scales(c::Evaporator)
     Q = c.Qscale
-    return (Q, Q, Q, Q, Q, Q, 1.0, map(_ -> 1.0, _extra_names(c.formulation))...)
+    return (Q, Q, Q, Q, Q, Q, 1.0, map(_ -> 1.0, _extra_names(c.formulation))..., _cycle_scales(c)...)
 end
+_cycle_scales(c::Evaporator) = _cycle_scales(c.cycleports, c)
+_cycle_scales(::Nothing, c) = ()
+_cycle_scales(cp::CyclePorts, c) = (cp.pscale, 1.0, c.Qscale / cp.hscale)
 
 function residuals!(r, c::Evaporator, x, p)
     F = c.formulation
     vols = map(k -> x[k], _extra_names(F))
     rs = refrigerant_state!(view(r, 8:7+length(vols)), F, c.refrigerant, x[1], vols, c.ΔTsup)
-    _evaporator_balances!(r, c, x, p.Ts_in, p.Ts_out, rs)
+    _evaporator_balances!(r, c, x, p.Ts_in, p.Ts_out, rs, _hei(c, p))
+    _cycle_residuals!(r, 7 + length(vols), c.cycleports, c, p, rs)
+    return nothing
+end
+
+_cycle_residuals!(r, n, ::Nothing, c, p, rs) = nothing
+function _cycle_residuals!(r, n, ::CyclePorts, c, p, rs)
+    r[n+1] = p.p_suc - rs.pe                           # outlet pressure (end of the two-phase zone)
+    r[n+2] = p.T_suc - (rs.Te + c.ΔTsup)               # outlet temperature
+    r[n+3] = p.m - rs.ρsup * c.Vref                    # mass flow (displacement at the outlet density)
     return nothing
 end
 
 # Refrigerant temperature at the inlet of the two-phase zone and the pressure drop over it, for
 # the refrigerant mass flow m and the zone fraction xs (rs: refrigerant state at the end of the zone)
-_twophase_inlet(::Nothing, c::Evaporator, rs, m, xs) = (rs.Te, zero(rs.Te))
-function _twophase_inlet(model::TwoPhaseFriction, c::Evaporator, rs, m, xs)
+_twophase_inlet(::Nothing, c::Evaporator, rs, m, xs, hei) = (rs.Te, zero(rs.Te))
+function _twophase_inlet(model::TwoPhaseFriction, c::Evaporator, rs, m, xs, hei)
     r, pe, phx = c.refrigerant, rs.pe, c.plateheatexchanger
     hl = h_bubble(r, pe)
-    x_in = (c.hei - hl) / (rs.hes - hl)
+    x_in = (hei - hl) / (rs.hes - hl)
     Δp = twophase_pressure_drop(model, r, phx, m, pe, x_in, one(x_in); L = xs * phx.L).total
     return (T_dew(r, pe + Δp), Δp)
 end
@@ -161,7 +192,7 @@ _glide_inlet_T(r::ClapeyronRefrigerant, pe, hei, Te) = ispure(r) ? Te : T_ph(r, 
 # temperature. Refrigerant temperature linear along the zone (Qiao 2025): it rises by the glide
 # Te − T_in (blends; capacity C_r = ṁ (h_dew − hei)/(Te − T_in), φ = Cs/C_r) and falls by the
 # saturation shift of the pressure drop, Te − T_dew(pe + Δp) < 0 (γ).
-function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs)
+function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs, hei)
     sf, phx = c.secondaryfluid, c.plateheatexchanger
     Tsm = (Ts_l + Ts_m)/2
     U, _, _ = evaporator_uvalue_twophase(Tsm, c.Vs, Qe, rs.pe, xs, sf, c.refrigerant, phx)
@@ -170,10 +201,10 @@ function _twophase_zone(c::Evaporator, Qe, xs, Ts_l, Ts_m, rs)
     # pressure drop: dew temperature at the inlet pressure p_in = pe + Δp (Tsat_in); blends enter
     # below it by the glide, T_r,in = T(p_in, hei). Te − T_r,in = (Te − Tsat_in) + glide: the
     # saturation shift goes into γ, the glide into φ.
-    Tsat_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, m, xs)
-    Tr_in = _glide_inlet_T(c.refrigerant, rs.pe + Δp, c.hei, Tsat_in)
+    Tsat_in, Δp = _twophase_inlet(c.pressure_drop, c, rs, m, xs, hei)
+    Tr_in = _glide_inlet_T(c.refrigerant, rs.pe + Δp, hei, Tsat_in)
     glide = Tsat_in - Tr_in
-    φ = Cs * glide / (m * (rs.hes - c.hei))
+    φ = Cs * glide / (m * (rs.hes - hei))
     NTU = U * phx.A * xs / Cs
     γ = (rs.Te - Tsat_in) / (Tr_in - Ts_m)
     return (U = U, Cs = Cs, NTU = NTU, γ = γ, φ = φ, ϵ = effectiveness_counterflow(NTU, γ, φ), Tr_in = Tr_in, Δp = Δp)
@@ -191,20 +222,20 @@ function _superheat_zone(c::Evaporator, xs, Ts_h, Ts_m, rs)
     return (U = U, Cs = Cs, Cref = Cref, Cmin = Cmin, Cr = Cmin / max(Cref, Cs), NTU = U * phx.A * (1 - xs) / Cmin)
 end
 
-function _evaporator_balances!(du, c::Evaporator, x, Ts_h, Ts_l, rs)
+function _evaporator_balances!(du, c::Evaporator, x, Ts_h, Ts_l, rs, hei)
     (; Qe, Qsup, ϵsup, xs, Ts_m) = x
     ΔTsup = c.ΔTsup
     (; Te, hes, ρsup) = rs
     m = ρsup * c.Vref
 
     # two-phase (counter-flow, refrigerant temperature changing with the pressure drop)
-    z = _twophase_zone(c, Qe, xs, Ts_l, Ts_m, rs)
+    z = _twophase_zone(c, Qe, xs, Ts_l, Ts_m, rs, hei)
 
     # superheat (as evaporator_balances!)
     h = _superheat_zone(c, xs, Ts_h, Ts_m, rs)
 
     du[1] = z.Cs * (Ts_m - Ts_l) - Qe                 # secondary fluid, two-phase zone
-    du[2] = m * (hes - c.hei) - Qe                     # refrigerant, two-phase zone
+    du[2] = m * (hes - hei) - Qe                     # refrigerant, two-phase zone
     du[3] = z.ϵ * z.Cs * (Ts_m - z.Tr_in) - Qe         # ε-NTU (Qiao)
     du[4] = h.Cs * (Ts_h - Ts_m) - Qsup                # secondary fluid, superheat
     du[5] = h.Cref * ΔTsup - Qsup                      # refrigerant, superheat
@@ -226,14 +257,14 @@ function guess(c::Evaporator; Te, Qe, Qsup, Ts_m, ϵsup = 0.5, xs = 0.5)
 end
 
 """
-    EvaporatorParameters(c::Evaporator, Ts_h)
+    EvaporatorParameters(c::Evaporator, Ts_h, hei = c.hei)
 
 Parameters of the original model ([`evaporator_model!`](@ref)) for the same evaporator, with
-secondary-fluid inlet temperature `Ts_h`.
+secondary-fluid inlet temperature `Ts_h` (and inlet enthalpy `hei`: needed for a cycle evaporator).
 """
-EvaporatorParameters(c::Evaporator, Ts_h) =
+EvaporatorParameters(c::Evaporator, Ts_h, hei = c.hei) =
     EvaporatorParameters(refrigerant = c.refrigerant, secondaryfluid = c.secondaryfluid,
-                         plateheatexchanger = c.plateheatexchanger, hei = c.hei, Vs = c.Vs, Vref = c.Vref,
+                         plateheatexchanger = c.plateheatexchanger, hei = hei, Vs = c.Vs, Vref = c.Vref,
                          ΔTsup = c.ΔTsup, Ts_h = Ts_h)
 
 """
@@ -249,10 +280,11 @@ function evaporator_solution(c::Evaporator, x, p)
     # refrigerant temperature (so ≤ 1): Te at the end of the zone, or T(pe, hei) of a blend
     Tsm = (p.Ts_out + x.Ts_m)/2
     Te = T_dew(r, pe)
-    ϵe = x.Qe / (c.secondaryfluid.ρ(Tsm) * c.secondaryfluid.cp(Tsm) * c.Vs * (x.Ts_m - _glide_inlet_T(r, pe, c.hei, Te)))
+    hei = _hei(c, p)
+    ϵe = x.Qe / (c.secondaryfluid.ρ(Tsm) * c.secondaryfluid.cp(Tsm) * c.Vs * (x.Ts_m - _glide_inlet_T(r, pe, hei, Te)))
     u = [to_R(pressure_transform(r), pe), x.Qe, x.Qsup, to_R(Unit(), ϵe), to_R(Unit(), x.ϵsup),
          to_R(Unit(), x.xs), p.Ts_out, x.Ts_m]
-    return evaporator_model(u, EvaporatorParameters(c, p.Ts_in))
+    return evaporator_model(u, EvaporatorParameters(c, p.Ts_in, hei))
 end
 
 _pe(c::Evaporator, x) = c.formulation isa NestedPressure ? x[1] : p_sat(c.refrigerant, x[1])
@@ -273,7 +305,7 @@ Constant within each zone, so the temperature profiles follow in closed form (e.
 function evaporator_zones(c::Evaporator, x, p)
     pe = _pe(c, x)
     rs = refrigerant_state!(nothing, NestedPressure(), c.refrigerant, pe, (), c.ΔTsup)
-    z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs)
+    z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs, _hei(c, p))
     h = _superheat_zone(c, x.xs, p.Ts_in, x.Ts_m, rs)
     Asup = c.plateheatexchanger.A * (1 - x.xs)
     return (twophase = (U = z.U, Cs = z.Cs, NTU = z.NTU, γ = z.γ, φ = z.φ, Tr_in = z.Tr_in, Te = rs.Te, Δp = z.Δp),
@@ -295,7 +327,7 @@ function evaporator_pressure_drop(c::Evaporator, x, p)
     Tsup = Te + c.ΔTsup
     ρsup = ρ_pT(r, pe, Tsup; phase = :vapor)
     rs = (pe = pe, Te = Te, hes = h_dew(r, pe), ρsup = ρsup)
-    z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs)
+    z = _twophase_zone(c, x.Qe, x.xs, p.Ts_out, x.Ts_m, rs, _hei(c, p))
     m = ρsup * c.Vref
     Tm = Te + c.ΔTsup/2
     Δp_sup = vapour_pressure_drop(phx, m, ρ_pT(r, pe, Tm; phase = :vapor), μ_pT(r, pe, Tm; phase = :vapor), (1 - x.xs) * phx.L)

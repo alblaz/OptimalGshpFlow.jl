@@ -52,7 +52,7 @@ unconstrained solvers can be used.
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
-| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
+| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | in progress |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -980,7 +980,8 @@ Decisions (user, 2026-11-20):
 - Closed cycle: the condenser is a component, the condensing pressure an unknown set by the water
   side, `hei` from the condenser outlet. Expansion valve: isenthalpic, superheat set by `ΔTsup`
   (as now). Compressor: fixed displacement and isentropic efficiency (as now); a better compressor
-  model is of interest, later.
+  model is of interest, later: volumetric efficiency (mass flow below ρ_suc × displacement), and
+  for speed-modulating compressors the inverter efficiency (user, 2026-11-20).
 - Water side: floor heating 30 → 35 °C at design (for now); Wanniarachchi. Geometry: the plate
   type of the evaporator, area from a condenser analogue of `EvaporatorDesign`.
 Tools checked: saturated-liquid ρ, h available; μ_L, λ_L, cp_L work (CoolProp for pure fluids,
@@ -1055,3 +1056,27 @@ Done:
 Next: 9d (closed cycle: evaporator +
 compressor link + condenser + borehole; `hei` from the condenser outlet, pc from the water side;
 node scaling for `m`, `h_in` ports, now `Free()`); then `perf/entropyscaling-barrier`.
+
+## `feature/cycle` (9d, 2026-11-20)
+Closed cycle as one `ComponentSystem` (design agreed with the user, 2026-11-20): links are ports
+with residuals in the component that computes them; the isenthalpic valve is a shared node.
+- `src/components/cycle.jl`: `CyclePorts(r)` (transforms of the refrigerant-loop ports, the same in
+  every component of a refrigerant: pressure `LogBox` over `pressure_bounds`, enthalpy
+  `Linear(h_bubble, Δh_lv)` at 0 °C, mass flow `Above(0, 1)` (log scale); residual scales);
+  `Compressor(; refrigerant, ηis, ξ, Δp_suction)` (ports `p_suc`, `T_suc`, `m`, `pc`, `h_dis`; one
+  residual), `compression_state` (property interface, AD-able; spline: `vapour_h_ps`, Newton on
+  `s_pT`), `compressor_power(c::Compressor, p)`.
+- `Evaporator(…; hei = nothing, hei_nominal)`: ports `hei` (in), `p_suc`, `T_suc`, `m` (out, three
+  residuals). Dispatch on the `cycleports` field: a method on `Evaporator{…, Nothing}` was not taken
+  as more specific than `ports(::Evaporator)` (constrained type variable `H <: Union{Nothing, T}`).
+- `Condenser`: `pc` is now a port (was an internal unknown), new port `h_out` (`h_bubble(pc)`).
+- `src/components/heatpump.jl`: `heatpump_cycle(; evaporator, compressor, condenser, borehole,
+  T_ground, Tw_in)` (nodes `T_cold`, `T_warm`, `Tb`, `p_suc`, `T_suc`, `m`, `pc`, `h_dis`,
+  `h_liq`, `Tw_in`, `Tw_out`; 19 unknowns), `heatpump_guess(sys; Te, Tc, T_cold, T_warm, Tw_out)`.
+- `test/cycle.jl` (16 tests, spline R290, `newton_solve`): energy balance to 1e-10, W and Q1 equal the
+  open-cycle post-processing (`compressor_condenser_power`, CoolProp compression) within 1e-7.
+- R290 spline, Tb 8 °C, water 30 °C in: Te −1.37 °C, condensation 41.1 °C, Tdis 59.7 °C, water out
+  34.80 °C, Q2 5703 W, W 1753 W, Q1 7334 W, COP1 (no pumps) 4.18. 6 Newton steps from the guess;
+  residual 19 µs, second solve 5 ms; `residual!` inferred, JET clean except a pre-existing runtime
+  dispatch in `uniform_Tb_coeffs` (keyword call of `h_circularpipe` with an abstract `transition`):
+  separate fix.
