@@ -308,3 +308,20 @@ guess_dummies(S) = initial_guess(S; d1 = (x = 1.0,), d2 = (x = 2.0,), d3 = (x = 
     @test u ≈ [0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 1.5, 0.0] atol = 1e-14
     @test (@allocated guess_dummies(S)) <= (@allocated zeros(length(S)))
 end
+
+# validity_issues and port_values with four component types: same widening as initial_guess (B12).
+# For the closed cycle of a blend (step 9d) the post-processing never finished: `validity` and
+# the callers of `port_values` (evaporator_solution, …) were inferred on `Any`, Clapeyron included.
+for N in 1:4                 # one method per type, as real components: no static dispatch on a widened type
+    @eval OptimalGshpFlow.validity(::GuessDummy{$N}, x, p) = ()
+end
+pv_dummy2(S, u) = port_values(S, u, :d2)
+validity_allocs(S, u) = (validity_issues(S, u); @allocated validity_issues(S, u))   # compiled first
+@testset "validity_issues and port_values: concrete with four component types" begin
+    S = ComponentSystem((d1 = GuessDummy{1}(), d2 = GuessDummy{2}(), d3 = GuessDummy{3}(), d4 = GuessDummy{4}());
+                        nodes = (a = (:d1 => :a, :d2 => :a, :d3 => :a, :d4 => :a),), fixed = (a = 1.0,))
+    u = guess_dummies(S)
+    @test isempty(validity_issues(S, u))
+    @test validity_allocs(S, u) < 200                  # the issues vector only (runtime dispatch: ≈ 1000 bytes)
+    @test (@inferred pv_dummy2(S, u)) == (a = 1.0,)
+end
