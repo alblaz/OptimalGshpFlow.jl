@@ -46,7 +46,7 @@ unconstrained solvers can be used.
 | 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | merged (#58) |
 | 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
 | 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
-| 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | PR pending |
+| 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | PR #62 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
