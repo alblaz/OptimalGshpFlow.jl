@@ -16,7 +16,7 @@ using NonlinearSolve, ForwardDiff
         nodes = (T_out = (:evaporator => :Ts_out,), T_in = (:evaporator => :Ts_in,)), fixed = (T_in = 278.,))
     coupled(e; Tb = 283.15) = ComponentSystem((evaporator = e, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
+                 Tb = (:borehole => :Tb,)), fixed = (Tb = Tb,))
     g = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.)
 
     @testset "defaults and declarations" begin
@@ -272,10 +272,10 @@ using NonlinearSolve, ForwardDiff
         e = evap(cla)
         S = coupled(e)
         @test length(S) == 8                                     # a fixed node adds no unknown
-        S2 = @inferred set_fixed(S; T_ground = 280.15)
+        S2 = @inferred set_fixed(S; Tb = 280.15)
         @test typeof(S2) === typeof(S)                           # same type: nothing to recompile
-        @test physical(S2, zeros(length(S2))).nodes.T_ground == 280.15
-        @test physical(S, zeros(length(S))).nodes.T_ground == 283.15       # S unchanged
+        @test physical(S2, zeros(length(S2))).nodes.Tb == 280.15
+        @test physical(S, zeros(length(S))).nodes.Tb == 283.15       # S unchanged
         u0 = initial_guess(S; evaporator = g, nodes = (T_cold = 274., T_warm = 279.))
         sol(sys) = physical(sys, solve(NonlinearProblem(sys, u0), NewtonRaphson(); abstol = 1e-10).u)
         x2 = sol(S2)

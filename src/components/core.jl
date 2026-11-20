@@ -92,8 +92,8 @@ Example, evaporator coupled to a borehole:
     sys = ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)),
-        fixed = (T_ground = 281.15,))         # undisturbed ground, e.g. ≈ 8 °C (Stockholm)
+                 Tb = (:borehole => :Tb,)),
+        fixed = (Tb = 278.15,))               # borehole wall (not the undisturbed ground Tg)
 
 Fixed values are changed with [`set_fixed`](@ref).
 """
@@ -163,7 +163,7 @@ Base.length(sys::ComponentSystem) = sys.n
 """
     set_fixed(sys::ComponentSystem; node = value, ...) -> ComponentSystem
 
-Copy of `sys` with new values of fixed nodes (e.g. the ground temperature at each time step of a
+Copy of `sys` with new values of fixed nodes (e.g. the borehole wall temperature at each time step of a
 dynamic simulation). The copy has the same type as `sys`, so nothing is compiled again, and the
 unknowns keep their layout: the previous solution is a warm start.
 """

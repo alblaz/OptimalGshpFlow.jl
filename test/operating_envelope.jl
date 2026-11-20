@@ -72,7 +72,7 @@ using NonlinearSolve
                                                             hei = ev.hei, Vs = λ * ev.Vs, Vref = ev.Vref, ΔTsup = 5.),
                                     borehole = BoreholeHX(borehole = bh, secondaryfluid = sf, Vs = λ * ev.Vs, λground = 3.5));
             nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin), T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
-                     T_ground = (:borehole => :Tb,)), fixed = (T_ground = 283.15,))
+                     Tb = (:borehole => :Tb,)), fixed = (Tb = 283.15,))
         u0 = initial_guess(build(1.0); evaporator = (Te = ev.Te, Qe = 0.9ev.Qnom, Qsup = 0.1ev.Qnom, Ts_m = 276.),
                            nodes = (T_cold = 274., T_warm = 279.))
         λs = [1.0, 0.7, 0.4, 0.2]

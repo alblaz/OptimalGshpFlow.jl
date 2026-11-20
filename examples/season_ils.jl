@@ -19,7 +19,7 @@ include(joinpath(@__DIR__, "optimalflow_components.jl"))
 const GROUND = InfiniteLineSource(λ = λGROUND, α = 1e-6, rb = BOREHOLE.rb, Tg = 273.15 + 8)
 const DAY = 86400.
 
-# solve at the flow factor Vf and ground temperature Tb from u (Newton, TrustRegion as fallback)
+# solve at the flow factor Vf and borehole wall temperature Tb from u (Newton, TrustRegion as fallback)
 function solve_point(S, u)
     for alg in (NewtonRaphson(), TrustRegion())
         sol = solve(NonlinearProblem(S, u), alg; abstol = 1e-9)
@@ -63,7 +63,7 @@ function season(r; flow = 1.0, days = 180, dt = 3600., g = GROUND, sf = BRINE_PR
             Vf, u = optimal_point(r, Tb; sf = sf, bh = bh, refrigerant_pressure_drop = refrigerant_pressure_drop)
             S = hp(Vf, Tb)
         end
-        S = set_fixed(S; T_ground = Tb)
+        S = set_fixed(S; Tb = Tb)
         un = solve_point(S, u)
         un === nothing && (@warn "no solution at t = $(t/DAY) d, Tb = $(Tb - 273.15) °C"; break)
         u = un
