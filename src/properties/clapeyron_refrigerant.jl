@@ -362,8 +362,9 @@ _coolprop_key(prop) = prop === :viscosity ? COOLPROP_V : COOLPROP_L
 
 # surface tension: CoolProp (pure fluids with CoolProp transport); mixtures: mole-fraction average
 # of the pure components at the bubble temperature (neither Clapeyron nor CoolProp has a mixture
-# surface tension). An approximation: for R454C the pure values differ by 15 %, and the two-phase
-# pressure drop (Amalfi) depends on σ^0.22 only.
+# surface tension). An approximation: 7–10 % above measured R32 + R1234yf data (Khordad 2018,
+# Table 15; real blends lie below the linear average); the two-phase pressure drop (Amalfi)
+# depends on σ^0.22 only (≈ +2 % in Δp).
 function surface_tension(r::ClapeyronRefrigerant, p)
     ispure(r) || return _surface_tension_mixture(r, p)
     cs = r.transport_model
