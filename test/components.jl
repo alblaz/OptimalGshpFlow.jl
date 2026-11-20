@@ -324,4 +324,6 @@ validity_allocs(S, u) = (validity_issues(S, u); @allocated validity_issues(S, u)
     @test isempty(validity_issues(S, u))
     @test validity_allocs(S, u) < 200                  # the issues vector only (runtime dispatch: ≈ 1000 bytes)
     @test (@inferred pv_dummy2(S, u)) == (a = 1.0,)
+    # physical: the recursive _drop_empty gave up from three components on (abstract NamedTuple)
+    @test (@inferred physical(S, u)).d4 == (x = 4.0, y = 0.5)
 end
