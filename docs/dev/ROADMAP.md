@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/saturated-liquid-properties).
+Last updated: 2026-11-20 (feature/condensation-htc).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -49,8 +49,8 @@ unconstrained solvers can be used.
 | 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
 | 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | merged (#63) |
 | 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | in progress |
-| 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | PR #64 |
-| 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), smooth max; Silver–Bell–Ghaly for blends | planned |
+| 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
+| 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | PR pending |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; sizing | planned |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
@@ -971,8 +971,9 @@ Decisions (user, 2026-11-20):
   R1270 in a BPHE (65°, b = 2 mm, the plate of `LONGO_FITS`; the condensation Δp fit ζ = 1900 is
   already there). Two regimes, transition at Re_eq ≈ 1600–1700 (G ≈ 15–18 kg/(m² s)): Nusselt film
   condensation × Φ (gravity controlled; explicit in the heat flux, h ∝ q^−1/3; 14.8 % mean
-  deviation) and Akers × Φ (forced convection, local in x; 21 %). Smooth maximum of the two for the
-  solver. Our G (3–13) is in the gravity regime. Blends: Silver–Bell–Ghaly
+  deviation) and Akers × Φ (forced convection, local in x; 21 %). Joined by Longo's criterion (Re_eq
+  at the mean quality, C¹ blend 1500–1800; a smooth maximum was tried and rejected, see 9b). Our G
+  (3–13) is in the gravity regime. Blends: Silver–Bell–Ghaly
   (1/h = 1/h_film + Z_g/h_g, Z_g = x cp_g dT/dh).
 - Zones: desuperheating + condensation, saturated liquid at the outlet (as the current cycle);
   subcooling later with zone switching (6b).
@@ -990,3 +991,29 @@ Found in 9a: EntropyScaling transport (blends: `μ_pT`, `μ_dew`, `μ_bubble`, �
 (`_transport` passes EntropyScaling's result through without a barrier). An assertion as in
 `T_ph` would fix it, and may cut the 70–85 s first-call compile of a blend solve: separate branch
 (`perf/entropyscaling-barrier`), to measure.
+
+## `feature/condensation-htc` (9b, 2026-11-20)
+`src/condensation.jl`: `nusselt_film_htc` (written with the heat flux: `h = [0.943⁴ λ³ρ²gΔh_lv/(μ L q)]^⅓`),
+`akers_htc` (mean over the quality in closed form: Re_eq linear in x), `reynolds_equivalent`,
+`condensation_htc(Longo2010(), r, phx, m, p, x_in, x_out, q; L)` → `(; h, gravity, forced, Re_eq)`.
+h and q refer to the actual area `A` (as the evaporator); Longo's projected-area values are Φ × h,
+Φ × q (so Φ drops out of his formulas here). `d_h = 2b` as Longo. Blends: Silver–Bell–Ghaly with
+the vapour alone (Wanniarachchi) at the mean quality.
+
+Check against Longo's data (his BPHE, x 1 → 0, h × Φ; reference = my reading of his Figs. 3–5):
+
+| fluid | Tsat | G = 6 | G = 10 | G = 15 | G = 20 | G = 28 |
+|---|---|---|---|---|---|---|
+| R290 | 25 °C | +6 % | −11 % | +42 % | +32 % | +13 % |
+| R290 | 40 °C | 0 % | −16 % | +30 % | +21 % | +4 % |
+| R600a | 25 °C | −18 % | −31 % | +23 % | +33 % | +29 % |
+| R1270 | 25 °C | +15 % | −3 % | +35 % | +33 % | +19 % |
+
+- Gravity regime (G ≤ 10, Nusselt): within Longo's 14.8 % mean deviation for R290 and R1270, R600a
+  −20…−30 % (the data are flat in G, Nusselt falls with q ∝ G). Forced (G ≥ 20, Akers): +4…+33 %
+  (Longo: 21 %, Akers over-predicts). Just above the transition (G 15–20) Akers jumps while the
+  data rise gradually: +16…+42 %.
+- First version: the smooth maximum (p-norm, n = 4) of the two: +22…+41 % at G = 6–15 (adds them
+  where they coincide; takes Akers below the transition). Replaced by Longo's Re_eq criterion.
+- Our condenser (the evaporator's mass flow, G ≈ 3–13) is in the Nusselt regime. If the transition
+  matters (high compressor speed): Longo's J_H(Re_eq) curve (his Fig. 6, read off the figure).
