@@ -881,6 +881,15 @@ Vref of the R290 example, sweep 2 → 0.3 × design brine flow, 0.9 s after comp
   `Te − T_dew(p_in)` in γ, glide `T_dew(p_in) − T_r,in` in φ (`C_r = ṁ (h_dew − hei)/glide`). Pure
   fluids unchanged. `default_refrigerant_pressure_drop` is `Amalfi2016()` for every refrigerant.
 - Cost: blend residual 1.2 ms (glide only) → 1.6 ms (with Δp: bubble state, σ, `T_dew(p_in)`).
+- Check of the mixing rule (2026-11-20, paper from the user: Khordad 2018, Int. J. Refrig. 86, 73,
+  `assets/docs/`): its Table 15 has measured σ of R32 + R1234yf (mole fractions 0.519/0.481,
+  293–343 K, Zhao 2014). The mole-fraction average of the CoolProp pure values overestimates them
+  by 7–10 % (real blends lie below the linear average: the lower-σ component enriches the
+  surface). Effect: Δp ∝ σ^0.22, so ≈ +2 % in Δp and ≈ 0.01 % in capacity: negligible, kept.
+  The paper's own method (Ornstein–Zernike/HNC with a Stockmayer potential) is not worth
+  implementing: numerically heavy and less accurate for the pure fluids than CoolProp (R1234yf
+  +17 %). If σ ever matters: Di Nicola & Pierantozzi 2013 (correlation for refrigerant binaries)
+  or the corresponding-states model of Rice & Teja 1982 (≈ 0.3 mN/m mean deviation, their Table 18).
 
 R454C, `examples/blend_glide.jl` (`pressure_drop_effect`), brine in 5 °C, ΔTsup 3.5 K:
 
