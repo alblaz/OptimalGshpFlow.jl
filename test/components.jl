@@ -288,3 +288,23 @@ using NonlinearSolve, ForwardDiff
         @test_throws ArgumentError set_fixed(S; T_x = 270.)
     end
 end
+
+# initial_guess with more component types than inference keeps in a union: each `guess` must be
+# called with concrete types (a loop over the blocks widened them to an abstract type and inferred
+# the guesses, i.e. property code and Clapeyron, on `Any`: 560 s for the closed cycle of step 9d).
+# Four cheap dummy component types; no runtime dispatch shows as no allocation beyond `u`.
+struct GuessDummy{N} <: OptimalGshpFlow.AbstractComponent end
+OptimalGshpFlow.unknowns(::GuessDummy) = (x = OptimalGshpFlow.Linear(1.0, 2.0), y = OptimalGshpFlow.Unit())
+OptimalGshpFlow.ports(::GuessDummy) = (a = OptimalGshpFlow.Free(),)
+OptimalGshpFlow.residual_scales(::GuessDummy) = (1.0, 1.0)
+OptimalGshpFlow.residuals!(r, ::GuessDummy, x, p) = (r .= x.x - p.a; nothing)
+OptimalGshpFlow.guess(::GuessDummy; x, y = 0.5) = (x = x, y = y)
+guess_dummies(S) = initial_guess(S; d1 = (x = 1.0,), d2 = (x = 2.0,), d3 = (x = 3.0,), d4 = (x = 4.0, y = 0.5))
+
+@testset "initial_guess: concrete guesses with four component types" begin
+    S = ComponentSystem((d1 = GuessDummy{1}(), d2 = GuessDummy{2}(), d3 = GuessDummy{3}(), d4 = GuessDummy{4}());
+                        nodes = (a = (:d1 => :a, :d2 => :a, :d3 => :a, :d4 => :a),), fixed = (a = 1.0,))
+    u = guess_dummies(S)
+    @test u ≈ [0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 1.5, 0.0] atol = 1e-14
+    @test (@allocated guess_dummies(S)) <= (@allocated zeros(length(S)))
+end
