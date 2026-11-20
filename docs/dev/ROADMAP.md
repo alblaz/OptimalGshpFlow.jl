@@ -39,6 +39,7 @@ unconstrained solvers can be used.
 | 6e | `feature/nusselt-gnielinski` | `GnielinskiTransition()`: Gnielinski (VDI 2013) turbulent, C¹ Hermite blend from laminar; sensitivity of the optimal flow to the transition model | merged (#48) |
 | B10 | `fix/dittus-boelter-exponent` | Dittus-Boelter `mode = "heating"` used `Pr^0.3` (cooling exponent); now 0.4 | merged (#49) |
 | B11 | `fix/suction-mass-balance` | with `Δp_suction ≠ 0` the compressor took ṁ = ρ(pe − Δp) Vref ≠ the evaporator's ρ(pe) Vref and h_in at (pe − Δp, T_suc): now the evaporator's ṁ and outlet enthalpy, isenthalpic suction (20 kPa: W −0.4 % → +4.7 %) | merged (#59) |
+| B12 | `fix/initial-guess-inference` | `initial_guess` looped over the blocks: with four component types (closed cycle, 9d) the block widened to an abstract type and `guess` was inferred on `Any` (Clapeyron): 564 s first call; now recursion over the tuples, 0.3 s | PR #68 |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
