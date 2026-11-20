@@ -17,6 +17,7 @@ Usage:
     rows = compare_cycle([r290, r454c]); report_cycle(rows)
 =#
 include(joinpath(@__DIR__, "condenser.jl"))
+using ForwardDiff
 
 const TBS_CYCLE = 273.15 .+ (8.0, 0.0, -5.0)
 
@@ -33,6 +34,24 @@ function cycle_system(r; Vf = 1.0, Tb = TB, Tw_in = TW_IN, design = refrigerant_
 end
 
 cycle_guess(S, Tb) = heatpump_guess(S; Te = Tb - 8, Tc = TCOND, T_cold = Tb - 6, T_warm = Tb - 2, Tw_out = TW_OUT)
+
+# Plain Newton with one ForwardDiff tag and chunk (compiled once per system type). The closed
+# cycle of a blend in `solve(NonlinearProblem(S, u0), NewtonRaphson())` did not finish in 30 min
+# (R454C; R290: 19 s), while this converges in 6 steps (100 s of compilation, then ms): to be
+# investigated (ROADMAP 9d).
+struct CycleTag end
+function cycle_newton(S, u; tol = 1e-10, maxiters = 30)
+    f!(d, u) = OptimalGshpFlow.residual!(d, u, S)
+    d = similar(u)
+    cfg = ForwardDiff.JacobianConfig(f!, d, u, ForwardDiff.Chunk{7}(), ForwardDiff.Tag{CycleTag, Float64}())
+    for it in 1:maxiters
+        J = ForwardDiff.jacobian(f!, d, u, cfg, Val(false))
+        all(isfinite, d) || return (ok = false, u = u, iterations = it)
+        maximum(abs, d) < tol && return (ok = true, u = u, iterations = it - 1)
+        u = u - J \ d
+    end
+    return (ok = false, u = u, iterations = maxiters)
+end
 
 # performance of a closed-cycle solution
 function cycle_point(S, u)
@@ -71,13 +90,16 @@ function compare_cycle(refrigerants; Tbs = TBS_CYCLE, Vf = 1.0)
     rows = []
     for r in refrigerants
         S = cycle_system(r; Vf = Vf, Tb = first(Tbs))
-        res = continuation(Tb -> set_fixed(S; Tb = Tb), Tbs, cycle_guess(S, first(Tbs)), NewtonRaphson(); abstol = 1e-10)
+        u = cycle_guess(S, first(Tbs))
         convs = OptimalGshpFlow.ispure(r) ? (:midpoint,) : (:bubble, :midpoint, :dew)
-        for x in res
-            x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(x.λ - 273.15) °C"; continue)
-            c = cycle_point(set_fixed(S; Tb = x.λ), x.u)
-            opens = map(conv -> conv => open_point(r, x.λ, conv; Vf = Vf), convs)
-            push!(rows, (name = r.name, Tb = x.λ, closed = c, open = opens))
+        for Tb in Tbs                                  # warm start from the previous Tb
+            St = set_fixed(S; Tb = Tb)
+            x = cycle_newton(St, u)
+            x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(Tb - 273.15) °C"; break)
+            u = x.u
+            c = cycle_point(St, u)
+            opens = map(conv -> conv => open_point(r, Tb, conv; Vf = Vf), convs)
+            push!(rows, (name = r.name, Tb = Tb, closed = c, open = opens))
         end
     end
     return rows
