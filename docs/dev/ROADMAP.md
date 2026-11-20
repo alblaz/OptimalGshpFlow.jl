@@ -49,7 +49,7 @@ unconstrained solvers can be used.
 | 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
 | 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | merged (#63) |
 | 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | in progress |
-| 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | PR pending |
+| 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | PR #64 |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), smooth max; Silver–Bell–Ghaly for blends | planned |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; sizing | planned |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
