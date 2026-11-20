@@ -47,7 +47,7 @@ unconstrained solvers can be used.
 | 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
 | 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
 | 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
-| 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | PR pending |
+| 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | PR #63 |
 | 9 | `feature/condenser` | condenser component on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; with 6b for zone switching | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
