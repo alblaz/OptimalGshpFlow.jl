@@ -5,14 +5,14 @@ evaporator coupled to the borehole by continuation, post-process compressor, con
 and find the flow that maximises the COP. Each point is checked with `validity_issues` (e.g. brine
 below its freezing point at low flow).
 
-`study_tb` repeats the sweep over a range of ground temperatures `Tb` (the ground cools down
+`study_tb` repeats the sweep over a range of borehole wall temperatures `Tb` (the ground cools down
 during the heating season), to see how the optimal flow moves with the operating point and the
 brine viscosity.
 
 Needs NonlinearSolve in the environment. Usage:
     include("examples/optimalflow_components.jl")
     rows = study(ClapeyronRefrigerant("R290")); report(rows)
-    old  = original(); compare(rows, old)          # original API (spline Refrigerant)
+    old  = original(); compare(study(ClapeyronRefrigerant("R290"); bh = ORIGINAL_BOREHOLE), old)  # original API, its geometry
     tb = study_tb(ClapeyronRefrigerant("R290")); report_tb(tb)
     c = pressure_drop_tb(ClapeyronRefrigerant("R290")); report_pressure_drop_tb(c)   # with/without refrigerant Δp
     g = pressure_drop_grid(Refrigerant("R290")); report_pressure_drop_grid(g)          # capacity vs speed × flow
@@ -29,16 +29,33 @@ const BRINE = "INCOMP::MEA-28%"
 const DESIGN = EvaporatorDesign(6000., 273., 273 + 40, REFRIGERANT, BRINE; U = 2000., ΔTs = 3., ΔT_l = 1.5)
 const BRINE_PROPS = SecondaryFluid(range(-15. + 273.15, 30 + 273.15, length = 40), BRINE)   # as the original
 const PHX = PlateHeatExchanger(DESIGN.A, 0.5, 0.15; b = 0.002, ϕ = 1.189, β = 30.)
-const DI = 0.04 * (1 - 1/17)                          # internal pipe diameter
-const BOREHOLE = SingleUPipeBorehole(H = 200., D = 4., rpi = DI/2, rb = 0.115, λg = 2.,
-                                     pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
+"""
+    borehole(; Db = 0.115, Dpo = 0.040, SDR = 17, λfill = 0.57, H = 200., gap = 0.0025)
+
+Single U-pipe borehole from its design data: borehole diameter `Db`, collector outer diameter
+`Dpo` and SDR (wall `Dpo/SDR`), filling conductivity `λfill`, depth `H`; the two legs `gap` from
+the borehole wall (free-hanging collector). Default: the Swedish reference, a 115 mm
+groundwater-filled borehole (stagnant water, conduction only; natural convection not modelled) with a
+PE 40 × 2.4 collector, legs at ±35 mm.
+"""
+function borehole(; Db = 0.115, Dpo = 0.040, SDR = 17, λfill = 0.57, H = 200., gap = 0.0025)
+    rb, rpo = Db/2, Dpo/2
+    x = rb - rpo - gap
+    return SingleUPipeBorehole(H = H, D = 4., rpi = rpo * (1 - 2/SDR), rpo = rpo, rb = rb, λg = λfill,
+                               pipe_position = ((x, 0.0), (-x, 0.0)))
+end
+const BOREHOLE = borehole()
+# geometry of the original study (heatpumpborehole_optimalflowrate.jl), for `original()`/`compare`
+# only: the 115 mm diameter taken as the radius, SDR wall halved, default outer radius, grout λ = 2
+const ORIGINAL_BOREHOLE = SingleUPipeBorehole(H = 200., D = 4., rpi = 0.04 * (1 - 1/17) / 2, rb = 0.115, λg = 2.,
+                                              pipe_position = ((0.035, 0.0), (-0.035, 0.0)))
 const λGROUND = 3.
-const TB = 273.15 - 5                                 # undisturbed ground temperature
+const TB = 273.15 - 5                                 # borehole wall temperature Tb (not the undisturbed ground Tg)
 const ΔTSUP = 3.5
 const ηPUMP = 0.3
 const TCOND, ηIS = 273.15 + 40, 0.7
 const FLOWS = 2:-0.05:0.1                             # × design brine flow, from high to low
-const TBS = 273.15 .+ (9:-1:-5)                       # ground temperatures of `study_tb`, warm to cold
+const TBS = 273.15 .+ (9:-1:-5)                       # borehole wall temperatures of `study_tb`, warm to cold
 
 # ---- model ----
 """
@@ -91,7 +108,7 @@ function heatpump(r, Vf; sf = BRINE_PROPS, Tb = TB, bh = BOREHOLE, speed = 1.0,
     return ComponentSystem((evaporator = evap, borehole = bhx);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in,  :borehole => :Tout),
-                 T_ground = (:borehole => :Tb,)), fixed = (T_ground = Tb,))
+                 Tb = (:borehole => :Tb,)), fixed = (Tb = Tb,))
 end
 
 # pumping power: borehole U-pipe (2H) and evaporator plates
@@ -126,7 +143,7 @@ function evaluate(S, u, r, sf; Tc = condenser_bubble_T(r))
             perf = performance(es, bs, r, sf; Δp_suction = Δp_suction, Tc = Tc))
 end
 
-# post-processing of the continuation results `res` (ground temperature `Tb`)
+# post-processing of the continuation results `res` (borehole wall temperature `Tb`)
 function postprocess(r, res, Tb, sf, bh = BOREHOLE; refrigerant_pressure_drop = default_refrigerant_pressure_drop(r),
                      design = refrigerant_design(r))
     rows = []
@@ -191,7 +208,7 @@ end
     study_tb(r; Tbs = TBS, flows = FLOWS, sf = BRINE_PROPS, bh = BOREHOLE, alg = TrustRegion(),
              refrigerant_pressure_drop = default_refrigerant_pressure_drop(r), design = refrigerant_design(r)) -> Vector
 
-The flow sweep of `study` for each ground temperature in `Tbs` (from warm to cold, as over a
+The flow sweep of `study` for each borehole wall temperature in `Tbs` (from warm to cold, as over a
 heating season). A continuation in `Tb` at the first flow gives the starting point of each sweep
 (warm start from the previous `Tb`). One entry per `Tb`: `(Tb, rows, COP1, COP2)` with the optima
 of [`optimum`](@ref).
@@ -240,7 +257,7 @@ continuation loop, unscaled TrustRegion), as in `heatpumpborehole_optimalflowrat
 function original(; flows = FLOWS)
     r = Refrigerant(REFRIGERANT)
     p0 = EvaporatorBoreholeParameters(refrigerant = r, secondaryfluid = BRINE_PROPS, plateheatexchanger = PHX,
-            hei = DESIGN.hei, Vs = DESIGN.Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP, borehole = BOREHOLE,
+            hei = DESIGN.hei, Vs = DESIGN.Vs, Vref = DESIGN.Vref, ΔTsup = ΔTSUP, borehole = ORIGINAL_BOREHOLE,
             λground = λGROUND, Tb = TB)
     u = [to_R(pressure_transform(r), PropsSI("P", "T", DESIGN.Te, "Q", 1., REFRIGERANT)),
          0.9DESIGN.Qnom, 0.1DESIGN.Qnom, sigmoid_01_to_R(0.3), sigmoid_01_to_R(0.3), sigmoid_01_to_R(0.3),
@@ -297,7 +314,7 @@ pressure_drop_tb(r; Tbs = TBS, kwargs...) =
 """
     report_pressure_drop_tb(c)
 
-Per ground temperature, at the COP1 optimum of each case: optimal flow, COP1, evaporation (dew)
+Per borehole wall temperature, at the COP1 optimum of each case: optimal flow, COP1, evaporation (dew)
 temperature and two-phase Δp (with) at the best grid point; then the change of COP1 and of the
 evaporator duty Q2 (capacity) at a fixed flow (design flow, both cases at the same grid point).
 """
@@ -320,7 +337,7 @@ const PRESSURE_DROP_MODELS = (none = nothing, amalfi = Amalfi2016(), longo = LON
     pressure_drop_grid(r; Tbs = (268.15, 282.15), speeds = (0.5, 1.0, 1.5), flows = FLOWS,
                        models = PRESSURE_DROP_MODELS) -> Dict
 
-Capacity and COP over ground temperature × compressor speed × brine flow for each refrigerant
+Capacity and COP over borehole wall temperature × compressor speed × brine flow for each refrigerant
 pressure-drop model (`nothing`, Amalfi 2016, Longo-type fit: the upper end of the Δp estimates).
 `Dict((model, Tb, speed) => Dict(Vf => (Q2, COP1, Te, Δp)))`; see [`report_pressure_drop_grid`](@ref).
 """
@@ -363,7 +380,7 @@ end
 """
     report_refrigerants_tb(tbs::Pair...)
 
-Side by side, per ground temperature, the COP1 optimum of several `study_tb` results, e.g.
+Side by side, per borehole wall temperature, the COP1 optimum of several `study_tb` results, e.g.
 `report_refrigerants_tb("R290" => tb290, "R454C" => tb454)`: optimal flow, COP1, evaporation (dew)
 temperature and evaporator duty Q2 at the best grid point.
 """

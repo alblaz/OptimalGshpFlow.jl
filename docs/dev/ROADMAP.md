@@ -55,6 +55,7 @@ unconstrained solvers can be used.
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
+| 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -1057,3 +1058,30 @@ Done:
 Next: 9d (closed cycle: evaporator +
 compressor link + condenser + borehole; `hei` from the condenser outlet, pc from the water side;
 node scaling for `m`, `h_in` ports, now `Free()`); then `perf/entropyscaling-barrier`.
+
+## `fix/borehole-groundwater` (B13, 2026-11-20)
+The study borehole (`examples/optimalflow_components.jl`) had three geometry errors: `rb = 0.115`
+(the 115 mm diameter as the radius: a 230 mm borehole), `rpi = 0.04 (1 − 1/17)/2` (SDR 17 wall halved:
+ID 37.6 instead of 35.3 mm) and no `rpo` (struct default 0.0223, a 44.6 mm OD). Found from the
+effective borehole resistance, 0.193 m K/W (user: far too large). Now `borehole(; Db = 0.115,
+Dpo = 0.040, SDR = 17, λfill = 0.57, H = 200., gap = 0.0025)`: the Swedish reference, 115 mm
+groundwater-filled (user, 2026-11-20; stagnant water, conduction only), PE 40 × 2.4, legs 2.5 mm
+from the wall (±35 mm). `ORIGINAL_BOREHOLE` keeps the old geometry for `original()`/`compare`.
+Naming (user): `Tb` borehole wall, `Tg` undisturbed ground (as `InfiniteLineSource`); the node
+`T_ground` of examples, tests and docstrings is now `Tb`. `season_ils` takes `rb` from `BOREHOLE`:
+the ILS radius item of 8b is fixed with it.
+
+`study_tb(R290)`, optimum of COP1 (old geometry → reference borehole):
+
+| Tb [°C] | Vf* | Vs* [l/s] | COP1* | Te [°C] |
+|---|---|---|---|---|
+| 9 | 1.082 → 1.008 | 0.531 → 0.495 | 4.287 → 4.221 | 0.32 → −0.28 |
+| 5 | 1.187 → 0.698 (laminar) | 0.582 → 0.343 | 3.860 → 3.823 | −3.39 → −5.41 |
+| 0 | 0.664 → 0.600 | 0.326 → 0.294 | 3.505 → 3.477 | −9.37 → −9.69 |
+| −5 | 0.562 → 0.508 | 0.276 → 0.249 | 3.200 → 3.178 | −13.79 → −14.10 |
+
+- COP1 −0.7…−1.5 %, optimal flow −7…−10 %; the laminar optimum takes over at 5 °C (was 4 °C).
+- The corrections cancel only partly: the smaller borehole lowers the filling resistance, but
+  stagnant water (0.57) conducts less than the grout (2), and the smaller ID raises the pump power
+  (Re +7 % at the same flow helps the heat transfer). Natural convection in the groundwater would
+  lower Rb: a candidate for step 10 (borehole sizing).
