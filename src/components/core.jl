@@ -281,11 +281,10 @@ end
 _nodenames(::ComponentSystem{C, B, Val{NN}}) where {C, B, NN} = NN
 
 # drop the entries without internal unknowns (empty NamedTuples), at the type level so that the
-# result is inferred
-_drop_empty(nt::NamedTuple{()}) = nt
-function _drop_empty(nt::NamedTuple{K}) where {K}
-    rest = _drop_empty(Base.tail(nt))
-    return first(nt) isa NamedTuple{()} ? rest : merge(NamedTuple{(first(K),)}((first(nt),)), rest)
+# result is inferred: generated, since inference gave up on a recursion over three or more entries
+@generated function _drop_empty(nt::NamedTuple{K, T}) where {K, T}
+    keep = [i for i in 1:length(K) if !(fieldtype(T, i) <: NamedTuple{()})]
+    return :(NamedTuple{$(Tuple(K[keep]))}(($((:(getfield(nt, $i)) for i in keep)...),)))
 end
 
 """
