@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/condensation-htc).
+Last updated: 2026-11-20 (feature/condenser, PR).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -50,8 +50,8 @@ unconstrained solvers can be used.
 | 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | merged (#63) |
 | 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | in progress |
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
-| 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | PR #65 |
-| 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; sizing | planned |
+| 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
+| 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -1017,3 +1017,41 @@ Check against Longo's data (his BPHE, x 1 → 0, h × Φ; reference = my reading
   where they coincide; takes Akers below the transition). Replaced by Longo's Re_eq criterion.
 - Our condenser (the evaporator's mass flow, G ≈ 3–13) is in the Nusselt regime. If the transition
   matters (high compressor speed): Longo's J_H(Re_eq) curve (his Fig. 6, read off the figure).
+
+## `feature/condenser` (9c, 2026-11-20)
+Done:
+- `src/components/condenser.jl`: `Condenser(; refrigerant, secondaryfluid, plateheatexchanger, Vs,
+  Qscale, condensation = Longo2010())`. Ports `Tw_in`, `Tw_out`, `m`, `h_in` (refrigerant mass flow
+  and inlet enthalpy: from the compressor in 9d; fixed nodes standalone). Unknowns `pc` (LogBox),
+  `Qd`, `Qc`, `xd`, `Tw_m`. Six residuals: refrigerant and water balance and counter-flow ε-NTU per
+  zone (`effectiveness_counterflow`; desuperheat with φ = C_w/C_vapour, condensation with φ for a
+  blend's glide). U: Longo condensation (over the zone length, q = Qc/A_zone floored at 1e-3 Qscale)
+  ‖ water (Wanniarachchi); desuperheat: vapour ‖ water (Wanniarachchi). `vapour_T_ph` (Newton on
+  h_pT, no flash), `condenser_zones`, `validity` (pinches at both ends and at the boundary),
+  `condenser_design(Q, Tc, Tw_in, Tw_out, water; U)`. Zones inferred concretely (spline, Clapeyron).
+- `test/condenser.jl` (12 tests, spline R290, < 1 s after compilation): converges at the design
+  point, energy balances, Td − Tw_m = (Td − Tw_in) e^−NTU, validity. Full suite passes (247 s, fresh session).
+- R290 design point (discharge from Te 0 °C, ΔTsup 3.5 K, ηis 0.7; Q1 7641 W; A 0.530 m², water
+  0.368 l/s, 30 → 35 °C): Td 41.38 °C (sized for 40 at U 2000; actual U 1724), Tw_out 34.94 °C,
+  T_dis 58.4 °C, xd 0.184, Qd 836 W (11 %); condensation h_ref 2044, U 1724; desuperheat h_ref 669
+  (vapour side limits), U 632.
+- Note: G = 21 kg/(m² s) in this condenser (smaller area than the evaporator: fewer channels), i.e.
+  in Longo's transition/forced region where Akers over-predicts (~ +13 % at G = 21 vs his curve).
+  The J_H(Re_eq) fit of his Fig. 6 would fix it if needed.
+- `examples/condenser.jl` (written, first run was compiling at handoff): `report_condenser([R290,
+  R454C])` (R454C in the R290-sized condenser at its own design discharge: where bubble, dew and
+  mean temperature fall against the 30 → 35 °C water, vs the 5h conventions) and `water_sweep`.
+  Results (first run 57 s, sweep 6 s): R290-sized condenser (A 0.528 m², water 0.366 l/s):
+  | | pc | T_bubble | T_dew | mean | Tdis | Q | h_ref cond. | U cond. | G |
+  |---|---|---|---|---|---|---|---|---|---|
+  | R290 | 14.14 bar | 41.40 | 41.40 | 41.40 °C | 58.5 °C | 7521 W | 2041 | 1721 | 20.9 |
+  | R454C | 17.07 bar | 39.79 | 46.45 | 43.12 °C | 65.1 °C | 7621 W | 1556 | 1363 | 41.9 |
+  The water side puts R454C at bubble ≈ 40 °C: the `:bubble` convention of 5h (the least
+  favourable, COP −11…−14 % vs R290), not the midpoint: a 6.7 K glide against a 5 K water rise
+  does not match, and its condensation coefficient is lower (twice the mass flux, lower latent heat,
+  Silver–Bell–Ghaly). `water_sweep` (Tw_in 25 → 40 °C): T_bubble − Tw_out ≈ 4.6–4.9 K throughout,
+  xd 0.155–0.167. To be confirmed in the closed cycle (9d).
+
+Next: 9d (closed cycle: evaporator +
+compressor link + condenser + borehole; `hei` from the condenser outlet, pc from the water side;
+node scaling for `m`, `h_in` ports, now `Free()`); then `perf/entropyscaling-barrier`.
