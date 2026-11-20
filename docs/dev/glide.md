@@ -281,3 +281,9 @@ bubble-point secant (user decision): `C_r = ṁ (h_dew − hei)/(T_dew − T_in)
 refrigerant pressure drop for blends yet. Results and costs: ROADMAP, section `feature/blend-glide`.
 Linear-profile error for R454C: the two-phase duty is overestimated by 1.1–1.6 % (exact T(h) is
 concave).
+
+## Step 5f: pressure drop for blends (2026-11-19, `feature/blend-pressure-drop`)
+`T_r,in = T_ph(pe + Δp, hei)`; the saturation shift `Te − T_dew(pe + Δp)` goes into γ and the glide
+`T_dew(pe + Δp) − T_r,in` into φ, so Qiao's eq. 56 is used with both parameters. Blend surface
+tension: mole-fraction average of the components. R454C: Δp 3.5–5.6 kPa, capacity −0.03 to −0.56 %
+(ROADMAP, section `feature/blend-pressure-drop`).

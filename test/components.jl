@@ -25,8 +25,7 @@ using NonlinearSolve, ForwardDiff
         mix = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785])
         @test default_formulation(mix) == NestedPressure()
         @test default_refrigerant_pressure_drop(cla) == default_refrigerant_pressure_drop(spl) == Amalfi2016()
-        @test default_refrigerant_pressure_drop(mix) === nothing                # needs the glide
-        @test_throws ArgumentError evap(mix; refrigerant_pressure_drop = Amalfi2016())
+        @test default_refrigerant_pressure_drop(mix) == Amalfi2016()
         @test nominal_duty(cla, ev.Vref, ev.hei) ≈ ev.Qnom rtol = 0.05      # design point Te = 273 K
         for F in (NestedPressure(), SaturationTemperature(), ExplicitTv())
             e = evap(cla, F)
@@ -172,7 +171,7 @@ using NonlinearSolve, ForwardDiff
         mx = ClapeyronRefrigerant(["R32", "R1234yf"]; mass_fractions = [0.215, 0.785], name = "R454C")
         hei = h_bubble(mx, OptimalGshpFlow._p_bubble(mx, 313.15))
         e = Evaporator(; refrigerant = mx, secondaryfluid = sf, plateheatexchanger = phx, hei = hei,
-                       Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5.)
+                       Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5., refrigerant_pressure_drop = nothing)
         pe = 4.5e5
         x = (pe = pe, Qe = 5500., Qsup = 200., ϵsup = 0.5, xs = 0.5, Ts_m = 277.9)
         p = (Ts_in = 278.15, Ts_out = 275.1)
@@ -186,6 +185,20 @@ using NonlinearSolve, ForwardDiff
         # two-phase pinch against the refrigerant inlet: brine leaving below Te is fine above T_r,in
         pinch(Ts_out) = any(i -> occursin("two-phase pinch", i.message), validity(e, x, (Ts_in = p.Ts_in, Ts_out = Ts_out)))
         @test !pinch(Te - 1) && pinch(z.Tr_in)
+        # with the refrigerant pressure drop (Amalfi): the inlet at p_in = pe + Δp; the saturation
+        # shift Te − T_dew(p_in) in γ, the glide T_dew(p_in) − T_r,in in φ
+        e1 = Evaporator(; refrigerant = mx, secondaryfluid = sf, plateheatexchanger = phx, hei = hei,
+                        Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 5.)
+        z1 = evaporator_zones(e1, x, p).twophase
+        p_in = pe + z1.Δp
+        @test 1e3 < z1.Δp < 1e4
+        @test z1.Tr_in ≈ T_ph(mx, p_in, hei) && z1.Tr_in > z.Tr_in
+        @test z1.γ ≈ (Te - T_dew(mx, p_in)) / (z1.Tr_in - x.Ts_m) rtol = 1e-12
+        @test z1.φ ≈ z1.Cs * (T_dew(mx, p_in) - z1.Tr_in) / (m * (h_dew(mx, pe) - hei)) rtol = 1e-12
+        # blend surface tension: mole-fraction average of the components at the bubble temperature
+        Tb = T_bubble(mx, pe)
+        σi = [PropsSI("I", "T", Tb, "Q", 0, c) for c in ("R32", "R1234yf")]
+        @test surface_tension(mx, pe) ≈ sum(mx.z .* σi) rtol = 1e-10
     end
 
     @testset "evaporator with refrigerant pressure drop" begin

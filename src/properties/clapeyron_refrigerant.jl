@@ -360,9 +360,29 @@ _transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
 
 _coolprop_key(prop) = prop === :viscosity ? COOLPROP_V : COOLPROP_L
 
-# surface tension: CoolProp (pure fluids with CoolProp transport)
+# surface tension: CoolProp (pure fluids with CoolProp transport); mixtures: mole-fraction average
+# of the pure components at the bubble temperature (neither Clapeyron nor CoolProp has a mixture
+# surface tension). An approximation: 7–10 % above measured R32 + R1234yf data (Khordad 2018,
+# Table 15; real blends lie below the linear average); the two-phase pressure drop (Amalfi)
+# depends on σ^0.22 only (≈ +2 % in Δp).
 function surface_tension(r::ClapeyronRefrigerant, p)
+    ispure(r) || return _surface_tension_mixture(r, p)
     cs = r.transport_model
     cs isa CoolPropState || throw(ArgumentError("surface_tension needs a pure fluid with CoolPropTransport"))
     return _coolprop(cs, COOLPROP_PQ, COOLPROP_I, p, 0.0, 1e-6, 0.0)
 end
+
+function _surface_tension_mixture(r::ClapeyronRefrigerant, p)
+    T = T_bubble(r, p)
+    σ = zero(T)
+    for (i, name) in enumerate(r.components)
+        σ += r.z[i] * _coolprop(_pure_coolprop_state(name), COOLPROP_QT, COOLPROP_I, 0.0, T, 0.0, 1e-6)
+    end
+    return σ
+end
+
+# cached CoolProp states of pure fluids (components of mixtures), created on first use
+const _PURE_COOLPROP_STATES = Dict{String, CoolPropState}()
+const _PURE_COOLPROP_LOCK = ReentrantLock()
+_pure_coolprop_state(name::String) =
+    lock(() -> get!(() -> CoolPropState(name), _PURE_COOLPROP_STATES, name), _PURE_COOLPROP_LOCK)

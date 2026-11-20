@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-19 (feature/blend-glide).
+Last updated: 2026-11-19 (feature/blend-pressure-drop).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -44,7 +44,8 @@ unconstrained solvers can be used.
 | 5b | `feature/epsntu-pressure-drop` | component `Evaporator`: `ϵe` eliminated (same unknowns with/without Δp), Qiao ε with the refrigerant pressure drop (default `Amalfi2016()`, `nothing` = original equations), `evaporator_pressure_drop`, compressor `Δp_suction`; `examples/evaporator_profiles.jl` (temperature profiles, compressor speed sweep) | merged (#56) |
 | 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | merged (#57) |
 | 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | merged (#58) |
-| 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | PR #60 |
+| 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
+| 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | PR #61 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -66,8 +67,7 @@ Candidates, roughly in order:
 1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
    low end of Amalfi's database).
-2. Blends, next steps (5e done the glide): the pressure drop for blends (Amalfi needs the blend's
-   surface tension and transport, check them first); boiling heat-transfer degradation of blends
+2. Blends, next steps (5e glide, 5f pressure drop done): boiling heat-transfer degradation of blends
    (mass-transfer resistance, e.g. Silver–Bell–Ghaly / Thome); first-call compile of a blend solve
    (≈ 85 s: Clapeyron mixture code with Duals, EntropyScaling transport not inferable); blends in
    the optimal-flow study (needs a design for R454C: Vref, hei).
@@ -871,3 +871,35 @@ Vref of the R290 example, sweep 2 → 0.3 × design brine flow, 0.9 s after comp
   A two-segment linearisation would reduce it, if it matters.
 - Superheat pinch at Vf ≥ 1.7: Te + ΔTsup reaches the 5 °C brine inlet (operating point, not a
   model issue).
+
+## `feature/blend-pressure-drop` (5f, 2026-11-19)
+- `surface_tension` of a blend: mole-fraction average of the pure components (CoolProp, cached
+  states) at `T_bubble(p)`; neither Clapeyron nor CoolProp has a mixture surface tension. R454C at
+  4 bar: R32 0.0131, R1234yf 0.0111 N/m, mix 0.0119 (mass-fraction average 0.0116). Amalfi depends
+  on σ^0.22, so the mixing rule matters < 1 % in Δp. Amalfi needs no viscosity.
+- Two-phase zone with both effects: `p_in = pe + Δp`, `T_r,in = T_ph(p_in, hei)`; saturation shift
+  `Te − T_dew(p_in)` in γ, glide `T_dew(p_in) − T_r,in` in φ (`C_r = ṁ (h_dew − hei)/glide`). Pure
+  fluids unchanged. `default_refrigerant_pressure_drop` is `Amalfi2016()` for every refrigerant.
+- Cost: blend residual 1.2 ms (glide only) → 1.6 ms (with Δp: bubble state, σ, `T_dew(p_in)`).
+- Check of the mixing rule (2026-11-20, paper from the user: Khordad 2018, Int. J. Refrig. 86, 73,
+  `assets/docs/`): its Table 15 has measured σ of R32 + R1234yf (mole fractions 0.519/0.481,
+  293–343 K, Zhao 2014). The mole-fraction average of the CoolProp pure values overestimates them
+  by 7–10 % (real blends lie below the linear average: the lower-σ component enriches the
+  surface). Effect: Δp ∝ σ^0.22, so ≈ +2 % in Δp and ≈ 0.01 % in capacity: negligible, kept.
+  The paper's own method (Ornstein–Zernike/HNC with a Stockmayer potential) is not worth
+  implementing: numerically heavy and less accurate for the pure fluids than CoolProp (R1234yf
+  +17 %). If σ ever matters: Di Nicola & Pierantozzi 2013 (correlation for refrigerant binaries)
+  or the corresponding-states model of Rice & Teja 1982 (≈ 0.3 mN/m mean deviation, their Table 18).
+
+R454C, `examples/blend_glide.jl` (`pressure_drop_effect`), brine in 5 °C, ΔTsup 3.5 K:
+
+| Vf | Δp | γ | T_r,in shift | ΔTe | ΔQe |
+|---|---|---|---|---|---|
+| 2.0 | 3.5 kPa | 0.025 | +0.21 K | −0.008 K | −0.03 % |
+| 1.0 | 5.0 kPa | 0.035 | +0.24 K | −0.068 K | −0.25 % |
+| 0.3 | 5.5 kPa | 0.031 | +0.23 K | −0.148 K | −0.56 % |
+
+- Same order as R290 (5d: −0.3 % capacity at design): the pressure drop is a small correction for
+  the blend too; the glide (5.2–5.4 K over the zone) dominates.
+- The exact-T(h) reference with the pressure linear along the zone gives the same linear-profile
+  error as without Δp (+1.1–1.6 % duty).
