@@ -49,6 +49,7 @@ include("models.jl")
 include("compressor.jl")
 include("pressuredrop.jl")
 include("refrigerant_pressuredrop.jl")
+include("condensation.jl")
 include("ground.jl")
 include("components/core.jl")
 include("components/evaporator.jl")
@@ -89,6 +90,7 @@ export compressor_power, condenser_power, compressor_condenser_power
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
 export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
+export CondensationModel, Longo2010, nusselt_film_htc, akers_htc, condensation_htc, reynolds_equivalent
 export default_refrigerant_pressure_drop, evaporator_pressure_drop, evaporator_zones, effectiveness_counterflow,
        mixture_boiling_factor
 export pressure_drop, pumping_power
