@@ -18,7 +18,8 @@ export VariableTransform, Free, Linear, Unit, Box, LogBox, Above, from_R, to_R, 
 
 include("properties/interface.jl")
 export AbstractRefrigerant, critical_pressure, molar_mass, pressure_transform
-export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew, surface_tension
+export T_dew, T_bubble, h_dew, h_bubble, ρ_dew, ρ_bubble, s_dew, cp_dew, μ_dew, λ_dew, surface_tension,
+       cp_bubble, μ_bubble, λ_bubble
 export h_pT, s_pT, ρ_pT, cp_pT, μ_pT, λ_pT
 export h_superheated, s_superheated, ρ_superheated, cp_superheated, μ_superheated, λ_superheated
 

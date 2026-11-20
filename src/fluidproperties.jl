@@ -334,3 +334,6 @@ cp_pT(r::Refrigerant, p, T; phase = :vapor) = cp_superheated(r, p, _spline_super
 ρ_bubble(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_D, p, 0.0, 1e-6, 0.0)
 h_bubble(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_H, p, 0.0, 1e-6, 0.0)
 surface_tension(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_I, p, 0.0, 1e-6, 0.0)
+cp_bubble(r::Refrigerant, p) = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_C, p, 0.0, 1e-6, 0.0)
+μ_bubble(r::Refrigerant, p)  = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_V, p, 0.0, 1e-6, 0.0)
+λ_bubble(r::Refrigerant, p)  = _coolprop(r.coolprop, COOLPROP_PQ, COOLPROP_L, p, 0.0, 1e-6, 0.0)

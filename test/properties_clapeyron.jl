@@ -17,6 +17,7 @@ using ForwardDiff
             @test ρ_bubble(r, p) ≈ PropsSI("D", "P", p, "Q", 0, f) rtol = 1e-8
             @test s_dew(r, p)    ≈ PropsSI("S", "P", p, "Q", 1, f) rtol = 1e-8
             @test cp_dew(r, p)   ≈ PropsSI("C", "P", p, "Q", 1, f) rtol = 1e-6
+            @test cp_bubble(r, p) ≈ PropsSI("C", "P", p, "Q", 0, f) rtol = 1e-6
             Ts = T_dew(r, p)
             for ΔT in (2., 5., 20.)
                 T = Ts + ΔT
@@ -45,6 +46,8 @@ end
         @test λ_pT(r, p, T) ≈ PropsSI("CONDUCTIVITY", "P", p, "T", T, f) rtol = 1e-12
         @test μ_dew(r, p)   ≈ PropsSI("V", "P", p, "Q", 1, f) rtol = 1e-12
         @test λ_dew(r, p)   ≈ PropsSI("CONDUCTIVITY", "P", p, "Q", 1, f) rtol = 1e-12
+        @test μ_bubble(r, p) ≈ PropsSI("V", "P", p, "Q", 0, f) rtol = 1e-12
+        @test λ_bubble(r, p) ≈ PropsSI("CONDUCTIVITY", "P", p, "Q", 0, f) rtol = 1e-12
     end
     # EntropyScaling backend (RefpropRES): sanity bounds only. Measured deviations vs CoolProp in
     # the vapour: μ within ≈ 9 %, λ up to ≈ 16 % (R290); see examples/properties_validation.jl
@@ -99,6 +102,14 @@ end
     # dew and bubble states are consistent with single-phase evaluations just outside the dome
     @test h_pT(mx, p, T_dew(mx, p) + 1e-3; phase = :vapor) ≈ h_dew(mx, p) rtol = 1e-5
     @test h_pT(mx, p, T_bubble(mx, p) - 1e-3; phase = :liquid) ≈ h_bubble(mx, p) rtol = 1e-5
+    # saturated liquid of the blend (EntropyScaling): between the pure components at the same T,
+    # within the EntropyScaling accuracy (liquid conductivity of a blend is below the linear mix)
+    Tb = T_bubble(mx, p)
+    for (f, key) in ((μ_bubble, "V"), (λ_bubble, "CONDUCTIVITY"))
+        lo, hi = extrema(PropsSI(key, "T", Tb, "Q", 0, c) for c in ("R32", "R1234yf"))
+        @test 0.8lo < f(mx, p) < 1.2hi
+    end
+    @test cp_bubble(mx, p) ≈ cp_pT(mx, p, Tb - 1e-3; phase = :liquid) rtol = 1e-3
     @test dderivative(q -> T_dew(mx, q), p) ≈ (T_dew(mx, p + 1) - T_dew(mx, p - 1)) / 2 rtol = 1e-4
     @test cp_twophase(ClapeyronRefrigerant("R290"), p) == Inf
     @test_throws ArgumentError ClapeyronRefrigerant(["R32", "R1234yf"])

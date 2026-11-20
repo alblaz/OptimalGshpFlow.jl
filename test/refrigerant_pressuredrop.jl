@@ -6,6 +6,9 @@
     # saturated liquid density and surface tension through the cached CoolProp state
     @test ρ_bubble(r, p) ≈ PropsSI("D", "P", p, "Q", 0, "R290") rtol = 1e-12
     @test surface_tension(r, p) ≈ PropsSI("I", "P", p, "Q", 0, "R290") rtol = 1e-12
+    for (f, key) in ((cp_bubble, "C"), (μ_bubble, "V"), (λ_bubble, "CONDUCTIVITY"))      # saturated liquid
+        @test f(r, p) ≈ PropsSI(key, "P", p, "Q", 0, "R290") rtol = 1e-12
+    end
     @test dderivative(q -> surface_tension(r, q), p) < 0          # σ falls with T (and p)
 
     phx = PlateHeatExchanger(1.1, 0.5, 0.15; b = 0.002, ϕ = 1.189, β = 30.)

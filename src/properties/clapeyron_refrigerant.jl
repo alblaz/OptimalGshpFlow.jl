@@ -235,6 +235,14 @@ s_dew(r::ClapeyronRefrigerant, p) = ((T, v) = saturation_dew(r, p); Clapeyron.VT
 "Isobaric specific heat [J/kg/K] of saturated vapour (dew point) at pressure `p`."
 cp_dew(r::ClapeyronRefrigerant, p) = ((T, v) = saturation_dew(r, p); Clapeyron.VT_isobaric_heat_capacity(r.eos, v, T, r.z) / r.M)
 
+"Isobaric specific heat [J/kg/K] of saturated liquid (bubble point) at pressure `p`."
+cp_bubble(r::ClapeyronRefrigerant, p) = ((T, v) = saturation_bubble(r, p); Clapeyron.VT_isobaric_heat_capacity(r.eos, v, T, r.z) / r.M)
+
+"Viscosity [Pa s] of saturated liquid (bubble point) at pressure `p`."
+μ_bubble(r::ClapeyronRefrigerant, p) = _transport_bubble(r, :viscosity, p)
+"Thermal conductivity [W/m/K] of saturated liquid (bubble point) at pressure `p`."
+λ_bubble(r::ClapeyronRefrigerant, p) = _transport_bubble(r, :conductivity, p)
+
 "Viscosity [Pa s] of saturated vapour (dew point) at pressure `p`."
 μ_dew(r::ClapeyronRefrigerant, p) = _transport_dew(r, :viscosity, p)
 "Thermal conductivity [W/m/K] of saturated vapour (dew point) at pressure `p`."
@@ -353,6 +361,12 @@ _transport_dew(r::ClapeyronRefrigerant{<:Any, EntropyScalingTransport}, prop, p)
 # saturated vapour with CoolProp: (p, Q = 1) avoids evaluating exactly on the phase boundary
 _transport_dew(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
     _coolprop(r.transport_model, COOLPROP_PQ, _coolprop_key(prop), p, 1.0, 1e-6, 0.0)
+
+# saturated liquid: liquid root at the bubble temperature (EntropyScaling), (p, Q = 0) (CoolProp)
+_transport_bubble(r::ClapeyronRefrigerant{<:Any, EntropyScalingTransport}, prop, p) =
+    _transport(r, prop, p, T_bubble(r, p), :liquid)
+_transport_bubble(r::ClapeyronRefrigerant{<:Any, CoolPropTransport}, prop, p) =
+    _coolprop(r.transport_model, COOLPROP_PQ, _coolprop_key(prop), p, 0.0, 1e-6, 0.0)
 
 ########################
 # CoolProp low level   #

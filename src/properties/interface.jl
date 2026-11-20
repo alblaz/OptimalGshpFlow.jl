@@ -20,7 +20,8 @@ Required by the evaporator models
 
 Optional (backend dependent)
 ----------------------------
-- bubble point: `T_bubble`, `h_bubble`, `ρ_bubble`; `s_dew`, `cp_dew`, `μ_dew`, `λ_dew`
+- bubble point (saturated liquid): `T_bubble`, `h_bubble`, `ρ_bubble`, `cp_bubble`, `μ_bubble`,
+  `λ_bubble`; dew point: `s_dew`, `cp_dew`, `μ_dew`, `λ_dew`
 - single phase at (p, T) with a phase hint: `h_pT`, `s_pT`, `ρ_pT`, `cp_pT`, `μ_pT`, `λ_pT`
 - isentropic: `T_ps`, `h_ps`
 =#
@@ -70,6 +71,9 @@ function ρ_dew end
 function ρ_bubble end
 function s_dew end
 function cp_dew end
+function cp_bubble end
+function μ_bubble end
+function λ_bubble end
 function μ_dew end
 function λ_dew end
 function surface_tension end   # saturated liquid, at the pressure p [N/m]

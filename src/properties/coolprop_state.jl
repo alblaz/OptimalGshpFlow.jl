@@ -35,6 +35,7 @@ const COOLPROP_H  = Ref{Clong}(-1)
 const COOLPROP_S  = Ref{Clong}(-1)
 const COOLPROP_D  = Ref{Clong}(-1)
 const COOLPROP_I  = Ref{Clong}(-1)    # surface tension
+const COOLPROP_C  = Ref{Clong}(-1)    # isobaric specific heat (mass)
 
 function _init_coolprop_indices()
     COOLPROP_PT[] = CoolProp.get_input_pair_index("PT_INPUTS")
@@ -50,6 +51,7 @@ function _init_coolprop_indices()
     COOLPROP_S[]  = CoolProp.get_param_index("Smass")
     COOLPROP_D[]  = CoolProp.get_param_index("Dmass")
     COOLPROP_I[]  = CoolProp.get_param_index("I")
+    COOLPROP_C[]  = CoolProp.get_param_index("Cpmass")
     return nothing
 end
 
