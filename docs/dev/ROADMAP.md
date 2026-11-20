@@ -1042,8 +1042,17 @@ Done (committed on the branch, not yet a PR):
 - `examples/condenser.jl` (written, first run was compiling at handoff): `report_condenser([R290,
   R454C])` (R454C in the R290-sized condenser at its own design discharge: where bubble, dew and
   mean temperature fall against the 30 → 35 °C water, vs the 5h conventions) and `water_sweep`.
-  Run it and record the numbers here.
+  Results (first run 57 s, sweep 6 s): R290-sized condenser (A 0.528 m², water 0.366 l/s):
+  | | pc | T_bubble | T_dew | mean | Tdis | Q | h_ref cond. | U cond. | G |
+  |---|---|---|---|---|---|---|---|---|---|
+  | R290 | 14.14 bar | 41.40 | 41.40 | 41.40 °C | 58.5 °C | 7521 W | 2041 | 1721 | 20.9 |
+  | R454C | 17.07 bar | 39.79 | 46.45 | 43.12 °C | 65.1 °C | 7621 W | 1556 | 1363 | 41.9 |
+  The water side puts R454C at bubble ≈ 40 °C: the `:bubble` convention of 5h (the least
+  favourable, COP −11…−14 % vs R290), not the midpoint: a 6.7 K glide against a 5 K water rise
+  does not match, and its condensation coefficient is lower (twice the mass flux, lower latent heat,
+  Silver–Bell–Ghaly). `water_sweep` (Tw_in 25 → 40 °C): T_bubble − Tw_out ≈ 4.6–4.9 K throughout,
+  xd 0.155–0.167. To be confirmed in the closed cycle (9d).
 
-Next: run the example and the full suite, open the 9c PR; then 9d (closed cycle: evaporator +
+Next: run the full suite, open the 9c PR; then 9d (closed cycle: evaporator +
 compressor link + condenser + borehole; `hei` from the condenser outlet, pc from the water side;
 node scaling for `m`, `h_in` ports, now `Free()`); then `perf/entropyscaling-barrier`.
