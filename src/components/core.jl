@@ -229,22 +229,41 @@ nodes.
 function initial_guess(sys::ComponentSystem; nodes::NamedTuple = (;), kwargs...)
     u = zeros(sys.n)
     # blocks are in the order of the components (no identity search: `===` on a large inline
-    # immutable block was seen to return false for the same value on Julia 1.13)
-    for (cname, b) in zip(keys(sys.components), sys.blocks)
-        ts = unknowns(b.component)
-        isempty(ts) && continue
-        x = guess(b.component; get(kwargs, cname, (;))...)
-        keys(x) == keys(ts) || throw(ArgumentError("guess for $cname has keys $(keys(x)), expected $(keys(ts))"))
-        for (i, (t, xi)) in enumerate(zip(values(ts), values(x)))
-            u[b.uoffset + i] = to_R(t, xi)
-        end
-    end
+    # immutable block was seen to return false for the same value on Julia 1.13). Recursion over
+    # the tuples, not a loop: a loop over more than three component types widens the block to
+    # an abstract type, and `guess` (property calls, Clapeyron) was inferred on `Any` (cycle of
+    # four components: 560 s of compilation).
+    _guess_blocks!(u, keys(sys.components), sys.blocks, _component_kwargs(sys.components, values(kwargs)))
     for (k, t, v, i) in zip(_nodenames(sys), sys.nodetransforms, sys.nodefixed, sys.nodeindex)
         v === nothing || continue
         haskey(nodes, k) || throw(ArgumentError("no initial value for node $k"))
         u[i] = to_R(t, nodes[k])
     end
     return u
+end
+
+# keyword arguments of `guess` for each component (an empty NamedTuple when not given), in the
+# order of the components; generated so that each element has a concrete type
+@generated function _component_kwargs(::NamedTuple{K}, kw::NamedTuple{KW}) where {K, KW}
+    return Expr(:tuple, (k in KW ? :(kw.$k) : :((;)) for k in K)...)
+end
+
+_guess_blocks!(u, ::Tuple{}, ::Tuple{}, ::Tuple{}) = u
+function _guess_blocks!(u, names::Tuple, blocks::Tuple, kws::Tuple)
+    _guess_block!(u, first(names), first(blocks), first(kws))
+    return _guess_blocks!(u, Base.tail(names), Base.tail(blocks), Base.tail(kws))
+end
+
+function _guess_block!(u, cname, b::ComponentBlock, kw::NamedTuple)
+    ts = unknowns(b.component)
+    isempty(ts) && return nothing
+    x = guess(b.component; kw...)
+    keys(x) == keys(ts) || throw(ArgumentError("guess for $cname has keys $(keys(x)), expected $(keys(ts))"))
+    v = map(to_R, values(ts), values(x))               # tuple map: each transform concretely typed
+    for i in eachindex(v)
+        u[b.uoffset + i] = v[i]
+    end
+    return nothing
 end
 
 """
