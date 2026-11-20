@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/blend-optimal-flow).
+Last updated: 2026-11-20 (feature/saturated-liquid-properties).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -47,8 +47,12 @@ unconstrained solvers can be used.
 | 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
 | 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
 | 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
-| 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | PR #63 |
-| 9 | `feature/condenser` | condenser component on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; with 6b for zone switching | planned (user, 2026-11-20) |
+| 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | merged (#63) |
+| 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | in progress |
+| 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | PR #64 |
+| 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), smooth max; Silver–Bell–Ghaly for blends | planned |
+| 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; sizing | planned |
+| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -960,3 +964,29 @@ COP1 optimum (valid points), R454C (Clapeyron, Δp, glide, Thome–Shakir) vs R2
   6 °C with `:dew`); the dew temperature is 0.6–1.1 K higher (the glide follows the brine); Q2 within
   ±2 % (same nominal duty).
 - Cost: R454C `study_tb` 116 s first call (70 s compilation), R290 11 s.
+
+## Step 9: condenser and closed cycle (plan, 2026-11-20)
+Decisions (user, 2026-11-20):
+- Refrigerant-side condensation: Longo 2010 (Int. J. Refrig. 33, 944; `assets/docs/`), R290/R600a/
+  R1270 in a BPHE (65°, b = 2 mm, the plate of `LONGO_FITS`; the condensation Δp fit ζ = 1900 is
+  already there). Two regimes, transition at Re_eq ≈ 1600–1700 (G ≈ 15–18 kg/(m² s)): Nusselt film
+  condensation × Φ (gravity controlled; explicit in the heat flux, h ∝ q^−1/3; 14.8 % mean
+  deviation) and Akers × Φ (forced convection, local in x; 21 %). Smooth maximum of the two for the
+  solver. Our G (3–13) is in the gravity regime. Blends: Silver–Bell–Ghaly
+  (1/h = 1/h_film + Z_g/h_g, Z_g = x cp_g dT/dh).
+- Zones: desuperheating + condensation, saturated liquid at the outlet (as the current cycle);
+  subcooling later with zone switching (6b).
+- Closed cycle: the condenser is a component, the condensing pressure an unknown set by the water
+  side, `hei` from the condenser outlet. Expansion valve: isenthalpic, superheat set by `ΔTsup`
+  (as now). Compressor: fixed displacement and isentropic efficiency (as now); a better compressor
+  model is of interest, later.
+- Water side: floor heating 30 → 35 °C at design (for now); Wanniarachchi. Geometry: the plate
+  type of the evaporator, area from a condenser analogue of `EvaporatorDesign`.
+Tools checked: saturated-liquid ρ, h available; μ_L, λ_L, cp_L work (CoolProp for pure fluids,
+exact; EntropyScaling for blends) and enter the interface in 9a. Desuperheating: the vapour
+correlation of the evaporator superheat zone; the spline covers 40 K of superheat (discharge
+25–35 K above condensation; configurable).
+Found in 9a: EntropyScaling transport (blends: `μ_pT`, `μ_dew`, `μ_bubble`, …) infers `Any`
+(`_transport` passes EntropyScaling's result through without a barrier). An assertion as in
+`T_ph` would fix it, and may cut the 70–85 s first-call compile of a blend solve: separate branch
+(`perf/entropyscaling-barrier`), to measure.
