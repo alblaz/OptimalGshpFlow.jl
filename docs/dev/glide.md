@@ -287,3 +287,7 @@ concave).
 `T_dew(pe + Δp) − T_r,in` into φ, so Qiao's eq. 56 is used with both parameters. Blend surface
 tension: mole-fraction average of the components. R454C: Δp 3.5–5.6 kPa, capacity −0.03 to −0.56 %
 (ROADMAP, section `feature/blend-pressure-drop`).
+
+## Step 5g: boiling heat transfer of blends (2026-11-20, `feature/blend-boiling-htc`)
+Thome & Shakir (1987) factor on the nucleate boiling coefficient (Cooper with mixture properties):
+R454C h_ref −17 to −23 %, capacity −0.6 to −1.7 % (ROADMAP, section `feature/blend-boiling-htc`).

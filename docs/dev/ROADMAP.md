@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-19 (feature/blend-pressure-drop).
+Last updated: 2026-11-20 (feature/blend-boiling-htc).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -45,7 +45,8 @@ unconstrained solvers can be used.
 | 5c | `feature/evaporator-zone-profiles` | `evaporator_zones` (U, capacities, NTU per zone); profiles of both zones from the model's NTUs (far ends reproduced to 1e-13 K) | merged (#57) |
 | 5d | `feature/pressure-drop-studies` | effect of the refrigerant Δp on `study_tb` and `season` (COP1 −0.2 %, capacity −0.3 %, optimal flow unchanged; up to −0.5 % / −2.5 % capacity at 1.5× speed, Amalfi / Longo-type); `refrigerant_pressure_drop` kwarg and suction Δp in the examples | merged (#58) |
 | 5e | `feature/blend-glide` | zeotropic glide in the two-phase zone (R454C): `T_r,in = T_ph(pe, hei)` (p-h flash), φ = C_s/C_r in Qiao's ε; `effectiveness_counterflow` finite at φ = 1; two-phase pinch against T_r,in | merged (#60) |
-| 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | PR #61 |
+| 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
+| 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | PR #62 |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
 | 8 | `spike/dynamic-vs-steady` | is a dynamic model needed for robustness? coupling to a dynamic borehole model (warm starts, see below) | |
@@ -67,8 +68,7 @@ Candidates, roughly in order:
 1. (was 2) Longo 2012 (R290 vaporisation, ASME J. Heat Transfer 134, 101801): the user will look for it;
    add its fit to `LONGO_FITS` and redo the Amalfi comparison (our G is only 3–13 kg/(m² s), at the
    low end of Amalfi's database).
-2. Blends, next steps (5e glide, 5f pressure drop done): boiling heat-transfer degradation of blends
-   (mass-transfer resistance, e.g. Silver–Bell–Ghaly / Thome); first-call compile of a blend solve
+2. Blends, next steps (5e glide, 5f pressure drop, 5g boiling degradation done): first-call compile of a blend solve
    (≈ 85 s: Clapeyron mixture code with Duals, EntropyScaling transport not inferable); blends in
    the optimal-flow study (needs a design for R454C: Vref, hei).
 3. Validity: the two-phase pinch now compares the brine outlet with T_r,in (5e); a pinch inside a
@@ -903,3 +903,29 @@ R454C, `examples/blend_glide.jl` (`pressure_drop_effect`), brine in 5 °C, ΔTsu
   the blend too; the glide (5.2–5.4 K over the zone) dominates.
 - The exact-T(h) reference with the pressure linear along the zone gives the same linear-profile
   error as without Δp (+1.1–1.6 % duty).
+
+## `feature/blend-boiling-htc` (5g, 2026-11-20)
+The refrigerant side of the two-phase zone is Cooper's nucleate pool-boiling correlation (×1.5),
+with the mixture's reduced pressure and molar mass for a blend: the "ideal" coefficient. For a
+zeotropic blend the light component evaporates first, the liquid at the bubble interface is
+enriched in the heavy one and its local boiling point rises (mass-transfer resistance):
+`mixture_boiling_factor` = Thome & Shakir (1987),
+`F = [1 + (h_ideal/q) ΔT_bp (1 − exp(−B q/(ρ_l Δh_lv β_L)))]⁻¹`, `ΔT_bp = T_dew − T_bubble`,
+`β_L = 0.0003 m/s`, `B = 1`; 1 for pure fluids (dispatch, no cost). Silver–Bell–Ghaly is the
+correction for convective (flow-boiling/condensation) correlations, not for Cooper.
+- Cost: one bubble and one dew state per residual (blends only).
+
+R454C, `examples/blend_glide.jl` (`glide_sweep`, with Δp), brine in 5 °C, ΔTsup 3.5 K:
+
+| Vf | q | h_ideal | F | h_ref | U | ΔTe vs 5f | ΔQe vs 5f |
+|---|---|---|---|---|---|---|---|
+| 2.0 | 8.2 kW/m² | 2783 | 0.767 | 2135 | 1536 | −0.17 K | −0.6 % |
+| 1.0 | 6.5 | 2372 | 0.793 | 1881 | 1209 | −0.42 K | −1.6 % |
+| 0.5 | 5.5 | 2067 | 0.815 | 1685 | 928 | −0.45 K | −1.7 % |
+| 0.3 | 4.8 | 1846 | 0.833 | 1537 | 738 | −0.37 K | −1.4 % |
+
+- The largest single correction for the blend so far (Δp: −0.03…−0.56 %). F rises towards 1 at
+  low heat flux (`h_ideal/q` falls as `q^−0.33`, the exponential term as `q`).
+- Not validated against blend data in a plate exchanger (none at hand); β_L = 0.0003 m/s is
+  Thome's generic value. Cooper itself (pure, ×1.5) is the original model's choice; a flow-boiling
+  plate correlation (e.g. Amalfi 2016 part 2, Longo) would be a separate step for all fluids.

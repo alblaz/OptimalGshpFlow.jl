@@ -171,6 +171,33 @@ end
 
 
 """
+    mixture_boiling_factor(refrigerant, p, q, h_ideal; β_L = 3e-4, B = 1.0)
+
+Ratio of the nucleate boiling heat-transfer coefficient of a zeotropic mixture to the ideal one
+`h_ideal` (the pure-fluid correlation evaluated with the mixture properties), at pressure `p` and
+heat flux `q` [W/m²] (Thome & Shakir 1987, AIChE Symp. Ser. 83(257), 46):
+
+`F = [1 + (h_ideal/q) ΔT_bp (1 − exp(−B q/(ρ_l Δh_lv β_L)))]⁻¹`
+
+with the boiling range `ΔT_bp = T_dew − T_bubble`, the saturated-liquid density `ρ_l`, the latent
+heat `Δh_lv = h_dew − h_bubble` (overall composition), the liquid mass-transfer coefficient
+`β_L = 0.0003 m/s` and `B = 1` (all the heat goes into evaporation). The light component
+evaporates first and the liquid at the bubble interface is enriched in the heavy one, whose
+higher local boiling point lowers the driving temperature difference. 1 for a pure fluid.
+"""
+mixture_boiling_factor(::AbstractRefrigerant, p, q, h; kw...) = one(h)
+mixture_boiling_factor(r::ClapeyronRefrigerant, p, q, h; kw...) = ispure(r) ? one(h) : _thome_shakir(r, p, q, h; kw...)
+
+function _thome_shakir(r::ClapeyronRefrigerant, p, q, h; β_L = 3e-4, B = 1.0)
+    Tb, vl = saturation_bubble(r, p)
+    Td, vv = saturation_dew(r, p)
+    Δh_lv = (Clapeyron.VT_enthalpy(r.eos, vv, Td, r.z) - Clapeyron.VT_enthalpy(r.eos, vl, Tb, r.z)) / r.M
+    c = B / (r.M / vl * Δh_lv * β_L)                  # (1 − e^{−c q})/q = c E(c q), finite at q = 0
+    E, _ = _glide_EG(c * q)
+    return inv(1 + h * (Td - Tb) * c * E)
+end
+
+"""
 `evaporator_uvalue_twophase(Tsm_e, Vs, Qe, pe, xs, secondaryfluid, refrigerant, plateheatexchanger)`
 
 evaluate U value `Ue` and the heat transfer coefficients `hs_e`, `href_e` in the two-phase region of the heat exchanger
@@ -197,7 +224,9 @@ function evaporator_uvalue_twophase(Tsm_e, Vs, Qe, pe, xs, secondaryfluid, refri
 
     # heat_transfer_coefficient refrigerant side
     pr = pe/critical_pressure(refrigerant)
-    href_e = 1.5 * 55*pr^(0.12)/((-log10(pr))^0.55 * (molar_mass(refrigerant)*1000)^0.5) * (abs(Qe)/(A * xs))^0.67
+    q = abs(Qe)/(A * xs)
+    href_e = 1.5 * 55*pr^(0.12)/((-log10(pr))^0.55 * (molar_mass(refrigerant)*1000)^0.5) * q^0.67
+    href_e *= mixture_boiling_factor(refrigerant, pe, q, href_e)     # blends: mass-transfer resistance
 
     Ue =  1/(1/hs_e + 1/href_e) 
 

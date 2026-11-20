@@ -55,8 +55,9 @@ Zeotropic blend (`ClapeyronRefrigerant` mixture): the refrigerant enters at `T_r
 temperature changes linearly along the zone: the glide `T_dew(p_in) − T_r,in` with the pseudo
 capacity `C_r = ṁ (h_dew − hei)/glide` (`φ = C_s/C_r`), and the saturation shift
 `Te − T_dew(p_in)` of the pressure drop (`γ`). The surface tension of a blend is a mole-fraction
-average of its components ([`surface_tension`](@ref)). The boiling heat-transfer coefficient is the
-pure-fluid correlation (the mass-transfer degradation of blends is not modelled). The inlet quality is
+average of its components ([`surface_tension`](@ref)). The boiling heat-transfer coefficient
+(Cooper with the mixture properties) is reduced by the mass-transfer resistance of the blend
+([`mixture_boiling_factor`](@ref), Thome & Shakir 1987). The inlet quality is
 taken at `pe`; the superheat zone has no pressure drop inside the model (see
 [`evaporator_pressure_drop`](@ref) for the compressor suction pressure).
 
