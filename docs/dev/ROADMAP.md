@@ -58,6 +58,7 @@ unconstrained solvers can be used.
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | merged (#66) |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | merged (#73; results below) |
+| 9e | `feature/longo-transition` | condensation: Longo's single J_H(Re_eq) curve (Fig. 6) as the `Condenser` default (`LongoJH`), instead of Nusselt/Akers joined over Re_eq 1500–1800 (`Longo2010`, kept): the closed cycle runs at Re_eq 1580–1840, where the jump made h fall 20 % for −4 % of mass flow | PR |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -1206,3 +1207,27 @@ fresh session per refrigerant: each row includes only the compilation not done b
   ≈ 7 min for R454C.
 - From the evaporator guess at Tb −5 °C `NewtonRaphson` diverged (42 iterations), `TrustRegion`
   converged: keep `TrustRegion` as the default.
+
+## `feature/longo-transition` (9e, 2026-11-21)
+Found in the closed-cycle optimal-flow study: the condenser runs at G ≈ 13–15.5 kg/(m² s), Re_eq
+1580–1840 (not G 3–13 as assumed in 9b), inside the 1500–1800 blend of `Longo2010` (Nusselt ≈ 1000,
+Akers ≈ 1800 W/(m² K) there). At Tb −5 °C, −4 % of refrigerant mass flow → h −20 % → condensing
+temperature rising as Q1 falls (the 9d puzzle) and a closed-cycle optimal flow rising again below
+Tb −2 °C (0.54 → 0.60 × design; with Akers only it keeps falling, 0.53 → 0.48).
+- `LongoJH` (user decision, 2026-11-21): Longo's heat transfer factor J_H = Nu/Pr_l^⅓ vs Re_eq at the
+  mean quality, one curve for R600a, R290, R1270 (and his HFC data): not specific to R290, but to
+  his plate (65°, b = 2 mm) and Re_eq ≈ 700–3500. No equation in the paper: read off Fig. 6 by a
+  pixel trace (axes from the gridlines; columns where the fitted line is clear of markers): plateau
+  55.8 (Re_eq 1000–1600), 76.9 at 3000, 82.2 at 3400, transition line at 1648. Power law through the
+  two upper anchors: exponent 0.535, meets the plateau at 1648. Longo's text says 0.3–0.4, but his
+  h ∝ G^0.65–0.7 above the transition (Fig. 4) supports the trace. C¹ fillet in log-log over
+  ±0.1 in ln Re_eq (≤ 1.3 %). h per actual area = J λ Pr^⅓ / (2b Φ), Φ = 1.24 (his plate).
+- Longo's BPHE, R290 30 °C (Φ h, W/(m² K); Fig. 4 data ≈ 1750 to G 15, ≈ 2000 at 18–20, ≈ 2300 at
+  24, 2600–2700 at 28):
+  | G | 6 | 10 | 15 | 18 | 20 | 24 | 28 |
+  |---|---|---|---|---|---|---|---|
+  | `LongoJH` | 1799 | 1799 | 1889 | 2082 | 2203 | 2428 | 2637 |
+  | `Longo2010` | 1814 | 1530 | 2407 | 2558 | 2649 | 2815 | 2964 |
+- h no longer depends on q or the plate length (Nusselt did: h ∝ (L q)^−⅓, low on our 0.5 m plate).
+- `test/cycle.jl`: condensing temperature 42.9 °C (bound 316 → 318 K). The 9d results (closed vs
+  open cycle) were computed with `Longo2010`: to be redone (`feature/cycle-optimal-flow`).

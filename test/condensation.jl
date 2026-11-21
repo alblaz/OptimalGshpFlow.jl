@@ -38,4 +38,21 @@
     pm = OptimalGshpFlow._p_bubble(mx, 303.15)
     cm = condensation_htc(Longo2010(), mx, phx, 0.01, pm, 1.0, 0.0, 1e4)
     @test cm.h < cm.gravity && cm.Re_eq < 1500
+
+    # LongoJH (Condenser default): Longo's single J_H(Re_eq) curve (Fig. 6)
+    jm = LongoJH()
+    @test longo_jh(jm, 1000.0) == 55.8 && longo_jh(jm, 1400.0) == 55.8         # gravity plateau
+    @test longo_jh(jm, 3000.0) ≈ 76.9 rtol = 0.02                               # read off Fig. 6
+    @test longo_jh(jm, 3400.0) ≈ 82.2 rtol = 0.02
+    for Re in jm.Re_t .* exp.((-jm.δ, jm.δ))                                    # C¹ fillet ends
+        @test isapprox(dderivative(x -> longo_jh(jm, x), Re * (1 - 1e-9)),
+                       dderivative(x -> longo_jh(jm, x), Re * (1 + 1e-9)); atol = 1e-6)
+    end
+    jh(Gr) = (mr = Gr * 4 * Wp * b; condensation_htc(jm, r, phx, mr, p, 1.0, 0.0, mr * Δh_lv / S / Φ))
+    j6, j12, j28 = jh(6.0), jh(12.0), jh(28.0)
+    @test j6.h == j12.h && j12.Re_eq < jm.Re_t * exp(-jm.δ)                     # flat, as the data (Fig. 4)
+    @test Φ * j6.h ≈ 1750 rtol = 0.12
+    @test Φ * j28.h ≈ 2700 rtol = 0.12
+    cj = condensation_htc(jm, mx, phx, 0.01, pm, 1.0, 0.0, 1e4)                # blend: Silver–Bell–Ghaly
+    @test cj.h < cj.film
 end
