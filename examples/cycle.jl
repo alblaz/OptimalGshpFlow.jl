@@ -88,22 +88,29 @@ For the refrigerant `r` and each borehole wall temperature: the closed cycle (Ne
 from the previous `Tb`, warmest first) and the open cycle with each condenser convention
 (`:bubble`, `:midpoint`, `:dew`; one for a pure fluid).
 """
-function compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0)
+function compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0, log = devnull)
     S = cycle_system(r; Vf = Vf, Tb = first(Tbs))
     u = cycle_guess(S, first(Tbs))
     convs = OptimalGshpFlow.ispure(r) ? (:midpoint,) : (:bubble, :midpoint, :dew)
     rows = []
     for Tb in Tbs
         St = set_fixed(S; Tb = Tb)
+        _log(log, r.name, " Tb ", Tb - 273.15, ": closed cycle")
         x = cycle_newton(St, u)
         x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(Tb - 273.15) °C"; break)
         u = x.u
+        _log(log, "  newton ", x.iterations, " its; post-processing")
         c = cycle_point(St, u)
-        opens = map(conv -> conv => open_point(r, Tb, conv; Vf = Vf), convs)
+        opens = map(convs) do conv
+            _log(log, "  open cycle ", conv)
+            conv => open_point(r, Tb, conv; Vf = Vf)
+        end
         push!(rows, (name = r.name, Tb = Tb, closed = c, open = opens))
     end
     return rows
 end
+
+_log(io, args...) = (println(io, args...); flush(io); nothing)
 
 function report_cycle(rows)
     @printf("%-6s %5s | %7s %7s %7s %7s %7s %6s %6s %6s %6s | %s\n", "", "Tb", "Te", "T_bub", "T_dew", "Tdis", "Tw_out",

@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/condenser, PR).
+Last updated: 2026-11-21 (feature/cycle, handoff).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -55,7 +55,7 @@ unconstrained solvers can be used.
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
-| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | in progress |
+| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | in progress (handoff below) |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -1113,3 +1113,27 @@ with residuals in the component that computes them; the isenthalpic valve is a s
   separate fix.
 - `heatpump_guess` first call took 564 s (Clapeyron R290): `initial_guess` inferred `guess` on
   `Any` with four component types; fixed in B12 (#68), now 0.3 s; first closed-cycle solve 19 s.
+
+### 9d handoff (2026-11-21)
+State: `feature/cycle` pushed (not a PR). It contains the 9d work and merges of the open PRs #70 (B14)
+and #71 (B15); after they are merged into main, merge main into it.
+- Closed cycle works for R290 and R454C (`cycle_newton` in `examples/cycle.jl`: plain Newton, fixed
+  ForwardDiff tag; R454C 5 iterations, 77 s first call incl. compilation). `cycle_point` R454C 0.07 s.
+- R290 results (reference borehole, water 30 °C in, design brine flow), closed vs open (Tc = 40 °C):
+  | Tb | Te | T_cond | Tdis | Tw_out | Q1 | W | COP1 closed | open |
+  |---|---|---|---|---|---|---|---|---|
+  | 8 | −1.25 | 41.20 | 59.8 | 34.83 | 7356 | 1757 | 4.006 | 4.110 (+2.6 %) |
+  | 0 | −9.05 | 39.49 | 61.5 | 33.93 | 5976 | 1645 | 3.452 | 3.418 (−1.0 %) |
+  | −5 | −13.20 | 39.75 | 64.0 | 33.48 | 5304 | 1601 | 3.093 | 3.079 (−0.5 %) |
+  To check: T_cond rises from 0 to −5 °C while Q1 falls (Longo gravity/forced transition at lower G?).
+- **Open problem:** `compare_cycle(r454c)` never starts executing (its progress log stays empty):
+  inference of its body hangs. Suspect `open_point` → `refrigerant_design(r; condenser)` →
+  `_p_bubble` of a blend (`Clapeyron.bubble_pressure(...)[1]`, likely `Any`): check with
+  `Base.return_types(refrigerant_design, …)`/`open_point` *before* any long run; fix with a barrier
+  (separate fix branch, failing `@inferred` test first). Then run `compare_cycle(r290)`,
+  `compare_cycle(r454c)` separately (never a mixed vector), record, open the 9d PR.
+- Lessons (inference with 4 components / blends): B12, B14, B15 were all "abstract type reaches
+  Clapeyron mixture code" (minutes to hours of compilation, looks like a hang). Before a long run,
+  check the entry points with `Base.return_types`/`@inferred`; log progress to a file
+  (`compare_cycle(r; log = io)`) and follow it with a monitor (never delete a file Julia has open).
+  Stopping an MCP call does not stop Julia: `julia_restart` the session (or the process keeps running).
