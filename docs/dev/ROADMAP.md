@@ -58,7 +58,8 @@ unconstrained solvers can be used.
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | merged (#66) |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | merged (#73; results below) |
-| 9e | `feature/longo-transition` | condensation: Longo's single J_H(Re_eq) curve (Fig. 6) as the `Condenser` default (`LongoJH`), instead of Nusselt/Akers joined over Re_eq 1500–1800 (`Longo2010`, kept): the closed cycle runs at Re_eq 1580–1840, where the jump made h fall 20 % for −4 % of mass flow | PR |
+| 9f | `feature/cycle-optimal-flow` | optimal brine flow with the closed cycle (`study_cycle_tb`, `compare_optimal_flow`; `examples/cycle_optimal_flow.jl`), R290 and R454C vs the open study | PR |
+| 9e | `feature/longo-transition` | condensation: Longo's single J_H(Re_eq) curve (Fig. 6) as the `Condenser` default (`LongoJH`), instead of Nusselt/Akers joined over Re_eq 1500–1800 (`Longo2010`, kept): the closed cycle runs at Re_eq 1580–1840, where the jump made h fall 20 % for −4 % of mass flow | merged (#76) |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -73,11 +74,10 @@ B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the r
 Step 9 (condenser, closed cycle) done. In order (user, 2026-11-21):
 1. Done: NonlinearSolve on the closed cycle (`feature/cycle-nonlinearsolve`); cost of the three
    systems measured (`examples/system_timing.jl`).
-2. Optimal brine flow with the closed cycle (`study_tb` redone on `heatpump_cycle`): does the
-   optimum or its shift with Tb change? Open cycle error vs closed depends on Tb (R290 −1…+2.6 %).
+2. Done: optimal brine flow with the closed cycle (`feature/cycle-optimal-flow`); it exposed the
+   Longo 2010 transition jump, fixed in 9e (`LongoJH`).
 3. Step 10 (borehole sizing), from the closed-cycle optimum.
-Smaller: R290 condensing temperature rises from Tb 0 to −5 °C while Q1 falls (Longo 2010
-gravity/forced transition at low G?); runtime dispatch in `uniform_Tb_coeffs` (keyword call of
+Smaller: runtime dispatch in `uniform_Tb_coeffs` (keyword call of
 `h_circularpipe` with an abstract `transition`); remove `_with_nodetransforms` when CI min > 1.10
 (B16). Still open from the list below: Longo 2012, blend first-call compile, compressor model
 (volumetric/inverter efficiency), suction line, 6b/7/8.
@@ -1153,7 +1153,8 @@ and #71 (B15); after they are merged into main, merge main into it.
   `refrigerant_design` was fine. The 30-min `solve` of the blend closed cycle (reason for
   `cycle_newton`) was B16 too: NonlinearSolve works now, `cycle_newton` replaced by `cycle_solve`
   (`feature/cycle-nonlinearsolve`, below).
-- Results (`compare_cycle`, R290 31 s, R454C 135 s incl. compilation; open cycle COP1 and Δ vs closed):
+- Results with `Longo2010` (superseded: redone with `LongoJH` in `feature/cycle-optimal-flow`, below)
+  (`compare_cycle`, R290 31 s, R454C 135 s incl. compilation; open cycle COP1 and Δ vs closed):
   | | Tb | Te | T_bub | T_dew | Tdis | Tw_out | Q1 | W | COP1 closed | bubble | midpoint | dew |
   |---|---|---|---|---|---|---|---|---|---|---|---|---|
   | R290 | 8 | −1.25 | 41.20 | 41.20 | 59.8 | 34.83 | 7356 | 1757 | 4.006 | | 4.110 (+2.6 %) | |
@@ -1231,3 +1232,45 @@ Tb −2 °C (0.54 → 0.60 × design; with Akers only it keeps falling, 0.53 →
 - h no longer depends on q or the plate length (Nusselt did: h ∝ (L q)^−⅓, low on our 0.5 m plate).
 - `test/cycle.jl`: condensing temperature 42.9 °C (bound 316 → 318 K). The 9d results (closed vs
   open cycle) were computed with `Longo2010`: to be redone (`feature/cycle-optimal-flow`).
+
+## `feature/cycle-optimal-flow` (9f, 2026-11-21)
+`examples/cycle_optimal_flow.jl`: `study_tb` redone on the closed cycle (`study_cycle_tb`: same grids
+`FLOWS` × `TBS`, same machine `refrigerant_design(r)`, continuation in Tb then in the flow;
+`optimum` and `report_tb` reused), `compare_optimal_flow(closed, open)`. Water in 30 °C, fixed water
+flow; COP1 = Q1/(W + Ppump), brine pumps only. Condensation `LongoJH` (9e). Cost: R290 27 s,
+R454C 289 s (open study: 7 s; R454C 63 s midpoint, 44 s bubble).
+
+R290 (closed vs open, Tc 40 °C):
+| Tb | Vf* closed | COP1* closed | Vf* open | COP1* open | ΔCOP1 open vs closed |
+|---|---|---|---|---|---|
+| 9 | 0.975 | 3.979 | 1.008 | 4.221 | +6.1 % |
+| 7 | 0.689 | 3.818 | 1.055 | 4.006 | +4.9 % |
+| 5 | 0.652 | 3.700 | 0.698 | 3.823 | +3.3 % |
+| 0 | 0.562 | 3.426 | 0.600 | 3.477 | +1.5 % |
+| −5 | 0.466 | 3.187 | 0.508 | 3.178 | −0.3 % |
+R454C (closed; open with the midpoint / bubble convention):
+| Tb | Vf* closed | COP1* closed | Vf* mid | ΔCOP1 mid | Vf* bubble | ΔCOP1 bubble |
+|---|---|---|---|---|---|---|
+| 9 | 0.968 | 3.579 | 1.011 | +9.6 % | 1.015 | +1.5 % |
+| 8 | 0.610 | 3.515 | 1.034 | +8.8 % | 1.038 | +1.0 % |
+| 5 | 0.565 | 3.373 | 0.607 | +6.4 % | 0.617 | −1.0 % |
+| 0 | 0.493 | 3.153 | 0.526 | +4.1 % | 0.535 | −2.5 % |
+| −5 | 0.423 | 2.950 | 0.452 | +2.3 % | 0.459 | −3.8 % |
+- Optimal flow: the same two optima as the open study (turbulent ≈ 1.0 × design at warm ground,
+  laminar 0.4–0.7 below), but in the closed cycle the laminar one takes over 2 K earlier (R290 at
+  7 °C vs 5 °C; R454C at 8 °C vs 6 °C), and in the laminar range the closed optimum is 0.03–0.05 ×
+  design lower (6–9 %). Running the closed cycle at the open optimum costs ≤ 0.15 % COP1 (≤ 0.65 %
+  at the Tb where the two optima swap): the open study's optimal flow stands.
+- COP level: the open cycle's error depends on Tb (fixed Tc = 40 °C against a condensing
+  temperature that falls with Q1): R290 +6 % at 9 °C to −0.3 % at −5 °C. For R454C midpoint
+  overestimates throughout (+2…+10 %), bubble goes from +1.5 % to −3.8 %.
+- R454C vs R290, closed cycle at each optimum: COP1* −10.0 % (9 °C) to −7.4 % (−5 °C).
+- Before 9e (`Longo2010`), the closed optimum rose again below Tb −2 °C (R290 0.54 → 0.60): the
+  transition jump of the condensation model; with `LongoJH` it falls smoothly (0.545 → 0.466).
+- `compare_cycle` with `LongoJH` (replaces the 9d table; design flow): R290 Tb 8 / 0 / −5 °C:
+  T_cond 42.48 / 40.93 / 40.08 °C (now falls with Q1: 9d puzzle resolved), COP1 3.898 / 3.361 /
+  3.075, open midpoint +5.4 / +1.7 / +0.1 %. R454C: bubble 40.76 / 38.95 / 38.04, dew 47.37 / 45.64
+  / 44.77 °C, COP1 3.514 / 3.078 / 2.835; open bubble +0.9 / −2.1 / −3.3 %, midpoint +8.8 / +4.3 /
+  +2.4 %, dew +18.1 / +11.7 / +8.9 %. R454C / R290 COP1 −9.8 / −8.4 / −7.8 %, Q1 +4.3 / +2.2 / +0.9 %.
+- Assumptions to revisit: water in fixed at 30 °C (a heating curve would lower it in mild weather,
+  when the ground is warm), fixed compressor speed and isentropic efficiency.

@@ -24,7 +24,7 @@ const TBS_CYCLE = 273.15 .+ (8.0, 0.0, -5.0)
 
 # closed cycle of the refrigerant `r` (same machine as the open study: `refrigerant_design(r)`)
 function cycle_system(r; Vf = 1.0, Tb = TB, Tw_in = TW_IN, design = refrigerant_design(r), sf = BRINE_PROPS,
-                      condensation = Longo2010())
+                      condensation = LongoJH())
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = nothing,
                       hei_nominal = design.hei, Vs = Vs, Vref = design.Vref, ΔTsup = ΔTSUP)

@@ -25,14 +25,14 @@ end
 
 """
     study_cycle_tb(r; Tbs = TBS, flows = FLOWS, Tw_in = TW_IN, design = refrigerant_design(r),
-                   condensation = Longo2010(), log = devnull) -> Vector
+                   condensation = LongoJH(), log = devnull) -> Vector
 
 The flow sweep of the closed cycle for each borehole wall temperature in `Tbs` (warm to cold): a
 continuation in `Tb` at the first flow gives the start of each sweep, then a continuation in the
 flow. One entry per `Tb`: `(Tb, rows, COP1, COP2)` with the optima of `optimum`, as `study_tb`.
 """
 function study_cycle_tb(r; Tbs = TBS, flows = FLOWS, Tw_in = TW_IN, design = refrigerant_design(r),
-                        condensation = Longo2010(), log = devnull)
+                        condensation = LongoJH(), log = devnull)
     hp(Vf, Tb) = cycle_system(r; Vf = Vf, Tb = Tb, Tw_in = Tw_in, design = design, condensation = condensation)
     Vf1 = float(first(flows))
     u0 = cycle_guess(hp(Vf1, first(Tbs)), first(Tbs))
