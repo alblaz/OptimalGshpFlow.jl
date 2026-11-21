@@ -313,6 +313,45 @@ function evaporator_zones(c::Evaporator, x, p)
 end
 
 """
+    evaporator_profiles(c::Evaporator, x, p; n = 100) -> NamedTuple
+
+Temperature profiles along the evaporator from a solution (`x` physical unknowns, `p` port values):
+area fraction `a` from the refrigerant inlet (0) to the outlet (1), refrigerant `Tr` and secondary
+fluid `Ts`, `n` points per zone, the zone boundary `xs`, and `end_error`: the largest difference [K]
+between the far ends of the integrated profiles and the solution (`Ts_m`, `Te + ΔTsup`, `Ts_in`).
+- Two-phase zone (0 … xs), as the model (Qiao 2025): the refrigerant temperature changes by the
+  pressure drop linearly in the area (ΔT_p = Te − T_sat,in) and by the glide linearly in the heat
+  (φ = C_s glide / Qe); with w = Ts − Ts_out, w′ = NTU [(1 − φ) w + D₀ − ΔT_p s], D₀ = Ts_out − T_r,in
+  (closed form, finite at φ = 1), Tr = T_r,in + ΔT_p s + φ w.
+- Superheat zone (xs … 1): counter-flow single-phase streams with the zone's U value and capacities
+  (`evaporator_zones`): dTr/dt = NTU_r D, dTs/dt = NTU_s D, from Te and Ts_m.
+"""
+function evaporator_profiles(c::Evaporator, x, p; n::Integer = 100)
+    zn = evaporator_zones(c, x, p)
+    xs, Te, Tr_in, N, φ = x.xs, zn.twophase.Te, zn.twophase.Tr_in, zn.twophase.NTU, zn.twophase.φ
+    glide = φ * x.Qe / zn.twophase.Cs
+    ΔTp = Te - Tr_in - glide                       # saturation shift of the pressure drop
+    s = range(0, 1, n)
+    # two-phase zone: w = NTU [D₀ E₁(s) − ΔT_p E₂(s)], E₁ = ∫₀ˢ e^{βt}, E₂ = ∫₀ˢ E₁, β = (1 − φ) NTU
+    β = (1 - φ) * N
+    E1(t) = abs(β * t) < 1e-6 ? t + β * t^2 / 2 : expm1(β * t) / β
+    E2(t) = abs(β * t) < 1e-6 ? t^2 / 2 + β * t^3 / 6 : (expm1(β * t) / β - t) / β
+    D0 = p.Ts_out - Tr_in
+    w = [N * (D0 * E1(t) - ΔTp * E2(t)) for t in s]
+    Ts2 = p.Ts_out .+ w
+    Tr2 = Tr_in .+ ΔTp .* s .+ φ .* w
+    # superheat zone
+    (; NTU_s, NTU_r) = zn.superheat
+    k = NTU_s - NTU_r
+    D1 = x.Ts_m - Te
+    I(t) = abs(k) < 1e-12 ? D1 * t : D1 * expm1(k * t) / k                  # ∫₀ᵗ D
+    Tr3 = Te .+ NTU_r .* I.(s)
+    Ts3 = x.Ts_m .+ NTU_s .* I.(s)
+    end_error = maximum(abs, (Ts2[end] - x.Ts_m, Tr2[end] - Te, Tr3[end] - (Te + c.ΔTsup), Ts3[end] - p.Ts_in))
+    return (a = [xs .* s; xs .+ (1 - xs) .* s], Tr = [Tr2; Tr3], Ts = [Ts2; Ts3], xs = xs, end_error = end_error)
+end
+
+"""
     evaporator_pressure_drop(c::Evaporator, x, p) -> NamedTuple
 
 Refrigerant side of a solution (`x` physical unknowns, `p` port values): two-phase pressure drop

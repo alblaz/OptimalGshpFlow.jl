@@ -195,6 +195,28 @@ using NonlinearSolve, ForwardDiff
         @test z1.Tr_in ≈ T_ph(mx, p_in, hei) && z1.Tr_in > z.Tr_in
         @test z1.γ ≈ (Te - T_dew(mx, p_in)) / (z1.Tr_in - x.Ts_m) rtol = 1e-12
         @test z1.φ ≈ z1.Cs * (T_dew(mx, p_in) - z1.Tr_in) / (m * (h_dew(mx, pe) - hei)) rtol = 1e-12
+        # two-phase profile with glide and pressure drop (φ ≈ 2, γ > 0): the zone made consistent alone
+        # (balances and Qiao's ε, scalar bisection in xs, Float64 only), the profile reproduces Ts_m
+        # and Te at its end (refrigerant linear in the heat for the glide, in the area for Δp)
+        Qe1 = m * (h_dew(mx, pe) - hei)
+        function zone1(xs)
+            Tsm, zz = p.Ts_out + 3.0, z1
+            for _ in 1:5
+                zz = evaporator_zones(e1, (x..., Qe = Qe1, xs = xs, Ts_m = Tsm), p).twophase
+                Tsm = p.Ts_out + Qe1 / zz.Cs
+            end
+            return effectiveness_counterflow(zz.NTU, zz.γ, zz.φ) * zz.Cs * (Tsm - zz.Tr_in) - Qe1, Tsm
+        end
+        lo, hi = 0.5, 0.7
+        for _ in 1:50
+            mid = (lo + hi) / 2
+            first(zone1(mid)) < 0 ? (lo = mid) : (hi = mid)
+        end
+        xc = (x..., Qe = Qe1, xs = (lo + hi) / 2, Ts_m = last(zone1((lo + hi) / 2)))
+        pr = evaporator_profiles(e1, xc, p; n = 10)
+        @test evaporator_zones(e1, xc, p).twophase.φ > 1
+        @test pr.Ts[10] ≈ xc.Ts_m atol = 1e-9
+        @test pr.Tr[10] ≈ Te atol = 1e-9
         # blend surface tension: mole-fraction average of the components at the bubble temperature
         Tb = T_bubble(mx, pe)
         σi = [PropsSI("I", "T", Tb, "Q", 0, c) for c in ("R32", "R1234yf")]

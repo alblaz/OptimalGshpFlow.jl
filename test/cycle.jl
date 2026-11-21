@@ -44,6 +44,14 @@
     # condensing temperature 42.9 °C with LongoJH (lower h than the Akers branch of Longo2010 at Re_eq ≈ 1650)
     @test 270 < T_dew(r, n.p_suc) < n.T_cold < n.T_warm < 281.15 && 311 < T_dew(r, n.pc) < 318 && 307 < n.Tw_out < 309
     @test isempty(validity_issues(S, u))
+    # temperature profiles: the far ends of each zone reproduce the solution; streams monotonic
+    ep = evaporator_profiles(evap, x.evaporator, port_values(S, u, :evaporator); n = 20)
+    cp = condenser_profiles(cond, x.condenser, port_values(S, u, :condenser); n = 20)
+    @test ep.end_error < 1e-8 && cp.end_error < 1e-8
+    @test length(ep.a) == length(cp.a) == 40 && issorted(ep.a) && issorted(cp.a)
+    # monotonic up to rounding: zones meet at T_dew / Ts_m only to ~1e-13 K (flat condensation of R290)
+    @test all(diff(cp.Tr) .< 1e-9) && all(diff(cp.Tw) .< 1e-9) && all(diff(ep.Ts) .> -1e-9)
+    @test all(cp.Tr .> cp.Tw) && all(ep.Ts .> ep.Tr)
     @test_throws ArgumentError heatpump_cycle(evaporator = Evaporator(refrigerant = r, secondaryfluid = brine,
             plateheatexchanger = evap.plateheatexchanger, hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 3.5),
             compressor = comp, condenser = cond, borehole = bhx, Tb = 281.15, Tw_in = 303.15)
