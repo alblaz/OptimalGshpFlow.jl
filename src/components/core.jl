@@ -109,7 +109,8 @@ struct ComponentSystem{C <: NamedTuple, B <: Tuple, NN <: Val, NT <: Tuple, F <:
     n::Int
 end
 
-function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::NamedTuple = (;))
+# aggressive: by default the closed cycle (`heatpump_cycle`) was not constant-propagated (abstract type)
+Base.@constprop :aggressive function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::NamedTuple = (;))
     nodenames = keys(nodes)
     for k in keys(fixed)
         k in nodenames || throw(ArgumentError("fixed node $k is not in `nodes`"))
