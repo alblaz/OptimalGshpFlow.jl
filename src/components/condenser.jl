@@ -137,6 +137,43 @@ coefficients, capacities, NTU and effectiveness. The refrigerant leaves at `hb` 
 condenser_zones(c::Condenser, x, p) = _condenser_zones(c, x, p)
 
 """
+    condenser_profiles(c::Condenser, x, p; n = 100) -> NamedTuple
+
+Temperature profiles along the condenser from a solution (`x` physical unknowns, `p` port values):
+area fraction `a` from the refrigerant inlet (0) to the outlet (1), refrigerant `Tr` and water `Tw`,
+`n` points per zone, the zone boundary `xd`, and `end_error`: the largest difference [K] between
+the far ends of the integrated profiles and the solution (`Td`, `Tw_m`, `Tw_in`).
+- Desuperheating (0 … xd): counter-flow single-phase streams with the zone's U value and capacities
+  (`condenser_zones`): with D = Tr − Tw along the refrigerant flow, dTr/dt = −NTU_r D and
+  dTw/dt = −NTU_w D (the water leaves at t = 0), from Tdis and Tw_out.
+- Condensation (xd … 1): refrigerant linear in the heat from Td to Tb (the glide of a blend), water
+  from the balance; the heat fraction z obeys dz/dt = NTU (Cw D₀/Qc + (1 − φ) z), from Td and Tw_m.
+"""
+function condenser_profiles(c::Condenser, x, p; n::Integer = 100)
+    z = _condenser_zones(c, x, p)
+    s = range(0, 1, n)
+    # desuperheating zone
+    d = z.desuperheat
+    NTUw = d.NTU
+    NTUr = d.NTU * d.Cw / d.Cref
+    k = NTUw - NTUr
+    D0 = z.Tdis - p.Tw_out
+    I(t) = abs(k) < 1e-12 ? D0 * t : D0 * expm1(k * t) / k                  # ∫₀ᵗ D
+    Tr1 = z.Tdis .- NTUr .* I.(s)
+    Tw1 = p.Tw_out .- NTUw .* I.(s)
+    # condensation zone
+    cz = z.condensation
+    ΔTg = z.Td - z.Tb
+    b = cz.NTU * (1 - cz.φ)
+    a0 = cz.NTU * cz.Cw * (z.Td - x.Tw_m) / x.Qc
+    Z = [abs(b) < 1e-12 ? a0 * t : a0 * expm1(b * t) / b for t in s]
+    Tr2 = z.Td .- ΔTg .* Z
+    Tw2 = x.Tw_m .- (x.Qc / cz.Cw) .* Z
+    end_error = maximum(abs, (Tr1[end] - z.Td, Tw1[end] - x.Tw_m, Tw2[end] - p.Tw_in, (Z[end] - 1) * (z.Td - x.Tw_m)))
+    return (a = [x.xd .* s; x.xd .+ (1 - x.xd) .* s], Tr = [Tr1; Tr2], Tw = [Tw1; Tw2], xd = x.xd, end_error = end_error)
+end
+
+"""
     validity(c::Condenser, x, p; ΔTpinch = 0.1, xd_tol = 1e-3)
 
 Issues of a condenser solution: water outside its property table; pinch (within `ΔTpinch`) at the

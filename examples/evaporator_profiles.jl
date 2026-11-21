@@ -11,7 +11,8 @@ Profiles from the solution of the evaporator + borehole system (`optimalflow_com
   capacities (`evaporator_zones`): dT_r/dt = NTU_r D, dT_s/dt = NTU_s D, so D = D(0) e^{(NTU_s − NTU_r) t},
   t = (a − xs)/(1 − xs), from the boundary values Te and Ts_m.
 In both zones the profile is integrated from one end of the zone; the far end (Ts_m, and Te + ΔTsup,
-Ts_in) is not imposed and is reproduced by the solution of the model (`end_error`).
+Ts_in) is not imposed and is reproduced by the solution of the model (`end_error`). The profiles
+come from the library (`evaporator_profiles`; condenser: `condenser_profiles`).
 
 `speed_sweep` varies the compressor speed (displaced volume flow, i.e. the refrigerant flow, of a
 variable-speed heat pump) at a fixed brine flow: pressure drop, refrigerant temperatures and COP.
@@ -52,27 +53,8 @@ function profiles(S, u; n = 200)
     e = S.components.evaporator
     x = physical(S, u).evaporator
     p = port_values(S, u, :evaporator)
-    dp = evaporator_pressure_drop(e, x, p)
-    zn = evaporator_zones(e, x, p)
-    xs, Te, Tr_in, N = x.xs, zn.twophase.Te, zn.twophase.Tr_in, zn.twophase.NTU
-    ΔTsat = Te - Tr_in
-    # two-phase zone
-    s = range(0, 1, n)
-    Tr2 = Tr_in .+ ΔTsat .* s
-    D0 = p.Ts_out - Tr_in
-    D = (D0 - ΔTsat/N) .* exp.(N .* s) .+ ΔTsat/N
-    Ts2 = Tr2 .+ D
-    # superheat zone: model U value and capacities, integrated from the boundary (Te, Ts_m)
-    (; NTU_s, NTU_r) = zn.superheat
-    k = NTU_s - NTU_r
-    D0 = x.Ts_m - Te
-    I(t) = abs(k) < 1e-12 ? D0 * t : D0 * (exp(k * t) - 1) / k       # ∫₀ᵗ D
-    Tr3 = Te .+ NTU_r .* I.(s)
-    Ts3 = x.Ts_m .+ NTU_s .* I.(s)
-    a = [xs .* s; xs .+ (1 - xs) .* s]
-    end_error = maximum(abs, (Ts2[end] - x.Ts_m, Tr3[end] - (Te + e.ΔTsup), Ts3[end] - p.Ts_in))
-    return (a = a, Tr = [Tr2; Tr3], Ts = [Ts2; Ts3], xs = xs, dp = dp, zones = zn, end_error = end_error,
-            Qe = x.Qe, Qsup = x.Qsup)
+    pr = evaporator_profiles(e, x, p; n = n)
+    return (pr..., dp = evaporator_pressure_drop(e, x, p), zones = evaporator_zones(e, x, p), Qe = x.Qe, Qsup = x.Qsup)
 end
 
 """

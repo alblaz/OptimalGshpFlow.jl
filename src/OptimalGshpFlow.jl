@@ -93,10 +93,10 @@ export compressor_power, condenser_power, compressor_condenser_power
 export AbstractComponent, unknowns, ports, residual_scales, residuals!, guess
 export ComponentSystem, residual!, initial_guess, physical, port_values, validity, validity_issues, continuation, set_fixed
 export Evaporator, BoreholeHX, default_formulation, default_Te_min, nominal_duty, evaporator_solution, borehole_solution
-export Condenser, condenser_zones, condenser_design, vapour_T_ph
+export Condenser, condenser_zones, condenser_profiles, condenser_design, vapour_T_ph
 export CyclePorts, Compressor, compression_state, vapour_h_ps, heatpump_cycle, heatpump_guess
 export CondensationModel, LongoJH, longo_jh, Longo2010, nusselt_film_htc, akers_htc, condensation_htc, reynolds_equivalent
-export default_refrigerant_pressure_drop, evaporator_pressure_drop, evaporator_zones, effectiveness_counterflow,
+export default_refrigerant_pressure_drop, evaporator_pressure_drop, evaporator_zones, evaporator_profiles, effectiveness_counterflow,
        mixture_boiling_factor
 export pressure_drop, pumping_power
 export TwoPhaseFriction, Amalfi2016, KineticEnergyFriction, LONGO_FITS, twophase_pressure_drop, friction_pressure_drop
