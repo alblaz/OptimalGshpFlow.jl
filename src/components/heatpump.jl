@@ -19,7 +19,7 @@ function heatpump_cycle(; evaporator::Evaporator, compressor::Compressor, conden
                         Tb, Tw_in)
     evaporator.hei === nothing ||
         throw(ArgumentError("heatpump_cycle: the evaporator needs `hei = nothing` (inlet enthalpy from the condenser)"))
-    return ComponentSystem((evaporator = evaporator, compressor = compressor, condenser = condenser, borehole = borehole);
+    sys = ComponentSystem((evaporator = evaporator, compressor = compressor, condenser = condenser, borehole = borehole);
         nodes = (T_cold = (:evaporator => :Ts_out, :borehole => :Tin),
                  T_warm = (:evaporator => :Ts_in, :borehole => :Tout),
                  Tb = (:borehole => :Tb,),
@@ -32,6 +32,13 @@ function heatpump_cycle(; evaporator::Evaporator, compressor::Compressor, conden
                  Tw_in = (:condenser => :Tw_in,),
                  Tw_out = (:condenser => :Tw_out,)),
         fixed = (Tb = Tb, Tw_in = Tw_in))
+    # node transforms by field access, in the node order above: concrete on every Julia version.
+    # ComponentSystem looks them up by port name, which is concrete only if the literal `nodes` is
+    # constant-propagated (not on Julia 1.10: abstract system type, everything solved with it
+    # inferred on it, Clapeyron included)
+    pe, pk, pd, pb = ports(evaporator), ports(compressor), ports(condenser), ports(borehole)
+    return _with_nodetransforms(sys, (pe.Ts_out, pe.Ts_in, pb.Tb, pe.p_suc, pe.T_suc, pe.m, pk.pc, pk.h_dis, pd.h_out,
+                                      pd.Tw_in, pd.Tw_out))
 end
 
 """

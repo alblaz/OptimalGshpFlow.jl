@@ -85,9 +85,9 @@ order of `components`), then the free nodes. Build it with [`initial_guess`](@re
 [`residual!`](@ref), and read the physical values by name with [`physical`](@ref). The type of the
 system is inferred from the types of the components, so code that builds a system inside a
 function stays concretely typed. Node transforms of different types (e.g. the `LogBox` pressure
-and the `Free` temperatures of a closed cycle) are inferred by constant propagation of the port
-names: pass `nodes` as a literal, as in `heatpump_cycle`; a `nodes` built at runtime gives
-an abstract system type unless all its transforms have one type.
+and the `Free` temperatures of a closed cycle) are looked up by port name: concrete only if a
+literal `nodes` is constant-propagated (Julia ≥ 1.11, not 1.10). A builder of a fixed topology
+should pass its transforms explicitly (`_with_nodetransforms`, as `heatpump_cycle`).
 
 Example, evaporator coupled to a borehole:
 
@@ -157,6 +157,13 @@ end
 # constant-propagated and the tuple is concrete with mixed transform types (a Vector gave NTuple{N, Any}).
 _node_transforms(components, nodes) = map(k -> _port_transform(components, first(nodes[k])), keys(nodes))
 _port_transform(components, (c, p)::Pair) = ports(components[c])[p]
+
+# `sys` with the node transforms `nt` (the same values, in a concretely inferred tuple): for builders
+# of a fixed topology, which know their node transforms (`heatpump_cycle`)
+function _with_nodetransforms(sys::ComponentSystem, nt::Tuple)
+    sys.nodetransforms == nt || throw(ArgumentError("node transforms $nt differ from the system's $(sys.nodetransforms)"))
+    return ComponentSystem(sys.components, sys.blocks, sys.nodenames, nt, sys.nodefixed, sys.nodeindex, sys.n)
+end
 
 # number of internal unknowns and of residuals of all blocks
 _block_sizes(blocks) = (sum(b -> length(unknowns(b.component)), blocks; init = 0),
