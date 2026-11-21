@@ -281,11 +281,10 @@ end
 _nodenames(::ComponentSystem{C, B, Val{NN}}) where {C, B, NN} = NN
 
 # drop the entries without internal unknowns (empty NamedTuples), at the type level so that the
-# result is inferred
-_drop_empty(nt::NamedTuple{()}) = nt
-function _drop_empty(nt::NamedTuple{K}) where {K}
-    rest = _drop_empty(Base.tail(nt))
-    return first(nt) isa NamedTuple{()} ? rest : merge(NamedTuple{(first(K),)}((first(nt),)), rest)
+# result is inferred: generated, since inference gave up on a recursion over three or more entries
+@generated function _drop_empty(nt::NamedTuple{K, T}) where {K, T}
+    keep = [i for i in 1:length(K) if !(fieldtype(T, i) <: NamedTuple{()})]
+    return :(NamedTuple{$(Tuple(K[keep]))}(($((:(getfield(nt, $i)) for i in keep)...),)))
 end
 
 """
@@ -293,8 +292,12 @@ end
 
 Physical values of the ports of component `name` at the unknowns `u`.
 """
-function port_values(sys::ComponentSystem, u, name::Symbol)
-    b = sys.blocks[findfirst(==(name), keys(sys.components))]
+@inline port_values(sys::ComponentSystem, u, name::Symbol) = port_values(sys, u, Val(name))
+# by name in the type (a literal `name` is propagated through the inlined method above): the block
+# is concretely typed, so callers post-processing the ports are inferred (a runtime position in the
+# tuple of blocks gave an abstract NamedTuple with more than three component types)
+function port_values(sys::ComponentSystem, u, ::Val{name}) where {name}
+    b = getfield(NamedTuple{keys(sys.components)}(sys.blocks), name)
     return _port_values(b, _node_values(sys, u))
 end
 
@@ -320,12 +323,17 @@ Validity issues of all components at the unknowns `u` (e.g. a solution), as Name
 function validity_issues(sys::ComponentSystem, u)
     nodevals = _node_values(sys, u)
     issues = NamedTuple[]
-    for (name, b) in zip(keys(sys.components), sys.blocks)
-        for i in validity(b.component, _internal_values(b, u), _port_values(b, nodevals))
-            push!(issues, (component = name, i...))
-        end
+    return _validity_blocks!(issues, keys(sys.components), sys.blocks, u, nodevals)
+end
+
+# recursion over the blocks, not a loop: each `validity` with its component's concrete types (B12)
+_validity_blocks!(issues, ::Tuple{}, ::Tuple{}, u, nodevals) = issues
+function _validity_blocks!(issues, names::Tuple, blocks::Tuple, u, nodevals)
+    b = first(blocks)
+    for i in validity(b.component, _internal_values(b, u), _port_values(b, nodevals))
+        push!(issues, (component = first(names), i...))
     end
-    return issues
+    return _validity_blocks!(issues, Base.tail(names), Base.tail(blocks), u, nodevals)
 end
 
 _issue(quantity, value, limit, message) = (quantity = quantity, value = value, limit = limit, message = message)
