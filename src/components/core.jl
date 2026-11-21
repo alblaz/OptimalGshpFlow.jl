@@ -84,8 +84,10 @@ The unknowns, in ℝ, are a `Vector{Float64}`: the internal unknowns of each com
 order of `components`), then the free nodes. Build it with [`initial_guess`](@ref), evaluate with
 [`residual!`](@ref), and read the physical values by name with [`physical`](@ref). The type of the
 system is inferred from the types of the components, so code that builds a system inside a
-function stays concretely typed (node transforms: all ports of a given transform type, e.g.
-`Free()`, give a concrete type).
+function stays concretely typed. Node transforms of different types (e.g. the `LogBox` pressure
+and the `Free` temperatures of a closed cycle) are inferred by constant propagation of the port
+names: pass `nodes` as a literal, as in `heatpump_cycle`; a `nodes` built at runtime gives
+an abstract system type unless all its transforms have one type.
 
 Example, evaporator coupled to a borehole:
 
@@ -125,11 +127,11 @@ function ComponentSystem(components::NamedTuple; nodes::NamedTuple, fixed::Named
         haskey(owner, (cname, pname)) || throw(ArgumentError("port $cname.$pname is not connected to a node"))
     end
     # node transform: the one of its first port; all ports of a node must agree
-    nodetransforms = map(nodenames) do k
+    for k in nodenames
         ts = [ports(components[c])[p] for (c, p) in nodes[k]]
         all(==(ts[1]), ts) || throw(ArgumentError("node $k joins ports with different transforms: $ts"))
-        ts[1]
     end
+    nodetransforms = _node_transforms(components, nodes)
     nodefixed = map(k -> haskey(fixed, k) ? Float64(fixed[k]) : nothing, nodenames)
 
     # layout of u: components with internal unknowns, then the free nodes. Built by recursion
@@ -148,6 +150,12 @@ function _blocks(names::Tuple, comps::Tuple, owner, uoff, roff)
     b = ComponentBlock(c, uoff, roff, map(p -> owner[(cname, p)], keys(ports(c))), map(float, residual_scales(c)))
     return (b, _blocks(Base.tail(names), Base.tail(comps), owner, uoff + length(unknowns(c)), roff + nresiduals(c))...)
 end
+
+# transform of each node: the one of its first port. Port names are values, not types: a small
+# function without containers, so that the literal `nodes` of a caller (e.g. `heatpump_cycle`) is
+# constant-propagated and the tuple is concrete with mixed transform types (a Vector gave NTuple{N, Any}).
+_node_transforms(components, nodes) = map(k -> _port_transform(components, first(nodes[k])), keys(nodes))
+_port_transform(components, (c, p)::Pair) = ports(components[c])[p]
 
 # number of internal unknowns and of residuals of all blocks
 _block_sizes(blocks) = (sum(b -> length(unknowns(b.component)), blocks; init = 0),
