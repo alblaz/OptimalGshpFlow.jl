@@ -49,7 +49,8 @@
     cp = condenser_profiles(cond, x.condenser, port_values(S, u, :condenser); n = 20)
     @test ep.end_error < 1e-8 && cp.end_error < 1e-8
     @test length(ep.a) == length(cp.a) == 40 && issorted(ep.a) && issorted(cp.a)
-    @test issorted(cp.Tr; rev = true) && issorted(cp.Tw; rev = true) && issorted(ep.Ts)
+    # monotonic up to rounding: zones meet at T_dew / Ts_m only to ~1e-13 K (flat condensation of R290)
+    @test all(diff(cp.Tr) .< 1e-9) && all(diff(cp.Tw) .< 1e-9) && all(diff(ep.Ts) .> -1e-9)
     @test all(cp.Tr .> cp.Tw) && all(ep.Ts .> ep.Tr)
     @test_throws ArgumentError heatpump_cycle(evaporator = Evaporator(refrigerant = r, secondaryfluid = brine,
             plateheatexchanger = evap.plateheatexchanger, hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 3.5),
