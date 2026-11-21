@@ -19,7 +19,6 @@ Usage:
 be inferred on the abstract `ClapeyronRefrigerant`, Clapeyron included: no result in 30 min)
 =#
 include(joinpath(@__DIR__, "condenser.jl"))
-using ForwardDiff
 
 const TBS_CYCLE = 273.15 .+ (8.0, 0.0, -5.0)
 
@@ -37,22 +36,12 @@ end
 
 cycle_guess(S, Tb) = heatpump_guess(S; Te = Tb - 8, Tc = TCOND, T_cold = Tb - 6, T_warm = Tb - 2, Tw_out = TW_OUT)
 
-# Plain Newton with one ForwardDiff tag and chunk (compiled once per system type). The closed
-# cycle of a blend in `solve(NonlinearProblem(S, u0), NewtonRaphson())` did not finish in 30 min
-# (R454C; R290: 19 s), while this converges in 6 steps (100 s of compilation, then ms): to be
-# investigated (ROADMAP 9d).
-struct CycleTag end
-function cycle_newton(S, u; tol = 1e-10, maxiters = 30)
-    f!(d, u) = OptimalGshpFlow.residual!(d, u, S)
-    d = similar(u)
-    cfg = ForwardDiff.JacobianConfig(f!, d, u, ForwardDiff.Chunk{7}(), ForwardDiff.Tag{CycleTag, Float64}())
-    for it in 1:maxiters
-        J = ForwardDiff.jacobian(f!, d, u, cfg, Val(false))
-        all(isfinite, d) || return (ok = false, u = u, iterations = it)
-        maximum(abs, d) < tol && return (ok = true, u = u, iterations = it - 1)
-        u = u - J \ d
-    end
-    return (ok = false, u = u, iterations = maxiters)
+# NonlinearSolve on the closed cycle, results through barriers (`solve` is inferred as `Any`: its
+# `u` passed on to the post-processing would infer the model, Clapeyron included, on it)
+function cycle_solve(S, u0; alg = TrustRegion(), abstol = 1e-10)
+    sol = solve(NonlinearProblem(S, u0), alg; abstol = abstol)
+    u = convert(Vector{Float64}, sol.u)::Vector{Float64}
+    return (ok = (SciMLBase.successful_retcode(sol)::Bool && all(isfinite, u)), u = u, iterations = Int(sol.stats.nsteps)::Int)
 end
 
 # performance of a closed-cycle solution
@@ -85,7 +74,7 @@ end
 """
     compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0) -> Vector
 
-For the refrigerant `r` and each borehole wall temperature: the closed cycle (Newton, warm start
+For the refrigerant `r` and each borehole wall temperature: the closed cycle (`cycle_solve`, warm start
 from the previous `Tb`, warmest first) and the open cycle with each condenser convention
 (`:bubble`, `:midpoint`, `:dew`; one for a pure fluid).
 """
@@ -97,7 +86,7 @@ function compare_cycle(r; Tbs = TBS_CYCLE, Vf = 1.0, log = devnull)
     for Tb in Tbs
         St = set_fixed(S; Tb = Tb)
         _log(log, r.name, " Tb ", Tb - 273.15, ": closed cycle")
-        x = cycle_newton(St, u)
+        x = cycle_solve(St, u)
         x.ok || (@warn "$(r.name): closed cycle failed at Tb = $(Tb - 273.15) °C"; break)
         u = x.u
         _log(log, "  newton ", x.iterations, " its; post-processing")
