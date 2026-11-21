@@ -110,6 +110,12 @@ end
         @test 0.8lo < f(mx, p) < 1.2hi
     end
     @test cp_bubble(mx, p) ≈ cp_pT(mx, p, Tb - 1e-3; phase = :liquid) rtol = 1e-3
+    # transport of a blend (EntropyScaling) inferred: an `Any` here reached the compressor through
+    # the suction pressure drop and Clapeyron was inferred on `Any` (open study, R454C: no result)
+    @test (@inferred μ_pT(mx, p, T_dew(mx, p) + 3; phase = :vapor)) isa Float64
+    @test (@inferred λ_pT(mx, p, T_dew(mx, p) + 3; phase = :vapor)) isa Float64
+    @test (@inferred μ_bubble(mx, p)) isa Float64
+    @test (@inferred λ_dew(mx, p)) isa Float64
     @test dderivative(q -> T_dew(mx, q), p) ≈ (T_dew(mx, p + 1) - T_dew(mx, p - 1)) / 2 rtol = 1e-4
     @test cp_twophase(ClapeyronRefrigerant("R290"), p) == Inf
     @test_throws ArgumentError ClapeyronRefrigerant(["R32", "R1234yf"])
