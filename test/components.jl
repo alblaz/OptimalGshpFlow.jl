@@ -333,17 +333,21 @@ end
 # were collected in a Vector by port name (runtime Symbols): NTuple{N, Any}, and everything called
 # with the system (set_fixed, Newton, post-processing) was inferred on an abstract type, Clapeyron
 # included (R454C closed cycle: no result).
-struct PortsDummy <: OptimalGshpFlow.AbstractComponent end
-OptimalGshpFlow.unknowns(::PortsDummy) = (x = OptimalGshpFlow.Free(),)
+struct PortsDummy{N} <: OptimalGshpFlow.AbstractComponent end
+OptimalGshpFlow.unknowns(::PortsDummy) = (;)
 OptimalGshpFlow.ports(::PortsDummy) = (a = OptimalGshpFlow.Free(), b = OptimalGshpFlow.LogBox(1.0, 2.0),
                                        c = OptimalGshpFlow.Above(0.0, 1.0))
-OptimalGshpFlow.residual_scales(::PortsDummy) = (1.0,)
-ports_system(Tb) = ComponentSystem((d1 = PortsDummy(), d2 = PortsDummy());
-    nodes = (a = (:d1 => :a, :d2 => :a), b = (:d1 => :b, :d2 => :b), c = (:d1 => :c, :d2 => :c)),
+OptimalGshpFlow.residual_scales(::PortsDummy) = ()
+# four component types, as the closed cycle: the transform of a port named at runtime is a Union,
+# so `nodes` must be constant-propagated (forced in the constructor: by default it was not for the
+# real cycle, which these dummies do not reproduce; locked in test/cycle.jl)
+ports_system(Tb) = ComponentSystem((d1 = PortsDummy{1}(), d2 = PortsDummy{2}(), d3 = PortsDummy{3}(), d4 = PortsDummy{4}());
+    nodes = (a = (:d1 => :a, :d2 => :a, :d3 => :a, :d4 => :a), b = (:d1 => :b, :d2 => :b, :d3 => :b, :d4 => :b),
+             c = (:d1 => :c, :d2 => :c, :d3 => :c, :d4 => :c)),
     fixed = (a = Tb, b = 1.5, c = 2.0))
 @testset "system type inferred with mixed node transforms" begin
     S = @inferred ports_system(1.0)
     @test S.nodetransforms isa Tuple{OptimalGshpFlow.Free, OptimalGshpFlow.LogBox{Float64}, OptimalGshpFlow.Above{Float64}}
-    @test_throws ArgumentError ComponentSystem((d1 = PortsDummy(), d2 = PortsDummy());
+    @test_throws ArgumentError ComponentSystem((d1 = PortsDummy{1}(), d2 = PortsDummy{2}());
         nodes = (a = (:d1 => :a, :d2 => :b), b = (:d1 => :b, :d2 => :a), c = (:d1 => :c, :d2 => :c)))
 end
