@@ -41,7 +41,8 @@
     oc = compressor_condenser_power(T_bubble(r, n.pc), 0.7, es, r)
     @test compressor_power(comp, pv) ≈ oc.W rtol = 1e-5
     @test Q1 ≈ oc.Q1 rtol = 1e-5
-    @test 270 < T_dew(r, n.p_suc) < n.T_cold < n.T_warm < 281.15 && 311 < T_dew(r, n.pc) < 316 && 307 < n.Tw_out < 309
+    # condensing temperature 42.9 °C with LongoJH (lower h than the Akers branch of Longo2010 at Re_eq ≈ 1650)
+    @test 270 < T_dew(r, n.p_suc) < n.T_cold < n.T_warm < 281.15 && 311 < T_dew(r, n.pc) < 318 && 307 < n.Tw_out < 309
     @test isempty(validity_issues(S, u))
     @test_throws ArgumentError heatpump_cycle(evaporator = Evaporator(refrigerant = r, secondaryfluid = brine,
             plateheatexchanger = evap.plateheatexchanger, hei = ev.hei, Vs = ev.Vs, Vref = ev.Vref, ΔTsup = 3.5),
