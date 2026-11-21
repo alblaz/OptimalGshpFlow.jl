@@ -57,7 +57,7 @@ unconstrained solvers can be used.
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
-| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | in progress (handoff below) |
+| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | PR (results below) |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -1128,14 +1128,37 @@ and #71 (B15); after they are merged into main, merge main into it.
   | 0 | −9.05 | 39.49 | 61.5 | 33.93 | 5976 | 1645 | 3.452 | 3.418 (−1.0 %) |
   | −5 | −13.20 | 39.75 | 64.0 | 33.48 | 5304 | 1601 | 3.093 | 3.079 (−0.5 %) |
   To check: T_cond rises from 0 to −5 °C while Q1 falls (Longo gravity/forced transition at lower G?).
-- **Open problem:** `compare_cycle(r454c)` never starts executing (its progress log stays empty):
-  inference of its body hangs. Suspect `open_point` → `refrigerant_design(r; condenser)` →
-  `_p_bubble` of a blend (`Clapeyron.bubble_pressure(...)[1]`, likely `Any`): check with
-  `Base.return_types(refrigerant_design, …)`/`open_point` *before* any long run; fix with a barrier
-  (separate fix branch, failing `@inferred` test first). Then run `compare_cycle(r290)`,
-  `compare_cycle(r454c)` separately (never a mixed vector), record, open the 9d PR.
-- Lessons (inference with 4 components / blends): B12, B14, B15 were all "abstract type reaches
+- Resolved (2026-11-21): `compare_cycle(r454c)` hung in inference for two reasons. (1) B16 (#72):
+  the closed-cycle system type was abstract when built inside a function (node transforms in a
+  `Vector`), so `set_fixed`, `cycle_newton` and `cycle_point` were inferred on it; fixed in
+  `ComponentSystem` (`@constprop :aggressive`), locked by `@inferred heatpump_cycle` in
+  `test/cycle.jl`. (2) `open_point` passed `sol.u` of `solve(NonlinearProblem…)` (not inferred) to
+  `evaluate`/`performance`: inference of `open_point(R454C)` > 13 min, 4.8 s with a
+  `convert(Vector{Float64}, sol.u)::Vector{Float64}` barrier (as the extension's `_solve`).
+  `refrigerant_design` was fine. Not rechecked: whether the 30-min `solve` of the blend closed cycle
+  (reason for `cycle_newton`) was B16 too.
+- Results (`compare_cycle`, R290 31 s, R454C 135 s incl. compilation; open cycle COP1 and Δ vs closed):
+  | | Tb | Te | T_bub | T_dew | Tdis | Tw_out | Q1 | W | COP1 closed | bubble | midpoint | dew |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | R290 | 8 | −1.25 | 41.20 | 41.20 | 59.8 | 34.83 | 7356 | 1757 | 4.006 | | 4.110 (+2.6 %) | |
+  | R290 | 0 | −9.05 | 39.49 | 39.49 | 61.5 | 33.93 | 5976 | 1645 | 3.452 | | 3.418 (−1.0 %) | |
+  | R290 | −5 | −13.20 | 39.75 | 39.75 | 64.0 | 33.48 | 5304 | 1601 | 3.093 | | 3.079 (−0.5 %) | |
+  | R454C | 8 | −0.40 | 39.84 | 46.50 | 67.3 | 35.04 | 7671 | 2064 | 3.579 | 3.547 (−0.9 %) | 3.823 (+6.8 %) | 4.151 (+16.0 %) |
+  | R454C | 0 | −8.18 | 37.77 | 44.52 | 68.6 | 34.02 | 6114 | 1861 | 3.142 | 3.011 (−4.2 %) | 3.209 (+2.1 %) | 3.439 (+9.4 %) |
+  | R454C | −5 | −12.42 | 36.76 | 43.55 | 69.6 | 33.53 | 5371 | 1742 | 2.895 | 2.741 (−5.3 %) | 2.902 (+0.3 %) | 3.088 (+6.7 %) |
+  Open-cycle Tc: bubble 40.00, midpoint 36.60, dew 33.05 °C. Closed cycle R454C vs R290: COP1
+  −10.7 / −9.0 / −6.4 %, Q1 +4.3 / +2.3 / +1.3 % (Tb 8 / 0 / −5 °C).
+  - With the water side, R454C condenses with bubble 37–40 °C, dew 44–46 °C. No fixed convention
+    fits the whole range: bubble is closest at 8 °C (−0.9 %) and drifts to −5.3 % at −5 °C, midpoint
+    goes from +6.8 % to +0.3 %, dew overestimates throughout (+7 to +16 %). The open-study
+    blend comparison (5h, midpoint) favoured R454C by up to 7 % at warm ground; in the closed cycle
+    R454C is 6–11 % below R290 in COP1.
+  - Still to check: T_cond (R290) rises from 0 to −5 °C while Q1 falls (also the R454C bubble from
+    0 to −5 °C falls only 1 K): Longo gravity/forced transition at lower G?
+- Lessons (inference with 4 components / blends): B12, B14, B15, B16 were all "abstract type reaches
   Clapeyron mixture code" (minutes to hours of compilation, looks like a hang). Before a long run,
   check the entry points with `Base.return_types`/`@inferred`; log progress to a file
   (`compare_cycle(r; log = io)`) and follow it with a monitor (never delete a file Julia has open).
   Stopping an MCP call does not stop Julia: `julia_restart` the session (or the process keeps running).
+  Open the log in its own call: `open(log) do io … end` around the runs compiles the whole closure
+  first, and the log stays empty during compilation (looks like a hang).
