@@ -76,9 +76,10 @@ function open_point(r, Tb, conv; Vf = 1.0, u0 = nothing)
     S = heatpump(r, Vf; Tb = Tb, design = design)
     sol = solve(NonlinearProblem(S, u0 === nothing ? first_guess(S, Tb) : u0), TrustRegion(); abstol = 1e-9)
     SciMLBase.successful_retcode(sol) || return nothing
-    v = evaluate(S, sol.u, r, BRINE_PROPS; Tc = design.Tc)
+    u = convert(Vector{Float64}, sol.u)::Vector{Float64}   # barrier: `sol.u` is not inferred (blend: Clapeyron on `Any`)
+    v = evaluate(S, u, r, BRINE_PROPS; Tc = design.Tc)
     p = performance(v.es, v.bs, r, BRINE_PROPS; Δp_suction = 0.0, Tc = design.Tc)
-    return (u = sol.u, Te = v.es.twophase_region.Tcl, Tc = design.Tc, p...)
+    return (u = u, Te = v.es.twophase_region.Tcl, Tc = design.Tc, p...)
 end
 
 """
