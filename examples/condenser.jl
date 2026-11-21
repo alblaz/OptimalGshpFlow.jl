@@ -6,8 +6,8 @@ the evaporator. The refrigerant inlet is the compressor discharge at the design 
 (dew temperature `DESIGN.Te`, superheat `ΔTSUP`, `refrigerant_design` displacement, ηis). The
 condensing pressure is the solution (not fixed at 40 °C as in the study): for a blend it shows where
 bubble and dew temperatures actually fall against the water, i.e. which condenser convention of
-step 5h (`:bubble`, `:midpoint`, `:dew`) the water side supports. Not coupled to the evaporator yet
-(step 9d).
+step 5h (`:bubble`, `:midpoint`, `:dew`) the water side supports. The closed cycle (step 9d):
+`examples/cycle.jl`.
 
 Usage:
     include("examples/condenser.jl")
@@ -39,11 +39,16 @@ function condenser_system(r, m, h_in; Tw_in = TW_IN, Vs = CONDENSER_DESIGN.Vs)
     cond = Condenser(; refrigerant = r, secondaryfluid = WATER, plateheatexchanger = CPHX, Vs = Vs,
                      Qscale = CONDENSER_DESIGN.Q1)
     return ComponentSystem((condenser = cond,); nodes = (Tw_in = (:condenser => :Tw_in,), Tw_out = (:condenser => :Tw_out,),
-            m = (:condenser => :m,), h_in = (:condenser => :h_in,)), fixed = (Tw_in = Tw_in, m = m, h_in = h_in))
+            m = (:condenser => :m,), h_in = (:condenser => :h_in,), pc = (:condenser => :pc,), h_out = (:condenser => :h_out,)),
+            fixed = (Tw_in = Tw_in, m = m, h_in = h_in))
 end
 
-condenser_guess(S, Q) = initial_guess(S; condenser = (Tc = TCOND, Qd = 0.15Q, Qc = 0.85Q, Tw_m = TW_OUT - 0.5),
-                                      nodes = (Tw_out = TW_OUT,))
+function condenser_guess(S, Q)
+    r = S.components.condenser.refrigerant
+    pc = OptimalGshpFlow._p_dew(r, TCOND)
+    return initial_guess(S; condenser = (Qd = 0.15Q, Qc = 0.85Q, Tw_m = TW_OUT - 0.5),
+                         nodes = (Tw_out = TW_OUT, pc = pc, h_out = h_bubble(r, pc)))
+end
 
 # one condenser solution: temperatures and zone quantities
 function condenser_point(r, m, h_in; Tw_in = TW_IN, u0 = nothing)
@@ -53,7 +58,7 @@ function condenser_point(r, m, h_in; Tw_in = TW_IN, u0 = nothing)
     x = physical(S, sol.u).condenser
     pv = port_values(S, sol.u, :condenser)
     z = condenser_zones(S.components.condenser, x, pv)
-    return (u = sol.u, pc = x.pc, Td = z.Td, Tb = z.Tb, Tdis = z.Tdis, Tw_in = pv.Tw_in, Tw_out = pv.Tw_out, Tw_m = x.Tw_m,
+    return (u = sol.u, pc = pv.pc, Td = z.Td, Tb = z.Tb, Tdis = z.Tdis, Tw_in = pv.Tw_in, Tw_out = pv.Tw_out, Tw_m = x.Tw_m,
             xd = x.xd, Qd = x.Qd, Qc = x.Qc, U_c = z.condensation.U, h_c = z.condensation.h_ref, φ = z.condensation.φ,
             G = OptimalGshpFlow.channel_mass_flux(CPHX, m), issues = String[i.message for i in validity_issues(S, sol.u)])
 end

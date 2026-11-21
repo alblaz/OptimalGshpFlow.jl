@@ -1,6 +1,6 @@
 # Development roadmap and status
 
-Last updated: 2026-11-20 (feature/condenser, PR).
+Last updated: 2026-11-21 (feature/cycle, handoff).
 
 ## Goal
 Upgrade the steady-state heat-pump model, one feature at a time:
@@ -42,7 +42,7 @@ unconstrained solvers can be used.
 | B12 | `fix/initial-guess-inference` | `initial_guess` looped over the blocks: with four component types (closed cycle, 9d) the block widened to an abstract type and `guess` was inferred on `Any` (Clapeyron): 564 s first call; now recursion over the tuples, 0.3 s | merged (#68) |
 | B14 | `fix/component-loops-inference` | same widening as B12 in `validity_issues` (loop over the blocks), `port_values` (runtime position in the block tuple) and `physical` (`_drop_empty` recursion: inference gives up from three entries): with four components (closed cycle) the post-processing of a blend was inferred on `Any` and never finished; recursion, name in the type (`Val`), generated `_drop_empty` | merged (#70) |
 | B15 | `perf/entropyscaling-barrier` | EntropyScaling transport of blends inferred `Any`: through the superheat Δp (`Δp_suction`) it reached the compression, and `evaluate` of the open study (R454C) was inferred on `Any` with Clapeyron (no result in 30 min; 0.7 s with the barrier). Type assertion as `T_ph`. First blend solve unchanged (58.5 vs 59.5 s): the 70–85 s first call is not this | merged (#71) |
-| B16 | `fix/node-transforms-inference` | `ComponentSystem` collected the node transforms in a `Vector` by port name: with transforms of different types (closed cycle: `LogBox`, `Linear`, `Above`, `Free`) the system built inside a function had an abstract type (`NTuple{11, Any}`), and everything called with it (`set_fixed`, Newton, post-processing) was inferred on it, Clapeyron included: `compare_cycle(r454c)` never started (9d handoff). Now a small lookup constant-propagated from the literal `nodes`, forced with `@constprop :aggressive` on the constructor (by default not propagated for the cycle) | PR #72 |
+| B16 | `fix/node-transforms-inference` | `ComponentSystem` collected the node transforms in a `Vector` by port name: with transforms of different types (closed cycle: `LogBox`, `Linear`, `Above`, `Free`) the system built inside a function had an abstract type (`NTuple{11, Any}`), and everything called with it (`set_fixed`, Newton, post-processing) was inferred on it, Clapeyron included: `compare_cycle(r454c)` never started (9d handoff). Now a small lookup constant-propagated from the literal `nodes`, forced with `@constprop :aggressive` on the constructor (by default not propagated for the cycle) | merged (#72); not enough on Julia 1.10 (CI min): `heatpump_cycle` passes its node transforms by field access (`_with_nodetransforms`, in #73) |
 | 6f | `feature/gnielinski-default` | `GnielinskiTransition()` as the default transition model (heat transfer; friction unchanged) | merged (#50) |
 | 4b | `feature/pump-power` | pump-power helper in the library: `pressure_drop`/`pumping_power` of an `EvaporatorSolution` or `BoreholeSolution` (open item 4) | merged (#51) |
 | 5a | `feature/refrigerant-pressure-drop` | refrigerant-side Δp in the BPHE: Amalfi 2016 and Longo-type fits (friction), acceleration, gravity, ports, vapour zone; `surface_tension`, spline `ρ_bubble`. No model change (design: `docs/dev/glide.md`) | merged (#55) |
@@ -57,7 +57,7 @@ unconstrained solvers can be used.
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
 | 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
-| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links | planned |
+| 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | PR (results below) |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
 | 7 | `spike/mtk` | how much ModelingToolkit integration is worthwhile | |
@@ -986,7 +986,8 @@ Decisions (user, 2026-11-20):
 - Closed cycle: the condenser is a component, the condensing pressure an unknown set by the water
   side, `hei` from the condenser outlet. Expansion valve: isenthalpic, superheat set by `ΔTsup`
   (as now). Compressor: fixed displacement and isentropic efficiency (as now); a better compressor
-  model is of interest, later.
+  model is of interest, later: volumetric efficiency (mass flow below ρ_suc × displacement), and
+  for speed-modulating compressors the inverter efficiency (user, 2026-11-20).
 - Water side: floor heating 30 → 35 °C at design (for now); Wanniarachchi. Geometry: the plate
   type of the evaporator, area from a condenser analogue of `EvaporatorDesign`.
 Tools checked: saturated-liquid ρ, h available; μ_L, λ_L, cp_L work (CoolProp for pure fluids,
@@ -1088,3 +1089,77 @@ the ILS radius item of 8b is fixed with it.
   stagnant water (0.57) conducts less than the grout (2), and the smaller ID raises the pump power
   (Re +7 % at the same flow helps the heat transfer). Natural convection in the groundwater would
   lower Rb: a candidate for step 10 (borehole sizing).
+
+## `feature/cycle` (9d, 2026-11-20)
+Closed cycle as one `ComponentSystem` (design agreed with the user, 2026-11-20): links are ports
+with residuals in the component that computes them; the isenthalpic valve is a shared node.
+- `src/components/cycle.jl`: `CyclePorts(r)` (transforms of the refrigerant-loop ports, the same in
+  every component of a refrigerant: pressure `LogBox` over `pressure_bounds`, enthalpy
+  `Linear(h_bubble, Δh_lv)` at 0 °C, mass flow `Above(0, 1)` (log scale); residual scales);
+  `Compressor(; refrigerant, ηis, ξ, Δp_suction)` (ports `p_suc`, `T_suc`, `m`, `pc`, `h_dis`; one
+  residual), `compression_state` (property interface, AD-able; spline: `vapour_h_ps`, Newton on
+  `s_pT`), `compressor_power(c::Compressor, p)`.
+- `Evaporator(…; hei = nothing, hei_nominal)`: ports `hei` (in), `p_suc`, `T_suc`, `m` (out, three
+  residuals). Dispatch on the `cycleports` field: a method on `Evaporator{…, Nothing}` was not taken
+  as more specific than `ports(::Evaporator)` (constrained type variable `H <: Union{Nothing, T}`).
+- `Condenser`: `pc` is now a port (was an internal unknown), new port `h_out` (`h_bubble(pc)`).
+- `src/components/heatpump.jl`: `heatpump_cycle(; evaporator, compressor, condenser, borehole,
+  Tb, Tw_in)` (nodes `T_cold`, `T_warm`, `Tb`, `p_suc`, `T_suc`, `m`, `pc`, `h_dis`,
+  `h_liq`, `Tw_in`, `Tw_out`; 19 unknowns), `heatpump_guess(sys; Te, Tc, T_cold, T_warm, Tw_out)`.
+- `test/cycle.jl` (16 tests, spline R290, `newton_solve`): energy balance to 1e-10, W and Q1 equal the
+  open-cycle post-processing (`compressor_condenser_power`, CoolProp compression) within 1e-7.
+- R290 spline, old study borehole (before B13), Tb 8 °C, water 30 °C in: Te −1.37 °C, condensation 41.1 °C, Tdis 59.7 °C, water out
+  34.80 °C, Q2 5703 W, W 1753 W, Q1 7334 W, COP1 (no pumps) 4.18. 6 Newton steps from the guess;
+  residual 19 µs, second solve 5 ms; `residual!` inferred, JET clean except a pre-existing runtime
+  dispatch in `uniform_Tb_coeffs` (keyword call of `h_circularpipe` with an abstract `transition`):
+  separate fix.
+- `heatpump_guess` first call took 564 s (Clapeyron R290): `initial_guess` inferred `guess` on
+  `Any` with four component types; fixed in B12 (#68), now 0.3 s; first closed-cycle solve 19 s.
+
+### 9d handoff (2026-11-21)
+State: `feature/cycle` pushed (not a PR). It contains the 9d work and merges of the open PRs #70 (B14)
+and #71 (B15); after they are merged into main, merge main into it.
+- Closed cycle works for R290 and R454C (`cycle_newton` in `examples/cycle.jl`: plain Newton, fixed
+  ForwardDiff tag; R454C 5 iterations, 77 s first call incl. compilation). `cycle_point` R454C 0.07 s.
+- R290 results (reference borehole, water 30 °C in, design brine flow), closed vs open (Tc = 40 °C):
+  | Tb | Te | T_cond | Tdis | Tw_out | Q1 | W | COP1 closed | open |
+  |---|---|---|---|---|---|---|---|---|
+  | 8 | −1.25 | 41.20 | 59.8 | 34.83 | 7356 | 1757 | 4.006 | 4.110 (+2.6 %) |
+  | 0 | −9.05 | 39.49 | 61.5 | 33.93 | 5976 | 1645 | 3.452 | 3.418 (−1.0 %) |
+  | −5 | −13.20 | 39.75 | 64.0 | 33.48 | 5304 | 1601 | 3.093 | 3.079 (−0.5 %) |
+  To check: T_cond rises from 0 to −5 °C while Q1 falls (Longo gravity/forced transition at lower G?).
+- Resolved (2026-11-21): `compare_cycle(r454c)` hung in inference for two reasons. (1) B16 (#72):
+  the closed-cycle system type was abstract when built inside a function (node transforms in a
+  `Vector`), so `set_fixed`, `cycle_newton` and `cycle_point` were inferred on it; fixed in
+  `ComponentSystem` (`@constprop :aggressive`; on Julia 1.10 constant propagation still fails, so
+  `heatpump_cycle` passes its transforms with `_with_nodetransforms`), locked by `@inferred
+  heatpump_cycle` in `test/cycle.jl` (checked on 1.10 and 1.13). (2) `open_point` passed `sol.u` of `solve(NonlinearProblem…)` (not inferred) to
+  `evaluate`/`performance`: inference of `open_point(R454C)` > 13 min, 4.8 s with a
+  `convert(Vector{Float64}, sol.u)::Vector{Float64}` barrier (as the extension's `_solve`).
+  `refrigerant_design` was fine. Not rechecked: whether the 30-min `solve` of the blend closed cycle
+  (reason for `cycle_newton`) was B16 too.
+- Results (`compare_cycle`, R290 31 s, R454C 135 s incl. compilation; open cycle COP1 and Δ vs closed):
+  | | Tb | Te | T_bub | T_dew | Tdis | Tw_out | Q1 | W | COP1 closed | bubble | midpoint | dew |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | R290 | 8 | −1.25 | 41.20 | 41.20 | 59.8 | 34.83 | 7356 | 1757 | 4.006 | | 4.110 (+2.6 %) | |
+  | R290 | 0 | −9.05 | 39.49 | 39.49 | 61.5 | 33.93 | 5976 | 1645 | 3.452 | | 3.418 (−1.0 %) | |
+  | R290 | −5 | −13.20 | 39.75 | 39.75 | 64.0 | 33.48 | 5304 | 1601 | 3.093 | | 3.079 (−0.5 %) | |
+  | R454C | 8 | −0.40 | 39.84 | 46.50 | 67.3 | 35.04 | 7671 | 2064 | 3.579 | 3.547 (−0.9 %) | 3.823 (+6.8 %) | 4.151 (+16.0 %) |
+  | R454C | 0 | −8.18 | 37.77 | 44.52 | 68.6 | 34.02 | 6114 | 1861 | 3.142 | 3.011 (−4.2 %) | 3.209 (+2.1 %) | 3.439 (+9.4 %) |
+  | R454C | −5 | −12.42 | 36.76 | 43.55 | 69.6 | 33.53 | 5371 | 1742 | 2.895 | 2.741 (−5.3 %) | 2.902 (+0.3 %) | 3.088 (+6.7 %) |
+  Open-cycle Tc: bubble 40.00, midpoint 36.60, dew 33.05 °C. Closed cycle R454C vs R290: COP1
+  −10.7 / −9.0 / −6.4 %, Q1 +4.3 / +2.3 / +1.3 % (Tb 8 / 0 / −5 °C).
+  - With the water side, R454C condenses with bubble 37–40 °C, dew 44–46 °C. No fixed convention
+    fits the whole range: bubble is closest at 8 °C (−0.9 %) and drifts to −5.3 % at −5 °C, midpoint
+    goes from +6.8 % to +0.3 %, dew overestimates throughout (+7 to +16 %). The open-study
+    blend comparison (5h, midpoint) favoured R454C by up to 7 % at warm ground; in the closed cycle
+    R454C is 6–11 % below R290 in COP1.
+  - Still to check: T_cond (R290) rises from 0 to −5 °C while Q1 falls (also the R454C bubble from
+    0 to −5 °C falls only 1 K): Longo gravity/forced transition at lower G?
+- Lessons (inference with 4 components / blends): B12, B14, B15, B16 were all "abstract type reaches
+  Clapeyron mixture code" (minutes to hours of compilation, looks like a hang). Before a long run,
+  check the entry points with `Base.return_types`/`@inferred`; log progress to a file
+  (`compare_cycle(r; log = io)`) and follow it with a monitor (never delete a file Julia has open).
+  Stopping an MCP call does not stop Julia: `julia_restart` the session (or the process keeps running).
+  Open the log in its own call: `open(log) do io … end` around the runs compiles the whole closure
+  first, and the log stays empty during compilation (looks like a hang).

@@ -16,20 +16,22 @@
     @test d.A ≈ Q1 / (2000 * ΔTlm) && d.Vs ≈ Q1 / (water.ρ(305.65) * water.cp(305.65) * 5)
     phx = PlateHeatExchanger(d.A, 0.5, 0.15; b = 0.002, ϕ = 1.189, β = 30.)
     cond = Condenser(; refrigerant = r, secondaryfluid = water, plateheatexchanger = phx, Vs = d.Vs, Qscale = Q1)
-    @test keys(unknowns(cond)) == (:pc, :Qd, :Qc, :xd, :Tw_m) && keys(ports(cond)) == (:Tw_in, :Tw_out, :m, :h_in)
+    @test keys(unknowns(cond)) == (:Qd, :Qc, :xd, :Tw_m) && keys(ports(cond)) == (:Tw_in, :Tw_out, :m, :h_in, :pc, :h_out)
     S = ComponentSystem((condenser = cond,); nodes = (Tw_in = (:condenser => :Tw_in,), Tw_out = (:condenser => :Tw_out,),
-            m = (:condenser => :m,), h_in = (:condenser => :h_in,)), fixed = (Tw_in = 303.15, m = m, h_in = h_in))
-    u0 = initial_guess(S; condenser = (Tc = 313.15, Qd = 0.15Q1, Qc = 0.85Q1, Tw_m = 307.), nodes = (Tw_out = 308.15,))
-    # shared-tag Newton (a NonlinearProblem compiles NonlinearSolve again for this system: +4 s);
-    # six unknowns, below the shared chunk size
-    u, its = newton_solve((du, u) -> OptimalGshpFlow.residual!(du, u, S), u0; tol = 1e-11, chunk = ForwardDiff.Chunk{6}())
+            m = (:condenser => :m,), h_in = (:condenser => :h_in,), pc = (:condenser => :pc,), h_out = (:condenser => :h_out,)),
+            fixed = (Tw_in = 303.15, m = m, h_in = h_in))
+    u0 = initial_guess(S; condenser = (Qd = 0.15Q1, Qc = 0.85Q1, Tw_m = 307.),
+                       nodes = (Tw_out = 308.15, pc = pc0, h_out = h_bubble(r, pc0)))
+    # shared-tag Newton (a NonlinearProblem compiles NonlinearSolve again for this system: +4 s)
+    u, its = newton_solve((du, u) -> OptimalGshpFlow.residual!(du, u, S), u0; tol = 1e-11)
     @test its > 0
     x = physical(S, u).condenser
     pv = port_values(S, u, :condenser)
     z = condenser_zones(cond, x, pv)
     # energy: refrigerant from the discharge to saturated liquid, water 30 → ≈ 35 °C
-    @test x.Qd + x.Qc ≈ m * (h_in - h_bubble(r, x.pc)) rtol = 1e-9
-    @test x.Qd ≈ m * (h_in - h_dew(r, x.pc)) rtol = 1e-9
+    @test x.Qd + x.Qc ≈ m * (h_in - h_bubble(r, pv.pc)) rtol = 1e-9
+    @test x.Qd ≈ m * (h_in - h_dew(r, pv.pc)) rtol = 1e-9
+    @test pv.h_out ≈ h_bubble(r, pv.pc) rtol = 1e-12
     @test 308.0 < pv.Tw_out < 308.3
     @test 313.15 < z.Td < 316.15                                     # sized for 40 °C at U = 2000
     @test z.Tdis > z.Td > x.Tw_m > pv.Tw_in && 0 < x.xd < 0.5
