@@ -23,13 +23,14 @@ include(joinpath(@__DIR__, "condenser.jl"))
 const TBS_CYCLE = 273.15 .+ (8.0, 0.0, -5.0)
 
 # closed cycle of the refrigerant `r` (same machine as the open study: `refrigerant_design(r)`)
-function cycle_system(r; Vf = 1.0, Tb = TB, Tw_in = TW_IN, design = refrigerant_design(r), sf = BRINE_PROPS)
+function cycle_system(r; Vf = 1.0, Tb = TB, Tw_in = TW_IN, design = refrigerant_design(r), sf = BRINE_PROPS,
+                      condensation = Longo2010())
     Vs = Vf * DESIGN.Vs
     evap = Evaporator(refrigerant = r, secondaryfluid = sf, plateheatexchanger = PHX, hei = nothing,
                       hei_nominal = design.hei, Vs = Vs, Vref = design.Vref, ΔTsup = ΔTSUP)
     comp = Compressor(refrigerant = r, ηis = ηIS)
     cond = Condenser(refrigerant = r, secondaryfluid = WATER, plateheatexchanger = CPHX, Vs = CONDENSER_DESIGN.Vs,
-                     Qscale = CONDENSER_DESIGN.Q1)
+                     Qscale = CONDENSER_DESIGN.Q1, condensation = condensation)
     bhx = BoreholeHX(borehole = BOREHOLE, secondaryfluid = sf, Vs = Vs, λground = λGROUND)
     return heatpump_cycle(evaporator = evap, compressor = comp, condenser = cond, borehole = bhx, Tb = Tb, Tw_in = Tw_in)
 end
