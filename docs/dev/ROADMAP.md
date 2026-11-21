@@ -53,10 +53,10 @@ unconstrained solvers can be used.
 | 5f | `feature/blend-pressure-drop` | refrigerant Δp for blends (Amalfi default for all refrigerants): inlet at `T_ph(pe + Δp, hei)`, saturation shift in γ, glide in φ; blend surface tension (mole-fraction average) | merged (#61) |
 | 5g | `feature/blend-boiling-htc` | nucleate boiling of blends: Thome & Shakir (1987) factor on Cooper (`mixture_boiling_factor`); R454C: h_ref −17…−23 %, capacity −0.6…−1.7 % | merged (#62) |
 | 5h | `feature/blend-optimal-flow` | R454C in the optimal-flow study (same machine size as R290); condenser convention for blends (`:bubble`, `:midpoint` default, `:dew`) | merged (#63) |
-| 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | in progress |
+| 9 | condenser and closed cycle | condenser on the water side (counter-flow, glide matching, as the evaporator): the fair blend comparison; plan and decisions below (9a–9d) | done |
 | 9a | `feature/saturated-liquid-properties` | `cp_bubble`, `μ_bubble`, `λ_bubble` (Clapeyron pure/blend, spline via CoolProp) | merged (#64) |
 | 9b | `feature/condensation-htc` | Longo 2010: Nusselt film (gravity) / Akers (forced convection), C¹ blend on Re_eq (Longo's criterion); Silver–Bell–Ghaly for blends | merged (#65) |
-| 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | PR #66 |
+| 9c | `feature/condenser` | `Condenser` component: desuperheating + condensation, saturated liquid out; water side; `condenser_design`; `examples/condenser.jl` | merged (#66) |
 | 9d | `feature/cycle` | closed cycle: condensing pressure an unknown, `hei` from the condenser, compressor and expansion valve as links (`heatpump_cycle`, `Compressor`); `examples/cycle.jl` | merged (#73; results below) |
 | 10 | `feature/borehole-sizing` | borehole and collector sizing: hydraulic vs thermal optimum over borehole diameter, collector diameter/SDR and depth (larger holes and pipes for deep boreholes: lower linear losses, different Rb and flow regime), with the optimal flow; natural convection in groundwater-filled holes (Gustafsson & Westerlund; Spitler et al. 2016) | planned (user, 2026-11-20) |
 | 6b | `feature/zone-switching` | zone appearance/collapse (Bell 2015 bounded-Q algorithm, Bonilla switching): needed for the condenser / R744 gas cooler or another expansion-valve control | deferred (cycle closure) |
@@ -67,6 +67,19 @@ unconstrained solvers can be used.
 
 B4 (fixed in step 3): the pressure was mapped onto `(pr_min, pcrit)`, i.e. the reduced pressure
 `pr_min` read as Pa (1e-2 Pa) instead of a pressure.
+
+## Next steps (2026-11-21)
+Step 9 (condenser, closed cycle) done. In order (user, 2026-11-21):
+1. Done: NonlinearSolve on the closed cycle (`feature/cycle-nonlinearsolve`); cost of the three
+   systems measured (`examples/system_timing.jl`).
+2. Optimal brine flow with the closed cycle (`study_tb` redone on `heatpump_cycle`): does the
+   optimum or its shift with Tb change? Open cycle error vs closed depends on Tb (R290 −1…+2.6 %).
+3. Step 10 (borehole sizing), from the closed-cycle optimum.
+Smaller: R290 condensing temperature rises from Tb 0 to −5 °C while Q1 falls (Longo 2010
+gravity/forced transition at low G?); runtime dispatch in `uniform_Tb_coeffs` (keyword call of
+`h_circularpipe` with an abstract `transition`); remove `_with_nodetransforms` when CI min > 1.10
+(B16). Still open from the list below: Longo 2012, blend first-call compile, compressor model
+(volumetric/inverter efficiency), suction line, 6b/7/8.
 
 ## Next steps (handoff 2026-11-19)
 Done in the last sessions: Tb sweep and season (ILS ground, `UniformLoadHistory`), Gnielinski C¹
@@ -1136,8 +1149,9 @@ and #71 (B15); after they are merged into main, merge main into it.
   heatpump_cycle` in `test/cycle.jl` (checked on 1.10 and 1.13). (2) `open_point` passed `sol.u` of `solve(NonlinearProblem…)` (not inferred) to
   `evaluate`/`performance`: inference of `open_point(R454C)` > 13 min, 4.8 s with a
   `convert(Vector{Float64}, sol.u)::Vector{Float64}` barrier (as the extension's `_solve`).
-  `refrigerant_design` was fine. Not rechecked: whether the 30-min `solve` of the blend closed cycle
-  (reason for `cycle_newton`) was B16 too.
+  `refrigerant_design` was fine. The 30-min `solve` of the blend closed cycle (reason for
+  `cycle_newton`) was B16 too: NonlinearSolve works now, `cycle_newton` replaced by `cycle_solve`
+  (`feature/cycle-nonlinearsolve`, below).
 - Results (`compare_cycle`, R290 31 s, R454C 135 s incl. compilation; open cycle COP1 and Δ vs closed):
   | | Tb | Te | T_bub | T_dew | Tdis | Tw_out | Q1 | W | COP1 closed | bubble | midpoint | dew |
   |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1163,3 +1177,32 @@ and #71 (B15); after they are merged into main, merge main into it.
   Stopping an MCP call does not stop Julia: `julia_restart` the session (or the process keeps running).
   Open the log in its own call: `open(log) do io … end` around the runs compiles the whole closure
   first, and the log stays empty during compilation (looks like a hang).
+
+## `feature/cycle-nonlinearsolve` (2026-11-21)
+NonlinearSolve solves the closed cycle for both refrigerants (`TrustRegion` and `NewtonRaphson`):
+the 30-min hang that motivated the plain Newton of `examples/cycle.jl` was B16. `cycle_newton`
+replaced by `cycle_solve` (NonlinearSolve, results through barriers: `solve` is inferred as `Any`,
+and its `u` passed on would infer the post-processing on it); `compare_cycle` results identical
+(R290 29 s, R454C 141 s, fresh session, compilation included).
+
+Cost of the three systems (`examples/system_timing.jl`; Tb −5 °C, design brine flow, standalone
+evaporator at the warm brine of the evaporator + borehole solution; Clapeyron properties,
+`TrustRegion` from the example guesses, Julia 1.13, Apple silicon). First call in this order, in a
+fresh session per refrigerant: each row includes only the compilation not done by the rows above.
+| | system | n | its | first call (s) | residual | warm solve |
+|---|---|---|---|---|---|---|
+| R290 | evaporator | 7 | 11 | 7.9 | 26 µs | 3.2 ms |
+| R290 | evaporator + borehole | 8 | 6 | 3.5 | 26 µs | 3.1 ms |
+| R290 | closed cycle | 19 | 8 | 11.8 | 146 µs | 24 ms |
+| R290 | closed cycle, `NewtonRaphson` | 19 | 8 | 8.0 | 144 µs | 24 ms |
+| R454C | evaporator | 7 | 17 | 40.6 | 1.56 ms | 238 ms |
+| R454C | evaporator + borehole | 8 | 7 | 10.4 | 1.58 ms | 154 ms |
+| R454C | closed cycle | 19 | 8 | 39.2 | 3.97 ms | 674 ms |
+| R454C | closed cycle, `NewtonRaphson` | 19 | 7 | 31.0 | 4.12 ms | 569 ms |
+- Closed cycle vs the study's evaporator + borehole: residual ×5.7 (R290) / ×2.5 (R454C), warm
+  solve ×8 / ×4.4 (19 unknowns instead of 8: compressor and condenser).
+- The blend costs ×60 (evaporator) / ×27 (cycle) per residual (Clapeyron mixture properties): it
+  dominates. A closed-cycle optimal-flow grid (39 flows × 15 Tb, warm starts) ≈ 15 s for R290,
+  ≈ 7 min for R454C.
+- From the evaporator guess at Tb −5 °C `NewtonRaphson` diverged (42 iterations), `TrustRegion`
+  converged: keep `TrustRegion` as the default.
