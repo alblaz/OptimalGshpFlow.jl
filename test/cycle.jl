@@ -20,7 +20,9 @@
                      Vs = cd.Vs, Qscale = 7641.0)
     bhx = BoreholeHX(borehole = SingleUPipeBorehole(H = 200., D = 4., λg = 3., pipe_position = ((0.04, 0.), (-0.04, 0.))),
                      secondaryfluid = brine, Vs = ev.Vs, λground = 3.)
-    S = heatpump_cycle(evaporator = evap, compressor = comp, condenser = cond, borehole = bhx, Tb = 281.15, Tw_in = 303.15)
+    # concrete system type (mixed node transforms; abstract before B16: everything solved with it
+    # was inferred on an abstract type, Clapeyron included)
+    S = @inferred heatpump_cycle(evaporator = evap, compressor = comp, condenser = cond, borehole = bhx, Tb = 281.15, Tw_in = 303.15)
     @test length(S) == 19
     u0 = heatpump_guess(S; Te = 273.15, Tc = 313.15, T_cold = 275., T_warm = 278., Tw_out = 308.15)
     u, its = newton_solve((du, u) -> OptimalGshpFlow.residual!(du, u, S), u0; tol = 1e-11)
