@@ -7,7 +7,7 @@ current cycle). ε-NTU in each zone, as the evaporator.
 
 """
     Condenser(; refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale,
-              condensation = Longo2010())
+              condensation = LongoJH())
 
 Two-zone (desuperheating + condensation) moving-boundary plate condenser; the water (secondary
 fluid, volume flow `Vs`) flows against the refrigerant. The refrigerant leaves as saturated
@@ -25,7 +25,7 @@ liquid.
   the counter-flow ε-NTU relation ([`effectiveness_counterflow`](@ref); desuperheating with the
   capacity ratio of the vapour, condensation with `φ` for the glide of a blend); and
   `h_out − h_bubble(pc)` (scaled by the latent heat).
-- U values: condensation [`condensation_htc`](@ref) (`condensation`, default [`Longo2010`](@ref),
+- U values: condensation [`condensation_htc`](@ref) (`condensation`, default [`LongoJH`](@ref),
   over the zone length) in series with the water (Wanniarachchi); desuperheating: vapour and water
   both with Wanniarachchi. No refrigerant pressure drop.
 
@@ -44,7 +44,7 @@ struct Condenser{R <: AbstractRefrigerant, P <: PlateHeatExchanger, T <: Real, S
     cycleports::X
 end
 
-function Condenser(; refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation::CondensationModel = Longo2010())
+function Condenser(; refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation::CondensationModel = LongoJH())
     Vs, Qscale = promote(float(Vs), float(Qscale))
     return Condenser(refrigerant, secondaryfluid, plateheatexchanger, Vs, Qscale, condensation, CyclePorts(refrigerant))
 end
