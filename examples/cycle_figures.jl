@@ -142,6 +142,23 @@ function panel_ph!(gp, st)
     return ax
 end
 
+# value of the profile `T(a)` at the area fraction `x` (linear interpolation, `a` increasing)
+function profile_at(a, T, x)
+    i = clamp(searchsortedlast(a, x), 1, length(a) - 1)
+    w = (x - a[i]) / (a[i + 1] - a[i])
+    return (1 - w) * T[i] + w * T[i + 1]
+end
+
+# arrows along a temperature profile in the flow direction (`dir = 1`: inlet at a = 0, `-1`: at a = 1)
+function flow_arrows!(ax, a, T, dir; color, at = (0.2, 0.5, 0.8), δ = 0.025)
+    for x in at
+        a0, a1 = x - dir * δ, x + dir * δ
+        p0 = Point2f(a0, profile_at(a, T, a0) - C2K)
+        p1 = Point2f(a1, profile_at(a, T, a1) - C2K)
+        arrows2d!(ax, [p0], [p1 - p0]; color = color, tiplength = 11, tipwidth = 11, shaftwidth = 2, align = :center)
+    end
+end
+
 function panel_profiles!(gp, st)
     g = GridLayout(gp)
     ae = Axis(g[1, 1]; xlabel = "area fraction (refrigerant inlet → outlet)", ylabel = "temperature [°C]",
@@ -156,6 +173,11 @@ function panel_profiles!(gp, st)
     lines!(ac, c.a, c.Tw .- C2K; color = COLORS.water, linewidth = 2, label = "water")
     lines!(ac, c.a, c.Tr .- C2K; color = COLORS.ref, linewidth = 2, label = "refrigerant")
     vlines!(ac, [c.xd]; color = :gray, linestyle = :dash)
+    # flow directions: refrigerant from a = 0, the secondary fluid counter-flow from a = 1
+    flow_arrows!(ae, e.a, e.Ts, -1; color = COLORS.brine)
+    flow_arrows!(ae, e.a, e.Tr, 1; color = COLORS.ref)
+    flow_arrows!(ac, c.a, c.Tw, -1; color = COLORS.water)
+    flow_arrows!(ac, c.a, c.Tr, 1; color = COLORS.ref)
     # zone labels in data coordinates of the area fraction
     text!(ae, (1 + e.xs) / 2, minimum(e.Tr) - C2K; text = "superheat", align = (:center, :bottom), fontsize = 10)
     text!(ac, c.xd / 2, minimum(c.Tw) - C2K; text = "desuper-\nheating", align = (:center, :bottom), fontsize = 10)
